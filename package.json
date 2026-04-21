@@ -1,0 +1,27 @@
+{
+  "name": "resort-pro",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ResortPro – All-in-one SaaS platform for small resort owners",
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
+    "db:migrate": "pnpm --filter @resort-pro/database migrate:dev",
+    "db:seed": "pnpm --filter @resort-pro/database seed",
+    "db:studio": "pnpm --filter @resort-pro/database studio",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "turbo": "^2.1.3",
+    "prettier": "^3.3.3"
+  }
+}

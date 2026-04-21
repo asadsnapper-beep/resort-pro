@@ -1,0 +1,604 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum TenantPlan {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum UserRole {
+  OWNER
+  MANAGER
+  STAFF
+  GUEST
+}
+
+enum RoomType {
+  STANDARD
+  DELUXE
+  SUITE
+  VILLA
+  COTTAGE
+  BUNGALOW
+}
+
+enum RoomStatus {
+  AVAILABLE
+  OCCUPIED
+  MAINTENANCE
+  RESERVED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+  NO_SHOW
+}
+
+enum PaymentStatus {
+  PENDING
+  PARTIAL
+  PAID
+  REFUNDED
+  FAILED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  BANK_TRANSFER
+  STRIPE
+  OTHER
+}
+
+enum HousekeepingStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+enum HousekeepingType {
+  DAILY
+  DEEP_CLEAN
+  TURNDOWN
+  CHECKOUT
+  CHECKIN
+}
+
+enum StaffDepartment {
+  FRONT_DESK
+  HOUSEKEEPING
+  RESTAURANT
+  MAINTENANCE
+  SECURITY
+  MANAGEMENT
+}
+
+enum MenuItemCategory {
+  BREAKFAST
+  LUNCH
+  DINNER
+  APPETIZER
+  DESSERT
+  BEVERAGE
+  SPECIAL
+}
+
+enum OrderStatus {
+  PENDING
+  PREPARING
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+enum InventoryCategory {
+  LINEN
+  TOILETRIES
+  CLEANING
+  FOOD_BEVERAGE
+  MAINTENANCE
+  OFFICE
+  OTHER
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketCategory {
+  MAINTENANCE
+  HOUSEKEEPING
+  FOOD_BEVERAGE
+  BILLING
+  COMPLAINT
+  REQUEST
+  OTHER
+}
+
+enum ChatSenderType {
+  GUEST
+  STAFF
+}
+
+enum AmenityCategory {
+  POOL
+  SPA
+  GYM
+  BEACH
+  SPORTS
+  ENTERTAINMENT
+  TRANSPORT
+  OTHER
+}
+
+// ─── Core Models ──────────────────────────────────────────────────────────────
+
+model Tenant {
+  id          String     @id @default(uuid())
+  name        String
+  slug        String     @unique
+  plan        TenantPlan @default(FREE)
+  isActive    Boolean    @default(true)
+  logoUrl     String?
+  address     String?
+  phone       String?
+  email       String?
+  website     String?
+  currency    String     @default("USD")
+  timezone    String     @default("UTC")
+  checkInTime String     @default("14:00")
+  checkOutTime String    @default("11:00")
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relations
+  users            User[]
+  rooms            Room[]
+  guests           Guest[]
+  bookings         Booking[]
+  staff            Staff[]
+  housekeepingTasks HousekeepingTask[]
+  menuItems        MenuItem[]
+  foodOrders       FoodOrder[]
+  inventoryItems   InventoryItem[]
+  inventoryMovements InventoryMovement[]
+  supportTickets   SupportTicket[]
+  amenities        Amenity[]
+  websiteContent   WebsiteContent?
+  notifications    Notification[]
+  payments         Payment[]
+
+  @@map("tenants")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  tenantId     String
+  email        String
+  passwordHash String
+  firstName    String
+  lastName     String
+  role         UserRole @default(STAFF)
+  phone        String?
+  avatarUrl    String?
+  isActive     Boolean  @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staff             Staff?
+  assignedTickets   SupportTicket[]   @relation("AssignedTickets")
+  chatMessages      ChatMessage[]
+  notifications     Notification[]
+  refreshTokens     RefreshToken[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ─── Resort ───────────────────────────────────────────────────────────────────
+
+model Room {
+  id           String     @id @default(uuid())
+  tenantId     String
+  number       String
+  name         String
+  type         RoomType   @default(STANDARD)
+  status       RoomStatus @default(AVAILABLE)
+  floor        Int?
+  maxOccupancy Int        @default(2)
+  basePrice    Decimal    @db.Decimal(10, 2)
+  description  String?
+  amenities    String[]
+  images       String[]
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  // Relations
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bookings          Booking[]
+  housekeepingTasks HousekeepingTask[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId])
+  @@index([status])
+  @@map("rooms")
+}
+
+model Amenity {
+  id          String          @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?
+  category    AmenityCategory @default(OTHER)
+  icon        String?
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("amenities")
+}
+
+// ─── Guests ───────────────────────────────────────────────────────────────────
+
+model Guest {
+  id          String   @id @default(uuid())
+  tenantId    String
+  firstName   String
+  lastName    String
+  email       String
+  phone       String?
+  nationality String?
+  idType      String?
+  idNumber    String?
+  address     String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bookings       Booking[]
+  foodOrders     FoodOrder[]
+  supportTickets SupportTicket[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("guests")
+}
+
+// ─── Bookings ─────────────────────────────────────────────────────────────────
+
+model Booking {
+  id              String        @id @default(uuid())
+  tenantId        String
+  roomId          String
+  guestId         String
+  checkIn         DateTime      @db.Date
+  checkOut        DateTime      @db.Date
+  status          BookingStatus @default(PENDING)
+  paymentStatus   PaymentStatus @default(PENDING)
+  adults          Int           @default(1)
+  children        Int           @default(0)
+  totalAmount     Decimal       @db.Decimal(10, 2)
+  paidAmount      Decimal       @default(0) @db.Decimal(10, 2)
+  specialRequests String?
+  notes           String?
+  source          String        @default("DIRECT")
+  confirmationNo  String        @unique
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  room           Room            @relation(fields: [roomId], references: [id])
+  guest          Guest           @relation(fields: [guestId], references: [id])
+  payments       Payment[]
+  foodOrders     FoodOrder[]
+  supportTickets SupportTicket[]
+
+  @@index([tenantId])
+  @@index([checkIn, checkOut])
+  @@index([status])
+  @@map("bookings")
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  tenantId      String
+  bookingId     String
+  amount        Decimal       @db.Decimal(10, 2)
+  method        PaymentMethod @default(CASH)
+  status        PaymentStatus @default(PENDING)
+  reference     String?
+  stripeId      String?
+  notes         String?
+  processedAt   DateTime?
+  createdAt     DateTime      @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  booking Booking @relation(fields: [bookingId], references: [id])
+
+  @@index([tenantId])
+  @@index([bookingId])
+  @@map("payments")
+}
+
+// ─── Staff ────────────────────────────────────────────────────────────────────
+
+model Staff {
+  id         String          @id @default(uuid())
+  tenantId   String
+  userId     String          @unique
+  department StaffDepartment @default(FRONT_DESK)
+  position   String
+  phone      String?
+  hireDate   DateTime        @db.Date
+  isActive   Boolean         @default(true)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  // Relations
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  housekeepingTasks HousekeepingTask[]
+
+  @@index([tenantId])
+  @@map("staff")
+}
+
+// ─── Housekeeping ─────────────────────────────────────────────────────────────
+
+model HousekeepingTask {
+  id            String             @id @default(uuid())
+  tenantId      String
+  roomId        String
+  assignedToId  String?
+  type          HousekeepingType   @default(DAILY)
+  status        HousekeepingStatus @default(PENDING)
+  scheduledDate DateTime           @db.Date
+  completedAt   DateTime?
+  notes         String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  // Relations
+  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  room       Room   @relation(fields: [roomId], references: [id])
+  assignedTo Staff? @relation(fields: [assignedToId], references: [id])
+
+  @@index([tenantId])
+  @@index([scheduledDate])
+  @@index([status])
+  @@map("housekeeping_tasks")
+}
+
+// ─── Restaurant / F&B ────────────────────────────────────────────────────────
+
+model MenuItem {
+  id          String           @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?
+  category    MenuItemCategory @default(SPECIAL)
+  price       Decimal          @db.Decimal(10, 2)
+  isAvailable Boolean          @default(true)
+  image       String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orderItems FoodOrderItem[]
+
+  @@index([tenantId])
+  @@map("menu_items")
+}
+
+model FoodOrder {
+  id          String      @id @default(uuid())
+  tenantId    String
+  bookingId   String?
+  guestId     String?
+  tableNumber String?
+  status      OrderStatus @default(PENDING)
+  totalAmount Decimal     @db.Decimal(10, 2)
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  booking Booking?        @relation(fields: [bookingId], references: [id])
+  guest   Guest?          @relation(fields: [guestId], references: [id])
+  items   FoodOrderItem[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("food_orders")
+}
+
+model FoodOrderItem {
+  id         String  @id @default(uuid())
+  orderId    String
+  menuItemId String
+  quantity   Int
+  unitPrice  Decimal @db.Decimal(10, 2)
+  notes      String?
+
+  order    FoodOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem MenuItem  @relation(fields: [menuItemId], references: [id])
+
+  @@map("food_order_items")
+}
+
+// ─── Inventory ────────────────────────────────────────────────────────────────
+
+model InventoryItem {
+  id           String            @id @default(uuid())
+  tenantId     String
+  name         String
+  category     InventoryCategory @default(OTHER)
+  unit         String
+  currentStock Decimal           @db.Decimal(10, 2)
+  minimumStock Decimal           @db.Decimal(10, 2)
+  unitCost     Decimal           @db.Decimal(10, 2)
+  supplier     String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  tenant    Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  movements InventoryMovement[]
+
+  @@index([tenantId])
+  @@map("inventory_items")
+}
+
+model InventoryMovement {
+  id              String   @id @default(uuid())
+  tenantId        String
+  inventoryItemId String
+  quantity        Decimal  @db.Decimal(10, 2)
+  type            String   // IN | OUT | ADJUSTMENT
+  reason          String?
+  createdAt       DateTime @default(now())
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+
+  @@index([tenantId])
+  @@index([inventoryItemId])
+  @@map("inventory_movements")
+}
+
+// ─── Support ──────────────────────────────────────────────────────────────────
+
+model SupportTicket {
+  id           String          @id @default(uuid())
+  tenantId     String
+  guestId      String?
+  assignedToId String?
+  bookingId    String?
+  title        String
+  description  String
+  category     TicketCategory  @default(OTHER)
+  priority     TicketPriority  @default(MEDIUM)
+  status       TicketStatus    @default(OPEN)
+  resolvedAt   DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  guest       Guest?        @relation(fields: [guestId], references: [id])
+  assignedTo  User?         @relation("AssignedTickets", fields: [assignedToId], references: [id])
+  booking     Booking?      @relation(fields: [bookingId], references: [id])
+  messages    ChatMessage[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("support_tickets")
+}
+
+model ChatMessage {
+  id         String         @id @default(uuid())
+  ticketId   String
+  senderId   String
+  senderType ChatSenderType
+  message    String
+  isRead     Boolean        @default(false)
+  createdAt  DateTime       @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender User          @relation(fields: [senderId], references: [id])
+
+  @@index([ticketId])
+  @@map("chat_messages")
+}
+
+// ─── Website ──────────────────────────────────────────────────────────────────
+
+model WebsiteContent {
+  id            String   @id @default(uuid())
+  tenantId      String   @unique
+  heroTitle     String
+  heroSubtitle  String?
+  heroImage     String?
+  aboutTitle    String?
+  aboutText     String?
+  aboutImage    String?
+  galleryImages String[]
+  testimonials  Json     @default("[]")
+  seoTitle      String?
+  seoDescription String?
+  primaryColor  String   @default("#1a6b5e")
+  accentColor   String   @default("#d4a853")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("website_content")
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(uuid())
+  tenantId  String
+  userId    String
+  title     String
+  body      String
+  type      String
+  data      Json?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, userId])
+  @@index([isRead])
+  @@map("notifications")
+}

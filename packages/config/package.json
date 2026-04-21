@@ -1,0 +1,6 @@
+{
+  "name": "@resort-pro/config",
+  "version": "1.0.0",
+  "private": true,
+  "files": ["tsconfig.json", "tsconfig.base.json", "eslint.js"]
+}

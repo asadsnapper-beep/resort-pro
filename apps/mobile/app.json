@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "ResortPro",
+    "slug": "resort-pro",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1a6b5e"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.resortpro.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1a6b5e"
+      },
+      "package": "com.resortpro.app"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      ["expo-notifications", {
+        "icon": "./assets/notification-icon.png",
+        "color": "#1a6b5e"
+      }]
+    ],
+    "scheme": "resortpro",
+    "extra": {
+      "apiUrl": "http://localhost:4000",
+      "eas": { "projectId": "your-eas-project-id" }
+    }
+  }
+}
