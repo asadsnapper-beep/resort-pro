@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '@resort-pro/database';
 import { requireRole } from '../middleware/auth';
-import { ok } from '../utils/response';
+import { ok, validate } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
 
 const updateTenantSchema = z.object({

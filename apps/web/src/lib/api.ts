@@ -7,9 +7,26 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+function getAuthState() {
+  try {
+    const raw = localStorage.getItem('resort-pro-auth');
+    return raw ? JSON.parse(raw)?.state : null;
+  } catch { return null; }
+}
+
+function setAuthTokens(token: string, refreshToken: string) {
+  try {
+    const raw = localStorage.getItem('resort-pro-auth');
+    const stored = raw ? JSON.parse(raw) : { state: {}, version: 0 };
+    stored.state.token = token;
+    stored.state.refreshToken = refreshToken;
+    localStorage.setItem('resort-pro-auth', JSON.stringify(stored));
+  } catch { /* ignore */ }
+}
+
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('token');
+    const token = getAuthState()?.token;
     if (token) config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
@@ -19,18 +36,16 @@ api.interceptors.response.use(
   (res) => res,
   async (error) => {
     if (error.response?.status === 401 && typeof window !== 'undefined') {
-      const refreshToken = localStorage.getItem('refreshToken');
+      const refreshToken = getAuthState()?.refreshToken;
       if (refreshToken) {
         try {
           const res = await axios.post(`${API_URL}/api/auth/refresh`, { refreshToken });
           const { token, refreshToken: newRefresh } = res.data.data;
-          localStorage.setItem('token', token);
-          localStorage.setItem('refreshToken', newRefresh);
+          setAuthTokens(token, newRefresh);
           error.config.headers.Authorization = `Bearer ${token}`;
           return api.request(error.config);
         } catch {
-          localStorage.removeItem('token');
-          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('resort-pro-auth');
           window.location.href = '/auth/login';
         }
       }

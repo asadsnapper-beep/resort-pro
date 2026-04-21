@@ -15,7 +15,7 @@ test.describe('Authentication', () => {
     await page.getByPlaceholder('owner@yourresort.com').fill('bad@email.com');
     await page.getByPlaceholder('••••••••').fill('wrongpassword');
     await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page.getByText(/Login failed|Invalid credentials/i)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('alert').filter({ hasText: /Login failed|Invalid credentials/i })).toBeVisible({ timeout: 10000 });
   });
 
   test('register page renders correctly', async ({ page }) => {

@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import { ZodError } from 'zod';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
@@ -129,6 +130,15 @@ export async function buildApp() {
 
     if (error.statusCode === 429) {
       return reply.status(429).send({ success: false, error: error.message });
+    }
+
+    // Zod validation errors
+    if (error instanceof ZodError) {
+      return reply.status(400).send({
+        success: false,
+        error: 'Validation failed',
+        details: error.errors.map((e) => ({ field: e.path.join('.'), message: e.message })),
+      });
     }
 
     if (error.validation) {

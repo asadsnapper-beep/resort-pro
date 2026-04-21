@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '@resort-pro/database';
 import { requireAuth } from '../middleware/auth';
-import { ok } from '../utils/response';
+import { ok, validate } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
 
 const registerSchema = z.object({
@@ -41,7 +41,8 @@ export async function authRoutes(app: FastifyInstance) {
       },
     },
     handler: async (request, reply) => {
-      const body = registerSchema.parse(request.body);
+      const body = validate(registerSchema, request.body, reply);
+      if (!body) return;
 
       const existingTenant = await prisma.tenant.findUnique({ where: { slug: body.slug } });
       if (existingTenant) {
@@ -121,7 +122,8 @@ export async function authRoutes(app: FastifyInstance) {
       },
     },
     handler: async (request, reply) => {
-      const body = loginSchema.parse(request.body);
+      const body = validate(loginSchema, request.body, reply);
+      if (!body) return;
 
       const tenant = await prisma.tenant.findUnique({ where: { slug: body.slug } });
       if (!tenant || !tenant.isActive) {

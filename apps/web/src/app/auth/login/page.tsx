@@ -25,6 +25,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { setAuth } = useAuthStore();
   const [loading, setLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -32,6 +33,7 @@ export default function LoginPage() {
 
   const onSubmit = async (data: FormData) => {
     setLoading(true);
+    setLoginError(null);
     try {
       const res = await authApi.login(data);
       const { user, tenant, token, refreshToken } = res.data.data;
@@ -40,6 +42,7 @@ export default function LoginPage() {
       router.push('/dashboard');
     } catch (err: unknown) {
       const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Login failed';
+      setLoginError(message);
       toast({ title: 'Error', description: message, variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -86,6 +89,9 @@ export default function LoginPage() {
               />
               {errors.password && <p className="mt-1 text-xs text-red-400">{errors.password.message}</p>}
             </div>
+            {loginError && (
+              <p className="text-sm text-red-400 text-center" role="alert">{loginError}</p>
+            )}
             <Button type="submit" variant="gold" size="lg" className="w-full" loading={loading}>
               Sign in
             </Button>
