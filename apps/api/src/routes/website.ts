@@ -238,4 +238,110 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
       return ok(rooms);
     },
   });
+
+  // GET /site/:slug/menu — public menu (available items only)
+  app.get('/:slug/menu', {
+    schema: { tags: ['website'], summary: 'Get public menu for resort' },
+    handler: async (request, reply) => {
+      const { slug } = request.params as { slug: string };
+      const tenant = await prisma.tenant.findUnique({ where: { slug } });
+      if (!tenant || !tenant.isActive) return reply.status(404).send({ success: false, error: 'Resort not found' });
+
+      const items = await prisma.menuItem.findMany({
+        where: { tenantId: tenant.id, isAvailable: true },
+        select: { id: true, name: true, description: true, category: true, price: true, image: true },
+        orderBy: [{ category: 'asc' }, { name: 'asc' }],
+      });
+
+      return ok(items);
+    },
+  });
+
+  // POST /site/:slug/order — place a food order from the website
+  const publicOrderSchema = z.object({
+    guestName: z.string().min(1),
+    roomNumber: z.string().optional(),
+    bookingRef: z.string().optional(),
+    email: z.string().email().optional(),
+    notes: z.string().optional(),
+    items: z.array(z.object({
+      menuItemId: z.string().uuid(),
+      quantity: z.number().int().min(1),
+      notes: z.string().optional(),
+    })).min(1),
+  });
+
+  app.post('/:slug/order', {
+    schema: { tags: ['website'], summary: 'Place a food order from the public website' },
+    handler: async (request, reply) => {
+      const { slug } = request.params as { slug: string };
+      const tenant = await prisma.tenant.findUnique({ where: { slug } });
+      if (!tenant || !tenant.isActive) return reply.status(404).send({ success: false, error: 'Resort not found' });
+
+      const body = publicOrderSchema.parse(request.body);
+
+      // Find menu items and validate
+      const menuItems = await prisma.menuItem.findMany({
+        where: {
+          tenantId: tenant.id,
+          id: { in: body.items.map(i => i.menuItemId) },
+          isAvailable: true,
+        },
+      });
+
+      if (menuItems.length !== body.items.length) {
+        return reply.status(400).send({ success: false, error: 'One or more items are unavailable' });
+      }
+
+      const totalAmount = body.items.reduce((sum, item) => {
+        const menuItem = menuItems.find(m => m.id === item.menuItemId)!;
+        return sum + Number(menuItem.price) * item.quantity;
+      }, 0);
+
+      // Find guest by email if provided
+      let guestId: string | undefined;
+      if (body.email) {
+        const guest = await prisma.guest.findFirst({ where: { tenantId: tenant.id, email: body.email } });
+        if (guest) guestId = guest.id;
+      }
+
+      // Find booking by confirmation number if provided
+      let bookingId: string | undefined;
+      if (body.bookingRef) {
+        const booking = await prisma.booking.findFirst({
+          where: { tenantId: tenant.id, confirmationNo: body.bookingRef, status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
+        });
+        if (booking) { bookingId = booking.id; if (!guestId) guestId = booking.guestId; }
+      }
+
+      const order = await prisma.foodOrder.create({
+        data: {
+          tenantId: tenant.id,
+          guestId,
+          bookingId,
+          tableNumber: body.roomNumber ? `Room ${body.roomNumber}` : undefined,
+          notes: body.notes ? `From: ${body.guestName}${body.email ? ` <${body.email}>` : ''}. ${body.notes}` : `From: ${body.guestName}${body.email ? ` <${body.email}>` : ''}`,
+          totalAmount,
+          status: 'PENDING',
+          items: {
+            create: body.items.map(item => {
+              const menuItem = menuItems.find(m => m.id === item.menuItemId)!;
+              return {
+                menuItemId: item.menuItemId,
+                quantity: item.quantity,
+                unitPrice: menuItem.price,
+                notes: item.notes,
+              };
+            }),
+          },
+        },
+      });
+
+      return reply.status(201).send(ok({
+        orderId: order.id,
+        totalAmount,
+        itemCount: body.items.length,
+      }, 'Order placed! Our team will deliver to your room shortly.'));
+    },
+  });
 }
