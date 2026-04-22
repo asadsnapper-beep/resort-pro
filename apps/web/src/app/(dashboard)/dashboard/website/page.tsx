@@ -3,11 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { websiteApi } from '@/lib/api';
+import { useAuthStore } from '@/store/auth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
-import { Globe, Image, FileText, Palette, Star, Plus, Trash2, Save, Eye } from 'lucide-react';
+import { Globe, Image, FileText, Palette, Star, Plus, Trash2, Save, Eye, Layout, CheckCircle2, ExternalLink } from 'lucide-react';
 
 interface WebsiteContent {
   heroTitle: string;
@@ -22,9 +23,63 @@ interface WebsiteContent {
   primaryColor?: string;
   accentColor?: string;
   testimonials?: { name: string; text: string; rating: number; avatar?: string }[];
+  templateId?: string;
 }
 
+/* ── Available Templates ──────────────────────────────────────────────────── */
+const TEMPLATES = [
+  {
+    id: 'luxe',
+    name: 'Luxe',
+    description: 'Full-screen hero, luxury card grid for rooms, smooth scroll navigation',
+    tags: ['Luxury', 'Modern', 'Full-Screen Hero'],
+    preview: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&q=80',
+    status: 'available' as const,
+  },
+  {
+    id: 'coastal',
+    name: 'Coastal',
+    description: 'Breezy beachside layout with wave animations and ocean color palette',
+    tags: ['Beach', 'Relaxed', 'Animated'],
+    preview: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80',
+    status: 'coming_soon' as const,
+  },
+  {
+    id: 'boutique',
+    name: 'Boutique',
+    description: 'Intimate editorial style with large typography and asymmetric layouts',
+    tags: ['Editorial', 'Boutique', 'Minimalist'],
+    preview: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=600&q=80',
+    status: 'coming_soon' as const,
+  },
+  {
+    id: 'villa',
+    name: 'Villa',
+    description: 'Private villa aesthetics with immersive gallery and split-screen layout',
+    tags: ['Villa', 'Immersive', 'Gallery-First'],
+    preview: 'https://images.unsplash.com/photo-1605276374104-dee2a0ed3cd6?w=600&q=80',
+    status: 'coming_soon' as const,
+  },
+  {
+    id: 'urban',
+    name: 'Urban',
+    description: 'Sleek city hotel style with dark theme option and grid-based layout',
+    tags: ['City Hotel', 'Dark Mode', 'Sleek'],
+    preview: 'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=600&q=80',
+    status: 'coming_soon' as const,
+  },
+  {
+    id: 'nature',
+    name: 'Nature Retreat',
+    description: 'Earthy tones, organic shapes and nature photography showcase',
+    tags: ['Eco', 'Nature', 'Organic'],
+    preview: 'https://images.unsplash.com/photo-1470114716159-e389f8712fda?w=600&q=80',
+    status: 'coming_soon' as const,
+  },
+] as const;
+
 const TABS = [
+  { id: 'template', label: 'Template', icon: Layout },
   { id: 'hero', label: 'Hero & About', icon: Globe },
   { id: 'gallery', label: 'Gallery', icon: Image },
   { id: 'testimonials', label: 'Testimonials', icon: Star },
@@ -35,7 +90,8 @@ type Tab = typeof TABS[number]['id'];
 
 export default function WebsitePage() {
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<Tab>('hero');
+  const { tenant } = useAuthStore();
+  const [tab, setTab] = useState<Tab>('template');
   const [form, setForm] = useState<WebsiteContent>({
     heroTitle: '',
     heroSubtitle: '',
@@ -49,6 +105,7 @@ export default function WebsitePage() {
     primaryColor: '#1a6b5e',
     accentColor: '#d4a853',
     testimonials: [],
+    templateId: 'luxe',
   });
 
   const { data, isLoading } = useQuery({
@@ -72,13 +129,17 @@ export default function WebsitePage() {
         primaryColor: content.primaryColor ?? '#1a6b5e',
         accentColor: content.accentColor ?? '#d4a853',
         testimonials: content.testimonials ?? [],
+        templateId: content.templateId ?? 'luxe',
       });
     }
   }, [data]);
 
   const saveMutation = useMutation({
     mutationFn: () => websiteApi.update(form),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['website'] }); toast({ title: 'Website updated!' }); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['website'] });
+      toast({ title: 'Website updated!', description: 'Your changes are live.' });
+    },
     onError: (err: { response?: { data?: { error?: string } } }) =>
       toast({ title: 'Error', description: err?.response?.data?.error ?? 'Failed to save', variant: 'destructive' }),
   });
@@ -97,6 +158,8 @@ export default function WebsitePage() {
   const removeTestimonial = (i: number) =>
     set('testimonials', (form.testimonials ?? []).filter((_, idx) => idx !== i));
 
+  const publicUrl = tenant?.slug ? `/${tenant.slug}` : null;
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -108,26 +171,46 @@ export default function WebsitePage() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Website Content</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Manage your public-facing resort website</p>
+          <h1 className="text-2xl font-bold text-gray-900">Website</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Design and publish your public resort website</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="gap-2" onClick={() => window.open('/', '_blank')}>
-            <Eye className="h-4 w-4" /> Preview
-          </Button>
+          {publicUrl && (
+            <Button variant="outline" className="gap-2" onClick={() => window.open(publicUrl, '_blank')}>
+              <ExternalLink className="h-4 w-4" /> View Live Site
+            </Button>
+          )}
           <Button className="gap-2" loading={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
-            <Save className="h-4 w-4" /> Save Changes
+            <Save className="h-4 w-4" /> Save & Publish
           </Button>
         </div>
       </div>
 
+      {/* Live URL banner */}
+      {publicUrl && (
+        <div className="flex items-center gap-3 rounded-xl border border-resort-200 bg-resort-50 px-5 py-3">
+          <Globe className="h-4 w-4 text-resort-600 flex-shrink-0" />
+          <p className="text-sm text-resort-700">
+            Your website is live at{' '}
+            <a href={publicUrl} target="_blank" rel="noopener noreferrer"
+              className="font-semibold underline hover:text-resort-900">
+              {typeof window !== 'undefined' ? window.location.origin : ''}{publicUrl}
+            </a>
+          </p>
+          <span className="ml-auto flex items-center gap-1 text-xs font-semibold text-green-600">
+            <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" /> Live
+          </span>
+        </div>
+      )}
+
       {/* Tabs */}
-      <div className="flex gap-1 border-b">
+      <div className="flex gap-1 border-b overflow-x-auto">
         {TABS.map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setTab(id)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               tab === id ? 'border-resort-600 text-resort-700' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}>
             <Icon className="h-4 w-4" /> {label}
@@ -135,7 +218,84 @@ export default function WebsitePage() {
         ))}
       </div>
 
-      {/* Hero & About */}
+      {/* ── Template Picker ─────────────────────────────────────────────── */}
+      {tab === 'template' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">Choose a layout for your public website. More templates coming soon.</p>
+            <span className="text-xs font-semibold text-resort-600 bg-resort-50 px-2.5 py-1 rounded-full">
+              {TEMPLATES.filter(t => t.status === 'available').length} available · {TEMPLATES.filter(t => t.status === 'coming_soon').length} coming soon
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {TEMPLATES.map(tpl => {
+              const isSelected = form.templateId === tpl.id;
+              const isAvailable = tpl.status === 'available';
+              return (
+                <div
+                  key={tpl.id}
+                  onClick={() => isAvailable && set('templateId', tpl.id)}
+                  className={`rounded-2xl border-2 overflow-hidden transition-all ${
+                    isSelected ? 'border-resort-600 shadow-lg shadow-resort-100' :
+                    isAvailable ? 'border-gray-200 hover:border-resort-300 hover:shadow-md cursor-pointer' :
+                    'border-gray-200 opacity-60 cursor-not-allowed'
+                  }`}
+                >
+                  {/* Preview image */}
+                  <div className="relative h-40 overflow-hidden">
+                    <img src={tpl.preview} alt={tpl.name} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                    {/* Selected badge */}
+                    {isSelected && (
+                      <div className="absolute top-3 right-3 flex items-center gap-1 bg-resort-600 text-white text-xs font-semibold px-2.5 py-1 rounded-full">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Active
+                      </div>
+                    )}
+                    {/* Coming Soon badge */}
+                    {!isAvailable && (
+                      <div className="absolute top-3 right-3 bg-gray-800/80 text-white text-xs font-semibold px-2.5 py-1 rounded-full">
+                        Coming Soon
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="p-4">
+                    <div className="flex items-center justify-between mb-1">
+                      <h3 className="font-bold text-gray-900">{tpl.name}</h3>
+                      {isAvailable && !isSelected && (
+                        <span className="text-xs font-medium text-resort-600">Free</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mb-3">{tpl.description}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {tpl.tags.map(tag => (
+                        <span key={tag} className="text-xs rounded-full px-2 py-0.5 bg-gray-100 text-gray-600">{tag}</span>
+                      ))}
+                    </div>
+                    {isSelected && isAvailable && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); window.open(publicUrl!, '_blank'); }}
+                        className="mt-3 w-full text-xs font-medium text-resort-600 hover:text-resort-800 flex items-center justify-center gap-1 border border-resort-200 rounded-lg py-1.5 hover:bg-resort-50 transition-colors"
+                      >
+                        <Eye className="h-3.5 w-3.5" /> Preview Live Site
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-6 rounded-xl border border-dashed border-gray-200 p-6 text-center">
+            <Layout className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+            <p className="text-sm font-medium text-gray-500">More templates being designed</p>
+            <p className="text-xs text-muted-foreground mt-1">New layouts are added regularly. All templates use your brand colors and content.</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Hero & About ─────────────────────────────────────────────────── */}
       {tab === 'hero' && (
         <div className="grid gap-6 lg:grid-cols-2">
           <Card>
@@ -188,7 +348,7 @@ export default function WebsitePage() {
         </div>
       )}
 
-      {/* Gallery */}
+      {/* ── Gallery ──────────────────────────────────────────────────────── */}
       {tab === 'gallery' && (
         <Card>
           <CardContent className="p-6 space-y-4">
@@ -225,7 +385,7 @@ export default function WebsitePage() {
         </Card>
       )}
 
-      {/* Testimonials */}
+      {/* ── Testimonials ─────────────────────────────────────────────────── */}
       {tab === 'testimonials' && (
         <Card>
           <CardContent className="p-6 space-y-4">
@@ -276,7 +436,7 @@ export default function WebsitePage() {
         </Card>
       )}
 
-      {/* SEO & Branding */}
+      {/* ── SEO & Branding ───────────────────────────────────────────────── */}
       {tab === 'seo' && (
         <div className="grid gap-6 lg:grid-cols-2">
           <Card>
@@ -300,6 +460,7 @@ export default function WebsitePage() {
           <Card>
             <CardContent className="p-6 space-y-4">
               <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Palette className="h-4 w-4 text-resort-600" /> Brand Colors</h3>
+              <p className="text-xs text-muted-foreground">These colors apply to your selected template.</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">Primary Color</label>
@@ -318,14 +479,12 @@ export default function WebsitePage() {
                   </div>
                 </div>
               </div>
-
-              {/* Color Preview */}
               <div className="rounded-xl overflow-hidden border mt-2">
                 <div className="p-4 text-white text-sm font-semibold" style={{ backgroundColor: form.primaryColor ?? '#1a6b5e' }}>
-                  Primary Color — Hero & Navigation
+                  Primary — Hero, Nav & Buttons
                 </div>
                 <div className="p-4 text-sm font-semibold" style={{ backgroundColor: form.accentColor ?? '#d4a853' }}>
-                  Accent Color — Buttons & Highlights
+                  Accent — CTAs & Highlights
                 </div>
               </div>
             </CardContent>
@@ -333,10 +492,10 @@ export default function WebsitePage() {
         </div>
       )}
 
-      {/* Save Button (bottom) */}
+      {/* Save (bottom) */}
       <div className="flex justify-end pt-2">
         <Button className="gap-2 px-8" loading={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
-          <Save className="h-4 w-4" /> Save All Changes
+          <Save className="h-4 w-4" /> Save & Publish
         </Button>
       </div>
     </div>

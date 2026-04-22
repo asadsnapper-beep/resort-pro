@@ -19,7 +19,7 @@ import { menuRoutes } from './routes/menu';
 import { foodOrderRoutes } from './routes/foodOrders';
 import { inventoryRoutes } from './routes/inventory';
 import { ticketRoutes } from './routes/tickets';
-import { websiteRoutes } from './routes/website';
+import { websiteRoutes, publicWebsiteRoutes } from './routes/website';
 import { dashboardRoutes } from './routes/dashboard';
 import { notificationRoutes } from './routes/notifications';
 import { chatRoutes } from './routes/chat';
@@ -122,6 +122,7 @@ export async function buildApp() {
   await app.register(ticketRoutes, { prefix: '/api/tickets' });
   await app.register(chatRoutes, { prefix: '/api/chat' });
   await app.register(websiteRoutes, { prefix: '/api/website' });
+  await app.register(publicWebsiteRoutes, { prefix: '/site' });
   await app.register(notificationRoutes, { prefix: '/api/notifications' });
 
   // ── Error Handler ─────────────────────────────────────────────────────────
