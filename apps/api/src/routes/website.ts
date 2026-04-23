@@ -69,7 +69,7 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
           websiteContent: true,
           rooms: {
             where: { isActive: true, status: { not: 'MAINTENANCE' } },
-            select: { id: true, name: true, type: true, number: true, floor: true, basePrice: true, maxOccupancy: true, images: true, amenities: true, description: true },
+            select: { id: true, name: true, type: true, number: true, floor: true, basePrice: true, maxOccupancy: true, images: true, videos: true, amenities: true, description: true },
             orderBy: { basePrice: 'asc' },
           },
         },
@@ -231,7 +231,7 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
 
       const rooms = await prisma.room.findMany({
         where: { tenantId: tenant.id, isActive: true, status: { not: 'MAINTENANCE' }, id: { notIn: bookedIds } },
-        select: { id: true, name: true, type: true, number: true, basePrice: true, maxOccupancy: true, images: true, amenities: true, description: true },
+        select: { id: true, name: true, type: true, number: true, basePrice: true, maxOccupancy: true, images: true, videos: true, amenities: true, description: true },
         orderBy: { basePrice: 'asc' },
       });
 
