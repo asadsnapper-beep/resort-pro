@@ -36,7 +36,9 @@ interface ResortData {
     number: string;
     basePrice: number;
     maxOccupancy: number;
+    floor?: number;
     images: string[];
+    videos: string[];
     amenities: string[];
     description?: string;
   }[];
