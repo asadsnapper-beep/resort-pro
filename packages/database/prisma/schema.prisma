@@ -168,7 +168,10 @@ model Tenant {
   address     String?
   phone       String?
   email       String?
-  website     String?
+  website          String?
+  customDomain     String?  @unique  // e.g. www.sunsetresort.com
+  domainVerified   Boolean  @default(false)
+  domainVerifiedAt DateTime?
   currency    String     @default("USD")
   timezone    String     @default("UTC")
   checkInTime String     @default("14:00")

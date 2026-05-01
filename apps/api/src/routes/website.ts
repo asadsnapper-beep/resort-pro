@@ -58,6 +58,20 @@ export async function websiteRoutes(app: FastifyInstance) {
 
 // ── Public routes (no auth) ──────────────────────────────────────────────────
 export async function publicWebsiteRoutes(app: FastifyInstance) {
+  // GET /site/domain/:hostname — resolve custom domain → slug (used by Next.js middleware)
+  app.get('/domain/:hostname', {
+    schema: { tags: ['website'], summary: 'Resolve custom domain to tenant slug' },
+    handler: async (request, reply) => {
+      const { hostname } = request.params as { hostname: string };
+      const tenant = await prisma.tenant.findFirst({
+        where: { customDomain: hostname.toLowerCase(), domainVerified: true, isActive: true },
+        select: { slug: true },
+      });
+      if (!tenant) return reply.status(404).send({ success: false, error: 'Domain not found' });
+      return ok({ slug: tenant.slug });
+    },
+  });
+
   // GET /site/:slug — full public resort data
   app.get('/:slug', {
     schema: { tags: ['website'], summary: 'Get public resort website data' },
@@ -156,7 +170,7 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
           totalAmount,
           specialRequests: body.specialRequests,
           status: 'PENDING',
-          paymentStatus: 'UNPAID',
+          paymentStatus: 'PENDING',
           confirmationNo: `WEB-${Date.now().toString(36).toUpperCase()}`,
         },
       });

@@ -173,7 +173,7 @@ export async function crmRoutes(app: FastifyInstance) {
   app.post('/templates', { preHandler: pre }, async (request) => {
     const { tenantId } = request.user as JwtPayload;
     const body = templateSchema.parse(request.body);
-    const tpl  = await prisma.emailTemplate.create({ data: { tenantId, ...body } });
+    const tpl  = await prisma.emailTemplate.create({ data: { tenantId, name: body.name, subject: body.subject, html: body.html, preheader: body.preheader } });
     return ok(tpl, 'Template created');
   });
 
@@ -323,7 +323,7 @@ export async function crmRoutes(app: FastifyInstance) {
   app.post('/sequences', { preHandler: pre }, async (request) => {
     const { tenantId } = request.user as JwtPayload;
     const body = sequenceSchema.parse(request.body);
-    const seq  = await prisma.sequence.create({ data: { tenantId, ...body } });
+    const seq  = await prisma.sequence.create({ data: { tenantId, name: body.name, trigger: body.trigger, triggerMeta: body.triggerMeta ?? undefined } });
     return ok(seq, 'Sequence created');
   });
 
@@ -352,7 +352,7 @@ export async function crmRoutes(app: FastifyInstance) {
     const lastStep = await prisma.sequenceStep.findFirst({ where: { sequenceId: id }, orderBy: { stepOrder: 'desc' } });
     const stepOrder = (lastStep?.stepOrder ?? 0) + 1;
 
-    const step = await prisma.sequenceStep.create({ data: { sequenceId: id, stepOrder, ...body } });
+    const step = await prisma.sequenceStep.create({ data: { sequenceId: id, stepOrder, subject: body.subject, html: body.html, delayDays: body.delayDays, ...(body.templateId ? { templateId: body.templateId } : {}) } });
     return ok(step, 'Step added');
   });
 
