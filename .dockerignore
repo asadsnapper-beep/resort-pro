@@ -1,0 +1,36 @@
+# Dependencies — installed fresh inside Docker
+**/node_modules
+
+# Build outputs — rebuilt inside Docker
+**/dist
+**/.next
+**/.turbo
+
+# Dev/test artifacts
+**/coverage
+**/.nyc_output
+**/playwright-report
+**/test-results
+
+# Local env files — never bake secrets into images
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+
+# Docs / editor
+*.md
+.vscode
+.idea
+docs
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
