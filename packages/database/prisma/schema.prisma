@@ -192,6 +192,16 @@ model Tenant {
   websiteContent   WebsiteContent?
   notifications    Notification[]
   payments         Payment[]
+  // CRM
+  guestTags        GuestTag[]
+  guestScores      GuestScore[]
+  emailConsents    EmailConsent[]
+  guestActivities  GuestActivity[]
+  emailTemplates   EmailTemplate[]
+  campaigns        Campaign[]
+  emailSends       EmailSend[]
+  sequences        Sequence[]
+  sequenceEnrollments SequenceEnrollment[]
 
   @@map("tenants")
 }
@@ -302,10 +312,16 @@ model Guest {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bookings       Booking[]
   foodOrders     FoodOrder[]
   supportTickets SupportTicket[]
+  tags           GuestTagRelation[]
+  score          GuestScore?
+  consent        EmailConsent?
+  activities     GuestActivity[]
+  emailSends     EmailSend[]
+  enrollments    SequenceEnrollment[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -582,6 +598,323 @@ model WebsiteContent {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("website_content")
+}
+
+// ─── CRM ──────────────────────────────────────────────────────────────────────
+
+enum GuestTier {
+  STANDARD
+  SILVER
+  GOLD
+  PLATINUM
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  PAUSED
+  CANCELLED
+}
+
+enum EmailSendStatus {
+  PENDING
+  SENT
+  DELIVERED
+  OPENED
+  CLICKED
+  BOUNCED
+  FAILED
+  UNSUBSCRIBED
+}
+
+enum SequenceStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum SequenceTrigger {
+  BOOKING_CONFIRMED
+  PRE_ARRIVAL
+  CHECK_IN
+  POST_STAY
+  WIN_BACK
+  BIRTHDAY
+  MANUAL
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  UNSUBSCRIBED
+}
+
+enum ActivityType {
+  BOOKING_CREATED
+  BOOKING_CANCELLED
+  CHECK_IN
+  CHECK_OUT
+  EMAIL_SENT
+  EMAIL_OPENED
+  EMAIL_CLICKED
+  FOOD_ORDER
+  SUPPORT_TICKET
+  FEEDBACK_SUBMITTED
+}
+
+// Guest tags (e.g. "VIP", "Honeymoon", "Corporate")
+model GuestTag {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  color     String   @default("#6b7280")
+  createdAt DateTime @default(now())
+
+  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  relations GuestTagRelation[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("guest_tags")
+}
+
+model GuestTagRelation {
+  id        String   @id @default(uuid())
+  guestId   String
+  tagId     String
+  createdAt DateTime @default(now())
+
+  guest Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  tag   GuestTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([guestId, tagId])
+  @@map("guest_tag_relations")
+}
+
+// Guest loyalty score + tier
+model GuestScore {
+  id           String    @id @default(uuid())
+  tenantId     String
+  guestId      String    @unique
+  score        Int       @default(0)
+  tier         GuestTier @default(STANDARD)
+  totalStays   Int       @default(0)
+  totalSpend   Decimal   @default(0) @db.Decimal(12, 2)
+  emailOpens   Int       @default(0)
+  emailClicks  Int       @default(0)
+  lastStayAt   DateTime?
+  updatedAt    DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  guest  Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([score])
+  @@map("guest_scores")
+}
+
+// Email consent / unsubscribe
+model EmailConsent {
+  id           String   @id @default(uuid())
+  tenantId     String
+  guestId      String   @unique
+  subscribed   Boolean  @default(true)
+  unsubscribedAt DateTime?
+  updatedAt    DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  guest  Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("email_consents")
+}
+
+// Activity log for guests
+model GuestActivity {
+  id        String       @id @default(uuid())
+  tenantId  String
+  guestId   String
+  type      ActivityType
+  meta      Json?
+  createdAt DateTime     @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  guest  Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([guestId])
+  @@map("guest_activities")
+}
+
+// Reusable email templates with HTML content
+model EmailTemplate {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  subject   String
+  html      String
+  preheader String?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campaigns Campaign[]
+  steps     SequenceStep[]
+
+  @@index([tenantId])
+  @@map("email_templates")
+}
+
+// Broadcast campaigns (one-time email blasts)
+model Campaign {
+  id           String         @id @default(uuid())
+  tenantId     String
+  templateId   String?
+  name         String
+  subject      String
+  html         String
+  segment      Json?          // filter criteria (tier, tags, lastStayBefore, etc.)
+  status       CampaignStatus @default(DRAFT)
+  scheduledAt  DateTime?
+  sentAt       DateTime?
+  recipientCount Int          @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  template EmailTemplate?  @relation(fields: [templateId], references: [id])
+  sends    EmailSend[]
+  stats    CampaignStats?
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("campaigns")
+}
+
+// Aggregate stats per campaign
+model CampaignStats {
+  id          String   @id @default(uuid())
+  campaignId  String   @unique
+  sent        Int      @default(0)
+  delivered   Int      @default(0)
+  opened      Int      @default(0)
+  clicked     Int      @default(0)
+  bounced     Int      @default(0)
+  unsubscribed Int     @default(0)
+  updatedAt   DateTime @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@map("campaign_stats")
+}
+
+// Individual email send record (per guest per campaign/sequence)
+model EmailSend {
+  id           String          @id @default(uuid())
+  tenantId     String
+  guestId      String
+  campaignId   String?
+  sequenceStepId String?
+  enrollmentId String?
+  subject      String
+  status       EmailSendStatus @default(PENDING)
+  resendId     String?         // Resend message ID
+  openedAt     DateTime?
+  deliveredAt  DateTime?
+  bouncedAt    DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  guest        Guest         @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  campaign     Campaign?     @relation(fields: [campaignId], references: [id])
+  sequenceStep SequenceStep? @relation(fields: [sequenceStepId], references: [id])
+  clicks       EmailClick[]
+
+  @@index([tenantId])
+  @@index([guestId])
+  @@index([campaignId])
+  @@map("email_sends")
+}
+
+// Link click tracking
+model EmailClick {
+  id         String   @id @default(uuid())
+  sendId     String
+  url        String
+  clickedAt  DateTime @default(now())
+
+  send EmailSend @relation(fields: [sendId], references: [id], onDelete: Cascade)
+
+  @@index([sendId])
+  @@map("email_clicks")
+}
+
+// Automated email sequences (drip campaigns)
+model Sequence {
+  id          String          @id @default(uuid())
+  tenantId    String
+  name        String
+  trigger     SequenceTrigger
+  triggerMeta Json?           // e.g. { daysOffset: -3 } for pre-arrival
+  status      SequenceStatus  @default(ACTIVE)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  steps       SequenceStep[]
+  enrollments SequenceEnrollment[]
+
+  @@index([tenantId])
+  @@index([trigger])
+  @@map("sequences")
+}
+
+// Individual steps inside a sequence (each = one email)
+model SequenceStep {
+  id           String   @id @default(uuid())
+  sequenceId   String
+  templateId   String?
+  stepOrder    Int
+  delayDays    Int      @default(0)   // days after trigger
+  subject      String
+  html         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sequence  Sequence       @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  template  EmailTemplate? @relation(fields: [templateId], references: [id])
+  sends     EmailSend[]
+
+  @@index([sequenceId])
+  @@map("sequence_steps")
+}
+
+// Tracks which guests are enrolled in which sequences
+model SequenceEnrollment {
+  id          String           @id @default(uuid())
+  tenantId    String
+  sequenceId  String
+  guestId     String
+  status      EnrollmentStatus @default(ACTIVE)
+  currentStep Int              @default(0)
+  triggerMeta Json?            // context at time of enrollment (bookingId, checkIn, etc.)
+  enrolledAt  DateTime         @default(now())
+  completedAt DateTime?
+  updatedAt   DateTime         @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sequence Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  guest    Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  @@unique([sequenceId, guestId])
+  @@index([tenantId])
+  @@index([status])
+  @@map("sequence_enrollments")
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────

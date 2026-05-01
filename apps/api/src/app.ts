@@ -23,6 +23,8 @@ import { websiteRoutes, publicWebsiteRoutes } from './routes/website';
 import { dashboardRoutes } from './routes/dashboard';
 import { notificationRoutes } from './routes/notifications';
 import { chatRoutes } from './routes/chat';
+import { crmRoutes, crmPublicRoutes } from './routes/crm';
+import { startAutomationEngine } from './services/automation';
 
 export async function buildApp() {
   const app = Fastify({
@@ -124,6 +126,11 @@ export async function buildApp() {
   await app.register(websiteRoutes, { prefix: '/api/website' });
   await app.register(publicWebsiteRoutes, { prefix: '/site' });
   await app.register(notificationRoutes, { prefix: '/api/notifications' });
+  await app.register(crmRoutes, { prefix: '/api/crm' });
+  await app.register(crmPublicRoutes, { prefix: '/crm' });
+
+  // ── Start automation engine ───────────────────────────────────────────────
+  if (process.env.NODE_ENV !== 'test') startAutomationEngine();
 
   // ── Error Handler ─────────────────────────────────────────────────────────
   app.setErrorHandler((error, _request, reply) => {
