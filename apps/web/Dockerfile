@@ -6,23 +6,18 @@
 # ── Stage 1: base ─────────────────────────────────────────────────────────────
 FROM node:20-alpine AS base
 RUN apk add --no-cache libc6-compat
-RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
+# Install pnpm directly via npm — more reliable than corepack in CI/Docker
+RUN npm install -g pnpm@9
 
-# ── Stage 2: install dependencies ─────────────────────────────────────────────
-FROM base AS deps
-WORKDIR /app
-
-# Copy the entire repo so pnpm can resolve all workspace packages correctly
-COPY . .
-
-RUN pnpm install --frozen-lockfile
-
-# ── Stage 3: build ────────────────────────────────────────────────────────────
+# ── Stage 2: install + build ──────────────────────────────────────────────────
 FROM base AS builder
 WORKDIR /app
 
-# Restore installed workspace
-COPY --from=deps /app ./
+# Copy full repo so pnpm workspace resolves all packages
+COPY . .
+
+# Install all deps
+RUN pnpm install --no-frozen-lockfile
 
 # NEXT_PUBLIC_API_URL bakes into the client bundle at build time
 ARG NEXT_PUBLIC_API_URL=http://localhost:4000
@@ -30,7 +25,7 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 RUN pnpm --filter @resort-pro/web build
 
-# ── Stage 4: runtime ──────────────────────────────────────────────────────────
+# ── Stage 3: runtime ──────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
 RUN apk add --no-cache wget
 WORKDIR /app
@@ -38,8 +33,7 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-# Next.js standalone output includes its own node_modules + server.js
-# outputFileTracingRoot=repo root → standalone lands reflecting monorepo structure
+# Next.js standalone output (self-contained server.js + node_modules)
 COPY --from=builder /app/apps/web/.next/standalone          ./
 COPY --from=builder /app/apps/web/.next/static              ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public                    ./apps/web/public
