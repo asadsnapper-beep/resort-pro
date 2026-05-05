@@ -36,7 +36,8 @@ ENV HOSTNAME=0.0.0.0
 # Next.js standalone output (self-contained server.js + node_modules)
 COPY --from=builder /app/apps/web/.next/standalone          ./
 COPY --from=builder /app/apps/web/.next/static              ./apps/web/.next/static
-COPY --from=builder /app/apps/web/public                    ./apps/web/public
+# public/ may be empty — copy only if it contains files (gitkeep ensures dir exists)
+COPY --from=builder /app/apps/web/public/                   ./apps/web/public/
 
 EXPOSE 3000
 
