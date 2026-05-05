@@ -8,37 +8,30 @@ FROM node:20-alpine AS base
 RUN apk add --no-cache libc6-compat openssl
 RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 
-# ── Stage 2: install all deps ──────────────────────────────────────────────────
+# ── Stage 2: install dependencies ─────────────────────────────────────────────
 FROM base AS deps
 WORKDIR /app
 
-# Copy only manifests first (better layer cache)
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/api/package.json                  ./apps/api/
-COPY packages/database/package.json         ./packages/database/
-COPY packages/types/package.json            ./packages/types/
+# Copy the entire repo so pnpm can resolve all workspace packages correctly
+COPY . .
 
+# Install all deps (workspace needs all package.json files present)
 RUN pnpm install --frozen-lockfile
 
 # ── Stage 3: build ────────────────────────────────────────────────────────────
 FROM base AS builder
 WORKDIR /app
 
-# Restore installed node_modules
-COPY --from=deps /app/node_modules          ./node_modules
-COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
+# Restore installed workspace
+COPY --from=deps /app ./
 
-# Copy full source
-COPY . .
-
-# 1. Generate Prisma client (writes to node_modules/.prisma)
+# 1. Generate Prisma client
 RUN pnpm --filter @resort-pro/database exec prisma generate
 
 # 2. Bundle API with tsup — @resort-pro/* are inlined, @prisma/client stays external
 RUN pnpm --filter @resort-pro/api build
 
-# 3. Create a flattened production-only node_modules via pnpm deploy
-#    This resolves all pnpm symlinks into real files (no workspace: links)
+# 3. Create a flattened production-only node_modules (resolves all pnpm symlinks)
 RUN pnpm deploy --filter @resort-pro/api --prod /standalone
 
 # ── Stage 4: runtime ──────────────────────────────────────────────────────────
