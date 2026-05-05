@@ -19,14 +19,17 @@ COPY . .
 # Install all deps
 RUN pnpm install --no-frozen-lockfile
 
-# Generate Prisma client
-RUN pnpm --filter @resort-pro/database exec prisma generate
-
 # Bundle API with tsup — @resort-pro/* inlined, @prisma/client stays external
 RUN pnpm --filter @resort-pro/api build
 
-# Flatten production deps (resolves pnpm symlinks → real files, no devDeps)
+# Flatten production deps into /standalone (resolves pnpm symlinks → real files)
 RUN pnpm deploy --filter @resort-pro/api --prod /standalone
+
+# Copy prisma schema into standalone and generate client there
+# This ensures .prisma/client lands inside /standalone/node_modules
+RUN cp -r packages/database/prisma /standalone/prisma
+WORKDIR /standalone
+RUN npx prisma generate --schema=prisma/schema.prisma
 
 # ── Stage 3: runtime ──────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
@@ -34,19 +37,11 @@ RUN apk add --no-cache openssl wget
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Production node_modules (flattened, no symlinks)
-COPY --from=builder /standalone/node_modules         ./node_modules
-
-# Prisma native query engine + generated client
-COPY --from=builder /app/node_modules/.prisma        ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma        ./node_modules/@prisma
-
-# Prisma schema + migrations
-COPY --from=builder /app/packages/database/prisma    ./prisma
-
-# Compiled bundle
-COPY --from=builder /app/apps/api/dist               ./dist
-COPY --from=builder /app/apps/api/package.json       ./package.json
+# Everything comes from the standalone deploy directory
+COPY --from=builder /standalone/node_modules   ./node_modules
+COPY --from=builder /standalone/prisma         ./prisma
+COPY --from=builder /app/apps/api/dist         ./dist
+COPY --from=builder /app/apps/api/package.json ./package.json
 
 EXPOSE 4000
 
