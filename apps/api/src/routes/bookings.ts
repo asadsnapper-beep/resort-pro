@@ -4,6 +4,7 @@ import { prisma } from '@resort-pro/database';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams, validate } from '../utils/response';
 import { generateConfirmationNo, calculateNights } from '../utils/booking';
+import { sendEmail } from '../services/email';
 import type { JwtPayload } from '@resort-pro/types';
 
 const createBookingSchema = z.object({
@@ -170,6 +171,58 @@ export async function bookingRoutes(app: FastifyInstance) {
           room: { select: { number: true, name: true } },
         },
       });
+
+      // Send confirmation email to guest (fire-and-forget)
+      if (booking.guest?.email) {
+        const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true, currency: true } });
+        const currency = tenant?.currency || 'USD';
+        const checkInFmt = checkInDate.toDateString();
+        const checkOutFmt = checkOutDate.toDateString();
+        sendEmail({
+          to: booking.guest.email,
+          subject: `Booking Confirmed — ${booking.confirmationNo}`,
+          html: `
+            <div style="font-family:sans-serif;max-width:560px;margin:0 auto">
+              <div style="background:#1a6b5e;padding:32px;text-align:center;border-radius:8px 8px 0 0">
+                <h1 style="color:white;margin:0;font-size:24px">Booking Confirmed ✓</h1>
+                <p style="color:#a8d5cf;margin:8px 0 0">${tenant?.name || 'ResortPro'}</p>
+              </div>
+              <div style="background:#f9fafb;padding:32px;border-radius:0 0 8px 8px">
+                <p>Dear ${booking.guest.firstName},</p>
+                <p>Your booking has been confirmed. Here are your details:</p>
+                <table style="width:100%;border-collapse:collapse;margin:16px 0">
+                  <tr style="border-bottom:1px solid #e5e7eb">
+                    <td style="padding:10px 0;color:#6b7280;font-size:14px">Confirmation No.</td>
+                    <td style="padding:10px 0;font-weight:700;font-size:18px;color:#1a6b5e;text-align:right">${booking.confirmationNo}</td>
+                  </tr>
+                  <tr style="border-bottom:1px solid #e5e7eb">
+                    <td style="padding:10px 0;color:#6b7280;font-size:14px">Room</td>
+                    <td style="padding:10px 0;font-weight:600;text-align:right">${booking.room.name} (${booking.room.number})</td>
+                  </tr>
+                  <tr style="border-bottom:1px solid #e5e7eb">
+                    <td style="padding:10px 0;color:#6b7280;font-size:14px">Check-in</td>
+                    <td style="padding:10px 0;font-weight:600;text-align:right">${checkInFmt}</td>
+                  </tr>
+                  <tr style="border-bottom:1px solid #e5e7eb">
+                    <td style="padding:10px 0;color:#6b7280;font-size:14px">Check-out</td>
+                    <td style="padding:10px 0;font-weight:600;text-align:right">${checkOutFmt}</td>
+                  </tr>
+                  <tr style="border-bottom:1px solid #e5e7eb">
+                    <td style="padding:10px 0;color:#6b7280;font-size:14px">Nights</td>
+                    <td style="padding:10px 0;font-weight:600;text-align:right">${nights}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:10px 0;color:#6b7280;font-size:14px">Total Amount</td>
+                    <td style="padding:10px 0;font-weight:700;font-size:18px;color:#d4a853;text-align:right">${currency} ${totalAmount.toLocaleString()}</td>
+                  </tr>
+                </table>
+                ${booking.specialRequests ? `<p style="background:#fff;border:1px solid #e5e7eb;padding:12px;border-radius:6px;font-size:14px"><strong>Special Requests:</strong> ${booking.specialRequests}</p>` : ''}
+                <p style="color:#6b7280;font-size:13px;margin-top:24px">Please keep your confirmation number handy at check-in. We look forward to welcoming you!</p>
+              </div>
+            </div>
+          `,
+        }).catch(() => {}); // don't let email failure block the response
+      }
 
       return reply.status(201).send(ok(booking, 'Booking created'));
     },

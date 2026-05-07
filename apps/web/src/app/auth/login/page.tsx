@@ -96,7 +96,12 @@ export default function LoginPage() {
               Sign in
             </Button>
           </form>
-          <p className="mt-6 text-center text-sm text-white/50">
+          <div className="mt-4 text-center">
+            <Link href="/auth/forgot-password" className="text-sm text-white/50 hover:text-gold-400 transition-colors">
+              Forgot password?
+            </Link>
+          </div>
+          <p className="mt-4 text-center text-sm text-white/50">
             No account?{' '}
             <Link href="/auth/register" className="text-gold-400 hover:text-gold-300 font-medium">
               Start free trial

@@ -1,9 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import { randomBytes } from 'crypto';
 import { prisma } from '@resort-pro/database';
 import { requireAuth } from '../middleware/auth';
 import { ok, validate } from '../utils/response';
+import { sendEmail } from '../services/email';
 import type { JwtPayload } from '@resort-pro/types';
 
 const registerSchema = z.object({
@@ -237,6 +239,164 @@ export async function authRoutes(app: FastifyInstance) {
         await prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
       }
       return reply.send(ok(null, 'Logged out'));
+    },
+  });
+
+  // ── Password Reset ────────────────────────────────────────────────────────
+
+  // POST /api/auth/forgot-password
+  app.post('/forgot-password', {
+    schema: { tags: ['auth'], summary: 'Request password reset email' },
+    handler: async (request, reply) => {
+      const { email, slug } = request.body as { email: string; slug: string };
+      if (!email || !slug) return reply.status(400).send({ success: false, error: 'Email and resort slug required' });
+
+      // Always return 200 to prevent email enumeration
+      const tenant = await prisma.tenant.findUnique({ where: { slug } });
+      if (!tenant) return reply.send(ok(null, 'If that account exists, a reset link has been sent.'));
+
+      const user = await prisma.user.findUnique({ where: { tenantId_email: { tenantId: tenant.id, email } } });
+      if (!user) return reply.send(ok(null, 'If that account exists, a reset link has been sent.'));
+
+      // Expire old tokens
+      await prisma.passwordResetToken.updateMany({ where: { userId: user.id, used: false }, data: { used: true } });
+
+      const token = randomBytes(32).toString('hex');
+      await prisma.passwordResetToken.create({
+        data: { userId: user.id, token, expiresAt: new Date(Date.now() + 60 * 60 * 1000) }, // 1 hour
+      });
+
+      const webUrl = process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:3000';
+      const resetUrl = `${webUrl}/auth/reset-password?token=${token}`;
+
+      await sendEmail({
+        to: email,
+        subject: 'Reset your ResortPro password',
+        html: `
+          <h2>Password Reset Request</h2>
+          <p>Hi ${user.firstName},</p>
+          <p>Click the button below to reset your password. This link expires in 1 hour.</p>
+          <p style="margin:24px 0">
+            <a href="${resetUrl}" style="background:#1a6b5e;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600">
+              Reset Password
+            </a>
+          </p>
+          <p>Or copy this link: <a href="${resetUrl}">${resetUrl}</a></p>
+          <p>If you didn't request this, ignore this email.</p>
+        `,
+      });
+
+      return ok(null, 'If that account exists, a reset link has been sent.');
+    },
+  });
+
+  // POST /api/auth/reset-password
+  app.post('/reset-password', {
+    schema: { tags: ['auth'], summary: 'Reset password using token' },
+    handler: async (request, reply) => {
+      const body = z.object({
+        token: z.string().min(1),
+        password: z.string().min(8).regex(/(?=.*[A-Z])(?=.*[0-9])/, 'Must contain uppercase and number'),
+      }).parse(request.body);
+
+      const resetToken = await prisma.passwordResetToken.findUnique({
+        where: { token: body.token },
+        include: { user: true },
+      });
+
+      if (!resetToken || resetToken.used || resetToken.expiresAt < new Date()) {
+        return reply.status(400).send({ success: false, error: 'Invalid or expired reset link.' });
+      }
+
+      const passwordHash = await bcrypt.hash(body.password, 12);
+
+      await prisma.$transaction([
+        prisma.user.update({ where: { id: resetToken.userId }, data: { passwordHash } }),
+        prisma.passwordResetToken.update({ where: { id: resetToken.id }, data: { used: true } }),
+        prisma.refreshToken.deleteMany({ where: { userId: resetToken.userId } }),
+      ]);
+
+      return ok(null, 'Password reset successfully. Please log in.');
+    },
+  });
+
+  // ── Staff Invite ──────────────────────────────────────────────────────────
+
+  // GET /api/auth/invite/:token — validate invite (public)
+  app.get('/invite/:token', {
+    schema: { tags: ['auth'], summary: 'Validate staff invite token' },
+    handler: async (request, reply) => {
+      const { token } = request.params as { token: string };
+      const invite = await prisma.staffInvite.findUnique({
+        where: { token },
+        include: { tenant: { select: { name: true, slug: true, logoUrl: true } } },
+      });
+
+      if (!invite || invite.used || invite.expiresAt < new Date()) {
+        return reply.status(400).send({ success: false, error: 'Invalid or expired invite link.' });
+      }
+
+      return ok({ email: invite.email, role: invite.role, tenant: invite.tenant });
+    },
+  });
+
+  // POST /api/auth/invite/accept — accept invite and create account
+  app.post('/invite/accept', {
+    schema: { tags: ['auth'], summary: 'Accept staff invite and create account' },
+    handler: async (request, reply) => {
+      const body = z.object({
+        token: z.string().min(1),
+        firstName: z.string().min(1),
+        lastName: z.string().min(1),
+        password: z.string().min(8).regex(/(?=.*[A-Z])(?=.*[0-9])/, 'Must contain uppercase and number'),
+      }).parse(request.body);
+
+      const invite = await prisma.staffInvite.findUnique({ where: { token: body.token } });
+      if (!invite || invite.used || invite.expiresAt < new Date()) {
+        return reply.status(400).send({ success: false, error: 'Invalid or expired invite.' });
+      }
+
+      // Check if user already exists for this tenant
+      const existing = await prisma.user.findUnique({
+        where: { tenantId_email: { tenantId: invite.tenantId, email: invite.email } },
+      });
+      if (existing) return reply.status(409).send({ success: false, error: 'Account already exists with this email.' });
+
+      const passwordHash = await bcrypt.hash(body.password, 12);
+
+      const user = await prisma.user.create({
+        data: {
+          tenantId: invite.tenantId,
+          email: invite.email,
+          passwordHash,
+          firstName: body.firstName,
+          lastName: body.lastName,
+          role: invite.role,
+        },
+      });
+
+      await prisma.staffInvite.update({ where: { id: invite.id }, data: { used: true } });
+
+      const tenant = await prisma.tenant.findUnique({ where: { id: invite.tenantId }, select: { slug: true, name: true } });
+
+      const payload: Omit<JwtPayload, 'iat' | 'exp'> = {
+        sub: user.id,
+        email: user.email,
+        role: user.role as JwtPayload['role'],
+        tenantId: user.tenantId,
+      };
+      const token = app.jwt.sign(payload);
+      const refreshToken = app.jwt.sign({ sub: user.id, type: 'refresh' }, { expiresIn: '7d' });
+      await prisma.refreshToken.create({
+        data: { userId: user.id, token: refreshToken, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
+      });
+
+      return reply.status(201).send(ok({
+        token,
+        refreshToken,
+        user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role },
+        tenant,
+      }, `Welcome to ${tenant?.name}!`));
     },
   });
 }

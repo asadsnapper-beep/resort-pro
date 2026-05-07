@@ -205,6 +205,7 @@ model Tenant {
   emailSends       EmailSend[]
   sequences        Sequence[]
   sequenceEnrollments SequenceEnrollment[]
+  staffInvites     StaffInvite[]
 
   @@map("tenants")
 }
@@ -230,7 +231,8 @@ model User {
   assignedTickets   SupportTicket[]   @relation("AssignedTickets")
   chatMessages      ChatMessage[]
   notifications     Notification[]
-  refreshTokens     RefreshToken[]
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -248,6 +250,36 @@ model RefreshToken {
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model StaffInvite {
+  id        String   @id @default(uuid())
+  tenantId  String
+  email     String
+  role      UserRole @default(STAFF)
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("staff_invites")
 }
 
 // ─── Resort ───────────────────────────────────────────────────────────────────

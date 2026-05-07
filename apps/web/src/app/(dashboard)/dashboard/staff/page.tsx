@@ -11,7 +11,8 @@ import { StaffModal } from '@/components/staff/StaffModal';
 import { StaffDetailSheet } from '@/components/staff/StaffDetailSheet';
 import { formatDate, getInitials } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Search, Users, Building2, Shield, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Users, Building2, Shield, ChevronLeft, ChevronRight, Mail, X } from 'lucide-react';
+import { api } from '@/lib/api';
 
 interface Staff {
   id: string;
@@ -50,9 +51,29 @@ export default function StaffPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [addOpen, setAddOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<'MANAGER' | 'STAFF'>('STAFF');
+  const [inviting, setInviting] = useState(false);
   const [editStaff, setEditStaff] = useState<Staff | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [deactivateStaff, setDeactivateStaff] = useState<Staff | null>(null);
+
+  const handleSendInvite = async () => {
+    if (!inviteEmail) return;
+    setInviting(true);
+    try {
+      await api.post('/staff/invite', { email: inviteEmail, role: inviteRole });
+      toast({ title: 'Invite sent!', description: `An invite email has been sent to ${inviteEmail}` });
+      setInviteOpen(false);
+      setInviteEmail('');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      toast({ title: 'Error', description: e?.response?.data?.error ?? 'Failed to send invite', variant: 'destructive' });
+    } finally {
+      setInviting(false);
+    }
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ['staff', deptFilter, page],
@@ -115,9 +136,14 @@ export default function StaffPage() {
             {total > 0 ? `${total} staff member${total !== 1 ? 's' : ''} registered` : 'Manage your team'}
           </p>
         </div>
-        <Button className="gap-2" onClick={() => setAddOpen(true)}>
-          <Plus className="h-4 w-4" /> Add Staff
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" className="gap-2 border-[#1a6b5e] text-[#1a6b5e] hover:bg-[#f0faf8]" onClick={() => setInviteOpen(true)}>
+            <Mail className="h-4 w-4" /> Invite by Email
+          </Button>
+          <Button className="gap-2" onClick={() => setAddOpen(true)}>
+            <Plus className="h-4 w-4" /> Add Staff
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -291,6 +317,62 @@ export default function StaffPage() {
         description={`Are you sure you want to deactivate ${deactivateStaff?.user.firstName} ${deactivateStaff?.user.lastName}? They will lose access to the system.`}
         confirmLabel="Deactivate"
       />
+
+      {/* Invite Modal */}
+      {inviteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between p-6 border-b">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Invite Staff Member</h2>
+                <p className="text-sm text-gray-500 mt-0.5">They'll receive an email to set up their account</p>
+              </div>
+              <button onClick={() => setInviteOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Email Address</label>
+                <Input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="staff@yourresort.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Role</label>
+                <div className="flex gap-3">
+                  {(['STAFF', 'MANAGER'] as const).map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => setInviteRole(r)}
+                      className={`flex-1 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                        inviteRole === r
+                          ? 'border-[#1a6b5e] bg-[#f0faf8] text-[#1a6b5e]'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      {r === 'STAFF' ? '👤 Staff' : '🛡️ Manager'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 p-6 pt-0">
+              <Button variant="outline" className="flex-1" onClick={() => setInviteOpen(false)}>Cancel</Button>
+              <Button
+                className="flex-1 bg-[#1a6b5e] hover:bg-[#145a4f]"
+                onClick={handleSendInvite}
+                disabled={!inviteEmail || inviting}
+              >
+                {inviting ? 'Sending...' : 'Send Invite'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
