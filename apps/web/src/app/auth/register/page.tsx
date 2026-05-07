@@ -47,7 +47,7 @@ export default function RegisterPage() {
       const { user, tenant, token, refreshToken } = res.data.data;
       setAuth(user, tenant, token, refreshToken);
       toast({ title: 'Resort created!', description: `Welcome to ResortPro, ${user.firstName}!` });
-      router.push('/dashboard');
+      router.push('/onboarding');
     } catch (err: unknown) {
       const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Registration failed';
       toast({ title: 'Error', description: message, variant: 'destructive' });
