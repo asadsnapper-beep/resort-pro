@@ -5,6 +5,7 @@ import { requireAuth, requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams, validate } from '../utils/response';
 import { generateConfirmationNo, calculateNights } from '../utils/booking';
 import { sendEmail } from '../services/email';
+import { createGuestPaymentLink } from './billing';
 import type { JwtPayload } from '@resort-pro/types';
 
 const createBookingSchema = z.object({
@@ -332,6 +333,83 @@ export async function bookingRoutes(app: FastifyInstance) {
       await prisma.booking.update({ where: { id }, data: { paidAmount: newPaid, paymentStatus: paymentStatus as never } });
 
       return reply.status(201).send(ok(payment, 'Payment recorded'));
+    },
+  });
+
+  // POST /api/bookings/:id/payment-link — generate Stripe payment link for guest
+  app.post('/:id/payment-link', {
+    schema: { tags: ['bookings'], summary: 'Generate guest payment link', security: [{ bearerAuth: [] }] },
+    preHandler: requireAuth,
+    handler: async (request, reply) => {
+      const { tenantId } = request.user as JwtPayload;
+      const { id } = request.params as { id: string };
+
+      const booking = await prisma.booking.findFirst({
+        where: { id, tenantId },
+        include: {
+          guest: { select: { firstName: true, lastName: true, email: true } },
+          room: { select: { name: true, number: true } },
+          tenant: { select: { currency: true, name: true } },
+        },
+      });
+
+      if (!booking) return reply.status(404).send({ success: false, error: 'Booking not found' });
+      if (booking.paymentStatus === 'PAID') {
+        return reply.status(400).send({ success: false, error: 'Booking is already fully paid' });
+      }
+      if (!booking.guest.email) {
+        return reply.status(400).send({ success: false, error: 'Guest has no email address' });
+      }
+
+      // Amount remaining to be paid
+      const remaining = Number(booking.totalAmount) - Number(booking.paidAmount);
+
+      if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_placeholder') {
+        return reply.status(400).send({
+          success: false,
+          error: 'Stripe is not configured. Add STRIPE_SECRET_KEY to environment variables.',
+        });
+      }
+
+      const { url, sessionId } = await createGuestPaymentLink({
+        booking: {
+          id: booking.id,
+          confirmationNo: booking.confirmationNo,
+          totalAmount: remaining,
+          tenantId,
+        },
+        guest: {
+          firstName: booking.guest.firstName,
+          lastName: booking.guest.lastName,
+          email: booking.guest.email,
+        },
+        roomName: `${booking.room.name} (#${booking.room.number})`,
+        currency: booking.tenant.currency,
+      });
+
+      // Save link to booking
+      await prisma.booking.update({
+        where: { id },
+        data: { stripePaymentLinkId: sessionId, paymentLinkUrl: url },
+      });
+
+      // Email the link to the guest
+      sendEmail({
+        to: booking.guest.email,
+        subject: `Payment link for your booking at ${booking.tenant.name}`,
+        html: `
+          <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+            <h2 style="color:#1a6b5e">Complete Your Payment</h2>
+            <p>Hi ${booking.guest.firstName},</p>
+            <p>Your booking <strong>${booking.confirmationNo}</strong> at <strong>${booking.tenant.name}</strong> has an outstanding balance.</p>
+            <p style="font-size:24px;font-weight:bold;color:#1a6b5e">Amount Due: ${booking.tenant.currency} ${remaining.toFixed(2)}</p>
+            <a href="${url}" style="display:inline-block;background:#1a6b5e;color:#fff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:bold;margin:16px 0">Pay Now</a>
+            <p style="color:#666;font-size:12px">This link expires in 24 hours. Use test card: <strong>4242 4242 4242 4242</strong>, any future date, any CVC.</p>
+          </div>
+        `,
+      }).catch(() => {});
+
+      return reply.send({ success: true, data: { url, sessionId, amount: remaining } });
     },
   });
 }

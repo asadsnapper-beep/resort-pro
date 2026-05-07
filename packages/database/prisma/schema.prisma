@@ -176,6 +176,13 @@ model Tenant {
   timezone    String     @default("UTC")
   checkInTime String     @default("14:00")
   checkOutTime String    @default("11:00")
+  // Stripe billing
+  stripeCustomerId     String?  @unique
+  stripeSubscriptionId String?  @unique
+  planStatus           String   @default("trialing")  // trialing | active | past_due | canceled | incomplete
+  trialEndsAt          DateTime?
+  currentPeriodEnd     DateTime?
+  billingEmail         String?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
@@ -382,6 +389,10 @@ model Booking {
   notes           String?
   source          String        @default("DIRECT")
   confirmationNo  String        @unique
+  // Stripe guest payment
+  stripePaymentIntentId String?
+  stripePaymentLinkId   String?
+  paymentLinkUrl        String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
@@ -887,6 +898,20 @@ model EmailClick {
 
   @@index([sendId])
   @@map("email_clicks")
+}
+
+// ─── Stripe ───────────────────────────────────────────────────────────────────
+
+model StripeWebhookEvent {
+  id        String   @id @default(uuid())
+  stripeId  String   @unique
+  type      String
+  processed Boolean  @default(false)
+  data      Json
+  createdAt DateTime @default(now())
+
+  @@index([type])
+  @@map("stripe_webhook_events")
 }
 
 // Automated email sequences (drip campaigns)

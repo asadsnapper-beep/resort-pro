@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, BedDouble, CalendarDays, Users, UserCog,
   Sparkles, ClipboardList, UtensilsCrossed, ShoppingBag,
-  Package, Ticket, Globe, Bell, Settings, LogOut, Mail,
+  Package, Ticket, Globe, Bell, Settings, LogOut, Mail, CreditCard,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
@@ -25,6 +25,7 @@ const navItems = [
   { href: '/dashboard/support', label: 'Support', icon: Ticket },
   { href: '/dashboard/crm', label: 'CRM & Email', icon: Mail },
   { href: '/dashboard/website', label: 'Website', icon: Globe },
+  { href: '/dashboard/billing', label: 'Billing', icon: CreditCard },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];
 

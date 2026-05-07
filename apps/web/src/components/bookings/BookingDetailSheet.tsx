@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { X, CalendarDays, Users, CreditCard, BedDouble, MessageSquare, CheckCircle, XCircle, LogIn, LogOut, Plus } from 'lucide-react';
+import { X, CalendarDays, Users, CreditCard, BedDouble, MessageSquare, CheckCircle, XCircle, LogIn, LogOut, Plus, Link2 } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { bookingsApi } from '@/lib/api';
+import { bookingsApi, bookingPaymentApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/ui/badge';
@@ -69,6 +69,23 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
       setShowPayment(false); setPayAmount('');
     },
     onError: () => toast({ title: 'Error', description: 'Payment failed', variant: 'destructive' }),
+  });
+
+  const sendPaymentLink = useMutation({
+    mutationFn: () => bookingPaymentApi.createPaymentLink(booking!.id),
+    onSuccess: (res) => {
+      const { url, amount } = res.data.data;
+      toast({
+        title: 'Payment link sent!',
+        description: `Guest will receive an email with a link to pay ${formatCurrency(amount)}.`,
+      });
+      // Also copy to clipboard
+      navigator.clipboard.writeText(url).catch(() => {});
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.error || 'Failed to generate payment link';
+      toast({ title: 'Error', description: msg, variant: 'destructive' });
+    },
   });
 
   if (!booking) return null;
@@ -191,12 +208,22 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
 
               {/* Add payment */}
               {outstanding > 0 && !showPayment && (
-                <button
-                  onClick={() => { setShowPayment(true); setPayAmount(outstanding.toString()); }}
-                  className="mt-3 flex items-center gap-1.5 text-sm text-resort-600 hover:text-resort-700 font-medium"
-                >
-                  <Plus className="h-4 w-4" /> Record Payment
-                </button>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <button
+                    onClick={() => { setShowPayment(true); setPayAmount(outstanding.toString()); }}
+                    className="flex items-center gap-1.5 text-sm text-resort-600 hover:text-resort-700 font-medium"
+                  >
+                    <Plus className="h-4 w-4" /> Record Payment
+                  </button>
+                  <button
+                    onClick={() => sendPaymentLink.mutate()}
+                    disabled={sendPaymentLink.isPending}
+                    className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
+                  >
+                    <Link2 className="h-4 w-4" />
+                    {sendPaymentLink.isPending ? 'Sending...' : 'Send Payment Link to Guest'}
+                  </button>
+                </div>
               )}
               {showPayment && (
                 <div className="mt-3 space-y-3 rounded-xl border border-resort-200 bg-resort-50 p-4">

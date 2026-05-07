@@ -1,0 +1,42 @@
+'use client';
+
+import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { XCircle } from 'lucide-react';
+
+function CancelContent() {
+  const params = useSearchParams();
+  const booking = params.get('booking');
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[#1a6b5e] via-[#145a4f] to-[#0d3d36] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-10 max-w-md w-full text-center">
+        <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <XCircle className="w-10 h-10 text-red-400" />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Payment Cancelled</h1>
+        {booking && (
+          <p className="text-gray-500 mb-1">
+            Booking reference: <strong className="text-gray-800 font-mono">{booking}</strong>
+          </p>
+        )}
+        <p className="text-gray-500 text-sm mb-8">
+          No payment was made. Your booking is still on hold. Please contact the resort if you need assistance.
+        </p>
+        <div className="p-4 bg-gray-50 rounded-xl text-sm text-gray-600">
+          If you'd like to complete your payment, please ask the resort to send you a new payment link.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function PayCancelPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#1a6b5e] flex items-center justify-center">
+      <div className="text-white">Loading...</div>
+    </div>}>
+      <CancelContent />
+    </Suspense>
+  );
+}

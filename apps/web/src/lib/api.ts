@@ -171,3 +171,17 @@ export const tenantApi = {
   get: () => api.get('/tenant'),
   update: (data: unknown) => api.patch('/tenant', data),
 };
+
+
+// ── Billing ───────────────────────────────────────────────────────────────────
+export const billingApi = {
+  getStatus: () => api.get('/billing/status'),
+  getInvoices: () => api.get('/billing/invoices'),
+  createCheckout: (planKey: string) => api.post('/billing/checkout', { planKey }),
+  createPortal: () => api.post('/billing/portal'),
+};
+
+// ── Booking Payment Link ───────────────────────────────────────────────────────
+export const bookingPaymentApi = {
+  createPaymentLink: (bookingId: string) => api.post(`/bookings/${bookingId}/payment-link`),
+};

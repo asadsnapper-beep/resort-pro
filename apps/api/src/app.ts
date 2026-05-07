@@ -24,6 +24,7 @@ import { dashboardRoutes } from './routes/dashboard';
 import { notificationRoutes } from './routes/notifications';
 import { chatRoutes } from './routes/chat';
 import { crmRoutes, crmPublicRoutes } from './routes/crm';
+import { billingRoutes, stripeWebhookRoute } from './routes/billing';
 import { startAutomationEngine } from './services/automation';
 
 export async function buildApp() {
@@ -128,6 +129,9 @@ export async function buildApp() {
   await app.register(notificationRoutes, { prefix: '/api/notifications' });
   await app.register(crmRoutes, { prefix: '/api/crm' });
   await app.register(crmPublicRoutes, { prefix: '/crm' });
+  await app.register(billingRoutes, { prefix: '/api/billing' });
+  // Webhook must use raw body — register on its own prefix BEFORE json parser
+  await app.register(stripeWebhookRoute, { prefix: '/api/stripe' });
 
   // ── Start automation engine ───────────────────────────────────────────────
   if (process.env.NODE_ENV !== 'test') startAutomationEngine();
