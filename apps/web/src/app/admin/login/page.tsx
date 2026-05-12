@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAdminStore } from '@/store/admin';
 import { adminEndpoints } from '@/lib/admin-api';
@@ -8,7 +8,14 @@ import { Shield, Loader2 } from 'lucide-react';
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const { setAdmin } = useAdminStore();
+  const { setAdmin, isAdminAuthenticated } = useAdminStore();
+
+  // Redirect to dashboard if already logged in
+  useEffect(() => {
+    if (isAdminAuthenticated()) {
+      router.replace('/admin/dashboard');
+    }
+  }, [isAdminAuthenticated, router]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);

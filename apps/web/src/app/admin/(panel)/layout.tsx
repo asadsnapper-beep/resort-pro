@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAdminStore } from '@/store/admin';
 import {
   LayoutDashboard, Building2, Users, CreditCard,
-  LogOut, Shield, ChevronRight,
+  LogOut, Shield, ChevronRight, Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -21,12 +21,23 @@ export default function AdminPanelLayout({ children }: { children: React.ReactNo
   const router = useRouter();
   const pathname = usePathname();
   const { clearAdmin, admin, isAdminAuthenticated } = useAdminStore();
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     if (!isAdminAuthenticated()) {
       router.push('/admin/login');
     }
   }, [isAdminAuthenticated, router]);
+
+  // Show spinner until client-side mount — avoids SSR/localStorage mismatch
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+      </div>
+    );
+  }
 
   if (!isAdminAuthenticated()) return null;
 
