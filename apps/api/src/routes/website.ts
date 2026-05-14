@@ -365,6 +365,24 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
     },
   });
 
+  // GET /site/:slug/themes — list active themes (for owner dashboard picker)
+  app.get('/:slug/themes', {
+    schema: { tags: ['website'], summary: 'Get available themes list' },
+    handler: async (request, reply) => {
+      const { slug } = request.params as { slug: string };
+      const tenant = await prisma.tenant.findUnique({ where: { slug } });
+      if (!tenant || !tenant.isActive) return reply.status(404).send({ success: false, error: 'Resort not found' });
+
+      const themes = await prisma.theme.findMany({
+        where: { isActive: true },
+        orderBy: { sortOrder: 'asc' },
+        select: { key: true, name: true, description: true, previewImage: true, isPremium: true },
+      });
+
+      return ok(themes);
+    },
+  });
+
   // GET /site/:slug/menu — public menu (available items only)
   app.get('/:slug/menu', {
     schema: { tags: ['website'], summary: 'Get public menu for resort' },
