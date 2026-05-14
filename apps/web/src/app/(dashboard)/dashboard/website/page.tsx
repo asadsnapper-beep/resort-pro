@@ -8,7 +8,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
-import { Globe, Image, FileText, Palette, Star, Plus, Trash2, Save, Eye, Layout, CheckCircle2, ExternalLink } from 'lucide-react';
+import { Globe, Image, FileText, Palette, Star, Plus, Trash2, Save, Layout, ExternalLink } from 'lucide-react';
+import { ThemePicker } from '@/components/dashboard/website/ThemePicker';
 
 interface WebsiteContent {
   heroTitle: string;
@@ -26,57 +27,6 @@ interface WebsiteContent {
   templateId?: string;
 }
 
-/* ── Available Templates ──────────────────────────────────────────────────── */
-const TEMPLATES = [
-  {
-    id: 'luxe',
-    name: 'Luxe',
-    description: 'Full-screen hero, luxury card grid for rooms, smooth scroll navigation',
-    tags: ['Luxury', 'Modern', 'Full-Screen Hero'],
-    preview: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&q=80',
-    status: 'available' as const,
-  },
-  {
-    id: 'coastal',
-    name: 'Coastal',
-    description: 'Breezy beachside layout with wave animations and ocean color palette',
-    tags: ['Beach', 'Relaxed', 'Animated'],
-    preview: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80',
-    status: 'coming_soon' as const,
-  },
-  {
-    id: 'boutique',
-    name: 'Boutique',
-    description: 'Intimate editorial style with large typography and asymmetric layouts',
-    tags: ['Editorial', 'Boutique', 'Minimalist'],
-    preview: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=600&q=80',
-    status: 'coming_soon' as const,
-  },
-  {
-    id: 'villa',
-    name: 'Villa',
-    description: 'Private villa aesthetics with immersive gallery and split-screen layout',
-    tags: ['Villa', 'Immersive', 'Gallery-First'],
-    preview: 'https://images.unsplash.com/photo-1605276374104-dee2a0ed3cd6?w=600&q=80',
-    status: 'coming_soon' as const,
-  },
-  {
-    id: 'urban',
-    name: 'Urban',
-    description: 'Sleek city hotel style with dark theme option and grid-based layout',
-    tags: ['City Hotel', 'Dark Mode', 'Sleek'],
-    preview: 'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=600&q=80',
-    status: 'coming_soon' as const,
-  },
-  {
-    id: 'nature',
-    name: 'Nature Retreat',
-    description: 'Earthy tones, organic shapes and nature photography showcase',
-    tags: ['Eco', 'Nature', 'Organic'],
-    preview: 'https://images.unsplash.com/photo-1470114716159-e389f8712fda?w=600&q=80',
-    status: 'coming_soon' as const,
-  },
-] as const;
 
 const TABS = [
   { id: 'template', label: 'Template', icon: Layout },
@@ -218,81 +168,13 @@ export default function WebsitePage() {
         ))}
       </div>
 
-      {/* ── Template Picker ─────────────────────────────────────────────── */}
-      {tab === 'template' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">Choose a layout for your public website. More templates coming soon.</p>
-            <span className="text-xs font-semibold text-resort-600 bg-resort-50 px-2.5 py-1 rounded-full">
-              {TEMPLATES.filter(t => t.status === 'available').length} available · {TEMPLATES.filter(t => t.status === 'coming_soon').length} coming soon
-            </span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {TEMPLATES.map(tpl => {
-              const isSelected = form.templateId === tpl.id;
-              const isAvailable = tpl.status === 'available';
-              return (
-                <div
-                  key={tpl.id}
-                  onClick={() => isAvailable && set('templateId', tpl.id)}
-                  className={`rounded-2xl border-2 overflow-hidden transition-all ${
-                    isSelected ? 'border-resort-600 shadow-lg shadow-resort-100' :
-                    isAvailable ? 'border-gray-200 hover:border-resort-300 hover:shadow-md cursor-pointer' :
-                    'border-gray-200 opacity-60 cursor-not-allowed'
-                  }`}
-                >
-                  {/* Preview image */}
-                  <div className="relative h-40 overflow-hidden">
-                    <img src={tpl.preview} alt={tpl.name} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                    {/* Selected badge */}
-                    {isSelected && (
-                      <div className="absolute top-3 right-3 flex items-center gap-1 bg-resort-600 text-white text-xs font-semibold px-2.5 py-1 rounded-full">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Active
-                      </div>
-                    )}
-                    {/* Coming Soon badge */}
-                    {!isAvailable && (
-                      <div className="absolute top-3 right-3 bg-gray-800/80 text-white text-xs font-semibold px-2.5 py-1 rounded-full">
-                        Coming Soon
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div className="p-4">
-                    <div className="flex items-center justify-between mb-1">
-                      <h3 className="font-bold text-gray-900">{tpl.name}</h3>
-                      {isAvailable && !isSelected && (
-                        <span className="text-xs font-medium text-resort-600">Free</span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-500 mb-3">{tpl.description}</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {tpl.tags.map(tag => (
-                        <span key={tag} className="text-xs rounded-full px-2 py-0.5 bg-gray-100 text-gray-600">{tag}</span>
-                      ))}
-                    </div>
-                    {isSelected && isAvailable && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); window.open(publicUrl!, '_blank'); }}
-                        className="mt-3 w-full text-xs font-medium text-resort-600 hover:text-resort-800 flex items-center justify-center gap-1 border border-resort-200 rounded-lg py-1.5 hover:bg-resort-50 transition-colors"
-                      >
-                        <Eye className="h-3.5 w-3.5" /> Preview Live Site
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="mt-6 rounded-xl border border-dashed border-gray-200 p-6 text-center">
-            <Layout className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-            <p className="text-sm font-medium text-gray-500">More templates being designed</p>
-            <p className="text-xs text-muted-foreground mt-1">New layouts are added regularly. All templates use your brand colors and content.</p>
-          </div>
-        </div>
+      {/* ── Theme Picker ────────────────────────────────────────────────── */}
+      {tab === 'template' && tenant?.slug && (
+        <ThemePicker
+          currentTheme={form.templateId ?? 'luxe'}
+          slug={tenant.slug}
+          onSelect={(key) => set('templateId', key)}
+        />
       )}
 
       {/* ── Hero & About ─────────────────────────────────────────────────── */}
