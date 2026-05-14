@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { AvailabilityCalendar } from '../themes/_widgets/AvailabilityCalendar';
 import {
   Star, Phone, Mail, MapPin, ChevronDown, Bed, Users, Calendar,
   ArrowRight, CheckCircle, Menu, X, Send,
@@ -1124,23 +1125,36 @@ function MenuSection({ data, primaryColor, accentColor }: {
 }
 
 /* ── Booking Form ────────────────────────────────────────────────────────────── */
-function BookingSection({ data }: { data: ResortData }) {
+function BookingSection({ data, initialCheckIn, initialCheckOut, initialRoomId }: {
+  data: ResortData;
+  initialCheckIn?: string;
+  initialCheckOut?: string;
+  initialRoomId?: string;
+}) {
   const { tenant, rooms } = data;
   const slug = tenant.slug;
   const primary = data.website.primaryColor || '#1a6b5e';
   const accent = data.website.accentColor || '#d4a853';
 
-  const [step, setStep] = useState<'dates' | 'rooms' | 'details' | 'success'>('dates');
-  const [checkIn, setCheckIn] = useState('');
-  const [checkOut, setCheckOut] = useState('');
+  const [checkIn, setCheckIn] = useState(initialCheckIn ?? '');
+  const [checkOut, setCheckOut] = useState(initialCheckOut ?? '');
   const [adults, setAdults] = useState(2);
-  const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
-  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const [selectedRoom, setSelectedRoom] = useState<Room | null>(
+    initialRoomId ? (rooms.find(r => r.id === initialRoomId) ?? null) : null,
+  );
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', specialRequests: '' });
   const [submitting, setSubmitting] = useState(false);
   const [confirmation, setConfirmation] = useState<{ confirmationNo: string; totalAmount: number; nights: number } | null>(null);
   const [error, setError] = useState('');
+
+  // If pre-filled from calendar, jump to details step
+  const [step, setStep] = useState<'dates' | 'rooms' | 'details' | 'success'>(
+    initialCheckIn && initialCheckOut && initialRoomId ? 'details' : 'dates',
+  );
+  const [availableRooms, setAvailableRooms] = useState<Room[]>(
+    initialRoomId ? rooms.filter(r => r.id === initialRoomId) : [],
+  );
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -1492,6 +1506,11 @@ export function LuxeTemplate({ data }: { data: ResortData }) {
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [bookingRoom, setBookingRoom]   = useState<Room | null>(null);
 
+  // Calendar → Booking pre-fill state
+  const [calendarCheckIn, setCalendarCheckIn]   = useState('');
+  const [calendarCheckOut, setCalendarCheckOut] = useState('');
+  const [calendarRoomId, setCalendarRoomId]     = useState('');
+
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 60);
     window.addEventListener('scroll', onScroll);
@@ -1501,6 +1520,7 @@ export function LuxeTemplate({ data }: { data: ResortData }) {
   const navItems = [
     { id: 'about', label: 'About' },
     { id: 'rooms', label: 'Rooms' },
+    { id: 'availability', label: 'Availability' },
     { id: 'menu', label: 'Menu' },
     { id: 'gallery', label: 'Gallery' },
     { id: 'booking', label: 'Book Now' },
@@ -1805,8 +1825,38 @@ export function LuxeTemplate({ data }: { data: ResortData }) {
         </section>
       )}
 
+      {/* ── Availability Calendar ────────────────────────────────────────────── */}
+      <section id="availability" className="py-20 bg-stone-50">
+        <div className="max-w-4xl mx-auto px-6">
+          <div className="text-center mb-10">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] mb-3" style={{ color: accent }}>
+              Availability
+            </p>
+            <h2 className="text-4xl font-bold text-gray-900">Check Availability</h2>
+            <p className="mt-3 text-gray-500">Select your dates to see available rooms</p>
+          </div>
+          <AvailabilityCalendar
+            slug={tenant.slug}
+            primaryColor={primary}
+            accentColor={accent}
+            currency={tenant.currency}
+            onRoomSelect={(room, checkIn, checkOut) => {
+              setCalendarCheckIn(checkIn.toISOString().split('T')[0]);
+              setCalendarCheckOut(checkOut.toISOString().split('T')[0]);
+              setCalendarRoomId(room.id);
+              document.getElementById('booking')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+          />
+        </div>
+      </section>
+
       {/* ── Booking ──────────────────────────────────────────────────────────── */}
-      <BookingSection data={data} />
+      <BookingSection
+        data={data}
+        initialCheckIn={calendarCheckIn || undefined}
+        initialCheckOut={calendarCheckOut || undefined}
+        initialRoomId={calendarRoomId || undefined}
+      />
 
       {/* ── Feedback ─────────────────────────────────────────────────────────── */}
       <FeedbackSection data={data} />
