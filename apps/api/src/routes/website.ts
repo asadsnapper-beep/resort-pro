@@ -253,6 +253,118 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
     },
   });
 
+  // GET /site/:slug/availability/calendar — monthly availability calendar
+  app.get('/:slug/availability/calendar', {
+    schema: { tags: ['website'], summary: 'Get monthly room availability calendar' },
+    handler: async (request, reply) => {
+      const { slug } = request.params as { slug: string };
+      const query = request.query as { month?: string; roomType?: string };
+
+      // Validate slug
+      const tenant = await prisma.tenant.findUnique({
+        where: { slug },
+        select: { id: true, isActive: true },
+      });
+      if (!tenant || !tenant.isActive) {
+        return reply.status(404).send({ success: false, error: 'Resort not found' });
+      }
+
+      // Validate month format YYYY-MM
+      if (!query.month || !/^\d{4}-\d{2}$/.test(query.month)) {
+        return reply.status(400).send({ success: false, error: 'month is required in YYYY-MM format' });
+      }
+
+      const [yearStr, monthStr] = query.month.split('-');
+      const year = parseInt(yearStr, 10);
+      const month = parseInt(monthStr, 10); // 1-based
+
+      if (month < 1 || month > 12) {
+        return reply.status(400).send({ success: false, error: 'Invalid month value' });
+      }
+
+      // First and last day of the month
+      const firstDay = new Date(year, month - 1, 1);
+      const lastDay = new Date(year, month, 0); // day 0 of next month = last day of current month
+      lastDay.setHours(23, 59, 59, 999);
+
+      // Fetch active rooms (with optional roomType filter)
+      const validRoomTypes = ['STANDARD', 'DELUXE', 'SUITE', 'VILLA', 'COTTAGE', 'BUNGALOW'] as const;
+      type RoomType = typeof validRoomTypes[number];
+      const roomTypeFilter = query.roomType && (validRoomTypes as readonly string[]).includes(query.roomType)
+        ? (query.roomType as RoomType)
+        : undefined;
+
+      const rooms = await prisma.room.findMany({
+        where: {
+          tenantId: tenant.id,
+          isActive: true,
+          status: { not: 'MAINTENANCE' },
+          ...(roomTypeFilter ? { type: roomTypeFilter } : {}),
+        },
+        select: { id: true },
+      });
+
+      const totalRooms = rooms.length;
+      const roomIds = rooms.map((r) => r.id);
+
+      if (totalRooms === 0) {
+        return ok({ month: query.month, totalRooms: 0, days: {} });
+      }
+
+      // Fetch all bookings that overlap this month
+      const bookings = await prisma.booking.findMany({
+        where: {
+          tenantId: tenant.id,
+          roomId: { in: roomIds },
+          status: { in: ['CONFIRMED', 'CHECKED_IN'] },
+          AND: [
+            { checkIn: { lt: lastDay } },
+            { checkOut: { gt: firstDay } },
+          ],
+        },
+        select: { roomId: true, checkIn: true, checkOut: true },
+      });
+
+      // Build per-day availability map
+      const days: Record<string, { available: number; total: number; status: string }> = {};
+      const daysInMonth = lastDay.getDate();
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dayStart = new Date(year, month - 1, d, 0, 0, 0, 0);
+        const dayEnd = new Date(year, month - 1, d, 23, 59, 59, 999);
+
+        // Count how many rooms are booked on this day
+        const bookedRoomIds = new Set<string>();
+        for (const booking of bookings) {
+          const checkIn = new Date(booking.checkIn);
+          const checkOut = new Date(booking.checkOut);
+          // A booking covers this day if checkIn < dayEnd AND checkOut > dayStart
+          if (checkIn < dayEnd && checkOut > dayStart) {
+            bookedRoomIds.add(booking.roomId);
+          }
+        }
+
+        const booked = bookedRoomIds.size;
+        const available = totalRooms - booked;
+
+        let status: string;
+        if (available === 0) {
+          status = 'full';
+        } else if (available === totalRooms) {
+          status = 'available';
+        } else {
+          status = 'partial';
+        }
+
+        // Format date as YYYY-MM-DD
+        const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        days[dateKey] = { available, total: totalRooms, status };
+      }
+
+      return ok({ month: query.month, totalRooms, days });
+    },
+  });
+
   // GET /site/:slug/menu — public menu (available items only)
   app.get('/:slug/menu', {
     schema: { tags: ['website'], summary: 'Get public menu for resort' },
