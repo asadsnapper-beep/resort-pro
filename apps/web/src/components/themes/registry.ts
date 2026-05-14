@@ -2,8 +2,7 @@ import type React from 'react'
 import type { ThemeProps } from './types'
 import { LuxeTheme }    from './luxe'
 import { MinimalTheme } from './minimal'
-// Future themes:
-// import { CoastalTheme } from './coastal'
+import { CoastalTheme } from './coastal'
 
 /* ── Theme Registry ──────────────────────────────────────────────────────────
    নতুন theme add করতে হলে:
@@ -14,7 +13,7 @@ import { MinimalTheme } from './minimal'
 export const THEME_REGISTRY: Record<string, React.ComponentType<ThemeProps>> = {
   luxe:    LuxeTheme,
   minimal: MinimalTheme,
-  // coastal: CoastalTheme,
+  coastal: CoastalTheme,
 }
 
 export type ThemeKey = keyof typeof THEME_REGISTRY
