@@ -7,9 +7,9 @@
 
 ## 🔴 Current Task
 
-**T-08 — Owner Dashboard Theme Picker UI**
-Branch: `feature/theme-picker`
-Task file: [task-08](./tasks/task-08-theme-picker.md)
+**T-09 — Admin Panel Theme Management Page**
+Branch: `feature/admin-themes`
+Task file: [task-09](./tasks/task-09-admin-themes.md)
 
 ---
 
@@ -84,3 +84,4 @@ Task file: [task-08](./tasks/task-08-theme-picker.md)
 | 2026-05-14 | T-05 | LuxeTemplate refactored → themes/luxe/ (sections/ + components/ + utils.tsx + config.ts). LuxeTheme fully assembled. feature/theme-system → main merged। |
 | 2026-05-14 | T-06 | Minimal Clean theme built। 7 sections, horizontal room cards, blue-600 palette, registered in THEME_REGISTRY। main-এ merge। |
 | 2026-05-14 | T-07 | Coastal Breeze theme built। 10 sections, wave SVG dividers, AmenitiesSection, split booking panel, dark cyan footer। main-এ merge। |
+| 2026-05-14 | T-08 | Theme picker UI। GET /site/:slug/themes API + ThemePicker component (DB-driven, fallback list, color hints, active ring)। website/page.tsx updated। |
