@@ -7,10 +7,10 @@
 
 ## 🔴 Current Task
 
-**T-03 — Theme System Foundation**
-Branch: `feature/theme-system`
-Task file: [task-03](./tasks/task-03-theme-system-foundation.md)
-Next step: Step 1 — Branch তৈরি করো
+**T-04 — Extract Shared Widgets**
+Branch: `feature/theme-system` (same branch)
+Task file: [task-04](./tasks/task-04-extract-widgets.md)
+Next step: Step 1 — BookingForm widget extract করো
 
 ---
 
@@ -80,3 +80,4 @@ Next step: Step 1 — Branch তৈরি করো
 | 2026-05-14 | Task files T-01 to T-09 | docs/tasks/ folder-এ সব task files তৈরি। T-01 to T-09 ready for implementation. |
 | 2026-05-14 | T-01 | Availability Calendar API endpoint সম্পূর্ণ। GET /site/:slug/availability/calendar implemented + tested. |
 | 2026-05-14 | T-02 | AvailabilityCalendar widget তৈরি + LuxeTemplate-এ inject। Calendar → Booking pre-fill কাজ করছে। main-এ merge। |
+| 2026-05-14 | T-03 | Theme system foundation। types.ts, registry.ts, luxe/index.tsx, page.tsx update, Theme DB model + seed। |
