@@ -7,9 +7,9 @@
 
 ## 🔴 Current Task
 
-**T-06 — Minimal Clean Theme**
-Branch: `feature/minimal-theme`
-Task file: [task-06](./tasks/task-06-minimal-theme.md)
+**T-07 — Coastal Breeze Theme**
+Branch: `feature/coastal-theme`
+Task file: [task-07](./tasks/task-07-coastal-theme.md)
 
 ---
 
@@ -82,3 +82,4 @@ Task file: [task-06](./tasks/task-06-minimal-theme.md)
 | 2026-05-14 | T-03 | Theme system foundation। types.ts, registry.ts, luxe/index.tsx, page.tsx update, Theme DB model + seed। |
 | 2026-05-14 | T-04 | BookingForm, MenuWidget, ContactForm extracted। LuxeTemplate 756 lines reduced। Widget-based architecture। |
 | 2026-05-14 | T-05 | LuxeTemplate refactored → themes/luxe/ (sections/ + components/ + utils.tsx + config.ts). LuxeTheme fully assembled. feature/theme-system → main merged। |
+| 2026-05-14 | T-06 | Minimal Clean theme built। 7 sections, horizontal room cards, blue-600 palette, registered in THEME_REGISTRY। main-এ merge। |
