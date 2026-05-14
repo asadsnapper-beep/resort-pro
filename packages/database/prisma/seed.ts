@@ -197,6 +197,22 @@ async function main() {
   }
   console.log(`✅ Inventory items created`);
 
+  // ── Default Themes ─────────────────────────────────────────────────────────
+  const defaultThemes = [
+    { key: 'luxe',    name: 'Luxe Gold',      description: 'Elegant luxury design with gold accents',                sortOrder: 1 },
+    { key: 'minimal', name: 'Minimal Clean',   description: 'Clean modern design with focus on whitespace',           sortOrder: 2 },
+    { key: 'coastal', name: 'Coastal Breeze',  description: 'Ocean-inspired design for beach and coastal properties', sortOrder: 3 },
+  ];
+
+  for (const theme of defaultThemes) {
+    await prisma.theme.upsert({
+      where:  { key: theme.key },
+      update: {},
+      create: theme,
+    });
+  }
+  console.log('✅ Default themes seeded (luxe, minimal, coastal)');
+
   console.log('\n🎉 Seed completed successfully!');
   console.log('\n📋 Login credentials:');
   console.log('  Owner:   owner@palmparadise.com / Password123!');

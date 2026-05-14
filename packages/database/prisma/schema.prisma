@@ -1007,3 +1007,19 @@ model Notification {
   @@index([isRead])
   @@map("notifications")
 }
+
+// ─── Themes ───────────────────────────────────────────────────────────────────
+
+model Theme {
+  id           String   @id @default(uuid())
+  key          String   @unique   // "luxe", "minimal", "coastal"
+  name         String             // "Luxe Gold"
+  description  String?
+  previewImage String?
+  isActive     Boolean  @default(true)
+  isPremium    Boolean  @default(false)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@map("themes")
+}
