@@ -17,14 +17,14 @@
 
 ## Steps
 
-### 🔲 Step 1 — Branch তৈরি করো
+### ✅ Step 1 — Branch তৈরি করো
 ```bash
 git checkout main
 git pull origin main
 git checkout -b feature/availability-calendar
 ```
 
-### 🔲 Step 2 — নতুন endpoint যোগ করো
+### ✅ Step 2 — নতুন endpoint যোগ করো
 
 **File:** `apps/api/src/routes/website.ts`
 
@@ -66,11 +66,11 @@ available = total     → "available"
 6. status assign করো
 7. Return করো
 
-### 🔲 Step 3 — Existing `/availability` endpoint review করো
+### ✅ Step 3 — Existing `/availability` endpoint review করো
 Existing endpoint: `GET /site/:slug/availability?checkIn=...&checkOut=...`
 এটা ঠিক আছে কিনা দেখো, দরকার হলে ছোট fix করো।
 
-### 🔲 Step 4 — Manual test করো
+### ✅ Step 4 — Manual test করো
 
 ```bash
 # API চালু থাকলে:
@@ -79,7 +79,7 @@ curl "http://localhost:4000/site/your-resort-slug/availability/calendar?month=20
 
 Response দেখো — সব দিনের data আসছে কিনা।
 
-### 🔲 Step 5 — Commit করো
+### ✅ Step 5 — Commit করো
 
 ```bash
 git add apps/api/src/routes/website.ts

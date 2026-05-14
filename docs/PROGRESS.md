@@ -7,8 +7,10 @@
 
 ## 🔴 Current Task
 
-**কোনো active task নেই।**
-নিচের Backlog থেকে পরের task pick করো।
+**T-02 — Availability Calendar Frontend Widget**
+Branch: `feature/availability-calendar`
+Task file: [task-02](./tasks/task-02-availability-calendar-widget.md)
+Next step: Step 1 — Widget folder তৈরি করো (`apps/web/src/components/themes/_widgets/`)
 
 ---
 
@@ -76,3 +78,4 @@
 |------|------|----------|
 | 2026-05-14 | Setup + Auth + Dashboard + Stripe + Admin + Business Control + Docs | Initial build complete |
 | 2026-05-14 | Task files T-01 to T-09 | docs/tasks/ folder-এ সব task files তৈরি। T-01 to T-09 ready for implementation. |
+| 2026-05-14 | T-01 | Availability Calendar API endpoint সম্পূর্ণ। GET /site/:slug/availability/calendar implemented + tested. |
