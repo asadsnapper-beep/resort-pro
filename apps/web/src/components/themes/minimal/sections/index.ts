@@ -1,0 +1,7 @@
+export { HeroSection }         from './HeroSection'
+export { AboutSection }        from './AboutSection'
+export { RoomsSection }        from './RoomsSection'
+export { AvailabilitySection } from './AvailabilitySection'
+export { BookingSection }      from './BookingSection'
+export { ContactSection }      from './ContactSection'
+export { FooterSection }       from './FooterSection'

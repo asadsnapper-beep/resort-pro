@@ -1,8 +1,8 @@
 import type React from 'react'
 import type { ThemeProps } from './types'
-import { LuxeTheme } from './luxe'
+import { LuxeTheme }    from './luxe'
+import { MinimalTheme } from './minimal'
 // Future themes:
-// import { MinimalTheme } from './minimal'
 // import { CoastalTheme } from './coastal'
 
 /* ── Theme Registry ──────────────────────────────────────────────────────────
@@ -12,8 +12,8 @@ import { LuxeTheme } from './luxe'
    3. packages/database/prisma/seed.ts-এ DB entry add করো
 ──────────────────────────────────────────────────────────────────────────── */
 export const THEME_REGISTRY: Record<string, React.ComponentType<ThemeProps>> = {
-  luxe: LuxeTheme,
-  // minimal: MinimalTheme,
+  luxe:    LuxeTheme,
+  minimal: MinimalTheme,
   // coastal: CoastalTheme,
 }
 
