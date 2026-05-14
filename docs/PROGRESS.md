@@ -5,11 +5,11 @@
 
 ---
 
-## 🔴 Current Task
+## 🟢 Current Status
 
-**T-09 — Admin Panel Theme Management Page**
-Branch: `feature/admin-themes`
-Task file: [task-09](./tasks/task-09-admin-themes.md)
+**Part 04B — Public Website Advanced — সম্পূর্ণ ✅**
+
+Backlog-এর T-01 থেকে T-09 সব complete। পরবর্তী কাজ: T-10 পরিকল্পনা করো বা নতুন features plan করো।
 
 ---
 
@@ -85,3 +85,4 @@ Task file: [task-09](./tasks/task-09-admin-themes.md)
 | 2026-05-14 | T-06 | Minimal Clean theme built। 7 sections, horizontal room cards, blue-600 palette, registered in THEME_REGISTRY। main-এ merge। |
 | 2026-05-14 | T-07 | Coastal Breeze theme built। 10 sections, wave SVG dividers, AmenitiesSection, split booking panel, dark cyan footer। main-এ merge। |
 | 2026-05-14 | T-08 | Theme picker UI। GET /site/:slug/themes API + ThemePicker component (DB-driven, fallback list, color hints, active ring)। website/page.tsx updated। |
+| 2026-05-14 | T-09 | Admin theme management। GET/PUT/PATCH theme CRUD API + /admin/themes page (inline edit, toggle, usage count, Add modal)। Part 04B ✅ |
