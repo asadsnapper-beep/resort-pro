@@ -7,10 +7,9 @@
 
 ## 🔴 Current Task
 
-**T-05 — LuxeTemplate Refactor → themes/luxe/ structure**
-Branch: `feature/theme-system` (same branch)
-Task file: [task-05](./tasks/task-05-luxe-theme-refactor.md)
-Next step: Step 1 — sections/ folder তৈরি করো
+**T-06 — Minimal Clean Theme**
+Branch: `feature/minimal-theme`
+Task file: [task-06](./tasks/task-06-minimal-theme.md)
 
 ---
 
@@ -82,3 +81,4 @@ Next step: Step 1 — sections/ folder তৈরি করো
 | 2026-05-14 | T-02 | AvailabilityCalendar widget তৈরি + LuxeTemplate-এ inject। Calendar → Booking pre-fill কাজ করছে। main-এ merge। |
 | 2026-05-14 | T-03 | Theme system foundation। types.ts, registry.ts, luxe/index.tsx, page.tsx update, Theme DB model + seed। |
 | 2026-05-14 | T-04 | BookingForm, MenuWidget, ContactForm extracted। LuxeTemplate 756 lines reduced। Widget-based architecture। |
+| 2026-05-14 | T-05 | LuxeTemplate refactored → themes/luxe/ (sections/ + components/ + utils.tsx + config.ts). LuxeTheme fully assembled. feature/theme-system → main merged। |
