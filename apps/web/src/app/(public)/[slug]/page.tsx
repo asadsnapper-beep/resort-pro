@@ -1,48 +1,7 @@
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
-import { LuxeTemplate } from '@/components/templates/LuxeTemplate';
-
-interface ResortData {
-  tenant: {
-    name: string;
-    slug: string;
-    phone?: string;
-    email?: string;
-    address?: string;
-    currency: string;
-    checkInTime: string;
-    checkOutTime: string;
-    logoUrl?: string;
-  };
-  website: {
-    heroTitle: string;
-    heroSubtitle?: string;
-    heroImage?: string;
-    aboutTitle?: string;
-    aboutText?: string;
-    aboutImage?: string;
-    galleryImages?: string[];
-    testimonials?: { name: string; text: string; rating: number; avatar?: string }[];
-    seoTitle?: string;
-    seoDescription?: string;
-    primaryColor?: string;
-    accentColor?: string;
-    templateId?: string;
-  } | null;
-  rooms: {
-    id: string;
-    name: string;
-    type: string;
-    number: string;
-    basePrice: number;
-    maxOccupancy: number;
-    floor?: number;
-    images: string[];
-    videos: string[];
-    amenities: string[];
-    description?: string;
-  }[];
-}
+import { getTheme } from '@/components/themes/registry';
+import type { ResortData } from '@/components/themes/types';
 
 async function fetchResortData(slug: string): Promise<ResortData | null> {
   try {
@@ -79,6 +38,6 @@ export default async function ResortWebsitePage({ params }: { params: { slug: st
     notFound();
   }
 
-  // Template selection (future: switch based on data.website.templateId)
-  return <LuxeTemplate data={data} />;
+  const ThemeComponent = getTheme(data.website?.templateId);
+  return <ThemeComponent data={data} />;
 }
