@@ -18,5 +18,6 @@ wf-02-workflow-name.md
 | File | Workflow | Description |
 |------|----------|-------------|
 | [wf-01-git-branching-workflow.md](./wf-01-git-branching-workflow.md) | Git Branching | Feature branch তৈরি → commit → merge → push এর পুরো flow |
+| [wf-02-theme-development.md](./wf-02-theme-development.md) | Theme Development | নতুন resort theme বানানোর step-by-step instruction |
 
 <!-- নতুন workflow add হলে এই table-এ যোগ করো -->
