@@ -7,10 +7,10 @@
 
 ## 🔴 Current Task
 
-**T-04 — Extract Shared Widgets**
+**T-05 — LuxeTemplate Refactor → themes/luxe/ structure**
 Branch: `feature/theme-system` (same branch)
-Task file: [task-04](./tasks/task-04-extract-widgets.md)
-Next step: Step 1 — BookingForm widget extract করো
+Task file: [task-05](./tasks/task-05-luxe-theme-refactor.md)
+Next step: Step 1 — sections/ folder তৈরি করো
 
 ---
 
@@ -81,3 +81,4 @@ Next step: Step 1 — BookingForm widget extract করো
 | 2026-05-14 | T-01 | Availability Calendar API endpoint সম্পূর্ণ। GET /site/:slug/availability/calendar implemented + tested. |
 | 2026-05-14 | T-02 | AvailabilityCalendar widget তৈরি + LuxeTemplate-এ inject। Calendar → Booking pre-fill কাজ করছে। main-এ merge। |
 | 2026-05-14 | T-03 | Theme system foundation। types.ts, registry.ts, luxe/index.tsx, page.tsx update, Theme DB model + seed। |
+| 2026-05-14 | T-04 | BookingForm, MenuWidget, ContactForm extracted। LuxeTemplate 756 lines reduced। Widget-based architecture। |
