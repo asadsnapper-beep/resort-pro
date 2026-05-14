@@ -97,14 +97,22 @@ export async function adminRoutes(app: FastifyInstance) {
       prisma.room.count(),
       prisma.tenant.findMany({
         orderBy: { createdAt: 'desc' },
-        take: 5,
-        select: { id: true, name: true, slug: true, plan: true, planStatus: true, createdAt: true, isActive: true },
+        take: 8,
+        select: { id: true, name: true, slug: true, plan: true, planStatus: true, createdAt: true, isActive: true, trialEndsAt: true },
       }),
       prisma.tenant.groupBy({ by: ['plan'], _count: { _all: true } }),
     ]);
 
-    // Rough MRR estimate from active paid plans
-    const planPrices: Record<string, number> = { STARTER: 49, PROFESSIONAL: 99, ENTERPRISE: 199, FREE: 0 };
+    // Get MRR from platform settings plan prices
+    const platformSettings = await prisma.platformSettings.findUnique({ where: { id: 'singleton' } });
+    const settingsPlans = (platformSettings?.plans ?? []) as Array<{ key: string; price: number }>;
+    const planPrices: Record<string, number> = { FREE: 0 };
+    for (const p of settingsPlans) planPrices[p.key] = p.price;
+    // Fallback hardcoded prices
+    if (!planPrices.STARTER) planPrices.STARTER = 49;
+    if (!planPrices.PROFESSIONAL) planPrices.PROFESSIONAL = 99;
+    if (!planPrices.ENTERPRISE) planPrices.ENTERPRISE = 199;
+
     const mrr = planBreakdown.reduce((sum, p) => {
       return sum + (planPrices[p.plan] || 0) * (p._count._all || 0);
     }, 0);
@@ -371,5 +379,182 @@ export async function adminRoutes(app: FastifyInstance) {
   app.get('/me', { preHandler: requireSuperAdmin }, async (request, reply) => {
     const user = request.user as any;
     return reply.send({ success: true, data: { email: user.email, isSuperAdmin: true } });
+  });
+
+  // ── GET /api/admin/tenants/:id/export ─────────────────────────────────
+  // Full data export for a tenant (JSON format). Admin can download from UI.
+  app.get<{ Params: { id: string } }>(
+    '/tenants/:id/export',
+    { preHandler: requireSuperAdmin },
+    async (request, reply) => {
+      const { id } = request.params;
+
+      const [tenant, rooms, bookings, guests, users] = await Promise.all([
+        prisma.tenant.findUnique({
+          where: { id },
+          select: {
+            id: true, name: true, slug: true, plan: true, planStatus: true,
+            trialEndsAt: true, billingEmail: true, createdAt: true,
+          },
+        }),
+        prisma.room.findMany({ where: { tenantId: id }, select: { id: true, name: true, type: true, floor: true, status: true, basePrice: true } }),
+        prisma.booking.findMany({
+          where: { tenantId: id },
+          select: {
+            id: true, confirmationNo: true, status: true, checkIn: true, checkOut: true,
+            totalAmount: true, paidAmount: true, createdAt: true,
+            guest: { select: { firstName: true, lastName: true, email: true, phone: true } },
+            room: { select: { name: true } },
+          },
+        }),
+        prisma.guest.findMany({
+          where: { tenantId: id },
+          select: { id: true, firstName: true, lastName: true, email: true, phone: true, nationality: true, createdAt: true },
+        }),
+        prisma.user.findMany({
+          where: { tenantId: id },
+          select: { id: true, email: true, firstName: true, lastName: true, role: true, createdAt: true },
+        }),
+      ]);
+
+      if (!tenant) {
+        return reply.status(404).send({ success: false, error: 'Tenant not found' });
+      }
+
+      const exportData = {
+        exportedAt: new Date().toISOString(),
+        exportedBy: 'ResortPro Super Admin',
+        tenant,
+        summary: {
+          totalRooms: rooms.length,
+          totalBookings: bookings.length,
+          totalGuests: guests.length,
+          totalUsers: users.length,
+        },
+        rooms,
+        bookings,
+        guests,
+        users,
+      };
+
+      reply.header('Content-Type', 'application/json');
+      reply.header('Content-Disposition', `attachment; filename="resortpro-export-${tenant.slug}-${new Date().toISOString().slice(0, 10)}.json"`);
+      return reply.send(exportData);
+    },
+  );
+
+  // ── POST /api/admin/tenants/:id/extend-trial ──────────────────────────
+  // Extend trial by N days
+  app.post<{ Params: { id: string }; Body: { days: number } }>(
+    '/tenants/:id/extend-trial',
+    { preHandler: requireSuperAdmin },
+    async (request, reply) => {
+      const { id } = request.params;
+      const { days } = request.body || {};
+
+      if (!days || days < 1 || days > 365) {
+        return reply.status(400).send({ success: false, error: 'days must be 1–365' });
+      }
+
+      const tenant = await prisma.tenant.findUnique({ where: { id } });
+      if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
+
+      const base = tenant.trialEndsAt && tenant.trialEndsAt > new Date()
+        ? tenant.trialEndsAt   // extend from current end
+        : new Date();          // extend from today if already expired
+
+      const newTrialEndsAt = new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
+
+      const updated = await prisma.tenant.update({
+        where: { id },
+        data: {
+          trialEndsAt: newTrialEndsAt,
+          planStatus: 'trialing', // re-activate trial status
+          isActive: true,
+        },
+      });
+
+      return reply.send(ok({ trialEndsAt: updated.trialEndsAt }, `Trial extended by ${days} days`));
+    },
+  );
+
+  // ── Platform Settings helpers ──────────────────────────────────────────────
+
+  const DEFAULT_PLANS = [
+    {
+      key: 'STARTER',
+      name: 'Starter',
+      price: 49,
+      roomLimit: 20,
+      features: ['Up to 20 rooms', 'Booking management', 'Guest CRM', 'Website builder', 'Email support'],
+    },
+    {
+      key: 'PROFESSIONAL',
+      name: 'Professional',
+      price: 99,
+      roomLimit: 100,
+      features: ['Up to 100 rooms', 'Everything in Starter', 'Staff invites', 'Priority support', 'Advanced analytics'],
+    },
+    {
+      key: 'ENTERPRISE',
+      name: 'Enterprise',
+      price: 199,
+      roomLimit: -1,
+      features: ['Unlimited rooms', 'Everything in Pro', 'Custom integrations', 'Dedicated support', 'SLA guarantee'],
+    },
+  ];
+
+  async function getOrCreateSettings() {
+    let settings = await prisma.platformSettings.findUnique({ where: { id: 'singleton' } });
+    if (!settings) {
+      settings = await prisma.platformSettings.create({
+        data: { id: 'singleton', trialDays: 14, plans: DEFAULT_PLANS },
+      });
+    }
+    return settings;
+  }
+
+  // ── GET /api/admin/settings ────────────────────────────────────────────────
+  app.get('/settings', { preHandler: requireSuperAdmin }, async (_request, reply) => {
+    const settings = await getOrCreateSettings();
+    return reply.send(ok(settings));
+  });
+
+  // ── PUT /api/admin/settings ────────────────────────────────────────────────
+  app.put<{
+    Body: {
+      trialDays?: number;
+      plans?: Array<{
+        key: string;
+        name: string;
+        price: number;
+        roomLimit: number;
+        features: string[];
+      }>;
+    };
+  }>('/settings', { preHandler: requireSuperAdmin }, async (request, reply) => {
+    const { trialDays, plans } = request.body || {};
+
+    const data: Record<string, unknown> = {};
+    if (trialDays !== undefined) {
+      if (trialDays < 1 || trialDays > 365) {
+        return reply.status(400).send({ success: false, error: 'trialDays must be 1–365' });
+      }
+      data.trialDays = trialDays;
+    }
+    if (plans !== undefined) {
+      if (!Array.isArray(plans) || plans.length === 0) {
+        return reply.status(400).send({ success: false, error: 'plans must be a non-empty array' });
+      }
+      data.plans = plans;
+    }
+
+    const updated = await prisma.platformSettings.upsert({
+      where: { id: 'singleton' },
+      update: data,
+      create: { id: 'singleton', trialDays: trialDays ?? 14, plans: plans ?? DEFAULT_PLANS },
+    });
+
+    return reply.send(ok(updated, 'Settings updated'));
   });
 }

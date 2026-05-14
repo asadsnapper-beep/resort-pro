@@ -9,9 +9,11 @@ import { toast } from '@/hooks/use-toast';
 import {
   Building2, Users, BedDouble, CalendarDays,
   DollarSign, TrendingUp, Activity, Clock,
-  Loader2, ExternalLink, CheckCircle2, AlertTriangle,
-  ShieldAlert,
+  Loader2, ExternalLink, AlertTriangle,
+  ShieldAlert, ArrowRight, CheckCircle2,
+  UserPlus, Zap, RefreshCw, Eye,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type Stats = {
   totalTenants: number;
@@ -26,30 +28,81 @@ type Stats = {
   recentTenants: Array<{
     id: string; name: string; slug: string;
     plan: string; planStatus: string; isActive: boolean; createdAt: string;
+    trialEndsAt: string | null;
   }>;
   planBreakdown: Array<{ plan: string; count: number }>;
 };
 
-function StatCard({
-  icon: Icon, label, value, sub, color, href,
+const PLAN_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
+  FREE:         { bg: 'bg-gray-700/50',       text: 'text-gray-400',  dot: 'bg-gray-500' },
+  STARTER:      { bg: 'bg-blue-500/10',        text: 'text-blue-400',  dot: 'bg-blue-500' },
+  PROFESSIONAL: { bg: 'bg-indigo-500/10',      text: 'text-indigo-400', dot: 'bg-indigo-500' },
+  ENTERPRISE:   { bg: 'bg-purple-500/10',      text: 'text-purple-400', dot: 'bg-purple-500' },
+};
+
+const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
+  trialing: { bg: 'bg-amber-500/10', text: 'text-amber-400' },
+  active:   { bg: 'bg-emerald-500/10', text: 'text-emerald-400' },
+  past_due: { bg: 'bg-red-500/10',   text: 'text-red-400' },
+  canceled: { bg: 'bg-gray-700/50',  text: 'text-gray-400' },
+};
+
+function KpiCard({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  iconBg,
+  iconColor,
+  href,
+  trend,
 }: {
-  icon: React.ElementType; label: string; value: string | number;
-  sub?: string; color: string; href?: string;
+  icon: React.ElementType;
+  label: string;
+  value: string | number;
+  sub?: string;
+  iconBg: string;
+  iconColor: string;
+  href?: string;
+  trend?: { value: string; up: boolean };
 }) {
-  const content = (
-    <div className={`bg-gray-900 border border-gray-800 rounded-2xl p-5 hover:border-gray-700 transition-colors ${href ? 'cursor-pointer' : ''}`}>
-      <div className="flex items-start justify-between mb-3">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color}`}>
-          <Icon className="w-5 h-5" />
+  const inner = (
+    <div className={cn(
+      'group bg-gray-900 border border-gray-800 rounded-2xl p-5 transition-all',
+      href && 'hover:border-gray-700 cursor-pointer',
+    )}>
+      <div className="flex items-start justify-between mb-4">
+        <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', iconBg)}>
+          <Icon className={cn('w-5 h-5', iconColor)} />
         </div>
-        {href && <ExternalLink className="w-3.5 h-3.5 text-gray-600" />}
+        {href && (
+          <ArrowRight className="w-4 h-4 text-gray-700 group-hover:text-gray-500 transition-colors" />
+        )}
       </div>
-      <p className="text-2xl font-bold text-white">{value}</p>
+      <p className="text-2xl font-bold text-white tracking-tight">{value}</p>
       <p className="text-sm text-gray-400 mt-0.5">{label}</p>
       {sub && <p className="text-xs text-gray-600 mt-1">{sub}</p>}
+      {trend && (
+        <div className={cn('flex items-center gap-1 mt-2 text-xs font-medium', trend.up ? 'text-emerald-400' : 'text-red-400')}>
+          <TrendingUp className={cn('w-3 h-3', !trend.up && 'rotate-180')} />
+          {trend.value}
+        </div>
+      )}
     </div>
   );
-  return href ? <Link href={href}>{content}</Link> : content;
+  return href ? <Link href={href}>{inner}</Link> : inner;
+}
+
+function TrialProgressBar({ value, max }: { value: number; max: number }) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+        <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+      </div>
+      <span className="text-xs text-gray-500 w-8 text-right">{pct}%</span>
+    </div>
+  );
 }
 
 export default function AdminOverviewPage() {
@@ -57,14 +110,24 @@ export default function AdminOverviewPage() {
   const { setAuth } = useAuthStore();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [impersonating, setImpersonating] = useState<string | null>(null);
 
-  useEffect(() => {
-    adminEndpoints.stats()
-      .then((r) => setStats(r.data.data))
-      .catch(() => toast({ title: 'Failed to load stats', variant: 'destructive' }))
-      .finally(() => setLoading(false));
-  }, []);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
+    else setRefreshing(true);
+    try {
+      const r = await adminEndpoints.stats();
+      setStats(r.data.data);
+    } catch {
+      toast({ title: 'Failed to load stats', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
 
   const handleImpersonate = async (tenantId: string, tenantName: string) => {
     setImpersonating(tenantId);
@@ -72,10 +135,10 @@ export default function AdminOverviewPage() {
       const res = await adminEndpoints.impersonate(tenantId);
       const { token, refreshToken, user, tenant } = res.data.data;
       setAuth(user, tenant, token, refreshToken);
-      toast({ title: `Impersonating ${tenantName}`, description: 'You are now logged in as the resort owner.' });
+      toast({ title: `Logged in as ${tenantName}`, description: '2-hour session active.' });
       router.push('/dashboard');
     } catch {
-      toast({ title: 'Impersonation failed', variant: 'destructive' });
+      toast({ title: 'Login failed', variant: 'destructive' });
     } finally {
       setImpersonating(null);
     }
@@ -91,141 +154,286 @@ export default function AdminOverviewPage() {
 
   if (!stats) return null;
 
-  const planColors: Record<string, string> = {
-    FREE: 'bg-gray-700 text-gray-300',
-    STARTER: 'bg-blue-500/20 text-blue-400',
-    PROFESSIONAL: 'bg-indigo-500/20 text-indigo-400',
-    ENTERPRISE: 'bg-purple-500/20 text-purple-400',
-  };
+  const conversionRate = stats.totalTenants > 0
+    ? Math.round((stats.paidTenants / stats.totalTenants) * 100)
+    : 0;
 
-  const statusColors: Record<string, string> = {
-    trialing: 'bg-amber-500/20 text-amber-400',
-    active: 'bg-green-500/20 text-green-400',
-    past_due: 'bg-red-500/20 text-red-400',
-    canceled: 'bg-gray-700 text-gray-400',
-  };
+  const trialConversionPotential = stats.mrr + (stats.trialingTenants * 49);
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Overview</h1>
-        <p className="text-gray-500 text-sm mt-1">ResortPro SaaS platform stats</p>
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Overview</h1>
+          <p className="text-gray-500 text-sm mt-1">ResortPro SaaS — real-time platform metrics</p>
+        </div>
+        <button
+          onClick={() => load(true)}
+          disabled={refreshing}
+          className="flex items-center gap-2 h-9 px-4 rounded-lg bg-gray-800 border border-gray-700 text-gray-400 hover:text-white text-sm transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={cn('w-3.5 h-3.5', refreshing && 'animate-spin')} />
+          Refresh
+        </button>
       </div>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          icon={DollarSign} label="Monthly Recurring Revenue"
-          value={`$${stats.mrr.toLocaleString()}`}
-          sub={`${stats.paidTenants} paid tenants`}
-          color="bg-green-500/20 text-green-400"
-          href="/admin/billing"
-        />
-        <StatCard
-          icon={Building2} label="Total Tenants"
-          value={stats.totalTenants}
-          sub={`${stats.activeTenants} active`}
-          color="bg-indigo-500/20 text-indigo-400"
-          href="/admin/tenants"
-        />
-        <StatCard
-          icon={Activity} label="On Trial"
-          value={stats.trialingTenants}
-          sub="Free trial accounts"
-          color="bg-amber-500/20 text-amber-400"
-        />
-        <StatCard
-          icon={ShieldAlert} label="Suspended"
-          value={stats.suspendedTenants}
-          sub="Inactive tenants"
-          color="bg-red-500/20 text-red-400"
-        />
-        <StatCard
-          icon={Users} label="Total Users"
-          value={stats.totalUsers.toLocaleString()}
-          color="bg-blue-500/20 text-blue-400"
-          href="/admin/users"
-        />
-        <StatCard
+      {/* Revenue row — most important first */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-indigo-900/40 to-indigo-800/20 border border-indigo-500/20 rounded-2xl p-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm text-indigo-300 font-medium">Monthly Recurring Revenue</p>
+              <p className="text-4xl font-extrabold text-white mt-1">${stats.mrr.toLocaleString()}</p>
+              <p className="text-indigo-400/70 text-sm mt-1">ARR: ${(stats.mrr * 12).toLocaleString()}</p>
+            </div>
+            <div className="w-12 h-12 bg-indigo-500/20 rounded-xl flex items-center justify-center">
+              <DollarSign className="w-6 h-6 text-indigo-400" />
+            </div>
+          </div>
+          <div className="mt-5 pt-4 border-t border-indigo-500/15 grid grid-cols-3 gap-4">
+            <div>
+              <p className="text-2xl font-bold text-white">{stats.paidTenants}</p>
+              <p className="text-xs text-indigo-300/60">Paying customers</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">{conversionRate}%</p>
+              <p className="text-xs text-indigo-300/60">Conversion rate</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-emerald-400">${trialConversionPotential.toLocaleString()}</p>
+              <p className="text-xs text-indigo-300/60">Max potential MRR</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="col-span-2 sm:col-span-1 grid grid-cols-2 gap-3">
+          <KpiCard
+            icon={Building2} label="Total Tenants"
+            value={stats.totalTenants}
+            sub={`${stats.activeTenants} active`}
+            iconBg="bg-indigo-500/10" iconColor="text-indigo-400"
+            href="/admin/tenants"
+          />
+          <KpiCard
+            icon={Activity} label="On Trial"
+            value={stats.trialingTenants}
+            sub="Free trial accounts"
+            iconBg="bg-amber-500/10" iconColor="text-amber-400"
+          />
+          <KpiCard
+            icon={Users} label="Total Users"
+            value={stats.totalUsers.toLocaleString()}
+            iconBg="bg-blue-500/10" iconColor="text-blue-400"
+            href="/admin/users"
+          />
+          <KpiCard
+            icon={ShieldAlert} label="Suspended"
+            value={stats.suspendedTenants}
+            sub={stats.suspendedTenants > 0 ? 'Need attention' : 'All good'}
+            iconBg="bg-red-500/10" iconColor="text-red-400"
+          />
+        </div>
+      </div>
+
+      {/* Secondary stats */}
+      <div className="grid grid-cols-3 gap-4">
+        <KpiCard
           icon={BedDouble} label="Total Rooms"
           value={stats.totalRooms.toLocaleString()}
-          color="bg-purple-500/20 text-purple-400"
+          iconBg="bg-purple-500/10" iconColor="text-purple-400"
         />
-        <StatCard
+        <KpiCard
           icon={CalendarDays} label="Total Bookings"
           value={stats.totalBookings.toLocaleString()}
-          color="bg-teal-500/20 text-teal-400"
+          iconBg="bg-teal-500/10" iconColor="text-teal-400"
         />
-        <StatCard
-          icon={TrendingUp} label="Paid Tenants"
-          value={stats.paidTenants}
-          sub="Active subscriptions"
-          color="bg-emerald-500/20 text-emerald-400"
+        <KpiCard
+          icon={TrendingUp} label="Avg Rooms/Tenant"
+          value={stats.totalTenants > 0 ? (stats.totalRooms / stats.totalTenants).toFixed(1) : '0'}
+          sub="Platform average"
+          iconBg="bg-cyan-500/10" iconColor="text-cyan-400"
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Plan breakdown */}
+        {/* Plan breakdown with better visuals */}
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-          <h2 className="text-white font-semibold mb-4">Plan Distribution</h2>
-          <div className="space-y-3">
-            {stats.planBreakdown.map((p) => (
-              <div key={p.plan} className="flex items-center justify-between">
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${planColors[p.plan] || 'bg-gray-700 text-gray-300'}`}>
-                  {p.plan}
-                </span>
-                <div className="flex items-center gap-3">
-                  <div className="w-32 h-2 bg-gray-800 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-indigo-500 rounded-full transition-all"
-                      style={{ width: `${Math.round((p.count / stats.totalTenants) * 100)}%` }}
-                    />
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-white font-semibold">Plan Distribution</h2>
+            <Link
+              href="/admin/billing"
+              className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+            >
+              Revenue <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="space-y-4">
+            {stats.planBreakdown.length === 0 ? (
+              <p className="text-gray-500 text-sm">No tenants yet.</p>
+            ) : (
+              stats.planBreakdown.map((p) => {
+                const colors = PLAN_COLORS[p.plan] || PLAN_COLORS.FREE;
+                return (
+                  <div key={p.plan}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className={cn('w-2 h-2 rounded-full', colors.dot)} />
+                        <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', colors.bg, colors.text)}>
+                          {p.plan}
+                        </span>
+                      </div>
+                      <span className="text-white text-sm font-semibold">{p.count}</span>
+                    </div>
+                    <TrialProgressBar value={p.count} max={stats.totalTenants} />
                   </div>
-                  <span className="text-white text-sm font-medium w-6 text-right">{p.count}</span>
-                </div>
-              </div>
-            ))}
+                );
+              })
+            )}
+          </div>
+
+          {/* Quick stats below */}
+          <div className="mt-5 pt-4 border-t border-gray-800 grid grid-cols-3 gap-3 text-center">
+            <div>
+              <p className="text-white font-bold">{conversionRate}%</p>
+              <p className="text-xs text-gray-500 mt-0.5">Conversion</p>
+            </div>
+            <div>
+              <p className="text-white font-bold">{stats.trialingTenants}</p>
+              <p className="text-xs text-gray-500 mt-0.5">Trialing</p>
+            </div>
+            <div>
+              <p className="text-white font-bold">{stats.suspendedTenants}</p>
+              <p className="text-xs text-gray-500 mt-0.5">Suspended</p>
+            </div>
           </div>
         </div>
 
         {/* Recent signups */}
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-5">
             <h2 className="text-white font-semibold">Recent Signups</h2>
-            <Link href="/admin/tenants" className="text-indigo-400 text-xs hover:text-indigo-300">
-              View all →
+            <Link href="/admin/tenants" className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+              View all <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
-          <div className="space-y-3">
-            {stats.recentTenants.map((t) => (
-              <div key={t.id} className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-300 uppercase">
-                  {t.name[0]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-medium truncate">{t.name}</p>
-                  <p className="text-gray-500 text-xs">{t.slug}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${statusColors[t.planStatus] || 'bg-gray-700 text-gray-400'}`}>
-                    {t.planStatus}
-                  </span>
-                  {!t.isActive && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400">
-                      suspended
-                    </span>
-                  )}
-                  <button
-                    onClick={() => handleImpersonate(t.id, t.name)}
-                    disabled={impersonating === t.id}
-                    className="text-xs text-indigo-400 hover:text-indigo-300 disabled:opacity-50 whitespace-nowrap"
+          <div className="space-y-2">
+            {stats.recentTenants.length === 0 ? (
+              <p className="text-gray-500 text-sm">No tenants yet.</p>
+            ) : (
+              stats.recentTenants.map((t) => {
+                const statusColor = STATUS_COLORS[t.planStatus] || STATUS_COLORS.canceled;
+                const daysLeft = t.trialEndsAt
+                  ? Math.max(0, Math.ceil((new Date(t.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+                  : null;
+
+                return (
+                  <div
+                    key={t.id}
+                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-800/50 transition-colors group"
                   >
-                    {impersonating === t.id ? '...' : 'Login as →'}
-                  </button>
-                </div>
-              </div>
-            ))}
+                    <div className="w-8 h-8 rounded-lg bg-gray-800 border border-gray-700 flex items-center justify-center text-xs font-bold text-gray-300 uppercase shrink-0">
+                      {t.name[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-white text-sm font-medium truncate">{t.name}</p>
+                        {!t.isActive && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">SUSPENDED</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className={cn('text-[10px] px-1.5 py-0.5 rounded font-medium', statusColor.bg, statusColor.text)}>
+                          {t.planStatus}
+                        </span>
+                        {daysLeft !== null && t.planStatus === 'trialing' && (
+                          <span className={cn('text-[10px] font-medium', daysLeft <= 3 ? 'text-red-400' : 'text-gray-500')}>
+                            {daysLeft}d left
+                          </span>
+                        )}
+                        <span className="text-[10px] text-gray-600">
+                          {new Date(t.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Link
+                        href={`/admin/tenants`}
+                        className="w-7 h-7 rounded-lg bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-600 transition-colors"
+                        title="View tenant"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </Link>
+                      <button
+                        onClick={() => handleImpersonate(t.id, t.name)}
+                        disabled={impersonating === t.id || !t.isActive}
+                        className="w-7 h-7 rounded-lg bg-indigo-600/20 flex items-center justify-center text-indigo-400 hover:text-indigo-300 hover:bg-indigo-600/30 transition-colors disabled:opacity-40"
+                        title="Login as this tenant"
+                      >
+                        {impersonating === t.id
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <Zap className="w-3.5 h-3.5" />
+                        }
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
+        </div>
+      </div>
+
+      {/* Quick actions */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+        <h2 className="text-white font-semibold mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            {
+              icon: Building2,
+              label: 'Manage Tenants',
+              sub: 'View, edit, suspend',
+              href: '/admin/tenants',
+              color: 'text-indigo-400',
+              bg: 'bg-indigo-500/10 hover:bg-indigo-500/20 border-indigo-500/20',
+            },
+            {
+              icon: DollarSign,
+              label: 'Billing & MRR',
+              sub: 'Revenue breakdown',
+              href: '/admin/billing',
+              color: 'text-emerald-400',
+              bg: 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/20',
+            },
+            {
+              icon: Users,
+              label: 'All Users',
+              sub: 'Search across tenants',
+              href: '/admin/users',
+              color: 'text-blue-400',
+              bg: 'bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/20',
+            },
+            {
+              icon: Zap,
+              label: 'Platform Settings',
+              sub: 'Plans, trial duration',
+              href: '/admin/settings',
+              color: 'text-amber-400',
+              bg: 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/20',
+            },
+          ].map(({ icon: Icon, label, sub, href, color, bg }) => (
+            <Link
+              key={href}
+              href={href}
+              className={cn('flex items-center gap-3 p-4 rounded-xl border transition-colors', bg)}
+            >
+              <Icon className={cn('w-5 h-5 shrink-0', color)} />
+              <div className="min-w-0">
+                <p className="text-white text-sm font-medium">{label}</p>
+                <p className="text-xs text-gray-500 truncate">{sub}</p>
+              </div>
+            </Link>
+          ))}
         </div>
       </div>
     </div>

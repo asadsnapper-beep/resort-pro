@@ -66,6 +66,7 @@ export async function billingRoutes(app: FastifyInstance) {
         billingEmail: true,
         name: true,
         email: true,
+        isActive: true,
       },
     });
 
@@ -93,6 +94,7 @@ export async function billingRoutes(app: FastifyInstance) {
         isCanceled,
         currentPeriodEnd: tenant.currentPeriodEnd,
         trialEndsAt: tenant.trialEndsAt,
+        tenantIsActive: tenant.isActive,
         hasStripeCustomer: !!tenant.stripeCustomerId,
         hasSubscription: !!tenant.stripeSubscriptionId,
         availablePlans: PLANS,

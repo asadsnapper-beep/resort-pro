@@ -53,11 +53,19 @@ export async function authRoutes(app: FastifyInstance) {
 
       const passwordHash = await bcrypt.hash(body.password, 12);
 
+      // Use platform trial days setting (falls back to 14)
+      const platformSettings = await prisma.platformSettings.findUnique({ where: { id: 'singleton' } });
+      const trialDays = platformSettings?.trialDays ?? 14;
+      const trialEndsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
+
       const tenant = await prisma.tenant.create({
         data: {
           name: body.resortName,
           slug: body.slug,
-          plan: 'FREE',
+          plan: 'STARTER',
+          planStatus: 'trialing',
+          trialEndsAt,
+          billingEmail: body.email,
           users: {
             create: {
               email: body.email,
@@ -99,11 +107,39 @@ export async function authRoutes(app: FastifyInstance) {
         },
       });
 
+      // Send welcome email
+      await sendEmail({
+        to: body.email,
+        subject: `Welcome to ResortPro — Your 14-day trial has started! 🎉`,
+        html: `
+          <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+            <h2 style="color:#1a6b5e">Welcome to ResortPro, ${body.firstName}!</h2>
+            <p>Your resort <strong>${body.resortName}</strong> is ready. You have a full <strong>14-day free trial</strong> with access to all Starter features.</p>
+            <p style="margin:24px 0">
+              <a href="${process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:3000'}/${body.slug}/dashboard"
+                 style="background:#1a6b5e;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600">
+                Open Your Dashboard
+              </a>
+            </p>
+            <p><strong>Your trial includes:</strong></p>
+            <ul>
+              <li>Full booking management</li>
+              <li>Guest CRM</li>
+              <li>Room management</li>
+              <li>Website builder</li>
+            </ul>
+            <p>Trial ends on: <strong>${trialEndsAt.toLocaleDateString('en-US', { dateStyle: 'long' })}</strong></p>
+            <p>Questions? Reply to this email anytime.</p>
+            <p style="color:#666;font-size:13px">— The ResortPro Team</p>
+          </div>
+        `,
+      }).catch(() => {}); // don't block registration if email fails
+
       return reply.status(201).send(ok({
         token,
         refreshToken,
         user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role },
-        tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug, plan: tenant.plan },
+        tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug, plan: tenant.plan, planStatus: tenant.planStatus, trialEndsAt: tenant.trialEndsAt, isActive: tenant.isActive },
       }, 'Resort registered successfully'));
     },
   });
@@ -128,8 +164,11 @@ export async function authRoutes(app: FastifyInstance) {
       if (!body) return;
 
       const tenant = await prisma.tenant.findUnique({ where: { slug: body.slug } });
-      if (!tenant || !tenant.isActive) {
+      if (!tenant) {
         return reply.status(401).send({ success: false, error: 'Invalid credentials' });
+      }
+      if (!tenant.isActive) {
+        return reply.status(403).send({ success: false, error: 'Account suspended. Please contact support.' });
       }
 
       const user = await prisma.user.findUnique({
@@ -169,7 +208,7 @@ export async function authRoutes(app: FastifyInstance) {
         token,
         refreshToken,
         user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role },
-        tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug, plan: tenant.plan },
+        tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug, plan: tenant.plan, planStatus: tenant.planStatus, trialEndsAt: tenant.trialEndsAt, isActive: tenant.isActive },
       });
     },
   });

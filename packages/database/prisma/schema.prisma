@@ -914,6 +914,16 @@ model StripeWebhookEvent {
   @@map("stripe_webhook_events")
 }
 
+// Singleton platform-level settings (one row)
+model PlatformSettings {
+  id         String   @id @default("singleton")
+  trialDays  Int      @default(14)
+  plans      Json     // Array of { key, name, price, features, roomLimit }
+  updatedAt  DateTime @updatedAt
+
+  @@map("platform_settings")
+}
+
 // Automated email sequences (drip campaigns)
 model Sequence {
   id          String          @id @default(uuid())

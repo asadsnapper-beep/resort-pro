@@ -6,15 +6,16 @@ import Link from 'next/link';
 import { useAdminStore } from '@/store/admin';
 import {
   LayoutDashboard, Building2, Users, CreditCard,
-  LogOut, Shield, ChevronRight, Loader2,
+  LogOut, Shield, ChevronRight, Loader2, Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { href: '/admin/dashboard', label: 'Overview', icon: LayoutDashboard  },
+  { href: '/admin/dashboard', label: 'Overview', icon: LayoutDashboard },
   { href: '/admin/tenants', label: 'Tenants', icon: Building2 },
   { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/billing', label: 'Billing & MRR', icon: CreditCard },
+  { href: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
 export default function AdminPanelLayout({ children }: { children: React.ReactNode }) {

@@ -8,7 +8,7 @@ import { toast } from '@/hooks/use-toast';
 import {
   Search, Building2, ChevronLeft, ChevronRight,
   ExternalLink, Loader2, CheckCircle2, AlertTriangle,
-  Ban, RefreshCw, UserCheck, Filter,
+  Ban, RefreshCw, UserCheck, Filter, Download,
 } from 'lucide-react';
 
 type Tenant = {
@@ -113,6 +113,25 @@ export default function AdminTenantsPage() {
     }
   };
 
+  const handleExport = async (t: Tenant) => {
+    setActionLoading(`exp-${t.id}`);
+    try {
+      const res = await adminEndpoints.exportTenant(t.id);
+      const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `resortpro-export-${t.slug}-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: `Data exported for ${t.name}` });
+    } catch {
+      toast({ title: 'Export failed', variant: 'destructive' });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const openEdit = (t: Tenant) => {
     setEditTenant(t);
     setEditPlan(t.plan);
@@ -123,14 +142,17 @@ export default function AdminTenantsPage() {
     if (!editTenant) return;
     setActionLoading(`edit-${editTenant.id}`);
     try {
-      const data: Record<string, unknown> = { plan: editPlan };
+      // Update plan
+      await adminEndpoints.updateTenant(editTenant.id, { plan: editPlan });
+
+      // Extend trial if specified
       if (editTrialDays) {
         const days = parseInt(editTrialDays);
-        const trialEndsAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
-        data.trialEndsAt = trialEndsAt;
-        data.planStatus = 'trialing';
+        if (days > 0) {
+          await adminEndpoints.extendTrial(editTenant.id, days);
+        }
       }
-      await adminEndpoints.updateTenant(editTenant.id, data);
+
       toast({ title: `${editTenant.name} updated` });
       setEditTenant(null);
       fetchTenants();
@@ -257,6 +279,14 @@ export default function AdminTenantsPage() {
                         className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded-md hover:bg-gray-700 transition-colors"
                       >
                         Edit
+                      </button>
+                      <button
+                        onClick={() => handleExport(t)}
+                        disabled={actionLoading === `exp-${t.id}`}
+                        title="Export data as JSON"
+                        className="text-xs text-gray-400 hover:text-green-400 px-2 py-1 rounded-md hover:bg-green-500/10 transition-colors disabled:opacity-40"
+                      >
+                        {actionLoading === `exp-${t.id}` ? '...' : <Download className="w-3.5 h-3.5" />}
                       </button>
                       <button
                         onClick={() => handleImpersonate(t)}

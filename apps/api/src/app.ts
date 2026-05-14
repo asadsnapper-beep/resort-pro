@@ -27,6 +27,7 @@ import { crmRoutes, crmPublicRoutes } from './routes/crm';
 import { billingRoutes, stripeWebhookRoute } from './routes/billing';
 import { adminRoutes } from './routes/admin';
 import { startAutomationEngine } from './services/automation';
+import { runTrialEmailCron } from './services/trial-emails';
 
 export async function buildApp() {
   const app = Fastify({
@@ -135,7 +136,16 @@ export async function buildApp() {
   await app.register(adminRoutes, { prefix: '/api/admin' });
 
   // ── Start automation engine ───────────────────────────────────────────────
-  if (process.env.NODE_ENV !== 'test') startAutomationEngine();
+  if (process.env.NODE_ENV !== 'test') {
+    startAutomationEngine();
+
+    // ── Trial lifecycle email cron (runs every 12 hours) ─────────────────
+    runTrialEmailCron().catch((e) => app.log.error(e, 'trial-cron failed on startup'));
+    const TWELVE_HOURS = 12 * 60 * 60 * 1000;
+    setInterval(() => {
+      runTrialEmailCron().catch((e) => app.log.error(e, 'trial-cron failed'));
+    }, TWELVE_HOURS);
+  }
 
   // ── Error Handler ─────────────────────────────────────────────────────────
   app.setErrorHandler((error, _request, reply) => {

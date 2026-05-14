@@ -40,10 +40,16 @@ export const adminEndpoints = {
   updateTenant: (id: string, data: Record<string, unknown>) =>
     adminApi.patch(`/tenants/${id}`, data),
   suspendTenant: (id: string) => adminApi.delete(`/tenants/${id}`),
+  reactivateTenant: (id: string) => adminApi.patch(`/tenants/${id}`, { isActive: true }),
   impersonate: (id: string) => adminApi.post(`/tenants/${id}/impersonate`),
+  exportTenant: (id: string) => adminApi.get(`/tenants/${id}/export`, { responseType: 'blob' }),
+  extendTrial: (id: string, days: number) => adminApi.post(`/tenants/${id}/extend-trial`, { days }),
   // Users
   users: (params?: Record<string, string>) =>
     adminApi.get('/users', { params }),
   // Billing
   billing: () => adminApi.get('/billing'),
+  // Platform settings
+  getSettings: () => adminApi.get('/settings'),
+  updateSettings: (data: { trialDays?: number; plans?: unknown[] }) => adminApi.put('/settings', data),
 };
