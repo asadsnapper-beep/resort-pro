@@ -514,6 +514,55 @@ export async function adminRoutes(app: FastifyInstance) {
     return settings;
   }
 
+  // ── GET /api/admin/themes ─────────────────────────────────────────────────
+  app.get('/themes', { preHandler: requireSuperAdmin }, async (_request, reply) => {
+    const themes = await prisma.theme.findMany({ orderBy: { sortOrder: 'asc' } });
+
+    // Count how many WebsiteContent rows use each theme key
+    const usageCounts = await prisma.websiteContent.groupBy({
+      by: ['templateId'],
+      _count: { templateId: true },
+    });
+    const countMap = Object.fromEntries(
+      usageCounts.map(r => [r.templateId ?? 'luxe', r._count.templateId])
+    );
+
+    const data = themes.map(t => ({ ...t, usageCount: countMap[t.key] ?? 0 }));
+    return reply.send(ok(data));
+  });
+
+  // ── PUT /api/admin/themes/:key ─────────────────────────────────────────────
+  app.put<{ Params: { key: string }; Body: { name: string; description?: string; previewImage?: string; isActive?: boolean; isPremium?: boolean; sortOrder?: number } }>(
+    '/themes/:key',
+    { preHandler: requireSuperAdmin },
+    async (request, reply) => {
+      const { key } = request.params;
+      const { name, description, previewImage, isActive, isPremium, sortOrder } = request.body;
+      const theme = await prisma.theme.upsert({
+        where: { key },
+        update: { name, description, previewImage, isActive, isPremium, sortOrder },
+        create: { key, name, description, previewImage, isActive: isActive ?? true, isPremium: isPremium ?? false, sortOrder: sortOrder ?? 99 },
+      });
+      return reply.send(ok(theme, 'Theme saved'));
+    }
+  );
+
+  // ── PATCH /api/admin/themes/:key/toggle ───────────────────────────────────
+  app.patch<{ Params: { key: string } }>(
+    '/themes/:key/toggle',
+    { preHandler: requireSuperAdmin },
+    async (request, reply) => {
+      const { key } = request.params;
+      const theme = await prisma.theme.findUnique({ where: { key } });
+      if (!theme) return reply.status(404).send({ success: false, error: 'Theme not found' });
+      const updated = await prisma.theme.update({
+        where: { key },
+        data: { isActive: !theme.isActive },
+      });
+      return reply.send(ok(updated, updated.isActive ? 'Theme activated' : 'Theme deactivated'));
+    }
+  );
+
   // ── GET /api/admin/settings ────────────────────────────────────────────────
   app.get('/settings', { preHandler: requireSuperAdmin }, async (_request, reply) => {
     const settings = await getOrCreateSettings();

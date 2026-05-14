@@ -52,4 +52,11 @@ export const adminEndpoints = {
   // Platform settings
   getSettings: () => adminApi.get('/settings'),
   updateSettings: (data: { trialDays?: number; plans?: unknown[] }) => adminApi.put('/settings', data),
+  // Themes
+  getThemes: () => adminApi.get('/themes'),
+  updateTheme: (key: string, data: {
+    name: string; description?: string; previewImage?: string;
+    isActive?: boolean; isPremium?: boolean; sortOrder?: number;
+  }) => adminApi.put(`/themes/${key}`, data),
+  toggleTheme: (key: string) => adminApi.patch(`/themes/${key}/toggle`),
 };
