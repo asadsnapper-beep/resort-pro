@@ -26,8 +26,21 @@ import { chatRoutes } from './routes/chat';
 import { crmRoutes, crmPublicRoutes } from './routes/crm';
 import { billingRoutes, stripeWebhookRoute } from './routes/billing';
 import { adminRoutes } from './routes/admin';
+import { ratePlanRoutes } from './routes/ratePlans';
+import { maintenanceRoutes } from './routes/maintenance';
+import { reportRoutes } from './routes/reports';
+import { packageRoutes } from './routes/packages';
+import { groupBookingRoutes } from './routes/groupBookings';
+import { loyaltyRoutes } from './routes/loyalty';
+import { externalCalendarRoutes } from './routes/externalCalendars'
+import { paymentRoutes } from './routes/payments'
+import { expenseRoutes } from './routes/expenses';
+import { embedRoutes } from './routes/embed';
+import { startPreArrivalCron } from './jobs/pre-arrival-reminder';
+import { startICalSyncCron } from './jobs/ical-sync';
 import { startAutomationEngine } from './services/automation';
 import { runTrialEmailCron } from './services/trial-emails';
+import { metrics, normalizePath } from './utils/metrics';
 
 export async function buildApp() {
   const app = Fastify({
@@ -105,6 +118,20 @@ export async function buildApp() {
     staticCSP: false,
   });
 
+  // ── Request metrics hook ─────────────────────────────────────────────────
+  app.addHook('onResponse', (request, reply, done) => {
+    // Skip health check, static, and swagger to keep metrics clean
+    const url = request.url ?? '';
+    if (!url.startsWith('/api/') && !url.startsWith('/site/') && !url.startsWith('/embed/')) { done(); return; }
+    metrics.record({
+      method: request.method,
+      path: normalizePath(url),
+      status: reply.statusCode,
+      durationMs: Math.round(reply.elapsedTime),
+    });
+    done();
+  });
+
   // ── Health Check ──────────────────────────────────────────────────────────
   app.get('/health', { schema: { hide: true } }, async () => ({
     status: 'ok',
@@ -134,10 +161,22 @@ export async function buildApp() {
   await app.register(billingRoutes, { prefix: '/api/billing' });
   await app.register(stripeWebhookRoute, { prefix: '/api/stripe' });
   await app.register(adminRoutes, { prefix: '/api/admin' });
+  await app.register(ratePlanRoutes, { prefix: '/api/rate-plans' });
+  await app.register(maintenanceRoutes, { prefix: '/api/maintenance' });
+  await app.register(reportRoutes, { prefix: '/api/reports' });
+  await app.register(packageRoutes, { prefix: '/api/packages' });
+  await app.register(groupBookingRoutes, { prefix: '/api/group-bookings' });
+  await app.register(loyaltyRoutes, { prefix: '/api/loyalty' });
+  await app.register(externalCalendarRoutes, { prefix: '/api/external-calendars' });
+  await app.register(paymentRoutes, { prefix: '/api/payments' });
+  await app.register(expenseRoutes, { prefix: '/api/expenses' });
+  await app.register(embedRoutes,   { prefix: '/embed' });
 
   // ── Start automation engine ───────────────────────────────────────────────
   if (process.env.NODE_ENV !== 'test') {
     startAutomationEngine();
+    startPreArrivalCron();
+    startICalSyncCron();
 
     // ── Trial lifecycle email cron (runs every 12 hours) ─────────────────
     runTrialEmailCron().catch((e) => app.log.error(e, 'trial-cron failed on startup'));

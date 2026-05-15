@@ -8,6 +8,7 @@ import {
   AvailabilitySection, BookingSection, GallerySection,
   TestimonialsSection, ContactSection, FooterSection,
 } from './sections'
+import { WhatsAppButton } from '../_widgets/SocialLinks'
 
 // Coastal theme uses a simple inline booking modal instead of a separate file
 // (rooms section scrolls to booking with pre-selected room)
@@ -148,6 +149,7 @@ export function CoastalTheme({ data }: ThemeProps) {
       <TestimonialsSection data={data} />
       <ContactSection      data={data} />
       <FooterSection       data={data} scrollTo={scrollTo} />
+      <WhatsAppButton whatsappNumber={data.website?.whatsappNumber} />
     </div>
   )
 }

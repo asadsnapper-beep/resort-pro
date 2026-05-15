@@ -1,5 +1,6 @@
 'use client'
 import type { ResortData } from '../../types'
+import { SocialLinks } from '../../_widgets/SocialLinks'
 
 interface FooterSectionProps {
   data:     ResortData
@@ -15,7 +16,7 @@ const NAV_ITEMS = [
 ]
 
 export function FooterSection({ data, scrollTo }: FooterSectionProps) {
-  const { tenant } = data
+  const { tenant, website } = data
 
   return (
     <footer className="border-t border-slate-200 bg-white py-8">
@@ -33,9 +34,12 @@ export function FooterSection({ data, scrollTo }: FooterSectionProps) {
           ))}
         </nav>
 
-        <p className="text-xs text-slate-300">
-          © {new Date().getFullYear()} {tenant.name}
-        </p>
+        <div className="flex items-center gap-4">
+          <SocialLinks website={website ?? null} className="text-slate-400" iconClassName="w-4 h-4" />
+          <p className="text-xs text-slate-300">
+            © {new Date().getFullYear()} {tenant.name}
+          </p>
+        </div>
       </div>
     </footer>
   )

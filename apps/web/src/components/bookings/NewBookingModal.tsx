@@ -5,12 +5,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery } from '@tanstack/react-query';
-import { roomsApi, guestsApi } from '@/lib/api';
+import { roomsApi, guestsApi, ratePlansApi } from '@/lib/api';
 import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
-import { Search, BedDouble, Users, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Search, BedDouble, Users, ChevronRight, ChevronLeft, Tags } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const step1Schema = z.object({
@@ -74,7 +74,20 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
     ? Math.ceil((new Date(step1Data.checkOut).getTime() - new Date(step1Data.checkIn).getTime()) / (1000 * 60 * 60 * 24))
     : 0;
 
-  const totalAmount = selectedRoom ? Number(selectedRoom.basePrice) * nights : 0;
+  // Resolve rate plan when room + dates are selected
+  const { data: resolvedRate } = useQuery({
+    queryKey: ['rate-resolve', selectedRoom?.id, step1Data?.checkIn, step1Data?.checkOut],
+    queryFn: () => ratePlansApi.resolve(
+      selectedRoom!.id as string,
+      step1Data!.checkIn,
+      step1Data!.checkOut,
+    ),
+    enabled: !!selectedRoom && !!step1Data?.checkIn && !!step1Data?.checkOut,
+    select: r => r.data.data as { effectivePrice: number; basePrice: number; resolved: { price: number; planName: string; planType: string } | null },
+  });
+
+  const effectivePrice = resolvedRate?.effectivePrice ?? (selectedRoom ? Number(selectedRoom.basePrice) : 0);
+  const totalAmount = effectivePrice * nights;
 
   useEffect(() => {
     if (!open) {
@@ -196,8 +209,8 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold text-resort-700">{formatCurrency(Number(room.basePrice))}</p>
-                      <p className="text-xs text-muted-foreground">per night</p>
-                      <p className="text-sm font-semibold text-gray-700 mt-1">{formatCurrency(Number(room.basePrice) * nights)} total</p>
+                      <p className="text-xs text-muted-foreground">base / night</p>
+                      <p className="text-sm font-semibold text-gray-700 mt-1">{formatCurrency(Number(room.basePrice) * nights)} est.</p>
                     </div>
                   </div>
                 </button>
@@ -273,12 +286,24 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
               { label: 'Check-out', value: step1Data?.checkOut },
               { label: 'Duration', value: `${nights} night${nights !== 1 ? 's' : ''}` },
               { label: 'Guests', value: `${step1Data?.adults} adults${step1Data?.children ? `, ${step1Data.children} children` : ''}` },
+              { label: 'Rate / night', value: formatCurrency(effectivePrice) },
             ].map(({ label, value }) => (
               <div key={label} className="flex justify-between px-4 py-3 text-sm">
                 <span className="text-muted-foreground">{label}</span>
                 <span className="font-medium text-gray-900">{value as string}</span>
               </div>
             ))}
+            {resolvedRate?.resolved && (
+              <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 dark:bg-amber-900/20">
+                <Tags className="h-3.5 w-3.5 text-amber-600" />
+                <span className="text-xs text-amber-700 dark:text-amber-400">
+                  Rate plan applied: <strong>{resolvedRate.resolved.planName}</strong>
+                  {resolvedRate.resolved.price !== resolvedRate.basePrice && (
+                    <span className="ml-1 text-gray-500">(base: {formatCurrency(resolvedRate.basePrice)})</span>
+                  )}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between bg-resort-50 px-4 py-3">
               <span className="font-semibold text-resort-700">Total Amount</span>
               <span className="text-lg font-bold text-resort-700">{formatCurrency(totalAmount)}</span>

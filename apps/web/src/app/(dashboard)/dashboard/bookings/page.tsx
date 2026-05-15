@@ -10,7 +10,8 @@ import { NewBookingModal } from '@/components/bookings/NewBookingModal';
 import { BookingDetailSheet } from '@/components/bookings/BookingDetailSheet';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
-import { Plus, CalendarDays, Search, LogIn, LogOut, Users, TrendingUp } from 'lucide-react';
+import { Plus, CalendarDays, Search, LogIn, LogOut, Users, TrendingUp, Zap } from 'lucide-react';
+import { WalkInModal } from '@/components/bookings/WalkInModal';
 import { Input } from '@/components/ui/input';
 
 const STATUS_FILTERS = ['', 'PENDING', 'CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED'];
@@ -31,6 +32,7 @@ export default function BookingsPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [newOpen, setNewOpen] = useState(false);
+  const [walkInOpen, setWalkInOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -74,9 +76,17 @@ export default function BookingsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Bookings</h1>
           <p className="mt-1 text-sm text-muted-foreground">Manage reservations and check-ins</p>
         </div>
-        <Button className="gap-2" onClick={() => setNewOpen(true)}>
-          <Plus className="h-4 w-4" /> New Booking
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm"
+            onClick={() => setWalkInOpen(true)}
+          >
+            <Zap className="h-4 w-4" /> Walk-in
+          </Button>
+          <Button variant="outline" className="gap-2" onClick={() => setNewOpen(true)}>
+            <Plus className="h-4 w-4" /> New Booking
+          </Button>
+        </div>
       </div>
 
       {/* Stats Bar */}
@@ -162,6 +172,11 @@ export default function BookingsPage() {
                     >
                       <td className="px-5 py-4">
                         <span className="font-mono text-xs font-bold text-resort-600">{booking.confirmationNo}</span>
+                        {(booking as { source?: string }).source === 'WALK_IN' && (
+                          <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+                            <Zap className="h-2.5 w-2.5" />Walk-in
+                          </span>
+                        )}
                       </td>
                       <td className="px-5 py-4">
                         <p className="text-sm font-medium text-gray-900">{booking.guest.firstName} {booking.guest.lastName}</p>
@@ -220,6 +235,9 @@ export default function BookingsPage() {
           </div>
         </div>
       )}
+
+      {/* Walk-in Modal */}
+      {walkInOpen && <WalkInModal onClose={() => setWalkInOpen(false)} />}
 
       {/* New Booking Modal */}
       <NewBookingModal

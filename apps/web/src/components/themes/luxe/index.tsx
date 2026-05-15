@@ -4,6 +4,7 @@ import { Menu, X } from 'lucide-react'
 
 import type { ThemeProps, ResortRoom } from '../types'
 import { AvailabilityCalendar, BookingForm, MenuWidget, ContactForm } from '../_widgets'
+import { WhatsAppButton } from '../_widgets/SocialLinks'
 import {
   HeroSection, AboutSection, RoomsSection,
   GallerySection, TestimonialsSection, FooterSection,
@@ -217,6 +218,9 @@ export function LuxeTheme({ data }: ThemeProps) {
       </section>
 
       <FooterSection data={data} scrollTo={scrollTo} />
+
+      {/* ── WhatsApp floating button ──────────────────────── */}
+      <WhatsAppButton whatsappNumber={website?.whatsappNumber} />
 
       {/* ── Modals ────────────────────────────────────────── */}
       {bookingRoom && (

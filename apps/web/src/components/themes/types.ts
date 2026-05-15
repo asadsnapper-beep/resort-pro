@@ -29,6 +29,14 @@ export interface ResortWebsite {
   templateId?: string
   seoTitle?: string
   seoDescription?: string
+  // Social media
+  facebookUrl?: string
+  instagramUrl?: string
+  twitterUrl?: string
+  tiktokUrl?: string
+  youtubeUrl?: string
+  whatsappNumber?: string
+  tripadvisorUrl?: string
 }
 
 export interface ResortRoom {

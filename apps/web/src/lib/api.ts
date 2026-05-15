@@ -56,7 +56,7 @@ api.interceptors.response.use(
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export const authApi = {
-  register: (data: { resortName: string; slug: string; firstName: string; lastName: string; email: string; password: string }) =>
+  register: (data: { resortName: string; slug: string; firstName: string; lastName: string; email: string; password: string; referralCode?: string }) =>
     api.post('/auth/register', data),
   login: (data: { email: string; password: string; slug: string }) =>
     api.post('/auth/login', data),
@@ -69,6 +69,8 @@ export const dashboardApi = {
   getStats: () => api.get('/dashboard'),
   getRevenue: () => api.get('/dashboard/revenue'),
   getOccupancy: () => api.get('/dashboard/occupancy'),
+  getAnalytics: () => api.get('/dashboard/analytics'),
+  getToday: () => api.get('/dashboard/today'),
 };
 
 // ── Rooms ─────────────────────────────────────────────────────────────────────
@@ -93,6 +95,13 @@ export const bookingsApi = {
   cancel: (id: string) => api.patch(`/bookings/${id}/cancel`),
   addPayment: (id: string, data: unknown) => api.post(`/bookings/${id}/payment`, data),
   calendar: (month: number, year: number) => api.get('/bookings/calendar', { params: { month, year } }),
+  gantt: (from: string, to: string) => api.get('/bookings/gantt', { params: { from, to } }),
+  getInvoice: (id: string) => api.get(`/bookings/${id}/invoice`),
+  addInvoiceExtra: (id: string, data: { description: string; amount: number; quantity?: number }) =>
+    api.post(`/bookings/${id}/invoice/extras`, data),
+  deleteInvoiceExtra: (id: string, extraId: string) =>
+    api.delete(`/bookings/${id}/invoice/extras/${extraId}`),
+  sendInvoiceEmail: (id: string) => api.post(`/bookings/${id}/invoice/send-email`),
 };
 
 // ── Guests ────────────────────────────────────────────────────────────────────
@@ -170,8 +179,80 @@ export const websiteApi = {
 export const tenantApi = {
   get: () => api.get('/tenant'),
   update: (data: unknown) => api.patch('/tenant', data),
+  getEmailSettings: () => api.get('/tenant/email-settings'),
+  updateEmailSettings: (data: unknown) => api.patch('/tenant/email-settings', data),
+  sendTestEmail: (toEmail: string) => api.post('/tenant/email-settings/test', { toEmail }),
 };
 
+
+// ── Maintenance ───────────────────────────────────────────────────────────────
+export const maintenanceApi = {
+  list: (params?: Record<string, unknown>) => api.get('/maintenance', { params }),
+  summary: () => api.get('/maintenance/summary'),
+  create: (data: unknown) => api.post('/maintenance', data),
+  update: (id: string, data: unknown) => api.patch(`/maintenance/${id}`, data),
+  resolve: (id: string, notes?: string) => api.patch(`/maintenance/${id}/resolve`, { notes }),
+  delete: (id: string) => api.delete(`/maintenance/${id}`),
+};
+
+// ── Rate Plans ────────────────────────────────────────────────────────────────
+export const ratePlansApi = {
+  list: () => api.get('/rate-plans'),
+  create: (data: unknown) => api.post('/rate-plans', data),
+  update: (id: string, data: unknown) => api.patch(`/rate-plans/${id}`, data),
+  delete: (id: string) => api.delete(`/rate-plans/${id}`),
+  resolve: (roomId: string, checkIn: string, checkOut: string) =>
+    api.get('/rate-plans/resolve', { params: { roomId, checkIn, checkOut } }),
+};
+
+// ── Loyalty ───────────────────────────────────────────────────────────────────
+export const loyaltyApi = {
+  getProgram: () => api.get('/loyalty/program'),
+  updateProgram: (data: unknown) => api.patch('/loyalty/program', data),
+  getAccounts: (params?: Record<string, unknown>) => api.get('/loyalty/accounts', { params }),
+  getAccount: (guestId: string) => api.get(`/loyalty/accounts/${guestId}`),
+  enroll: (guestId: string) => api.post(`/loyalty/accounts/${guestId}/enroll`),
+  award: (guestId: string, data: { points: number; description: string; bookingId?: string }) =>
+    api.post(`/loyalty/accounts/${guestId}/award`, data),
+  redeem: (guestId: string, data: { points: number; description: string; bookingId?: string }) =>
+    api.post(`/loyalty/accounts/${guestId}/redeem`, data),
+  adjust: (guestId: string, data: { points: number; description: string }) =>
+    api.post(`/loyalty/accounts/${guestId}/adjust`, data),
+  leaderboard: () => api.get('/loyalty/leaderboard'),
+};
+
+// ── Group Bookings ────────────────────────────────────────────────────────────
+export const groupBookingsApi = {
+  list: (params?: Record<string, unknown>) => api.get('/group-bookings', { params }),
+  get: (id: string) => api.get(`/group-bookings/${id}`),
+  create: (data: unknown) => api.post('/group-bookings', data),
+  update: (id: string, data: unknown) => api.patch(`/group-bookings/${id}`, data),
+  delete: (id: string) => api.delete(`/group-bookings/${id}`),
+  summary: (id: string) => api.get(`/group-bookings/${id}/summary`),
+  addBooking: (id: string, bookingId: string) => api.post(`/group-bookings/${id}/add-booking`, { bookingId }),
+  removeBooking: (id: string, bookingId: string) => api.delete(`/group-bookings/${id}/remove-booking/${bookingId}`),
+  bulkCheckIn: (id: string) => api.post(`/group-bookings/${id}/bulk-checkin`),
+  bulkCheckOut: (id: string) => api.post(`/group-bookings/${id}/bulk-checkout`),
+};
+
+// ── Packages ──────────────────────────────────────────────────────────────────
+export const packagesApi = {
+  list: () => api.get('/packages'),
+  create: (data: unknown) => api.post('/packages', data),
+  update: (id: string, data: unknown) => api.patch(`/packages/${id}`, data),
+  delete: (id: string) => api.delete(`/packages/${id}`),
+  // Booking-package operations
+  getForBooking: (bookingId: string) => api.get(`/packages/booking/${bookingId}`),
+  apply: (bookingId: string, packageId: string) => api.post('/packages/apply', { bookingId, packageId }),
+  remove: (bookingId: string, packageId: string) => api.delete('/packages/remove', { data: { bookingId, packageId } }),
+};
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+export const reportsApi = {
+  getDaily: (date?: string) => api.get('/reports/daily', { params: date ? { date } : {} }),
+  emailDaily: (date?: string, toEmail?: string) =>
+    api.post('/reports/daily/email', { toEmail }, { params: date ? { date } : {} }),
+};
 
 // ── Billing ───────────────────────────────────────────────────────────────────
 export const billingApi = {
@@ -184,4 +265,48 @@ export const billingApi = {
 // ── Booking Payment Link ───────────────────────────────────────────────────────
 export const bookingPaymentApi = {
   createPaymentLink: (bookingId: string) => api.post(`/bookings/${bookingId}/payment-link`),
+};
+
+// ── Expenses ──────────────────────────────────────────────────────────────────
+export const expensesApi = {
+  list: (params?: { month?: string; category?: string; page?: number; limit?: number }) =>
+    api.get('/expenses', { params }),
+  create: (data: {
+    date: string; category: string; description: string; amount: number;
+    vendor?: string; paymentMode?: string; notes?: string;
+  }) => api.post('/expenses', data),
+  update: (id: string, data: Partial<{
+    date: string; category: string; description: string; amount: number;
+    vendor?: string; paymentMode?: string; notes?: string;
+  }>) => api.patch(`/expenses/${id}`, data),
+  delete: (id: string) => api.delete(`/expenses/${id}`),
+  summary: (month?: string) => api.get('/expenses/summary', { params: month ? { month } : {} }),
+  trends: () => api.get('/expenses/trends'),
+};
+
+// ── Payment Gateways ──────────────────────────────────────────────────────────
+export const paymentGatewayApi = {
+  getSettings: () => api.get('/payments/settings'),
+  saveSettings: (data: {
+    bkash?: { enabled?: boolean; appKey?: string; appSecret?: string; username?: string; password?: string };
+    ssl?: { enabled?: boolean; storeId?: string; storePassword?: string; isLive?: boolean };
+    stripe?: { enabled?: boolean };
+  }) => api.patch('/payments/settings', data),
+  getActive: (slug: string) => api.get(`/payments/settings/active/${slug}`),
+  bkashInitiate: (bookingId: string) => api.post('/payments/bkash/initiate', { bookingId }),
+  sslInitiate: (bookingId: string) => api.post('/payments/ssl/initiate', { bookingId }),
+  stripeIntent: (bookingId: string) => api.post('/payments/stripe/intent', { bookingId }),
+};
+
+// ── External Calendars (iCal sync) ────────────────────────────────────────────
+export const externalCalendarsApi = {
+  list: () => api.get('/external-calendars'),
+  create: (data: { roomId: string; name: string; icalUrl: string; isActive?: boolean }) =>
+    api.post('/external-calendars', data),
+  update: (id: string, data: { name?: string; icalUrl?: string; isActive?: boolean }) =>
+    api.patch(`/external-calendars/${id}`, data),
+  delete: (id: string) => api.delete(`/external-calendars/${id}`),
+  sync: (id: string) => api.post(`/external-calendars/${id}/sync`),
+  status: (id: string) => api.get(`/external-calendars/${id}/status`),
+  testUrl: (url: string) => api.post('/external-calendars/test-url', { url }),
 };

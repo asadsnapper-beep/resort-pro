@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import Stripe from 'stripe';
 import { prisma } from '@resort-pro/database';
+import { createAdminNotification } from '../utils/notifications';
 
 // ── Stripe client ──────────────────────────────────────────────────────────
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
@@ -295,6 +296,28 @@ async function handleStripeEvent(event: Stripe.Event) {
         where: { stripeSubscriptionId: sub.id },
         data: { planStatus: 'canceled', plan: 'FREE' },
       });
+      // Find tenant for notification context
+      const canceledTenant = await prisma.tenant.findFirst({
+        where: { stripeSubscriptionId: sub.id },
+        select: { id: true, name: true, slug: true, plan: true },
+      });
+      await createAdminNotification({
+        type: 'subscription_canceled',
+        title: 'Subscription canceled',
+        message: canceledTenant
+          ? `${canceledTenant.name} canceled their ${canceledTenant.plan} subscription.`
+          : `A subscription was canceled (Stripe ID: ${sub.id}).`,
+        metadata: {
+          stripeSubscriptionId: sub.id,
+          ...(canceledTenant && {
+            tenantId: canceledTenant.id,
+            tenantName: canceledTenant.name,
+            tenantSlug: canceledTenant.slug,
+            plan: canceledTenant.plan,
+          }),
+        },
+        linkPath: canceledTenant ? `/admin/tenants` : undefined,
+      });
       break;
     }
 
@@ -315,6 +338,29 @@ async function handleStripeEvent(event: Stripe.Event) {
         await prisma.tenant.updateMany({
           where: { stripeSubscriptionId: inv.subscription as string },
           data: { planStatus: 'past_due' },
+        });
+        const failedTenant = await prisma.tenant.findFirst({
+          where: { stripeSubscriptionId: inv.subscription as string },
+          select: { id: true, name: true, slug: true, plan: true },
+        });
+        const amountDue = inv.amount_due ? `$${(inv.amount_due / 100).toFixed(2)}` : 'unknown amount';
+        await createAdminNotification({
+          type: 'payment_failed',
+          title: 'Payment failed',
+          message: failedTenant
+            ? `Payment of ${amountDue} failed for ${failedTenant.name} (${failedTenant.plan} plan). Account is past due.`
+            : `Payment of ${amountDue} failed for a tenant. Account is past due.`,
+          metadata: {
+            stripeInvoiceId: inv.id,
+            amountDue: inv.amount_due,
+            ...(failedTenant && {
+              tenantId: failedTenant.id,
+              tenantName: failedTenant.name,
+              tenantSlug: failedTenant.slug,
+              plan: failedTenant.plan,
+            }),
+          },
+          linkPath: failedTenant ? `/admin/billing` : undefined,
         });
       }
       break;
@@ -405,6 +451,7 @@ async function markBookingPaid(bookingId: string, stripePaymentIntentId: string,
       stripePaymentIntentId,
       paidAmount: newPaid,
       paymentStatus: isPaid ? 'PAID' : 'PARTIAL',
+      ...(isPaid ? { status: 'CONFIRMED', paymentGateway: 'STRIPE', gatewayTxId: stripePaymentIntentId, paidAt: new Date() } : {}),
     },
   });
 

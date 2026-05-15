@@ -8,6 +8,7 @@ import {
   AvailabilitySection, BookingSection,
   ContactSection, FooterSection,
 } from './sections'
+import { WhatsAppButton } from '../_widgets/SocialLinks'
 
 const NAV_ITEMS = [
   { id: 'about',        label: 'About' },
@@ -134,6 +135,7 @@ export function MinimalTheme({ data }: ThemeProps) {
         <ContactSection data={data} />
         <FooterSection  data={data} scrollTo={scrollTo} />
       </main>
+      <WhatsAppButton whatsappNumber={data.website?.whatsappNumber} />
     </div>
   )
 }

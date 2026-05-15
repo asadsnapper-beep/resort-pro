@@ -1,0 +1,532 @@
+/*
+ * ResortPro Embed Styles
+ * All selectors are prefixed with .rp- to avoid polluting host site styles.
+ * CSS custom properties (--rp-*) are set per-widget by theme.ts.
+ */
+
+/* ── Reset (scoped) ── */
+.rp-widget * {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Base widget shell ── */
+.rp-widget {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  color: #1f2937;
+  line-height: 1.5;
+  --rp-primary: #1a6b5e;
+  --rp-primary-light: rgba(26,107,94,0.1);
+  --rp-primary-mid: rgba(26,107,94,0.2);
+  --rp-radius: 12px;
+  --rp-radius-sm: 8px;
+  --rp-border: #e5e7eb;
+  --rp-muted: #6b7280;
+  --rp-success: #22c55e;
+  --rp-error: #ef4444;
+}
+
+/* ── Card ── */
+.rp-card {
+  background: #fff;
+  border-radius: var(--rp-radius);
+  box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+  overflow: hidden;
+}
+
+/* ── Step tabs ── */
+.rp-steps {
+  display: flex;
+  border-bottom: 1px solid var(--rp-border);
+}
+.rp-step {
+  flex: 1;
+  padding: 14px 8px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: #9ca3af;
+  border-bottom: 3px solid transparent;
+  transition: color .2s, border-color .2s;
+}
+.rp-step.active {
+  color: var(--rp-primary);
+  border-bottom-color: var(--rp-primary);
+}
+
+/* ── Body ── */
+.rp-body { padding: 24px; }
+
+/* ── Input ── */
+.rp-input {
+  width: 100%;
+  height: 40px;
+  border: 1px solid var(--rp-border);
+  border-radius: var(--rp-radius-sm);
+  padding: 0 12px;
+  font-size: 14px;
+  color: #1f2937;
+  background: #fff;
+  transition: border-color .2s, box-shadow .2s;
+  outline: none;
+}
+.rp-input:focus {
+  border-color: var(--rp-primary);
+  box-shadow: 0 0 0 3px var(--rp-primary-light);
+}
+.rp-textarea {
+  width: 100%;
+  border: 1px solid var(--rp-border);
+  border-radius: var(--rp-radius-sm);
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #1f2937;
+  background: #fff;
+  resize: none;
+  outline: none;
+  font-family: inherit;
+}
+.rp-textarea:focus {
+  border-color: var(--rp-primary);
+  box-shadow: 0 0 0 3px var(--rp-primary-light);
+}
+.rp-select {
+  width: 100%;
+  height: 40px;
+  border: 1px solid var(--rp-border);
+  border-radius: var(--rp-radius-sm);
+  padding: 0 12px;
+  font-size: 14px;
+  color: #1f2937;
+  background: #fff;
+  outline: none;
+  cursor: pointer;
+}
+
+/* ── Label ── */
+.rp-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 4px;
+}
+
+/* ── Button ── */
+.rp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 20px;
+  border: none;
+  border-radius: var(--rp-radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity .2s, transform .1s;
+}
+.rp-btn:active { transform: scale(0.98); }
+.rp-btn:disabled { opacity: .55; cursor: not-allowed; }
+.rp-btn-primary {
+  background: var(--rp-primary);
+  color: #fff;
+  width: 100%;
+  height: 48px;
+  font-size: 15px;
+  border-radius: var(--rp-radius);
+}
+.rp-btn-primary:hover:not(:disabled) { opacity: .9; }
+.rp-btn-outline {
+  background: transparent;
+  border: 1px solid var(--rp-border);
+  color: #374151;
+}
+.rp-btn-outline:hover:not(:disabled) { background: #f9fafb; }
+
+/* ── Grid helpers ── */
+.rp-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.rp-space-4 > * + * { margin-top: 16px; }
+.rp-space-3 > * + * { margin-top: 12px; }
+.rp-space-2 > * + * { margin-top: 8px; }
+.rp-flex { display: flex; align-items: center; }
+.rp-flex-between { display: flex; align-items: center; justify-content: space-between; }
+.rp-flex-gap-2 { gap: 8px; }
+.rp-flex-gap-3 { gap: 12px; }
+
+/* ── Room card ── */
+.rp-room-card {
+  border: 2px solid var(--rp-border);
+  border-radius: var(--rp-radius);
+  padding: 16px;
+  cursor: pointer;
+  transition: border-color .2s, background .2s, box-shadow .2s;
+}
+.rp-room-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.rp-room-card.selected {
+  border-color: var(--rp-primary);
+  background: var(--rp-primary-light);
+}
+.rp-room-img {
+  width: 88px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.rp-room-price {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--rp-primary);
+}
+.rp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+/* ── Payment method card ── */
+.rp-pay-card {
+  border: 2px solid var(--rp-border);
+  border-radius: var(--rp-radius);
+  padding: 14px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: border-color .2s, background .2s;
+}
+.rp-pay-card:hover { background: #fafafa; }
+.rp-pay-card.selected {
+  border-color: var(--rp-primary);
+  background: var(--rp-primary-light);
+}
+.rp-pay-radio {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--rp-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: border-color .2s;
+}
+.rp-pay-card.selected .rp-pay-radio { border-color: var(--rp-primary); }
+.rp-pay-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--rp-primary);
+  display: none;
+}
+.rp-pay-card.selected .rp-pay-dot { display: block; }
+
+/* ── Calendar ── */
+.rp-cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.rp-cal-nav {
+  background: none;
+  border: 1px solid var(--rp-border);
+  border-radius: 8px;
+  width: 32px; height: 32px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rp-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+.rp-cal-day-name {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--rp-muted);
+  padding: 6px 0;
+}
+.rp-cal-day {
+  text-align: center;
+  padding: 8px 4px;
+  font-size: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.rp-cal-day.empty { cursor: default; }
+.rp-cal-day.available:hover { background: var(--rp-primary-light); color: var(--rp-primary); }
+.rp-cal-day.booked { color: #9ca3af; text-decoration: line-through; cursor: not-allowed; }
+.rp-cal-day.selected { background: var(--rp-primary); color: #fff; }
+.rp-cal-day.in-range { background: var(--rp-primary-light); }
+
+/* ── Menu ── */
+.rp-menu-cats {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+.rp-menu-cats::-webkit-scrollbar { display: none; }
+.rp-cat-btn {
+  white-space: nowrap;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--rp-border);
+  background: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .2s;
+}
+.rp-cat-btn.active {
+  background: var(--rp-primary);
+  border-color: var(--rp-primary);
+  color: #fff;
+}
+.rp-menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+.rp-menu-item {
+  border: 1px solid var(--rp-border);
+  border-radius: var(--rp-radius);
+  overflow: hidden;
+  transition: box-shadow .2s;
+}
+.rp-menu-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.rp-menu-item-img {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+}
+.rp-menu-item-body { padding: 12px; }
+.rp-menu-item-name { font-weight: 600; font-size: 14px; }
+.rp-menu-item-desc { font-size: 12px; color: var(--rp-muted); margin-top: 4px; }
+.rp-menu-item-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+.rp-item-price { font-weight: 700; color: var(--rp-primary); }
+.rp-qty-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rp-qty-btn {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--rp-border);
+  background: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s;
+}
+.rp-qty-btn:hover { background: var(--rp-primary-light); }
+
+/* ── Cart ── */
+.rp-cart {
+  border-top: 1px solid var(--rp-border);
+  margin-top: 20px;
+  padding-top: 16px;
+}
+
+/* ── Success ── */
+.rp-success {
+  text-align: center;
+  padding: 32px 24px;
+}
+.rp-success-icon {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  background: var(--rp-primary-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  font-size: 28px;
+}
+.rp-success-ref {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--rp-border);
+}
+
+/* ── Error / Info banners ── */
+.rp-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--rp-radius-sm);
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #dc2626;
+  margin-top: 12px;
+}
+.rp-info {
+  background: var(--rp-primary-light);
+  border-radius: var(--rp-radius-sm);
+  padding: 12px 14px;
+  font-size: 13px;
+}
+
+/* ── Loading spinner ── */
+.rp-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+.rp-spinner::after {
+  content: '';
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 3px solid var(--rp-primary-mid);
+  border-top-color: var(--rp-primary);
+  animation: rp-spin .7s linear infinite;
+}
+@keyframes rp-spin { to { transform: rotate(360deg); } }
+
+/* ── Floating CTA ── */
+.rp-float {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+.rp-float-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 22px;
+  border-radius: 999px;
+  border: none;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--rp-primary);
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,.2);
+  transition: transform .2s, box-shadow .2s;
+}
+.rp-float-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,.25);
+}
+.rp-whatsapp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  background: #25d366;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,.18);
+  text-decoration: none;
+}
+
+/* ── Modal overlay ── */
+.rp-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  z-index: 9998;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.rp-modal {
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 20px 60px rgba(0,0,0,.3);
+}
+.rp-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: rgba(0,0,0,.08);
+  border: none;
+  border-radius: 50%;
+  width: 30px; height: 30px;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #374151;
+}
+
+/* ── Guest count stepper ── */
+.rp-stepper {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.rp-step-btn {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--rp-border);
+  background: #fff;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s;
+}
+.rp-step-btn:hover { background: var(--rp-primary-light); }
+
+/* ── Summary box ── */
+.rp-summary {
+  background: var(--rp-primary-light);
+  border-radius: var(--rp-radius-sm);
+  padding: 14px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.rp-summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+}
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .rp-body { padding: 16px; }
+  .rp-grid-2 { grid-template-columns: 1fr; }
+  .rp-menu-grid { grid-template-columns: 1fr; }
+  .rp-float { bottom: 16px; right: 16px; }
+}

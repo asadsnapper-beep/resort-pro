@@ -52,6 +52,87 @@ export const adminEndpoints = {
   // Platform settings
   getSettings: () => adminApi.get('/settings'),
   updateSettings: (data: { trialDays?: number; plans?: unknown[] }) => adminApi.put('/settings', data),
+  // CSV Exports
+  exportTenantsCsv: () => adminApi.get('/export/tenants-csv', { responseType: 'blob' }),
+  exportRevenueCsv: () => adminApi.get('/export/revenue-csv', { responseType: 'blob' }),
+  exportTenantCsv: (id: string) => adminApi.get(`/tenants/${id}/export-csv`, { responseType: 'blob' }),
+  // MRR Growth
+  getMrrGrowth: () => adminApi.get('/mrr-growth'),
+  // Referrals
+  getReferrals: () => adminApi.get('/referrals'),
+  // Churn Risk
+  getChurnRisk: () => adminApi.get('/churn-risk'),
+  // Notifications
+  getNotifications: () => adminApi.get('/notifications'),
+  markNotificationRead: (id: string) => adminApi.patch(`/notifications/${id}/read`),
+  markAllNotificationsRead: () => adminApi.patch('/notifications/read-all'),
+  // Audit Log
+  getAuditLog: (params?: {
+    page?: number; action?: string; adminEmail?: string;
+    targetType?: string; from?: string; to?: string;
+  }) => adminApi.get('/audit-log', { params }),
+  // Health
+  getHealth: () => adminApi.get('/health'),
+  // GDPR
+  getGdprRequests: () => adminApi.get('/gdpr/requests'),
+  requestErasure: (id: string) => adminApi.post(`/tenants/${id}/gdpr/request-erasure`),
+  anonymizeNow: (id: string) => adminApi.post(`/tenants/${id}/gdpr/anonymize-now`),
+  cancelErasure: (id: string) => adminApi.post(`/tenants/${id}/gdpr/cancel-erasure`),
+  gdprExport: (id: string) => adminApi.get(`/tenants/${id}/gdpr/export`, { responseType: 'blob' }),
+  // Announcements
+  getAnnouncements: () => adminApi.get('/announcements'),
+  createAnnouncement: (data: {
+    title: string; body: string; type?: string;
+    targetPlans?: string[]; isDismissible?: boolean;
+    startsAt?: string; endsAt?: string;
+  }) => adminApi.post('/announcements', data),
+  updateAnnouncement: (id: string, data: {
+    title?: string; body?: string; type?: string; targetPlans?: string[];
+    isDismissible?: boolean; startsAt?: string; endsAt?: string | null; isActive?: boolean;
+  }) => adminApi.patch(`/announcements/${id}`, data),
+  deleteAnnouncement: (id: string) => adminApi.delete(`/announcements/${id}`),
+  broadcastAnnouncement: (id: string) => adminApi.post(`/announcements/${id}/broadcast`),
+  // Feature Flags
+  getFeatureFlagRegistry: () => adminApi.get('/feature-flags'),
+  getTenantFlags: (id: string) => adminApi.get(`/tenants/${id}/flags`),
+  toggleTenantFlag: (id: string, flag: string, enabled: boolean) =>
+    adminApi.patch(`/tenants/${id}/flags/${flag}`, { enabled }),
+  bulkUpdateTenantFlags: (id: string, flags: Record<string, boolean>) =>
+    adminApi.patch(`/tenants/${id}/flags`, { flags }),
+  // Admin Team
+  getTeam: () => adminApi.get('/team'),
+  createTeamMember: (data: { email: string; password: string; role: string; firstName?: string; lastName?: string }) =>
+    adminApi.post('/team', data),
+  updateTeamMember: (id: string, data: { role?: string; isActive?: boolean; firstName?: string; lastName?: string }) =>
+    adminApi.patch(`/team/${id}`, data),
+  deleteTeamMember: (id: string) => adminApi.delete(`/team/${id}`),
+  // Domain management (T-27)
+  getDomains: () => adminApi.get('/domains'),
+  forceVerifyDomain: (id: string) => adminApi.post(`/domains/${id}/force-verify`),
+  removeDomain: (id: string) => adminApi.delete(`/domains/${id}`),
+  updateSslStatus: (id: string, data: { sslStatus: string; sslExpiresAt?: string; sslError?: string }) =>
+    adminApi.patch(`/domains/${id}/ssl`, data),
+  // Enterprise / SLA / White-label / SSO
+  getEnterpriseSummary: () => adminApi.get('/enterprise'),
+  getTenantEnterprise: (id: string) => adminApi.get(`/tenants/${id}/enterprise`),
+  upsertSla: (id: string, data: {
+    tier?: string; uptimePercent?: number; responseTimeH?: number;
+    contractStart?: string; contractEnd?: string | null;
+    autoRenew?: boolean; notes?: string; signedBy?: string; signedAt?: string;
+  }) => adminApi.put(`/tenants/${id}/sla`, data),
+  deleteSla: (id: string) => adminApi.delete(`/tenants/${id}/sla`),
+  updateWhitelabel: (id: string, data: {
+    whitelabelEnabled?: boolean; brandLogoUrl?: string | null;
+    brandPrimaryColor?: string | null; brandAccentColor?: string | null;
+    companyDisplayName?: string | null;
+  }) => adminApi.put(`/tenants/${id}/whitelabel`, data),
+  updateSso: (id: string, data: {
+    ssoEnabled?: boolean; ssoProvider?: string | null;
+    ssoClientId?: string | null; ssoClientSecret?: string | null;
+    ssoConfig?: Record<string, unknown> | null;
+  }) => adminApi.put(`/tenants/${id}/sso`, data),
+  updateOnboarding: (id: string, data: { step?: number; notes?: string; complete?: boolean }) =>
+    adminApi.patch(`/tenants/${id}/onboarding`, data),
   // Themes
   getThemes: () => adminApi.get('/themes'),
   updateTheme: (key: string, data: {

@@ -9,6 +9,7 @@ import { useAuthStore } from '@/store/auth';
 import {
   BedDouble, CalendarCheck, CalendarX, TrendingUp, Users,
   Ticket, DollarSign, Sparkles, ArrowUp, ArrowDown,
+  LogIn, LogOut, CheckCircle2, Clock, Wrench,
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import type { Metadata } from 'next';
@@ -67,18 +68,28 @@ export default function DashboardPage() {
     queryFn: () => dashboardApi.getOccupancy(),
   });
 
+  const { data: todayRes } = useQuery({
+    queryKey: ['today'],
+    queryFn: () => dashboardApi.getToday(),
+    refetchInterval: 60000,
+  });
+
   const stats = statsRes?.data?.data?.stats;
   const recentBookings = statsRes?.data?.data?.recentBookings || [];
   const lowStock = statsRes?.data?.data?.lowStockAlerts || [];
   const revenueData = revenueRes?.data?.data || [];
   const occupancyData = occupancyRes?.data?.data || [];
+  const todayData = todayRes?.data?.data;
+  const arrivals: any[] = todayData?.arrivals || [];
+  const departures: any[] = todayData?.departures || [];
+  const inHouseCount: number = todayData?.summary?.inHouseCount || 0;
 
   if (isLoading) {
     return (
       <div className="space-y-6">
         <div className="h-8 w-64 rounded-lg bg-gray-200 animate-pulse" />
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {[...Array(8)].map((_, i) => (
+          {[...Array(9)].map((_, i) => (
             <div key={i} className="h-28 rounded-xl bg-gray-200 animate-pulse" />
           ))}
         </div>
@@ -108,6 +119,104 @@ export default function DashboardPage() {
         <StatCard title="Monthly Revenue" value={formatCurrency(stats?.monthlyRevenue || 0)} icon={DollarSign} change={stats?.revenueGrowth} color="bg-emerald-500" />
         <StatCard title="Open Tickets" value={stats?.openTickets || 0} icon={Ticket} color="bg-red-500" />
         <StatCard title="Pending Cleaning" value={stats?.pendingHousekeeping || 0} icon={Sparkles} color="bg-yellow-500" />
+        <StatCard title="Maintenance" value={(stats as { openMaintenance?: number })?.openMaintenance || 0} icon={Wrench} color="bg-orange-600" />
+      </div>
+
+      {/* Today's Arrivals & Departures */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Arrivals */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <LogIn className="h-4 w-4 text-emerald-600" />
+              Today's Arrivals
+              <span className="ml-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                {arrivals.length}
+              </span>
+            </CardTitle>
+            <a href="/dashboard/bookings?status=CONFIRMED" className="text-xs text-resort-600 hover:underline">View all</a>
+          </CardHeader>
+          <CardContent>
+            {arrivals.length === 0 ? (
+              <div className="flex flex-col items-center py-6 text-center gap-2">
+                <CheckCircle2 className="h-8 w-8 text-gray-300" />
+                <p className="text-sm text-muted-foreground">No arrivals today</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {arrivals.map((b: any) => (
+                  <div key={b.id} className="flex items-center justify-between rounded-xl border border-gray-100 dark:border-gray-800 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-8 w-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-xs font-bold text-emerald-700 dark:text-emerald-400 shrink-0">
+                        {b.guest.firstName[0]}{b.guest.lastName[0]}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate text-gray-900 dark:text-white">{b.guest.firstName} {b.guest.lastName}</p>
+                        <p className="text-xs text-gray-500">Room {b.room.number} · {b.nights}n</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {b.status === 'CHECKED_IN' ? (
+                        <span className="text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-full font-medium">In</span>
+                      ) : (
+                        <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">
+                          <Clock className="inline w-3 h-3 mr-0.5" />Due
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Departures */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <LogOut className="h-4 w-4 text-indigo-600" />
+              Today's Departures
+              <span className="ml-1 rounded-full bg-indigo-100 dark:bg-indigo-900/30 px-2 py-0.5 text-xs font-bold text-indigo-700 dark:text-indigo-400">
+                {departures.length}
+              </span>
+            </CardTitle>
+            <span className="text-xs text-gray-400">{inHouseCount} in-house</span>
+          </CardHeader>
+          <CardContent>
+            {departures.length === 0 ? (
+              <div className="flex flex-col items-center py-6 text-center gap-2">
+                <CheckCircle2 className="h-8 w-8 text-gray-300" />
+                <p className="text-sm text-muted-foreground">No departures today</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {departures.map((b: any) => (
+                  <div key={b.id} className="flex items-center justify-between rounded-xl border border-gray-100 dark:border-gray-800 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-xs font-bold text-indigo-700 dark:text-indigo-400 shrink-0">
+                        {b.guest.firstName[0]}{b.guest.lastName[0]}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate text-gray-900 dark:text-white">{b.guest.firstName} {b.guest.lastName}</p>
+                        <p className="text-xs text-gray-500">Room {b.room.number} · {b.nights}n stay</p>
+                      </div>
+                    </div>
+                    <div className="shrink-0">
+                      {b.status === 'CHECKED_OUT' ? (
+                        <span className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 px-2 py-0.5 rounded-full font-medium">Out</span>
+                      ) : (
+                        <span className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 px-2 py-0.5 rounded-full font-medium">
+                          <Clock className="inline w-3 h-3 mr-0.5" />Pending
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Charts Row */}

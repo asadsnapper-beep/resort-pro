@@ -6,8 +6,9 @@ import Link from 'next/link';
 import { useAdminStore } from '@/store/admin';
 import {
   LayoutDashboard, Building2, Users, CreditCard,
-  LogOut, Shield, ChevronRight, Loader2, Settings, Palette,
+  LogOut, Shield, ChevronRight, Loader2, Settings, Palette, ClipboardList, Download, Gift, UserCog, Megaphone, ShieldCheck, Activity, Star, Globe,
 } from 'lucide-react';
+import NotificationBell from '@/components/admin/NotificationBell';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -16,7 +17,16 @@ const navItems = [
   { href: '/admin/users',     label: 'Users',       icon: Users },
   { href: '/admin/billing',   label: 'Billing & MRR', icon: CreditCard },
   { href: '/admin/themes',    label: 'Themes',      icon: Palette },
-  { href: '/admin/settings',  label: 'Settings',    icon: Settings },
+  { href: '/admin/audit-log', label: 'Audit Log',   icon: ClipboardList },
+  { href: '/admin/export',     label: 'Export',      icon: Download },
+  { href: '/admin/referrals',  label: 'Referrals',   icon: Gift },
+  { href: '/admin/team',           label: 'Team',           icon: UserCog },
+  { href: '/admin/announcements',  label: 'Announcements',  icon: Megaphone },
+  { href: '/admin/gdpr',           label: 'GDPR',           icon: ShieldCheck },
+  { href: '/admin/enterprise',      label: 'Enterprise',     icon: Star },
+  { href: '/admin/domains',         label: 'Domains',        icon: Globe },
+  { href: '/admin/health',         label: 'Health',         icon: Activity },
+  { href: '/admin/settings',       label: 'Settings',       icon: Settings },
 ];
 
 export default function AdminPanelLayout({ children }: { children: React.ReactNode }) {
@@ -118,7 +128,8 @@ export default function AdminPanelLayout({ children }: { children: React.ReactNo
           <span className="text-gray-300 text-sm font-medium capitalize">
             {pathname === '/admin' ? 'Overview' : pathname.split('/').pop()}
           </span>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-3">
+            <NotificationBell />
             <span className="text-xs text-gray-600 bg-gray-800 border border-gray-700 px-2 py-1 rounded-full">
               Super Admin
             </span>

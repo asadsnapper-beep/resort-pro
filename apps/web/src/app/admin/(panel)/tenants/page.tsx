@@ -8,15 +8,34 @@ import { toast } from '@/hooks/use-toast';
 import {
   Search, Building2, ChevronLeft, ChevronRight,
   ExternalLink, Loader2, CheckCircle2, AlertTriangle,
-  Ban, RefreshCw, UserCheck, Filter, Download,
+  Ban, RefreshCw, UserCheck, Filter, Download, Flag,
 } from 'lucide-react';
+import Link from 'next/link';
+
+type ChurnRisk = {
+  level: 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE';
+  score: number;
+  reasons: string[];
+  daysSinceLogin: number | null;
+  bookingsLast30: number;
+  bookingsPrev30: number;
+};
 
 type Tenant = {
   id: string; name: string; slug: string; plan: string; planStatus: string;
   isActive: boolean; email: string | null; phone: string | null; currency: string;
   trialEndsAt: string | null; currentPeriodEnd: string | null; stripeCustomerId: string | null;
   createdAt: string;
+  ownerLastLoginAt: string | null;
+  churnRisk: ChurnRisk;
   _count: { users: number; rooms: number; bookings: number };
+};
+
+const RISK_BADGE: Record<string, { label: string; cls: string }> = {
+  HIGH:   { label: '🔴 High',   cls: 'bg-red-500/15 text-red-400 border border-red-500/20' },
+  MEDIUM: { label: '🟡 Medium', cls: 'bg-amber-500/15 text-amber-400 border border-amber-500/20' },
+  LOW:    { label: '🟢 Low',    cls: 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20' },
+  NONE:   { label: '—',         cls: 'text-gray-600' },
 };
 
 const planColors: Record<string, string> = {
@@ -221,6 +240,7 @@ export default function AdminTenantsPage() {
                 <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Plan</th>
                 <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Status</th>
                 <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Stats</th>
+                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Risk</th>
                 <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Joined</th>
                 <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Actions</th>
               </tr>
@@ -269,6 +289,22 @@ export default function AdminTenantsPage() {
                       <span title="Bookings">📅 {t._count.bookings}</span>
                     </div>
                   </td>
+                  <td className="px-5 py-4">
+                    {t.churnRisk && t.churnRisk.level !== 'NONE' ? (
+                      <div title={t.churnRisk.reasons.join('\n')}>
+                        <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${RISK_BADGE[t.churnRisk.level]?.cls}`}>
+                          {RISK_BADGE[t.churnRisk.level]?.label}
+                        </span>
+                        {t.churnRisk.daysSinceLogin !== null && (
+                          <p className="text-[10px] text-gray-600 mt-0.5">
+                            {t.churnRisk.daysSinceLogin}d no login
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-gray-700 text-xs">—</span>
+                    )}
+                  </td>
                   <td className="px-5 py-4 text-xs text-gray-500">
                     {new Date(t.createdAt).toLocaleDateString()}
                   </td>
@@ -280,6 +316,13 @@ export default function AdminTenantsPage() {
                       >
                         Edit
                       </button>
+                      <Link
+                        href={`/admin/tenants/${t.id}`}
+                        title="Feature flags"
+                        className="text-xs text-gray-400 hover:text-indigo-400 px-2 py-1 rounded-md hover:bg-indigo-500/10 transition-colors"
+                      >
+                        <Flag className="w-3.5 h-3.5" />
+                      </Link>
                       <button
                         onClick={() => handleExport(t)}
                         disabled={actionLoading === `exp-${t.id}`}

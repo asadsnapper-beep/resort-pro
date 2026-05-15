@@ -4,6 +4,7 @@ import { prisma } from '@resort-pro/database';
 import { requireRole } from '../middleware/auth';
 import { ok, validate } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
+import { resolveRate } from './ratePlans';
 
 const websiteSchema = z.object({
   heroTitle: z.string().min(1),
@@ -175,7 +176,7 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
         },
       });
 
-      return reply.status(201).send(ok({ confirmationNo: booking.confirmationNo, totalAmount, nights }, 'Booking request submitted!'));
+      return reply.status(201).send(ok({ id: booking.id, confirmationNo: booking.confirmationNo, totalAmount, nights }, 'Booking request submitted!'));
     },
   });
 
@@ -486,6 +487,35 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
         totalAmount,
         itemCount: body.items.length,
       }, 'Order placed! Our team will deliver to your room shortly.'));
+    },
+  });
+
+  // GET /site/:slug/rate?roomId=&checkIn=&checkOut=  — public rate lookup
+  app.get('/:slug/rate', {
+    schema: { tags: ['website'], summary: 'Get effective rate for room + dates' },
+    handler: async (request, reply) => {
+      const { slug } = request.params as { slug: string };
+      const { roomId, checkIn, checkOut } = request.query as { roomId: string; checkIn: string; checkOut: string };
+
+      const tenant = await prisma.tenant.findUnique({ where: { slug }, select: { id: true, currency: true } });
+      if (!tenant) return reply.status(404).send({ success: false, error: 'Resort not found' });
+
+      const room = await prisma.room.findFirst({ where: { id: roomId, tenantId: tenant.id }, select: { id: true, basePrice: true, name: true } });
+      if (!room) return reply.status(404).send({ success: false, error: 'Room not found' });
+
+      const resolved = await resolveRate(tenant.id, roomId, new Date(checkIn), new Date(checkOut));
+
+      return reply.send({
+        success: true,
+        data: {
+          roomId,
+          roomName: room.name,
+          basePrice: Number(room.basePrice),
+          currency: tenant.currency,
+          resolved,
+          effectivePrice: resolved ? resolved.price : Number(room.basePrice),
+        },
+      });
     },
   });
 }

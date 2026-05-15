@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, BedDouble, CalendarDays, Users, UserCog,
   Sparkles, ClipboardList, UtensilsCrossed, ShoppingBag,
-  Package, Ticket, Globe, Bell, Settings, LogOut, Mail, CreditCard,
+  Package, Ticket, Globe, Bell, Settings, LogOut, Mail, CreditCard, BarChart2, LayoutGrid, Tags, Wrench, FileBarChart2, Gift, UsersRound, Star, Link2, Receipt,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
@@ -14,11 +14,21 @@ import { useRouter } from 'next/navigation';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart2 },
+  { href: '/dashboard/expenses', label: 'Expenses', icon: Receipt },
+  { href: '/dashboard/reports', label: 'Daily Reports', icon: FileBarChart2 },
   { href: '/dashboard/rooms', label: 'Rooms & Villas', icon: BedDouble },
+  { href: '/dashboard/rate-plans', label: 'Rate Plans', icon: Tags },
+  { href: '/dashboard/packages', label: 'Packages', icon: Gift },
+  { href: '/dashboard/group-bookings', label: 'Group Bookings', icon: UsersRound },
+  { href: '/dashboard/loyalty', label: 'Loyalty Program', icon: Star },
+  { href: '/dashboard/channels', label: 'Channel Sync', icon: Link2 },
   { href: '/dashboard/bookings', label: 'Bookings', icon: CalendarDays },
+  { href: '/dashboard/calendar', label: 'Booking Calendar', icon: LayoutGrid },
   { href: '/dashboard/guests', label: 'Guests', icon: Users },
   { href: '/dashboard/staff', label: 'Staff', icon: UserCog },
   { href: '/dashboard/housekeeping', label: 'Housekeeping', icon: Sparkles },
+  { href: '/dashboard/maintenance', label: 'Maintenance', icon: Wrench },
   { href: '/dashboard/restaurant', label: 'Restaurant', icon: UtensilsCrossed },
   { href: '/dashboard/orders', label: 'F&B Orders', icon: ShoppingBag },
   { href: '/dashboard/inventory', label: 'Inventory', icon: Package },

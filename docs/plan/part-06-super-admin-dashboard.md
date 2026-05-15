@@ -146,3 +146,151 @@ File download: `resortpro-export-{slug}-{date}.json`
 | `apps/web/src/store/admin.ts` | Admin Zustand store |
 | `apps/web/src/app/admin/login/` | Admin login page |
 | `apps/web/src/app/admin/(panel)/` | Admin panel layout + all pages |
+
+---
+
+## ⚠️ Known Gaps (Future Work)
+
+> Business planning analysis থেকে চিহ্নিত। Phase অনুযায়ী implement করতে হবে।
+
+### 🔴 Phase 1 — Critical (legal/safety risk — এখনই করা উচিত)
+
+#### Audit Log
+Admin-এর প্রতিটি action log করতে হবে।
+
+**DB Model:**
+```prisma
+model AuditLog {
+  id         String   @id @default(cuid())
+  adminEmail String
+  action     String   // impersonate | suspend | plan_change | export | settings_change | toggle_theme
+  targetType String   // tenant | user | theme | settings
+  targetId   String?
+  metadata   Json?    // before/after values
+  createdAt  DateTime @default(now())
+}
+```
+
+**কোথায় log করতে হবে:**
+- `POST /tenants/:id/impersonate` → `action: impersonate`
+- `PATCH /tenants/:id` → `action: plan_change` (metadata: `{ from, to }`)
+- `DELETE /tenants/:id` → `action: suspend`
+- `GET /tenants/:id/export` → `action: export`
+- `PUT /settings` → `action: settings_change`
+- `PUT|PATCH /themes/:key` → `action: toggle_theme | update_theme`
+
+**Admin page:** `/admin/audit-log` — searchable table, filter by action/admin/date range
+
+---
+
+#### Soft Delete / Data Retention Policy
+- Suspend = `isActive: false` (already done ✅)
+- Hard delete = আলাদা endpoint, 30-day grace period, then purge PII
+- `deletedAt` field add করতে হবে `Tenant` model-এ
+- Purge job: scheduled cron — `deletedAt` + 30 days পার হলে PII anonymize
+
+---
+
+### 🟡 Phase 2 — Important ($1k MRR-এর আগে)
+
+#### Churn Indicators
+Tenant table + dashboard-এ risk signals দেখাতে হবে।
+
+**Data points needed:**
+- `lastLoginAt` — Owner-এর শেষ login timestamp
+- Booking activity (last 30 days vs previous 30 days)
+- "At Risk" badge: 30+ দিন কোনো booking নেই = 🔴, 14 দিন = 🟡
+
+**Admin tenant row-এ add:**
+```
+[🔴 At Risk] [Last login: 23 days ago] [0 bookings this month]
+```
+
+#### MRR Growth Chart
+- Month-over-month MRR bar/line chart (Recharts)
+- Data source: Stripe `subscriptions` API — group by month
+- Show: New MRR | Expansion MRR | Churned MRR | Net MRR
+- Billing page-এ add করতে হবে
+
+#### Admin Notification Center
+Real-time alerts for key events:
+
+| Event | Trigger |
+|-------|---------|
+| New signup | Tenant created |
+| Trial expiring | 3 days before end |
+| Payment failed | Stripe webhook `invoice.payment_failed` |
+| Cancellation | Stripe webhook `customer.subscription.deleted` |
+| Account suspended | Admin action |
+
+**UI:** Bell icon in admin header — unread count badge — dropdown list
+
+---
+
+### 🔵 Phase 3 — Scale (team বড় হলে)
+
+#### Admin Role Granularity
+এখন `SUPER_ADMIN_EMAILS` = full access। Team বড় হলে granular roles দরকার।
+
+| Role | Access |
+|------|--------|
+| `SUPER_ADMIN` | Everything |
+| `SUPPORT` | View tenants, impersonate, extend trial |
+| `FINANCE` | Billing page, export only |
+| `VIEWER` | Read-only dashboard |
+
+**DB:** `AdminUser` model (email, role, createdAt) — replace env-var approach
+
+#### Feature Flags per Tenant
+Beta features specific tenant-এ test করার জন্য।
+
+```prisma
+model TenantFeatureFlag {
+  id       String  @id @default(cuid())
+  tenantId String
+  flag     String  // e.g. "beta_analytics", "ai_room_suggestions"
+  enabled  Boolean @default(false)
+  tenant   Tenant  @relation(...)
+}
+```
+
+**Admin UI:** Tenant detail page-এ feature flag toggle list
+
+---
+
+### ⚪ Phase 4 — Enterprise / EU Market
+
+#### GDPR Compliance Tools
+- **Right to Erasure:** Tenant delete করলে সব PII anonymize (name → "Deleted User", email → hash)
+- **Data Export (GDPR):** Machine-readable format (JSON ✅ already) — add CSV option
+- **Data Processing Agreement:** Auto-generate DPA PDF per tenant
+- **Cookie consent:** Public website-এ consent banner (per-resort config)
+
+#### Platform Health Dashboard
+- API response time (p50, p95, p99)
+- Error rate (5xx per hour)
+- DB connection pool status
+- Email delivery rate (Resend webhook stats)
+- Stripe webhook success rate
+- Active sessions count
+
+**Tool:** Prometheus metrics → Grafana, অথবা simple custom `/admin/health` page
+
+#### CSV / PDF Export
+- Tenant data → CSV (Finance team-এর জন্য Excel-friendly)
+- Monthly invoice PDF per tenant
+- Bulk export (all tenants → ZIP of CSVs)
+
+---
+
+## 📊 Future-Proof Scorecard
+
+| Category | Current | Target |
+|----------|---------|--------|
+| Core CRUD ops | ✅ 9/10 | — |
+| Revenue visibility | 🟡 6/10 | Phase 2: 9/10 |
+| Security & Audit | 🔴 3/10 | Phase 1: 9/10 |
+| Churn prevention | 🔴 2/10 | Phase 2: 8/10 |
+| Team scalability | 🔴 2/10 | Phase 3: 8/10 |
+| Platform observability | 🔴 1/10 | Phase 4: 8/10 |
+| GDPR / Compliance | 🔴 1/10 | Phase 4: 8/10 |

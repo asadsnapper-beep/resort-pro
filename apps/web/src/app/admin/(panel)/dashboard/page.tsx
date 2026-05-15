@@ -11,9 +11,38 @@ import {
   DollarSign, TrendingUp, Activity, Clock,
   Loader2, ExternalLink, AlertTriangle,
   ShieldAlert, ArrowRight, CheckCircle2,
-  UserPlus, Zap, RefreshCw, Eye,
+  UserPlus, Zap, RefreshCw, Eye, TriangleAlert,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+type ChurnRiskTenant = {
+  id: string;
+  name: string;
+  slug: string;
+  plan: string;
+  planStatus: string;
+  ownerLastLoginAt: string | null;
+  churnRisk: {
+    level: 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE';
+    score: number;
+    reasons: string[];
+    daysSinceLogin: number | null;
+    bookingsLast30: number;
+    bookingsPrev30: number;
+  };
+};
+
+type ChurnRiskData = {
+  atRisk: ChurnRiskTenant[];
+  summary: { total: number; high: number; medium: number; low: number };
+};
+
+const RISK_CONFIG = {
+  HIGH:   { label: 'High Risk',   bg: 'bg-red-500/10',    border: 'border-red-500/20',    text: 'text-red-400',    dot: 'bg-red-500',    bar: 'bg-red-500' },
+  MEDIUM: { label: 'Medium Risk', bg: 'bg-amber-500/10',  border: 'border-amber-500/20',  text: 'text-amber-400',  dot: 'bg-amber-500',  bar: 'bg-amber-500' },
+  LOW:    { label: 'Low Risk',    bg: 'bg-yellow-500/10', border: 'border-yellow-500/20', text: 'text-yellow-400', dot: 'bg-yellow-500', bar: 'bg-yellow-500' },
+  NONE:   { label: 'Safe',        bg: 'bg-gray-800',      border: 'border-gray-700',      text: 'text-gray-400',   dot: 'bg-gray-600',   bar: 'bg-gray-600' },
+};
 
 type Stats = {
   totalTenants: number;
@@ -109,6 +138,7 @@ export default function AdminOverviewPage() {
   const router = useRouter();
   const { setAuth } = useAuthStore();
   const [stats, setStats] = useState<Stats | null>(null);
+  const [churnData, setChurnData] = useState<ChurnRiskData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [impersonating, setImpersonating] = useState<string | null>(null);
@@ -117,8 +147,12 @@ export default function AdminOverviewPage() {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     try {
-      const r = await adminEndpoints.stats();
-      setStats(r.data.data);
+      const [statsRes, churnRes] = await Promise.all([
+        adminEndpoints.stats(),
+        adminEndpoints.getChurnRisk(),
+      ]);
+      setStats(statsRes.data.data);
+      setChurnData(churnRes.data.data);
     } catch {
       toast({ title: 'Failed to load stats', variant: 'destructive' });
     } finally {
@@ -383,6 +417,101 @@ export default function AdminOverviewPage() {
           </div>
         </div>
       </div>
+
+      {/* Churn Risk Widget */}
+      {churnData && (
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-red-500/10 rounded-lg flex items-center justify-center">
+                <TriangleAlert className="w-4 h-4 text-red-400" />
+              </div>
+              <div>
+                <h2 className="text-white font-semibold">Churn Risk</h2>
+                <p className="text-gray-500 text-xs">Based on login activity + booking trends</p>
+              </div>
+            </div>
+            <Link href="/admin/tenants" className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+              All tenants <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+
+          {/* Summary strip */}
+          <div className="grid grid-cols-3 gap-3 mb-5">
+            {[
+              { label: 'High Risk', count: churnData.summary.high, color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20' },
+              { label: 'Medium Risk', count: churnData.summary.medium, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },
+              { label: 'Low Risk', count: churnData.summary.low, color: 'text-yellow-400', bg: 'bg-yellow-500/10 border-yellow-500/20' },
+            ].map(({ label, count, color, bg }) => (
+              <div key={label} className={cn('rounded-xl border px-4 py-3 text-center', bg)}>
+                <p className={cn('text-2xl font-bold', color)}>{count}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* At-risk tenant rows */}
+          {churnData.atRisk.length === 0 ? (
+            <div className="flex flex-col items-center py-8 text-center">
+              <CheckCircle2 className="w-8 h-8 text-emerald-500 mb-2" />
+              <p className="text-gray-400 font-medium text-sm">All tenants look healthy!</p>
+              <p className="text-gray-600 text-xs mt-1">No churn signals detected</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {churnData.atRisk.slice(0, 6).map(t => {
+                const cfg = RISK_CONFIG[t.churnRisk.level];
+                return (
+                  <div key={t.id} className={cn(
+                    'flex items-center gap-3 p-3 rounded-xl border',
+                    cfg.bg, cfg.border
+                  )}>
+                    {/* Risk score bar */}
+                    <div className="w-8 h-8 rounded-lg bg-gray-900/60 flex items-center justify-center shrink-0">
+                      <span className={cn('text-xs font-bold', cfg.text)}>{t.churnRisk.score}</span>
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-white text-sm font-medium truncate">{t.name}</p>
+                        <span className={cn('text-[10px] px-1.5 py-0.5 rounded font-semibold shrink-0', cfg.bg, cfg.text, 'border', cfg.border)}>
+                          {cfg.label}
+                        </span>
+                      </div>
+                      {/* Reasons */}
+                      <p className="text-gray-500 text-xs truncate">
+                        {t.churnRisk.reasons.slice(0, 2).join(' · ')}
+                      </p>
+                      {/* Mini stats */}
+                      <div className="flex items-center gap-3 mt-1.5">
+                        <span className="text-[10px] text-gray-600">
+                          {t.churnRisk.daysSinceLogin !== null
+                            ? `Last login: ${t.churnRisk.daysSinceLogin}d ago`
+                            : 'Never logged in'}
+                        </span>
+                        <span className="text-[10px] text-gray-600">
+                          Bookings: {t.churnRisk.bookingsLast30} this month
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Score bar */}
+                    <div className="w-20 shrink-0">
+                      <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                        <div
+                          className={cn('h-full rounded-full transition-all', cfg.bar)}
+                          style={{ width: `${t.churnRisk.score}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-gray-600 mt-0.5 text-right">{t.plan}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Quick actions */}
       <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">

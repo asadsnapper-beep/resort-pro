@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,6 +11,7 @@ import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
+import { Gift } from 'lucide-react';
 
 const schema = z.object({
   resortName: z.string().min(2, 'Resort name must be at least 2 characters'),
@@ -25,8 +26,16 @@ type FormData = z.infer<typeof schema>;
 
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { setAuth } = useAuthStore();
   const [loading, setLoading] = useState(false);
+  const [referralCode, setReferralCode] = useState('');
+
+  // Capture ?ref= from URL on mount
+  useEffect(() => {
+    const ref = searchParams.get('ref');
+    if (ref) setReferralCode(ref.toUpperCase());
+  }, [searchParams]);
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -43,7 +52,7 @@ export default function RegisterPage() {
   const onSubmit = async (data: FormData) => {
     setLoading(true);
     try {
-      const res = await authApi.register(data);
+      const res = await authApi.register({ ...(data as Required<typeof data>), ...(referralCode && { referralCode }) });
       const { user, tenant, token, refreshToken } = res.data.data;
       setAuth(user, tenant, token, refreshToken);
       toast({ title: 'Resort created!', description: `Welcome to ResortPro, ${user.firstName}!` });
@@ -64,6 +73,18 @@ export default function RegisterPage() {
           <h1 className="font-display text-3xl font-bold text-white">Create your resort</h1>
           <p className="mt-2 text-white/60">Free for 3 months. No credit card needed.</p>
         </div>
+
+        {/* Referral banner */}
+        {referralCode && (
+          <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/15 border border-amber-500/30">
+            <Gift className="w-4 h-4 text-amber-400 shrink-0" />
+            <div>
+              <p className="text-amber-300 text-sm font-medium">Referral code applied: <span className="font-mono">{referralCode}</span></p>
+              <p className="text-amber-400/70 text-xs mt-0.5">You were invited by a ResortPro member.</p>
+            </div>
+            <button onClick={() => setReferralCode('')} className="ml-auto text-amber-500/60 hover:text-amber-300 text-xs">✕</button>
+          </div>
+        )}
 
         <div className="rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-sm">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

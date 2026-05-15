@@ -1,6 +1,7 @@
 'use client'
 import { Phone, Mail, MapPin } from 'lucide-react'
 import type { ResortData } from '../../types'
+import { SocialLinks } from '../../_widgets/SocialLinks'
 
 interface FooterSectionProps {
   data:     ResortData
@@ -105,6 +106,7 @@ export function FooterSection({ data, scrollTo }: FooterSectionProps) {
           <p className="text-white/30 text-xs">
             © {new Date().getFullYear()} {tenant.name}. All rights reserved.
           </p>
+          <SocialLinks website={website ?? null} className="text-white" iconClassName="w-4 h-4" />
           <p className="text-white/20 text-xs">Powered by ResortPro</p>
         </div>
       </div>

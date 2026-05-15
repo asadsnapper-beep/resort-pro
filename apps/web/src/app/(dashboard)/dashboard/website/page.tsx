@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
-import { Globe, Image, FileText, Palette, Star, Plus, Trash2, Save, Layout, ExternalLink } from 'lucide-react';
+import { Globe, Image, FileText, Palette, Star, Plus, Trash2, Save, Layout, ExternalLink, Share2 } from 'lucide-react';
 import { ThemePicker } from '@/components/dashboard/website/ThemePicker';
 
 interface WebsiteContent {
@@ -25,6 +25,14 @@ interface WebsiteContent {
   accentColor?: string;
   testimonials?: { name: string; text: string; rating: number; avatar?: string }[];
   templateId?: string;
+  // Social media
+  facebookUrl?: string;
+  instagramUrl?: string;
+  twitterUrl?: string;
+  tiktokUrl?: string;
+  youtubeUrl?: string;
+  whatsappNumber?: string;
+  tripadvisorUrl?: string;
 }
 
 
@@ -34,6 +42,7 @@ const TABS = [
   { id: 'gallery', label: 'Gallery', icon: Image },
   { id: 'testimonials', label: 'Testimonials', icon: Star },
   { id: 'seo', label: 'SEO & Branding', icon: Palette },
+  { id: 'social', label: 'Social Media', icon: Share2 },
 ] as const;
 
 type Tab = typeof TABS[number]['id'];
@@ -56,6 +65,13 @@ export default function WebsitePage() {
     accentColor: '#d4a853',
     testimonials: [],
     templateId: 'luxe',
+    facebookUrl: '',
+    instagramUrl: '',
+    twitterUrl: '',
+    tiktokUrl: '',
+    youtubeUrl: '',
+    whatsappNumber: '',
+    tripadvisorUrl: '',
   });
 
   const { data, isLoading } = useQuery({
@@ -80,6 +96,13 @@ export default function WebsitePage() {
         accentColor: content.accentColor ?? '#d4a853',
         testimonials: content.testimonials ?? [],
         templateId: content.templateId ?? 'luxe',
+        facebookUrl: content.facebookUrl ?? '',
+        instagramUrl: content.instagramUrl ?? '',
+        twitterUrl: content.twitterUrl ?? '',
+        tiktokUrl: content.tiktokUrl ?? '',
+        youtubeUrl: content.youtubeUrl ?? '',
+        whatsappNumber: content.whatsappNumber ?? '',
+        tripadvisorUrl: content.tripadvisorUrl ?? '',
       });
     }
   }, [data]);
@@ -368,6 +391,79 @@ export default function WebsitePage() {
                 <div className="p-4 text-sm font-semibold" style={{ backgroundColor: form.accentColor ?? '#d4a853' }}>
                   Accent — CTAs & Highlights
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ── Social Media ─────────────────────────────────────────────────── */}
+      {tab === 'social' && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card>
+            <CardContent className="p-6 space-y-4">
+              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                <Share2 className="h-4 w-4 text-resort-600" /> Social Profiles
+              </h3>
+              <p className="text-xs text-muted-foreground">These links appear in your website footer. Leave blank to hide.</p>
+
+              {[
+                { key: 'facebookUrl', label: 'Facebook', placeholder: 'https://facebook.com/yourresort', emoji: '📘' },
+                { key: 'instagramUrl', label: 'Instagram', placeholder: 'https://instagram.com/yourresort', emoji: '📸' },
+                { key: 'twitterUrl', label: 'X (Twitter)', placeholder: 'https://twitter.com/yourresort', emoji: '🐦' },
+                { key: 'tiktokUrl', label: 'TikTok', placeholder: 'https://tiktok.com/@yourresort', emoji: '🎵' },
+                { key: 'youtubeUrl', label: 'YouTube', placeholder: 'https://youtube.com/@yourresort', emoji: '▶️' },
+                { key: 'tripadvisorUrl', label: 'TripAdvisor', placeholder: 'https://tripadvisor.com/hotel/...', emoji: '🦉' },
+              ].map(({ key, label, placeholder, emoji }) => (
+                <div key={key}>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">{emoji} {label}</label>
+                  <Input
+                    value={(form as Record<string, string>)[key] ?? ''}
+                    onChange={e => set(key as keyof WebsiteContent, e.target.value)}
+                    placeholder={placeholder}
+                    type="url"
+                  />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6 space-y-4">
+              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                <span className="text-lg">💬</span> WhatsApp
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                A floating "Chat with us" button will appear on your public website.
+              </p>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">WhatsApp Number</label>
+                <Input
+                  value={form.whatsappNumber ?? ''}
+                  onChange={e => set('whatsappNumber', e.target.value)}
+                  placeholder="+8801XXXXXXXXX"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">Include country code. E.g. +8801712345678</p>
+              </div>
+
+              {form.whatsappNumber && (
+                <div className="rounded-xl bg-green-50 border border-green-100 p-4">
+                  <p className="text-sm text-green-700 font-medium mb-1">Preview</p>
+                  <a
+                    href={`https://wa.me/${form.whatsappNumber.replace(/\D/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 bg-green-500 text-white text-sm font-medium px-4 py-2 rounded-full hover:bg-green-600 transition-colors"
+                  >
+                    <span>💬</span> Chat with us on WhatsApp
+                  </a>
+                </div>
+              )}
+
+              <div className="rounded-xl bg-blue-50 border border-blue-100 p-4 mt-4">
+                <p className="text-xs text-blue-700">
+                  <span className="font-semibold">Tip:</span> Social links and WhatsApp button are only shown to guests on your public website — not in the dashboard.
+                </p>
               </div>
             </CardContent>
           </Card>
