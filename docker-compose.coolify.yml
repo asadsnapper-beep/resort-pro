@@ -1,25 +1,20 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# ResortPro — Coolify-specific Docker Compose
+# ResortPro — Coolify deployment (pre-built images from GHCR)
 #
-# ▶ Coolify setup:
-#   1. New Resource → Docker Compose
-#   2. Compose file: docker-compose.coolify.yml
-#   3. Set ALL environment variables in Coolify's "Environment Variables" tab
-#   4. In Coolify's service settings, set domains:
-#        api service  → api.yourdomain.com
-#        web service  → app.yourdomain.com
+# Images are built by GitHub Actions (.github/workflows/docker-build.yml)
+# and pushed to ghcr.io/asadsnapper-beep/resort-pro-api:latest
+#                   ghcr.io/asadsnapper-beep/resort-pro-web:latest
 #
-# Key difference from docker-compose.production.yml:
-#   - No port: bindings (Traefik / Coolify handles routing)
-#   - Joins the external "coolify" Docker network
-#   - Traefik labels on api + web for domain routing
+# Coolify setup:
+#   1. New Resource → Docker Compose → this file
+#   2. Set environment variables (see .env.example)
+#   3. Domains: api → api.resortpro.site, web → app.resortpro.site
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: resortpro
 
 services:
 
-  # ── PostgreSQL ──────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -38,7 +33,6 @@ services:
       retries: 10
       start_period: 20s
 
-  # ── Redis ───────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -53,11 +47,8 @@ services:
       retries: 10
       start_period: 10s
 
-  # ── API (Fastify) ────────────────────────────────────────────────────────────
   api:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
+    image: ghcr.io/asadsnapper-beep/resort-pro-api:latest
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -80,13 +71,6 @@ services:
       NEXT_PUBLIC_APP_URL: ${WEB_URL}
     networks:
       - coolify
-    labels:
-      # Coolify / Traefik routing — replace SERVICE_FQDN_API with your api domain
-      - traefik.enable=true
-      - traefik.http.routers.resortpro-api.rule=Host(`${API_DOMAIN:-api.example.com}`)
-      - traefik.http.routers.resortpro-api.tls=true
-      - traefik.http.routers.resortpro-api.tls.certresolver=letsencrypt
-      - traefik.http.services.resortpro-api.loadbalancer.server.port=4000
     depends_on:
       postgres:
         condition: service_healthy
@@ -99,26 +83,14 @@ services:
       start_period: 60s
       retries: 5
 
-  # ── Web (Next.js) ────────────────────────────────────────────────────────────
   web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-      args:
-        # CRITICAL: must be your public API URL — baked into the JS bundle at build time
-        NEXT_PUBLIC_API_URL: ${API_URL}
+    image: ghcr.io/asadsnapper-beep/resort-pro-web:latest
     restart: unless-stopped
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: ${API_URL}
     networks:
       - coolify
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.resortpro-web.rule=Host(`${WEB_DOMAIN:-app.example.com}`)
-      - traefik.http.routers.resortpro-web.tls=true
-      - traefik.http.routers.resortpro-web.tls.certresolver=letsencrypt
-      - traefik.http.services.resortpro-web.loadbalancer.server.port=3000
     depends_on:
       api:
         condition: service_healthy
