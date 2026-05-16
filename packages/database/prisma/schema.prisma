@@ -17,10 +17,14 @@ enum TenantPlan {
 }
 
 enum UserRole {
-  OWNER
-  MANAGER
-  STAFF
-  GUEST
+  OWNER        // সব কিছু দেখতে ও করতে পারে
+  MANAGER      // সব কিছু দেখতে ও করতে পারে
+  PARTNER      // শুধু Analytics ও Dashboard stats
+  RECEPTIONIST // Bookings, Calendar, Rooms, Guests, Housekeeping, Support
+  MARKETER     // Analytics, Website, CRM & Email, Guests
+  DEVELOPER    // Settings (Embed), Website
+  STAFF        // Housekeeping, Maintenance, Restaurant, Orders
+  GUEST        // (external, not dashboard user)
 }
 
 enum RoomType {
@@ -1311,10 +1315,11 @@ model StripeWebhookEvent {
 
 // Singleton platform-level settings (one row)
 model PlatformSettings {
-  id         String   @id @default("singleton")
-  trialDays  Int      @default(14)
-  plans      Json     // Array of { key, name, price, features, roomLimit }
-  updatedAt  DateTime @updatedAt
+  id            String   @id @default("singleton")
+  trialDays     Int      @default(14)
+  plans         Json     // Array of { key, name, price, features, roomLimit }
+  storageConfig Json?    // { driver, endpoint, region, bucket, publicUrl, accessKey, secretKey }
+  updatedAt     DateTime @updatedAt
 
   @@map("platform_settings")
 }

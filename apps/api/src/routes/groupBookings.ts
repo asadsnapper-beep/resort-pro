@@ -91,7 +91,7 @@ export async function groupBookingRoutes(app: FastifyInstance) {
   // Create group (optionally with room bookings in one call)
   app.post('/', {
     schema: { tags: ['group-bookings'], security: [{ bearerAuth: [] }] },
-    preHandler: [requireAuth, requireRole('MANAGER', 'ADMIN')],
+    preHandler: [requireAuth, requireRole('OWNER', 'MANAGER', 'RECEPTIONIST')],
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
 
@@ -190,7 +190,7 @@ export async function groupBookingRoutes(app: FastifyInstance) {
   // ── PATCH /api/group-bookings/:id ──────────────────────────────────────────
   app.patch('/:id', {
     schema: { tags: ['group-bookings'], security: [{ bearerAuth: [] }] },
-    preHandler: [requireAuth, requireRole('MANAGER', 'ADMIN')],
+    preHandler: [requireAuth, requireRole('OWNER', 'MANAGER', 'RECEPTIONIST')],
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
@@ -216,7 +216,7 @@ export async function groupBookingRoutes(app: FastifyInstance) {
   // ── DELETE /api/group-bookings/:id ─────────────────────────────────────────
   app.delete('/:id', {
     schema: { tags: ['group-bookings'], security: [{ bearerAuth: [] }] },
-    preHandler: [requireAuth, requireRole('MANAGER', 'ADMIN')],
+    preHandler: [requireAuth, requireRole('OWNER', 'MANAGER', 'RECEPTIONIST')],
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };

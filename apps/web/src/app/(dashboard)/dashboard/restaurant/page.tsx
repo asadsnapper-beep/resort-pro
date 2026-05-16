@@ -13,6 +13,7 @@ import {
   Plus, Search, UtensilsCrossed, Coffee, ChefHat, Pencil, Trash2,
   CheckCircle2, XCircle, Star,
 } from 'lucide-react';
+import { ImageUpload } from '@/components/ui/ImageUpload';
 
 interface MenuItem {
   id: string;
@@ -116,8 +117,14 @@ function MenuItemModal({ open, onClose, loading, onSubmit, item }: {
             className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none" />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Image URL</label>
-          <Input value={form.image} onChange={e => set('image', e.target.value)} placeholder="https://..." type="url" />
+          <ImageUpload
+            value={form.image || null}
+            onChange={url => set('image', url ?? '')}
+            folder="menu"
+            label="Dish Photo"
+            hint="Square photo works best · max 5 MB"
+            aspectRatio="square"
+          />
         </div>
         <div className="flex items-center gap-2">
           <input type="checkbox" id="available" checked={form.isAvailable} onChange={e => set('isAvailable', e.target.checked)}

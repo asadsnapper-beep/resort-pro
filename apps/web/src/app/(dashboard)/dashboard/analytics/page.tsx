@@ -115,7 +115,7 @@ function RevenueTooltip({ active, payload, label, currency }: any) {
 
 export default function AnalyticsPage() {
   const { tenant } = useAuthStore();
-  const currency = (tenant as any)?.currency ?? 'USD';
+  const currency = (tenant as any)?.currency ?? 'BDT';
   const [data, setData] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [occupancy, setOccupancy] = useState<{ date: string; rate: number }[]>([]);
@@ -255,7 +255,11 @@ export default function AnalyticsPage() {
             <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
             <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false}
-              tickFormatter={(v) => `${currency === 'USD' ? '$' : ''}${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`} />
+              tickFormatter={(v) => {
+                const sym: Record<string,string> = { BDT:'৳',USD:'$',EUR:'€',GBP:'£',INR:'₹',AUD:'A$',CAD:'C$',SGD:'S$',AED:'د.إ',THB:'฿',IDR:'Rp',MYR:'RM',JPY:'¥',PHP:'₱' };
+                const s = sym[currency] ?? currency;
+                return `${s}${v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}`;
+              }} />
             <Tooltip content={<RevenueTooltip currency={currency} />} />
             <Area type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={2} fill="url(#revGrad)" dot={false} />
           </AreaChart>

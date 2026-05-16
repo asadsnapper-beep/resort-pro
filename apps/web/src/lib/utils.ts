@@ -5,8 +5,47 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number, currency = 'USD') {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
+// Currency symbol map for currencies where Intl gives a code instead of symbol
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  BDT: '৳',
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  AUD: 'A$',
+  CAD: 'C$',
+  SGD: 'S$',
+  AED: 'د.إ',
+  INR: '₹',
+  THB: '฿',
+  IDR: 'Rp',
+  JPY: '¥',
+  CNY: '¥',
+  MYR: 'RM',
+  PKR: '₨',
+  LKR: '₨',
+  NPR: '₨',
+  MMK: 'K',
+  VND: '₫',
+  KHR: '៛',
+  PHP: '₱',
+};
+
+export function formatCurrency(amount: number, currency = 'BDT') {
+  const sym = CURRENCY_SYMBOLS[currency];
+  if (sym) {
+    // Use compact locale formatting then replace the code with our symbol
+    const num = new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(amount);
+    return `${sym}${num}`;
+  }
+  // Fallback for any other standard currency
+  try {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
+  } catch {
+    return `${currency} ${amount}`;
+  }
 }
 
 export function formatDate(date: string | Date) {

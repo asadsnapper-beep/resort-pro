@@ -8,6 +8,7 @@ import { X, Plus } from 'lucide-react';
 import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { ImageUpload } from '@/components/ui/ImageUpload';
 import { cn } from '@/lib/utils';
 import type { Room } from '@resort-pro/types';
 
@@ -194,34 +195,34 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
 
         {/* Images */}
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Image URLs</label>
-          <div className="flex gap-2">
-            <Input
-              value={imageInput}
-              onChange={(e) => setImageInput(e.target.value)}
-              placeholder="https://example.com/room.jpg"
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addImage(); } }}
-            />
-            <Button type="button" variant="outline" size="icon" onClick={addImage}>
-              <Plus className="h-4 w-4" />
-            </Button>
+          <div className="mb-2 flex items-center justify-between">
+            <label className="text-sm font-medium text-gray-700">Room Photos</label>
+            <span className="text-xs text-gray-400">{images.length} / 8 photos</span>
           </div>
-          {images.length > 0 && (
-            <div className="mt-2 grid grid-cols-3 gap-2">
-              {images.map((img) => (
-                <div key={img} className="group relative aspect-video rounded-lg overflow-hidden bg-gray-100">
-                  <img src={img} alt="" className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/400x300?text=Image'; }} />
-                  <button
-                    type="button"
-                    onClick={() => setImages((p) => p.filter((x) => x !== img))}
-                    className="absolute right-1 top-1 rounded-full bg-black/60 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="h-3 w-3 text-white" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="grid grid-cols-3 gap-2">
+            {images.map((img, i) => (
+              <div key={i} className="group relative aspect-video rounded-lg overflow-hidden bg-gray-100">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={img} alt="" className="h-full w-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setImages(p => p.filter((_, idx) => idx !== i))}
+                  className="absolute right-1 top-1 rounded-full bg-black/60 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="h-3 w-3 text-white" />
+                </button>
+              </div>
+            ))}
+            {images.length < 8 && (
+              <ImageUpload
+                value={null}
+                onChange={url => { if (url) setImages(p => [...p, url]); }}
+                folder="rooms"
+                aspectRatio="video"
+                className="col-span-1"
+              />
+            )}
+          </div>
         </div>
 
         {/* Actions */}

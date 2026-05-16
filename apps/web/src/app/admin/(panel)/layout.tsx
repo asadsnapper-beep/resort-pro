@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useAdminStore } from '@/store/admin';
 import {
   LayoutDashboard, Building2, Users, CreditCard,
-  LogOut, Shield, ChevronRight, Loader2, Settings, Palette, ClipboardList, Download, Gift, UserCog, Megaphone, ShieldCheck, Activity, Star, Globe,
+  LogOut, Shield, ChevronRight, Loader2, Settings, Palette, ClipboardList, Download, Gift, UserCog, Megaphone, ShieldCheck, Activity, Star, Globe, HardDrive,
 } from 'lucide-react';
 import NotificationBell from '@/components/admin/NotificationBell';
 import { cn } from '@/lib/utils';
@@ -26,6 +26,7 @@ const navItems = [
   { href: '/admin/enterprise',      label: 'Enterprise',     icon: Star },
   { href: '/admin/domains',         label: 'Domains',        icon: Globe },
   { href: '/admin/health',         label: 'Health',         icon: Activity },
+  { href: '/admin/storage',         label: 'Storage',         icon: HardDrive },
   { href: '/admin/settings',       label: 'Settings',       icon: Settings },
 ];
 

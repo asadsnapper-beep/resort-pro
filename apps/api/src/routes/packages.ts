@@ -37,7 +37,7 @@ export async function packageRoutes(app: FastifyInstance) {
   // ── POST /api/packages ────────────────────────────────────────────────────
   app.post('/', {
     schema: { tags: ['packages'], security: [{ bearerAuth: [] }] },
-    preHandler: [requireAuth, requireRole('MANAGER', 'ADMIN')],
+    preHandler: [requireAuth, requireRole('OWNER', 'MANAGER', 'RECEPTIONIST')],
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const data = packageSchema.parse(request.body);
@@ -51,7 +51,7 @@ export async function packageRoutes(app: FastifyInstance) {
   // ── PATCH /api/packages/:id ───────────────────────────────────────────────
   app.patch('/:id', {
     schema: { tags: ['packages'], security: [{ bearerAuth: [] }] },
-    preHandler: [requireAuth, requireRole('MANAGER', 'ADMIN')],
+    preHandler: [requireAuth, requireRole('OWNER', 'MANAGER', 'RECEPTIONIST')],
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
@@ -68,7 +68,7 @@ export async function packageRoutes(app: FastifyInstance) {
   // ── DELETE /api/packages/:id ──────────────────────────────────────────────
   app.delete('/:id', {
     schema: { tags: ['packages'], security: [{ bearerAuth: [] }] },
-    preHandler: [requireAuth, requireRole('MANAGER', 'ADMIN')],
+    preHandler: [requireAuth, requireRole('OWNER', 'MANAGER', 'RECEPTIONIST')],
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };

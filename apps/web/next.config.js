@@ -25,6 +25,8 @@ const nextConfig = {
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**' },
+      // Local dev — API serves uploaded files from /uploads/
+      { protocol: 'http', hostname: 'localhost', port: '4000', pathname: '/uploads/**' },
     ],
   },
 

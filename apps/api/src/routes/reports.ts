@@ -305,7 +305,7 @@ export async function reportRoutes(app: FastifyInstance) {
   // POST /api/reports/daily/email?date=YYYY-MM-DD
   app.post('/daily/email', {
     schema: { tags: ['reports'], security: [{ bearerAuth: [] }] },
-    preHandler: [requireAuth, requireRole('MANAGER', 'ADMIN')],
+    preHandler: [requireAuth, requireRole('OWNER', 'MANAGER')],
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { date } = request.query as { date?: string };

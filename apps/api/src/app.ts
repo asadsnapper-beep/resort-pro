@@ -7,6 +7,9 @@ import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import websocket from '@fastify/websocket';
+import staticPlugin from '@fastify/static';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 
 import { authRoutes } from './routes/auth';
 import { tenantRoutes } from './routes/tenants';
@@ -36,6 +39,7 @@ import { externalCalendarRoutes } from './routes/externalCalendars'
 import { paymentRoutes } from './routes/payments'
 import { expenseRoutes } from './routes/expenses';
 import { embedRoutes } from './routes/embed';
+import { uploadRoutes } from './routes/upload';
 import { startPreArrivalCron } from './jobs/pre-arrival-reminder';
 import { startICalSyncCron } from './jobs/ical-sync';
 import { startAutomationEngine } from './services/automation';
@@ -76,6 +80,20 @@ export async function buildApp() {
   });
 
   await app.register(websocket);
+
+  // ── Multipart (file uploads — 5 MB limit) ────────────────────────────────
+  await app.register(import('@fastify/multipart'), {
+    limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  });
+
+  // ── Static files — local upload storage ──────────────────────────────────
+  const uploadsDir = process.env.STORAGE_LOCAL_DIR ?? join(process.cwd(), 'uploads');
+  mkdirSync(uploadsDir, { recursive: true });
+  await app.register(staticPlugin, {
+    root:       uploadsDir,
+    prefix:     '/uploads/',
+    decorateReply: false,
+  });
 
   // ── Swagger / OpenAPI ─────────────────────────────────────────────────────
   await app.register(swagger, {
@@ -171,6 +189,7 @@ export async function buildApp() {
   await app.register(paymentRoutes, { prefix: '/api/payments' });
   await app.register(expenseRoutes, { prefix: '/api/expenses' });
   await app.register(embedRoutes,   { prefix: '/embed' });
+  await app.register(uploadRoutes,  { prefix: '/api/upload' });
 
   // ── Start automation engine ───────────────────────────────────────────────
   if (process.env.NODE_ENV !== 'test') {

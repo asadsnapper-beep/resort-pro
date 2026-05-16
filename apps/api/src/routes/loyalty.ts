@@ -26,7 +26,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
   // ── PATCH /api/loyalty/program ─────────────────────────────────────────────
   app.patch('/program', {
     schema: { tags: ['loyalty'], security: [{ bearerAuth: [] }] },
-    preHandler: [requireAuth, requireRole('MANAGER', 'ADMIN')],
+    preHandler: [requireAuth, requireRole('OWNER', 'MANAGER', 'RECEPTIONIST')],
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const schema = z.object({
@@ -150,7 +150,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
   // ── POST /api/loyalty/accounts/:guestId/award ─────────────────────────────
   app.post('/accounts/:guestId/award', {
     schema: { tags: ['loyalty'], security: [{ bearerAuth: [] }] },
-    preHandler: [requireAuth, requireRole('MANAGER', 'ADMIN')],
+    preHandler: [requireAuth, requireRole('OWNER', 'MANAGER', 'RECEPTIONIST')],
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { guestId } = request.params as { guestId: string };
@@ -197,7 +197,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
   // Admin manual adjustment (positive or negative)
   app.post('/accounts/:guestId/adjust', {
     schema: { tags: ['loyalty'], security: [{ bearerAuth: [] }] },
-    preHandler: [requireAuth, requireRole('MANAGER', 'ADMIN')],
+    preHandler: [requireAuth, requireRole('OWNER', 'MANAGER', 'RECEPTIONIST')],
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { guestId } = request.params as { guestId: string };

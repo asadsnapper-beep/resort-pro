@@ -16,7 +16,27 @@ import {
 } from 'lucide-react'
 import { paymentGatewayApi } from '@/lib/api';
 
-const CURRENCIES = ['USD', 'EUR', 'GBP', 'AUD', 'CAD', 'SGD', 'AED', 'INR', 'THB', 'IDR'];
+const CURRENCIES = [
+  { code: 'BDT', label: 'BDT — Bangladeshi Taka (৳)' },
+  { code: 'USD', label: 'USD — US Dollar ($)' },
+  { code: 'EUR', label: 'EUR — Euro (€)' },
+  { code: 'GBP', label: 'GBP — British Pound (£)' },
+  { code: 'AUD', label: 'AUD — Australian Dollar (A$)' },
+  { code: 'CAD', label: 'CAD — Canadian Dollar (C$)' },
+  { code: 'SGD', label: 'SGD — Singapore Dollar (S$)' },
+  { code: 'AED', label: 'AED — UAE Dirham (د.إ)' },
+  { code: 'INR', label: 'INR — Indian Rupee (₹)' },
+  { code: 'THB', label: 'THB — Thai Baht (฿)' },
+  { code: 'IDR', label: 'IDR — Indonesian Rupiah (Rp)' },
+  { code: 'MYR', label: 'MYR — Malaysian Ringgit (RM)' },
+  { code: 'PKR', label: 'PKR — Pakistani Rupee (₨)' },
+  { code: 'LKR', label: 'LKR — Sri Lankan Rupee (₨)' },
+  { code: 'NPR', label: 'NPR — Nepalese Rupee (₨)' },
+  { code: 'JPY', label: 'JPY — Japanese Yen (¥)' },
+  { code: 'CNY', label: 'CNY — Chinese Yuan (¥)' },
+  { code: 'PHP', label: 'PHP — Philippine Peso (₱)' },
+  { code: 'VND', label: 'VND — Vietnamese Dong (₫)' },
+];
 const TIMEZONES = [
   'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
   'America/Sao_Paulo', 'Europe/London', 'Europe/Paris', 'Europe/Berlin',
@@ -66,7 +86,7 @@ export default function SettingsPage() {
     city: '',
     country: '',
     timezone: 'America/New_York',
-    currency: 'USD',
+    currency: 'BDT',
     website: '',
     checkInTime: '14:00',
     checkOutTime: '11:00',
@@ -89,7 +109,7 @@ export default function SettingsPage() {
         city: t.city ?? '',
         country: t.country ?? '',
         timezone: t.timezone ?? 'America/New_York',
-        currency: t.currency ?? 'USD',
+        currency: t.currency ?? 'BDT',
         website: t.website ?? '',
         checkInTime: t.checkInTime ?? '14:00',
         checkOutTime: t.checkOutTime ?? '11:00',
@@ -401,7 +421,7 @@ export default function SettingsPage() {
                 <label className="mb-1 block text-sm font-medium text-gray-700">Currency</label>
                 <select value={form.currency} onChange={e => set('currency', e.target.value)}
                   className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
-                  {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
                 </select>
               </div>
               <div>

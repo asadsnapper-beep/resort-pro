@@ -169,7 +169,7 @@ export async function maintenanceRoutes(app: FastifyInstance) {
   // DELETE /api/maintenance/:id
   app.delete('/:id', {
     schema: { tags: ['maintenance'], security: [{ bearerAuth: [] }] },
-    preHandler: [requireAuth, requireRole('MANAGER', 'ADMIN')],
+    preHandler: [requireAuth, requireRole('OWNER', 'MANAGER', 'STAFF')],
     handler: async (request, reply) => {
       const { id } = request.params as { id: string };
       const { tenantId } = request.user as JwtPayload;

@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { Globe, Image, FileText, Palette, Star, Plus, Trash2, Save, Layout, ExternalLink, Share2 } from 'lucide-react';
 import { ThemePicker } from '@/components/dashboard/website/ThemePicker';
+import { ImageUpload } from '@/components/ui/ImageUpload';
 
 interface WebsiteContent {
   heroTitle: string;
@@ -215,13 +216,14 @@ export default function WebsitePage() {
                 <Input value={form.heroSubtitle ?? ''} onChange={e => set('heroSubtitle', e.target.value)} placeholder="Experience luxury at its finest" />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Hero Background Image URL</label>
-                <Input value={form.heroImage ?? ''} onChange={e => set('heroImage', e.target.value)} placeholder="https://..." type="url" />
-                {form.heroImage && (
-                  <div className="mt-2 rounded-lg overflow-hidden h-32">
-                    <img src={form.heroImage} alt="Hero preview" className="w-full h-full object-cover" />
-                  </div>
-                )}
+                <ImageUpload
+                  value={form.heroImage ?? null}
+                  onChange={url => set('heroImage', url ?? '')}
+                  folder="website"
+                  label="Hero Background Image"
+                  hint="Recommended: 1920×1080px landscape photo"
+                  aspectRatio="wide"
+                />
               </div>
             </CardContent>
           </Card>
@@ -240,13 +242,14 @@ export default function WebsitePage() {
                   className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none" />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">About Image URL</label>
-                <Input value={form.aboutImage ?? ''} onChange={e => set('aboutImage', e.target.value)} placeholder="https://..." type="url" />
-                {form.aboutImage && (
-                  <div className="mt-2 rounded-lg overflow-hidden h-24">
-                    <img src={form.aboutImage} alt="About preview" className="w-full h-full object-cover" />
-                  </div>
-                )}
+                <ImageUpload
+                  value={form.aboutImage ?? null}
+                  onChange={url => set('aboutImage', url ?? '')}
+                  folder="website"
+                  label="About Section Image"
+                  hint="Recommended: square or portrait photo"
+                  aspectRatio="video"
+                />
               </div>
             </CardContent>
           </Card>
@@ -259,33 +262,30 @@ export default function WebsitePage() {
           <CardContent className="p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Image className="h-4 w-4 text-resort-600" /> Gallery Images</h3>
-              <Button size="sm" variant="outline" onClick={addGalleryImage} className="gap-1"><Plus className="h-3.5 w-3.5" /> Add Image</Button>
+              <span className="text-xs text-gray-400">{(form.galleryImages ?? []).length} photos</span>
             </div>
-            {(form.galleryImages ?? []).length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-gray-200 rounded-xl">
-                <Image className="h-10 w-10 text-gray-300 mb-3" />
-                <p className="text-sm text-muted-foreground">No gallery images yet</p>
-                <Button size="sm" className="mt-3 gap-1" onClick={addGalleryImage}><Plus className="h-3.5 w-3.5" /> Add First Image</Button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {(form.galleryImages ?? []).map((url, i) => (
-                  <div key={i} className="space-y-2">
-                    <div className="flex gap-2">
-                      <Input value={url} onChange={e => setGalleryImage(i, e.target.value)} placeholder="https://..." type="url" className="flex-1" />
-                      <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => removeGalleryImage(i)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {url && (
-                      <div className="rounded-lg overflow-hidden h-32">
-                        <img src={url} alt={`Gallery ${i + 1}`} className="w-full h-full object-cover" />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {(form.galleryImages ?? []).map((url, i) => (
+                <div key={i} className="group relative aspect-video rounded-lg overflow-hidden bg-gray-100">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt={`Gallery ${i + 1}`} className="h-full w-full object-cover" />
+                  <button
+                    onClick={() => removeGalleryImage(i)}
+                    className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              {(form.galleryImages ?? []).length < 20 && (
+                <ImageUpload
+                  value={null}
+                  onChange={url => { if (url) set('galleryImages', [...(form.galleryImages ?? []), url]); }}
+                  folder="website"
+                  aspectRatio="video"
+                />
+              )}
+            </div>
           </CardContent>
         </Card>
       )}

@@ -1,0 +1,132 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ResortPro — Coolify-specific Docker Compose
+#
+# ▶ Coolify setup:
+#   1. New Resource → Docker Compose
+#   2. Compose file: docker-compose.coolify.yml
+#   3. Set ALL environment variables in Coolify's "Environment Variables" tab
+#   4. In Coolify's service settings, set domains:
+#        api service  → api.yourdomain.com
+#        web service  → app.yourdomain.com
+#
+# Key difference from docker-compose.production.yml:
+#   - No port: bindings (Traefik / Coolify handles routing)
+#   - Joins the external "coolify" Docker network
+#   - Traefik labels on api + web for domain routing
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: resortpro
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-resortpro}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-resortpro}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - coolify
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-resortpro}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - coolify
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ── API (Fastify) ────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://${POSTGRES_USER:-resortpro}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-resortpro}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CORS_ORIGIN: ${WEB_URL}
+      APP_DOMAIN: ${APP_DOMAIN}
+      APP_IP: ${APP_IP:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      SUPER_ADMIN_EMAILS: ${SUPER_ADMIN_EMAILS:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_STARTER: ${STRIPE_PRICE_STARTER:-}
+      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
+      STRIPE_PRICE_ENTERPRISE: ${STRIPE_PRICE_ENTERPRISE:-}
+      NEXT_PUBLIC_APP_URL: ${WEB_URL}
+    networks:
+      - coolify
+    labels:
+      # Coolify / Traefik routing — replace SERVICE_FQDN_API with your api domain
+      - traefik.enable=true
+      - traefik.http.routers.resortpro-api.rule=Host(`${API_DOMAIN:-api.example.com}`)
+      - traefik.http.routers.resortpro-api.tls=true
+      - traefik.http.routers.resortpro-api.tls.certresolver=letsencrypt
+      - traefik.http.services.resortpro-api.loadbalancer.server.port=4000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:4000/health || exit 1']
+      interval: 15s
+      timeout: 10s
+      start_period: 60s
+      retries: 5
+
+  # ── Web (Next.js) ────────────────────────────────────────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # CRITICAL: must be your public API URL — baked into the JS bundle at build time
+        NEXT_PUBLIC_API_URL: ${API_URL}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${API_URL}
+    networks:
+      - coolify
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.resortpro-web.rule=Host(`${WEB_DOMAIN:-app.example.com}`)
+      - traefik.http.routers.resortpro-web.tls=true
+      - traefik.http.routers.resortpro-web.tls.certresolver=letsencrypt
+      - traefik.http.services.resortpro-web.loadbalancer.server.port=3000
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  coolify:
+    external: true

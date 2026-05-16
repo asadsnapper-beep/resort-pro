@@ -43,7 +43,7 @@ export async function inventoryRoutes(app: FastifyInstance) {
 
   app.post('/', {
     schema: { tags: ['inventory'], summary: 'Add inventory item', security: [{ bearerAuth: [] }] },
-    preHandler: requireRole('OWNER', 'MANAGER'),
+    preHandler: requireRole('OWNER', 'MANAGER', 'STAFF'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const body = itemSchema.parse(request.body);
@@ -54,7 +54,7 @@ export async function inventoryRoutes(app: FastifyInstance) {
 
   app.patch('/:id', {
     schema: { tags: ['inventory'], summary: 'Update inventory item', security: [{ bearerAuth: [] }] },
-    preHandler: requireRole('OWNER', 'MANAGER'),
+    preHandler: requireRole('OWNER', 'MANAGER', 'STAFF'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };

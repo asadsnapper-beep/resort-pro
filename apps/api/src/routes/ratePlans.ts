@@ -100,7 +100,7 @@ export async function ratePlanRoutes(app: FastifyInstance) {
   // POST /api/rate-plans
   app.post('/', {
     schema: { tags: ['rate-plans'], security: [{ bearerAuth: [] }] },
-    preHandler: [requireAuth, requireRole('MANAGER', 'ADMIN')],
+    preHandler: [requireAuth, requireRole('OWNER', 'MANAGER')],
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const body = createPlanSchema.parse(request.body);
@@ -127,7 +127,7 @@ export async function ratePlanRoutes(app: FastifyInstance) {
   // PATCH /api/rate-plans/:id
   app.patch('/:id', {
     schema: { tags: ['rate-plans'], security: [{ bearerAuth: [] }] },
-    preHandler: [requireAuth, requireRole('MANAGER', 'ADMIN')],
+    preHandler: [requireAuth, requireRole('OWNER', 'MANAGER')],
     handler: async (request, reply) => {
       const { id } = request.params as { id: string };
       const { tenantId } = request.user as JwtPayload;
@@ -161,7 +161,7 @@ export async function ratePlanRoutes(app: FastifyInstance) {
   // DELETE /api/rate-plans/:id
   app.delete('/:id', {
     schema: { tags: ['rate-plans'], security: [{ bearerAuth: [] }] },
-    preHandler: [requireAuth, requireRole('MANAGER', 'ADMIN')],
+    preHandler: [requireAuth, requireRole('OWNER', 'MANAGER')],
     handler: async (request, reply) => {
       const { id } = request.params as { id: string };
       const { tenantId } = request.user as JwtPayload;

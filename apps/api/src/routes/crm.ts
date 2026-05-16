@@ -6,6 +6,230 @@ import { ok, validate } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
 import { sendEmail, wrapEmail, renderTemplate, SEQUENCE_TEMPLATES } from '../services/email';
 
+// ─── Default email templates (auto-created for every new tenant) ──────────────
+const DEFAULT_EMAIL_TEMPLATES = [
+  {
+    name: 'Booking Confirmation',
+    subject: 'Your booking is confirmed! ✅',
+    preheader: "We can't wait to welcome you.",
+    isDefault: true,
+    html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1f2937">
+  <div style="background:#1a6b5e;padding:32px 24px;text-align:center">
+    <h1 style="color:#d4a853;font-size:24px;margin:0">{{tenantName}}</h1>
+    <p style="color:#a7f3d0;margin:8px 0 0">Your reservation is confirmed</p>
+  </div>
+  <div style="padding:32px 24px;background:#ffffff">
+    <p>Dear <strong>{{guestName}}</strong>,</p>
+    <p>Great news — your reservation at <strong>{{tenantName}}</strong> is confirmed!</p>
+    <div style="background:#f0faf8;border-left:4px solid #1a6b5e;padding:16px;margin:24px 0;border-radius:4px">
+      <p style="margin:4px 0"><strong>Booking Reference:</strong> {{confirmationNo}}</p>
+      <p style="margin:4px 0"><strong>Room:</strong> {{roomName}}</p>
+      <p style="margin:4px 0"><strong>Check-in:</strong> {{checkInDate}} at {{checkInTime}}</p>
+      <p style="margin:4px 0"><strong>Check-out:</strong> {{checkOutDate}} at {{checkOutTime}}</p>
+      <p style="margin:4px 0"><strong>Guests:</strong> {{adults}} adults{{children}}</p>
+      <p style="margin:4px 0"><strong>Total:</strong> {{totalAmount}}</p>
+    </div>
+    <p>If you need to make any changes or have questions before your arrival, please contact us — we're happy to help.</p>
+    <p style="color:#6b7280;font-size:14px;margin-top:32px">Warm regards,<br><strong>{{tenantName}} Team</strong><br>{{tenantPhone}} | {{tenantEmail}}</p>
+  </div>
+</div>`,
+  },
+  {
+    name: 'Pre-Arrival Welcome',
+    subject: "Your stay is coming up soon, {{guestName}}! ✨",
+    preheader: 'Everything you need to know before you arrive.',
+    isDefault: true,
+    html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1f2937">
+  <div style="background:#1a6b5e;padding:32px 24px;text-align:center">
+    <h1 style="color:#d4a853;font-size:24px;margin:0">{{tenantName}}</h1>
+    <p style="color:#a7f3d0;margin:8px 0 0">We're getting ready for your arrival!</p>
+  </div>
+  <div style="padding:32px 24px;background:#ffffff">
+    <p>Dear <strong>{{guestName}}</strong>,</p>
+    <p>Your check-in is just a few days away and we're so excited to welcome you to <strong>{{tenantName}}</strong>!</p>
+    <h3 style="color:#1a6b5e">📅 Your Booking</h3>
+    <p><strong>Check-in:</strong> {{checkInDate}} from {{checkInTime}}<br>
+    <strong>Check-out:</strong> {{checkOutDate}} by {{checkOutTime}}</p>
+    <h3 style="color:#1a6b5e">🏨 On Arrival</h3>
+    <ul>
+      <li>Please bring a valid photo ID for check-in</li>
+      <li>Early check-in is subject to availability — please contact us in advance</li>
+      <li>Free parking is available on-site</li>
+    </ul>
+    <h3 style="color:#1a6b5e">📍 Getting Here</h3>
+    <p>{{tenantAddress}}</p>
+    <p style="color:#6b7280;font-size:14px;margin-top:32px">Looking forward to seeing you!<br><strong>{{tenantName}} Team</strong></p>
+  </div>
+</div>`,
+  },
+  {
+    name: 'Post-Stay Thank You',
+    subject: 'Thank you for staying with us, {{guestName}} 🙏',
+    preheader: 'We hope you had a wonderful experience.',
+    isDefault: true,
+    html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1f2937">
+  <div style="background:#1a6b5e;padding:32px 24px;text-align:center">
+    <h1 style="color:#d4a853;font-size:24px;margin:0">Thank You!</h1>
+    <p style="color:#a7f3d0;margin:8px 0 0">We hope you had a wonderful stay</p>
+  </div>
+  <div style="padding:32px 24px;background:#ffffff">
+    <p>Dear <strong>{{guestName}}</strong>,</p>
+    <p>It was our absolute pleasure hosting you at <strong>{{tenantName}}</strong>. We hope every moment of your stay was exactly what you needed.</p>
+    <h3 style="color:#1a6b5e">📝 Share Your Experience</h3>
+    <p>Your feedback helps us improve and helps other travellers make great decisions. Would you take a moment to leave us a review?</p>
+    <div style="text-align:center;margin:24px 0">
+      <a href="{{reviewUrl}}" style="background:#1a6b5e;color:#fff;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:600">Leave a Review</a>
+    </div>
+    <h3 style="color:#1a6b5e">🎁 Come Back Soon</h3>
+    <p>As a valued guest, enjoy a special discount on your next stay. Just mention this email when booking directly.</p>
+    <p style="color:#6b7280;font-size:14px;margin-top:32px">With warm regards,<br><strong>{{tenantName}} Team</strong><br>{{tenantPhone}} | {{tenantEmail}}</p>
+    <p style="color:#9ca3af;font-size:11px;text-align:center;margin-top:24px"><a href="{{unsubscribeUrl}}" style="color:#9ca3af">Unsubscribe</a></p>
+  </div>
+</div>`,
+  },
+  {
+    name: 'Win-Back Offer',
+    subject: "We miss you, {{guestName}}! Here's a special offer 🌟",
+    preheader: "It's been a while — come back with an exclusive discount.",
+    isDefault: false,
+    html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1f2937">
+  <div style="background:linear-gradient(135deg,#1a6b5e,#2d9e8f);padding:40px 24px;text-align:center">
+    <h1 style="color:#d4a853;font-size:28px;margin:0">We Miss You! 🌊</h1>
+    <p style="color:#ffffff;margin:12px 0 0;font-size:16px">It's been a while since your last visit</p>
+  </div>
+  <div style="padding:32px 24px;background:#ffffff">
+    <p>Dear <strong>{{guestName}}</strong>,</p>
+    <p>It's been over 3 months since your last stay with us — we genuinely miss having you here at <strong>{{tenantName}}</strong>!</p>
+    <div style="background:#f0faf8;border:2px solid #1a6b5e;border-radius:12px;padding:24px;text-align:center;margin:24px 0">
+      <p style="font-size:14px;color:#6b7280;margin:0">Exclusive offer for you</p>
+      <p style="font-size:40px;font-weight:700;color:#1a6b5e;margin:8px 0">20% OFF</p>
+      <p style="font-size:14px;color:#374151;margin:0">on any room for any 2+ night stay</p>
+      <p style="background:#1a6b5e;color:#fff;display:inline-block;padding:8px 20px;border-radius:6px;font-weight:600;margin-top:12px;letter-spacing:2px">COMEBACK20</p>
+    </div>
+    <p style="color:#6b7280;font-size:13px;text-align:center">Valid for 14 days. Direct bookings only.</p>
+    <div style="text-align:center;margin:24px 0">
+      <a href="{{bookingUrl}}" style="background:#1a6b5e;color:#fff;padding:16px 36px;text-decoration:none;border-radius:8px;font-weight:600">Book My Return →</a>
+    </div>
+    <p style="color:#6b7280;font-size:14px">Can't wait to see you again,<br><strong>{{tenantName}} Team</strong></p>
+    <p style="color:#9ca3af;font-size:11px;text-align:center;margin-top:24px"><a href="{{unsubscribeUrl}}" style="color:#9ca3af">Unsubscribe</a></p>
+  </div>
+</div>`,
+  },
+  {
+    name: 'Birthday Greeting',
+    subject: '🎂 Happy Birthday {{guestName}}! A special gift from us',
+    preheader: 'Your birthday deserves something special.',
+    isDefault: false,
+    html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1f2937">
+  <div style="background:linear-gradient(135deg,#7c3aed,#ec4899);padding:40px 24px;text-align:center">
+    <h1 style="color:#ffffff;font-size:32px;margin:0">🎂 Happy Birthday!</h1>
+    <p style="color:#fce7f3;margin:12px 0 0">Wishing you a day as wonderful as you are</p>
+  </div>
+  <div style="padding:32px 24px;background:#ffffff;text-align:center">
+    <p>Dear <strong>{{guestName}}</strong>,</p>
+    <p>The entire team at <strong>{{tenantName}}</strong> wishes you a very Happy Birthday! 🎉 As a special thank-you for being a valued guest, here is a birthday gift from us:</p>
+    <div style="background:#fdf4ff;border:2px solid #7c3aed;border-radius:12px;padding:24px;margin:24px 0">
+      <p style="font-size:20px;font-weight:700;color:#7c3aed;margin:0">Your Birthday Gift 🎁</p>
+      <p style="font-size:36px;font-weight:700;color:#ec4899;margin:8px 0">20% OFF</p>
+      <p style="color:#374151">on any stay booked within the next 30 days</p>
+      <p style="background:#7c3aed;color:#fff;display:inline-block;padding:8px 20px;border-radius:6px;font-weight:600;letter-spacing:2px">BDAY20</p>
+    </div>
+    <p>Stay with us on your birthday and we'll make it unforgettable!</p>
+    <div style="margin:24px 0">
+      <a href="{{bookingUrl}}" style="background:#7c3aed;color:#fff;padding:14px 32px;text-decoration:none;border-radius:8px;font-weight:600">Claim Your Birthday Gift</a>
+    </div>
+    <p style="color:#6b7280;font-size:14px">With birthday wishes,<br><strong>{{tenantName}} Team</strong></p>
+    <p style="color:#9ca3af;font-size:11px;margin-top:24px"><a href="{{unsubscribeUrl}}" style="color:#9ca3af">Unsubscribe</a></p>
+  </div>
+</div>`,
+  },
+  {
+    name: 'General Newsletter',
+    subject: 'News & offers from {{tenantName}} 🌴',
+    preheader: "See what's new and coming up at the resort.",
+    isDefault: false,
+    html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1f2937">
+  <div style="background:#1a6b5e;padding:24px;text-align:center">
+    <h1 style="color:#d4a853;font-size:22px;margin:0">{{tenantName}} — Newsletter</h1>
+  </div>
+  <div style="padding:32px 24px;background:#ffffff">
+    <p>Dear <strong>{{guestName}}</strong>,</p>
+    <p>Here's the latest news and special offers from <strong>{{tenantName}}</strong>!</p>
+    <h3 style="color:#1a6b5e">🆕 What's New</h3>
+    <p>[Add your latest news and updates here]</p>
+    <h3 style="color:#1a6b5e">🎉 Upcoming Events</h3>
+    <p>[Add upcoming events, festivals, or activities here]</p>
+    <h3 style="color:#1a6b5e">💰 Special Offers</h3>
+    <p>[Add your current promotions and packages here]</p>
+    <div style="text-align:center;margin:32px 0">
+      <a href="{{bookingUrl}}" style="background:#1a6b5e;color:#fff;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:600">Book Your Stay</a>
+    </div>
+    <p style="color:#6b7280;font-size:14px">Warm regards,<br><strong>{{tenantName}} Team</strong></p>
+    <p style="color:#9ca3af;font-size:11px;text-align:center;margin-top:24px"><a href="{{unsubscribeUrl}}" style="color:#9ca3af">Unsubscribe</a></p>
+  </div>
+</div>`,
+  },
+  {
+    name: 'Promotional Offer',
+    subject: 'Special offer just for you — limited time! 🎯',
+    preheader: 'Exclusive deal inside — book before it expires.',
+    isDefault: false,
+    html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1f2937">
+  <div style="background:linear-gradient(135deg,#d4a853,#f59e0b);padding:40px 24px;text-align:center">
+    <h1 style="color:#ffffff;font-size:28px;margin:0">Special Offer 🎯</h1>
+    <p style="color:#fef3c7;margin:12px 0 0">Exclusive deal for our valued guests</p>
+  </div>
+  <div style="padding:32px 24px;background:#ffffff">
+    <p>Dear <strong>{{guestName}}</strong>,</p>
+    <p>We have an exclusive offer just for you at <strong>{{tenantName}}</strong>:</p>
+    <div style="background:#fffbeb;border:2px solid #d4a853;border-radius:12px;padding:24px;text-align:center;margin:24px 0">
+      <p style="font-size:20px;font-weight:700;color:#92400e;margin:0">[Offer Title]</p>
+      <p style="font-size:36px;font-weight:700;color:#d4a853;margin:8px 0">[Discount]%</p>
+      <p style="color:#374151;font-size:14px">[Offer description — what's included, conditions]</p>
+      <p style="background:#d4a853;color:#fff;display:inline-block;padding:8px 20px;border-radius:6px;font-weight:600;margin-top:12px;letter-spacing:2px">[CODE]</p>
+    </div>
+    <p style="color:#6b7280;font-size:13px;text-align:center">Offer valid until [date]. Direct bookings only.</p>
+    <div style="text-align:center;margin:24px 0">
+      <a href="{{bookingUrl}}" style="background:#d4a853;color:#fff;padding:16px 36px;text-decoration:none;border-radius:8px;font-weight:600">Book Now →</a>
+    </div>
+    <p style="color:#6b7280;font-size:14px">Warm regards,<br><strong>{{tenantName}} Team</strong></p>
+    <p style="color:#9ca3af;font-size:11px;text-align:center;margin-top:24px"><a href="{{unsubscribeUrl}}" style="color:#9ca3af">Unsubscribe</a></p>
+  </div>
+</div>`,
+  },
+  {
+    name: 'Check-in Instructions',
+    subject: 'Your check-in details for {{tenantName}} 🏨',
+    preheader: 'Everything you need for a smooth arrival.',
+    isDefault: false,
+    html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1f2937">
+  <div style="background:#1a6b5e;padding:32px 24px;text-align:center">
+    <h1 style="color:#d4a853;font-size:24px;margin:0">Check-in Instructions</h1>
+    <p style="color:#a7f3d0;margin:8px 0 0">{{tenantName}}</p>
+  </div>
+  <div style="padding:32px 24px;background:#ffffff">
+    <p>Dear <strong>{{guestName}}</strong>,</p>
+    <p>We're looking forward to welcoming you! Here are your check-in details:</p>
+    <div style="background:#f9fafb;border-radius:8px;padding:20px;margin:20px 0">
+      <p style="margin:6px 0">🕐 <strong>Check-in:</strong> {{checkInDate}} from {{checkInTime}}</p>
+      <p style="margin:6px 0">🕙 <strong>Check-out:</strong> {{checkOutDate}} by {{checkOutTime}}</p>
+      <p style="margin:6px 0">📍 <strong>Address:</strong> {{tenantAddress}}</p>
+      <p style="margin:6px 0">📞 <strong>Contact:</strong> {{tenantPhone}}</p>
+    </div>
+    <h3 style="color:#1a6b5e">📋 What to Bring</h3>
+    <ul>
+      <li>Valid government-issued photo ID</li>
+      <li>Your booking confirmation (this email)</li>
+      <li>Payment card used for booking</li>
+    </ul>
+    <h3 style="color:#1a6b5e">🚗 Parking</h3>
+    <p>Free parking is available on-site. Please inform us of your vehicle details upon arrival.</p>
+    <p style="color:#6b7280;font-size:14px;margin-top:32px">See you soon!<br><strong>{{tenantName}} Team</strong></p>
+  </div>
+</div>`,
+  },
+];
+
 // ─── Helper: recalculate guest score ─────────────────────────────────────────
 async function recalcScore(tenantId: string, guestId: string) {
   const bookings = await prisma.booking.findMany({
@@ -42,7 +266,7 @@ async function recalcScore(tenantId: string, guestId: string) {
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 export async function crmRoutes(app: FastifyInstance) {
-  const pre = requireRole('OWNER', 'MANAGER');
+  const pre = requireRole('OWNER', 'MANAGER', 'MARKETER');
 
   /* ── CONTACTS ─────────────────────────────────────────────────────────────── */
 
@@ -159,7 +383,17 @@ export async function crmRoutes(app: FastifyInstance) {
 
   app.get('/templates', { preHandler: pre }, async (request) => {
     const { tenantId } = request.user as JwtPayload;
-    const templates = await prisma.emailTemplate.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' } });
+    let templates = await prisma.emailTemplate.findMany({ where: { tenantId }, orderBy: { isDefault: 'desc', createdAt: 'asc' } });
+
+    // ── Lazy-init: first visit → create default templates ──────────────────
+    if (templates.length === 0) {
+      await prisma.emailTemplate.createMany({
+        data: DEFAULT_EMAIL_TEMPLATES.map(t => ({ ...t, tenantId })),
+        skipDuplicates: true,
+      });
+      templates = await prisma.emailTemplate.findMany({ where: { tenantId }, orderBy: { isDefault: 'desc', createdAt: 'asc' } });
+    }
+
     return ok(templates);
   });
 

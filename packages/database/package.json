@@ -9,12 +9,15 @@
     "migrate:deploy": "prisma migrate deploy",
     "migrate:reset": "prisma migrate reset --force",
     "seed": "tsx prisma/seed.ts",
+    "seed:demo": "tsx prisma/demo-seed.ts",
     "studio": "prisma studio",
     "generate": "prisma generate",
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
-    "@prisma/client": "^5.19.0"
+    "@prisma/client": "^5.19.0",
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^2.4.3"
   },
   "devDependencies": {
     "prisma": "^5.19.0",

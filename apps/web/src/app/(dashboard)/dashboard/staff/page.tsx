@@ -53,7 +53,7 @@ export default function StaffPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<'MANAGER' | 'STAFF'>('STAFF');
+  const [inviteRole, setInviteRole] = useState<'MANAGER' | 'PARTNER' | 'RECEPTIONIST' | 'MARKETER' | 'DEVELOPER' | 'STAFF'>('STAFF');
   const [inviting, setInviting] = useState(false);
   const [editStaff, setEditStaff] = useState<Staff | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
@@ -343,21 +343,36 @@ export default function StaffPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Role</label>
-                <div className="flex gap-3">
-                  {(['STAFF', 'MANAGER'] as const).map((r) => (
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { value: 'STAFF',        emoji: '👤', label: 'Staff' },
+                    { value: 'RECEPTIONIST', emoji: '🛎️', label: 'Receptionist' },
+                    { value: 'MANAGER',      emoji: '🛡️', label: 'Manager' },
+                    { value: 'MARKETER',     emoji: '📣', label: 'Marketer' },
+                    { value: 'DEVELOPER',    emoji: '💻', label: 'Developer' },
+                    { value: 'PARTNER',      emoji: '🤝', label: 'Partner' },
+                  ] as const).map(({ value, emoji, label }) => (
                     <button
-                      key={r}
-                      onClick={() => setInviteRole(r)}
-                      className={`flex-1 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
-                        inviteRole === r
+                      key={value}
+                      onClick={() => setInviteRole(value)}
+                      className={`py-2.5 rounded-lg border text-xs font-medium transition-colors text-center ${
+                        inviteRole === value
                           ? 'border-[#1a6b5e] bg-[#f0faf8] text-[#1a6b5e]'
                           : 'border-gray-200 text-gray-600 hover:border-gray-300'
                       }`}
                     >
-                      {r === 'STAFF' ? '👤 Staff' : '🛡️ Manager'}
+                      {emoji} {label}
                     </button>
                   ))}
                 </div>
+                <p className="mt-2 text-xs text-gray-400">
+                  {inviteRole === 'MANAGER' && 'Full access — manages all hotel operations'}
+                  {inviteRole === 'PARTNER' && 'Read-only analytics & dashboard stats'}
+                  {inviteRole === 'RECEPTIONIST' && 'Bookings, guests, check-in/out, housekeeping'}
+                  {inviteRole === 'MARKETER' && 'CRM, email campaigns, analytics, website'}
+                  {inviteRole === 'DEVELOPER' && 'Website builder & embed settings'}
+                  {inviteRole === 'STAFF' && 'Housekeeping, maintenance, restaurant, orders'}
+                </p>
               </div>
             </div>
             <div className="flex gap-3 p-6 pt-0">

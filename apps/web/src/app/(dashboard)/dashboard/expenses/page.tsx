@@ -334,7 +334,7 @@ function PieLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) 
 
 export default function ExpensesPage() {
   const { tenant } = useAuthStore();
-  const currency = (tenant as any)?.currency ?? 'USD';
+  const currency = (tenant as any)?.currency ?? 'BDT';
   const qc = useQueryClient();
 
   const [currentMonth, setCurrentMonth] = useState(monthStr(new Date()));

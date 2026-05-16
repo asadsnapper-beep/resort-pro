@@ -62,6 +62,10 @@ export const authApi = {
     api.post('/auth/login', data),
   me: () => api.get('/auth/me'),
   logout: (refreshToken: string) => api.post('/auth/logout', { refreshToken }),
+  updateProfile: (data: { firstName?: string; lastName?: string; phone?: string | null; avatarUrl?: string | null }) =>
+    api.patch('/auth/me', data),
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    api.post('/auth/change-password', data),
 };
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────

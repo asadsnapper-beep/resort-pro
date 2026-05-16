@@ -1,5 +1,13 @@
 // ─── Auth ────────────────────────────────────────────────────────────────────
-export type UserRole = 'OWNER' | 'MANAGER' | 'STAFF' | 'GUEST';
+export type UserRole =
+  | 'OWNER'
+  | 'MANAGER'
+  | 'PARTNER'
+  | 'RECEPTIONIST'
+  | 'MARKETER'
+  | 'DEVELOPER'
+  | 'STAFF'
+  | 'GUEST';
 
 export interface AuthUser {
   id: string;

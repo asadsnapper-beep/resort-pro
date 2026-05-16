@@ -5,18 +5,34 @@ import { requireAuth, requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams, validate } from '../utils/response';
 import { generateConfirmationNo, calculateNights } from '../utils/booking';
 import { sendEmail } from '../services/email';
+import {
+  sendBookingConfirmation,
+  sendCheckoutEmail,
+  sendCancellationEmail,
+} from '../utils/guest-emails';
+import { awardCheckoutPoints } from '../services/loyalty';
+import { syncCalendarsForRoom } from '../jobs/ical-sync';
 import { createGuestPaymentLink } from './billing';
 import type { JwtPayload } from '@resort-pro/types';
 
 const createBookingSchema = z.object({
   roomId: z.string().uuid(),
-  guestId: z.string().uuid(),
+  guestId: z.string().uuid().optional(),
   checkIn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   checkOut: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   adults: z.number().int().min(1).default(1),
   children: z.number().int().min(0).default(0),
   specialRequests: z.string().optional(),
   notes: z.string().optional(),
+  source: z.enum(['DIRECT', 'WALK_IN', 'PHONE', 'OTA', 'ONLINE']).default('DIRECT'),
+  skipEmail: z.boolean().optional().default(false),
+  autoCheckIn: z.boolean().optional().default(false),
+  paymentMethod: z.enum(['CASH', 'CARD', 'BANK_TRANSFER', 'ONLINE']).optional(),
+  // Walk-in guest fields (when guestId not provided)
+  guestFirstName: z.string().optional(),
+  guestLastName: z.string().optional(),
+  guestEmail: z.string().email().optional(),
+  guestPhone: z.string().optional(),
 });
 
 export async function bookingRoutes(app: FastifyInstance) {
@@ -91,6 +107,83 @@ export async function bookingRoutes(app: FastifyInstance) {
     },
   });
 
+  // GET /api/bookings/gantt?from=YYYY-MM-DD&to=YYYY-MM-DD  (Gantt / room-grid view)
+  app.get('/gantt', {
+    schema: { tags: ['bookings'], summary: 'Gantt calendar — rooms × dates', security: [{ bearerAuth: [] }] },
+    preHandler: requireAuth,
+    handler: async (request) => {
+      const { tenantId } = request.user as JwtPayload;
+      const { from, to } = request.query as { from?: string; to?: string };
+
+      const start = from ? new Date(from) : (() => {
+        const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); d.setHours(0,0,0,0); return d;
+      })();
+      const end = to ? new Date(to) : new Date(start.getTime() + 29 * 86_400_000);
+      end.setHours(23, 59, 59, 999);
+
+      // All rooms for this tenant
+      const rooms = await prisma.room.findMany({
+        where: { tenantId },
+        orderBy: [{ floor: 'asc' }, { number: 'asc' }],
+        select: {
+          id: true, number: true, name: true, type: true,
+          status: true, floor: true, basePrice: true, maxOccupancy: true,
+        },
+      });
+
+      // All overlapping bookings in range
+      const bookings = await prisma.booking.findMany({
+        where: {
+          tenantId,
+          status: { notIn: ['CANCELLED', 'NO_SHOW'] },
+          OR: [
+            { checkIn: { gte: start, lte: end } },
+            { checkOut: { gte: start, lte: end } },
+            { checkIn: { lte: start }, checkOut: { gte: end } },
+          ],
+        },
+        include: {
+          guest: { select: { id: true, firstName: true, lastName: true } },
+        },
+        orderBy: { checkIn: 'asc' },
+      });
+
+      // Group bookings by roomId
+      const bookingsByRoom = new Map<string, typeof bookings>();
+      for (const b of bookings) {
+        if (!bookingsByRoom.has(b.roomId)) bookingsByRoom.set(b.roomId, []);
+        bookingsByRoom.get(b.roomId)!.push(b);
+      }
+
+      const result = rooms.map(room => ({
+        ...room,
+        bookings: (bookingsByRoom.get(room.id) ?? []).map(b => ({
+          id: b.id,
+          confirmationNumber: b.confirmationNumber,
+          guestName: `${b.guest.firstName} ${b.guest.lastName}`,
+          guestId: b.guest.id,
+          checkIn: b.checkIn.toISOString().slice(0, 10),
+          checkOut: b.checkOut.toISOString().slice(0, 10),
+          nights: Math.ceil((b.checkOut.getTime() - b.checkIn.getTime()) / 86_400_000),
+          status: b.status,
+          totalAmount: b.totalAmount,
+          adults: b.adults,
+          children: b.children,
+        })),
+      }));
+
+      // Build date array for the header
+      const dates: string[] = [];
+      const cursor = new Date(start);
+      while (cursor <= end) {
+        dates.push(cursor.toISOString().slice(0, 10));
+        cursor.setDate(cursor.getDate() + 1);
+      }
+
+      return ok({ rooms: result, dates, from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) });
+    },
+  });
+
   // GET /api/bookings/:id
   app.get('/:id', {
     schema: { tags: ['bookings'], summary: 'Get booking by ID', security: [{ bearerAuth: [] }] },
@@ -134,6 +227,16 @@ export async function bookingRoutes(app: FastifyInstance) {
       const room = await prisma.room.findFirst({ where: { id: body.roomId, tenantId, isActive: true } });
       if (!room) return reply.status(404).send({ success: false, error: 'Room not found' });
 
+      // Layer 1: sync-before-book — if room has external iCal feeds, refresh them NOW
+      // before checking availability so we have the latest data from OTAs.
+      // Rooms with no external calendars skip this entirely (zero overhead).
+      const externalCalendars = await prisma.externalCalendar.findMany({
+        where: { roomId: body.roomId, tenantId, isActive: true },
+      });
+      if (externalCalendars.length > 0) {
+        await syncCalendarsForRoom(body.roomId, externalCalendars);
+      }
+
       // Check room availability
       const conflict = await prisma.booking.findFirst({
         where: {
@@ -146,17 +249,44 @@ export async function bookingRoutes(app: FastifyInstance) {
       });
 
       if (conflict) {
-        return reply.status(409).send({ success: false, error: 'Room is not available for the selected dates' });
+        const reason = conflict.externalSource
+          ? `Room is already booked via ${conflict.externalSource} for these dates`
+          : 'Room is not available for the selected dates';
+        return reply.status(409).send({ success: false, error: reason });
+      }
+
+      // Resolve or create guest
+      let guestId = body.guestId;
+      if (!guestId) {
+        // Walk-in: create/find guest by name+phone
+        if (!body.guestFirstName || !body.guestLastName) {
+          return reply.status(400).send({ success: false, error: 'Guest name is required for walk-in bookings' });
+        }
+        const email = body.guestEmail ?? `walkin-${Date.now()}@resortpro.local`;
+        const existing = body.guestEmail
+          ? await prisma.guest.findFirst({ where: { tenantId, email } })
+          : null;
+        const guest = existing ?? await prisma.guest.create({
+          data: {
+            tenantId,
+            firstName: body.guestFirstName,
+            lastName: body.guestLastName,
+            email,
+            phone: body.guestPhone,
+          },
+        });
+        guestId = guest.id;
       }
 
       const nights = calculateNights(checkInDate, checkOutDate);
       const totalAmount = Number(room.basePrice) * nights;
+      const now = new Date();
 
       const booking = await prisma.booking.create({
         data: {
           tenantId,
           roomId: body.roomId,
-          guestId: body.guestId,
+          guestId,
           checkIn: checkInDate,
           checkOut: checkOutDate,
           adults: body.adults,
@@ -165,7 +295,9 @@ export async function bookingRoutes(app: FastifyInstance) {
           specialRequests: body.specialRequests,
           notes: body.notes,
           confirmationNo: generateConfirmationNo(),
-          status: 'CONFIRMED',
+          status: body.autoCheckIn ? 'CHECKED_IN' : 'CONFIRMED',
+          source: body.source,
+          actualCheckIn: body.autoCheckIn ? now : undefined,
         },
         include: {
           guest: { select: { firstName: true, lastName: true, email: true } },
@@ -173,56 +305,29 @@ export async function bookingRoutes(app: FastifyInstance) {
         },
       });
 
-      // Send confirmation email to guest (fire-and-forget)
-      if (booking.guest?.email) {
-        const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true, currency: true } });
-        const currency = tenant?.currency || 'USD';
-        const checkInFmt = checkInDate.toDateString();
-        const checkOutFmt = checkOutDate.toDateString();
-        sendEmail({
-          to: booking.guest.email,
-          subject: `Booking Confirmed — ${booking.confirmationNo}`,
-          html: `
-            <div style="font-family:sans-serif;max-width:560px;margin:0 auto">
-              <div style="background:#1a6b5e;padding:32px;text-align:center;border-radius:8px 8px 0 0">
-                <h1 style="color:white;margin:0;font-size:24px">Booking Confirmed ✓</h1>
-                <p style="color:#a8d5cf;margin:8px 0 0">${tenant?.name || 'ResortPro'}</p>
-              </div>
-              <div style="background:#f9fafb;padding:32px;border-radius:0 0 8px 8px">
-                <p>Dear ${booking.guest.firstName},</p>
-                <p>Your booking has been confirmed. Here are your details:</p>
-                <table style="width:100%;border-collapse:collapse;margin:16px 0">
-                  <tr style="border-bottom:1px solid #e5e7eb">
-                    <td style="padding:10px 0;color:#6b7280;font-size:14px">Confirmation No.</td>
-                    <td style="padding:10px 0;font-weight:700;font-size:18px;color:#1a6b5e;text-align:right">${booking.confirmationNo}</td>
-                  </tr>
-                  <tr style="border-bottom:1px solid #e5e7eb">
-                    <td style="padding:10px 0;color:#6b7280;font-size:14px">Room</td>
-                    <td style="padding:10px 0;font-weight:600;text-align:right">${booking.room.name} (${booking.room.number})</td>
-                  </tr>
-                  <tr style="border-bottom:1px solid #e5e7eb">
-                    <td style="padding:10px 0;color:#6b7280;font-size:14px">Check-in</td>
-                    <td style="padding:10px 0;font-weight:600;text-align:right">${checkInFmt}</td>
-                  </tr>
-                  <tr style="border-bottom:1px solid #e5e7eb">
-                    <td style="padding:10px 0;color:#6b7280;font-size:14px">Check-out</td>
-                    <td style="padding:10px 0;font-weight:600;text-align:right">${checkOutFmt}</td>
-                  </tr>
-                  <tr style="border-bottom:1px solid #e5e7eb">
-                    <td style="padding:10px 0;color:#6b7280;font-size:14px">Nights</td>
-                    <td style="padding:10px 0;font-weight:600;text-align:right">${nights}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:10px 0;color:#6b7280;font-size:14px">Total Amount</td>
-                    <td style="padding:10px 0;font-weight:700;font-size:18px;color:#d4a853;text-align:right">${currency} ${totalAmount.toLocaleString()}</td>
-                  </tr>
-                </table>
-                ${booking.specialRequests ? `<p style="background:#fff;border:1px solid #e5e7eb;padding:12px;border-radius:6px;font-size:14px"><strong>Special Requests:</strong> ${booking.specialRequests}</p>` : ''}
-                <p style="color:#6b7280;font-size:13px;margin-top:24px">Please keep your confirmation number handy at check-in. We look forward to welcoming you!</p>
-              </div>
-            </div>
-          `,
-        }).catch(() => {}); // don't let email failure block the response
+      // If auto check-in, mark room as OCCUPIED
+      if (body.autoCheckIn) {
+        await prisma.room.update({ where: { id: body.roomId }, data: { status: 'OCCUPIED' } });
+      }
+
+      // Record initial payment if provided
+      if (body.paymentMethod && body.paymentMethod !== 'ONLINE') {
+        await prisma.payment.create({
+          data: {
+            tenantId,
+            bookingId: booking.id,
+            amount: totalAmount,
+            method: body.paymentMethod === 'CARD' ? 'CREDIT_CARD' : body.paymentMethod as 'CASH' | 'BANK_TRANSFER',
+            status: 'COMPLETED',
+            processedAt: now,
+          },
+        });
+        await prisma.booking.update({ where: { id: booking.id }, data: { paidAmount: totalAmount, paymentStatus: 'PAID' } });
+      }
+
+      // Send confirmation email (skip for walk-in if opted out)
+      if (!body.skipEmail) {
+        sendBookingConfirmation(booking.id).catch(() => {});
       }
 
       return reply.status(201).send(ok(booking, 'Booking created'));
@@ -243,8 +348,17 @@ export async function bookingRoutes(app: FastifyInstance) {
         return reply.status(400).send({ success: false, error: 'Booking must be confirmed to check in' });
       }
 
+      const now = new Date();
       const [updated] = await Promise.all([
-        prisma.booking.update({ where: { id }, data: { status: 'CHECKED_IN' } }),
+        prisma.booking.update({
+          where: { id },
+          data: { status: 'CHECKED_IN', actualCheckIn: now },
+          include: {
+            guest: { select: { firstName: true, lastName: true, email: true, phone: true } },
+            room: { select: { number: true, name: true, type: true } },
+            payments: { select: { amount: true, method: true, status: true, processedAt: true } },
+          },
+        }),
         prisma.room.update({ where: { id: booking.roomId }, data: { status: 'OCCUPIED' } }),
       ]);
 
@@ -266,9 +380,25 @@ export async function bookingRoutes(app: FastifyInstance) {
         return reply.status(400).send({ success: false, error: 'Guest must be checked in to check out' });
       }
 
+      const now = new Date();
+
+      // Compute food order total for cost summary
+      const foodTotal = await prisma.foodOrder.aggregate({
+        where: { bookingId: id, status: { notIn: ['CANCELLED'] } },
+        _sum: { totalAmount: true },
+      });
+
       const [updated] = await Promise.all([
-        prisma.booking.update({ where: { id }, data: { status: 'CHECKED_OUT' } }),
-        prisma.room.update({ where: { id: booking.roomId }, data: { status: 'AVAILABLE' } }),
+        prisma.booking.update({
+          where: { id },
+          data: { status: 'CHECKED_OUT', actualCheckOut: now },
+          include: {
+            guest: { select: { firstName: true, lastName: true, email: true, phone: true } },
+            room: { select: { number: true, name: true, type: true } },
+            payments: { select: { amount: true, method: true, status: true, processedAt: true } },
+          },
+        }),
+        prisma.room.update({ where: { id: booking.roomId }, data: { status: 'CLEANING' } }),
         prisma.housekeepingTask.create({
           data: {
             tenantId,
@@ -280,7 +410,24 @@ export async function bookingRoutes(app: FastifyInstance) {
         }),
       ]);
 
-      return ok(updated, 'Guest checked out');
+      const nights = Math.ceil((booking.checkOut.getTime() - booking.checkIn.getTime()) / 86_400_000);
+
+      // Send checkout + invoice email (fire-and-forget)
+      sendCheckoutEmail(id).catch(() => {});
+      // Award loyalty points (fire-and-forget)
+      awardCheckoutPoints(id).catch(() => {});
+
+      return ok({
+        ...updated,
+        checkoutSummary: {
+          nights,
+          roomTotal: Number(booking.totalAmount),
+          foodTotal: Number(foodTotal._sum.totalAmount ?? 0),
+          grandTotal: Number(booking.totalAmount) + Number(foodTotal._sum.totalAmount ?? 0),
+          paidAmount: Number(booking.paidAmount),
+          balanceDue: Math.max(0, Number(booking.totalAmount) - Number(booking.paidAmount)),
+        },
+      }, 'Guest checked out');
     },
   });
 
@@ -299,6 +446,10 @@ export async function bookingRoutes(app: FastifyInstance) {
       }
 
       const updated = await prisma.booking.update({ where: { id }, data: { status: 'CANCELLED' } });
+
+      // Send cancellation email (fire-and-forget)
+      sendCancellationEmail(id).catch(() => {});
+
       return ok(updated, 'Booking cancelled');
     },
   });
@@ -410,6 +561,219 @@ export async function bookingRoutes(app: FastifyInstance) {
       }).catch(() => {});
 
       return reply.send({ success: true, data: { url, sessionId, amount: remaining } });
+    },
+  });
+
+  // ── Invoice routes ─────────────────────────────────────────────────────────
+
+  // GET /api/bookings/:id/invoice  — compute invoice data
+  app.get('/:id/invoice', {
+    schema: { tags: ['bookings'], security: [{ bearerAuth: [] }] },
+    preHandler: requireAuth,
+    handler: async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const { tenantId } = request.user as JwtPayload;
+
+      const booking = await prisma.booking.findFirst({
+        where: { id, tenantId },
+        include: {
+          guest: true,
+          room: true,
+          payments: { where: { status: 'COMPLETED' } },
+          foodOrders: { include: { items: { include: { menuItem: true } } } },
+          invoiceExtras: { orderBy: { createdAt: 'asc' } },
+          tenant: { select: { name: true, email: true, phone: true, address: true, currency: true, taxRate: true } },
+        },
+      });
+      if (!booking) return reply.status(404).send({ error: 'Booking not found' });
+
+      const nights = calculateNights(booking.checkIn, booking.checkOut);
+      const roomTotal = Number(booking.room.basePrice) * nights;
+      const foodTotal = booking.foodOrders.reduce((sum, o) => sum + Number(o.totalAmount), 0);
+      const extrasTotal = booking.invoiceExtras.reduce((sum, e) => sum + e.amount * e.quantity, 0);
+      const subtotal = roomTotal + foodTotal + extrasTotal;
+      const taxAmount = subtotal * ((booking.tenant.taxRate ?? 0) / 100);
+      const grandTotal = subtotal + taxAmount;
+      const paidAmount = booking.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+      const balanceDue = grandTotal - paidAmount;
+
+      return reply.send({
+        success: true,
+        data: {
+          booking: {
+            id: booking.id,
+            confirmationNo: booking.confirmationNo,
+            checkIn: booking.checkIn,
+            checkOut: booking.checkOut,
+            actualCheckIn: booking.actualCheckIn,
+            actualCheckOut: booking.actualCheckOut,
+            status: booking.status,
+            adults: booking.adults,
+            children: booking.children,
+            invoiceNumber: booking.invoiceNumber,
+            invoiceSentAt: booking.invoiceSentAt,
+          },
+          guest: booking.guest,
+          room: { id: booking.room.id, name: booking.room.name, number: booking.room.number, basePrice: booking.room.basePrice },
+          tenant: booking.tenant,
+          lineItems: {
+            room: { description: `Room ${booking.room.name} (${nights} nights × ${booking.tenant.currency} ${Number(booking.room.basePrice).toFixed(2)})`, amount: roomTotal, nights },
+            food: booking.foodOrders.flatMap(o => o.items.map(i => ({
+              description: i.menuItem.name,
+              quantity: i.quantity,
+              unitPrice: Number(i.unitPrice),
+              amount: i.quantity * Number(i.unitPrice),
+            }))),
+            extras: booking.invoiceExtras.map(e => ({ id: e.id, description: e.description, quantity: e.quantity, amount: e.amount, total: e.amount * e.quantity })),
+          },
+          summary: {
+            roomTotal,
+            foodTotal,
+            extrasTotal,
+            subtotal,
+            taxRate: booking.tenant.taxRate ?? 0,
+            taxAmount,
+            grandTotal,
+            paidAmount,
+            balanceDue,
+          },
+          payments: booking.payments,
+        },
+      });
+    },
+  });
+
+  // POST /api/bookings/:id/invoice/extras  — add a manual charge
+  app.post('/:id/invoice/extras', {
+    schema: { tags: ['bookings'], security: [{ bearerAuth: [] }] },
+    preHandler: [requireAuth, requireRole('OWNER', 'MANAGER', 'RECEPTIONIST')],
+    handler: async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const { tenantId } = request.user as JwtPayload;
+      const body = request.body as { description: string; amount: number; quantity?: number };
+
+      const booking = await prisma.booking.findFirst({ where: { id, tenantId } });
+      if (!booking) return reply.status(404).send({ error: 'Booking not found' });
+
+      const extra = await prisma.invoiceExtra.create({
+        data: {
+          tenantId,
+          bookingId: id,
+          description: body.description,
+          amount: body.amount,
+          quantity: body.quantity ?? 1,
+        },
+      });
+      return reply.send({ success: true, data: extra });
+    },
+  });
+
+  // DELETE /api/bookings/:id/invoice/extras/:extraId  — remove a manual charge
+  app.delete('/:id/invoice/extras/:extraId', {
+    schema: { tags: ['bookings'], security: [{ bearerAuth: [] }] },
+    preHandler: [requireAuth, requireRole('OWNER', 'MANAGER', 'RECEPTIONIST')],
+    handler: async (request, reply) => {
+      const { id, extraId } = request.params as { id: string; extraId: string };
+      const { tenantId } = request.user as JwtPayload;
+
+      await prisma.invoiceExtra.deleteMany({ where: { id: extraId, bookingId: id, tenantId } });
+      return reply.send({ success: true });
+    },
+  });
+
+  // POST /api/bookings/:id/invoice/send-email  — email invoice to guest
+  app.post('/:id/invoice/send-email', {
+    schema: { tags: ['bookings'], security: [{ bearerAuth: [] }] },
+    preHandler: [requireAuth, requireRole('OWNER', 'MANAGER', 'RECEPTIONIST')],
+    handler: async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const { tenantId } = request.user as JwtPayload;
+
+      const booking = await prisma.booking.findFirst({
+        where: { id, tenantId },
+        include: {
+          guest: true,
+          room: true,
+          payments: { where: { status: 'COMPLETED' } },
+          foodOrders: { include: { items: { include: { menuItem: true } } } },
+          invoiceExtras: true,
+          tenant: { select: { name: true, email: true, currency: true, taxRate: true } },
+        },
+      });
+      if (!booking) return reply.status(404).send({ error: 'Booking not found' });
+
+      const nights = calculateNights(booking.checkIn, booking.checkOut);
+      const roomTotal = Number(booking.room.basePrice) * nights;
+      const foodTotal = booking.foodOrders.reduce((sum, o) => sum + Number(o.totalAmount), 0);
+      const extrasTotal = booking.invoiceExtras.reduce((sum, e) => sum + e.amount * e.quantity, 0);
+      const subtotal = roomTotal + foodTotal + extrasTotal;
+      const taxAmount = subtotal * ((booking.tenant.taxRate ?? 0) / 100);
+      const grandTotal = subtotal + taxAmount;
+      const paidAmount = booking.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+      const balanceDue = grandTotal - paidAmount;
+      const cur = booking.tenant.currency;
+      const fmt = (n: number) => `${cur} ${n.toFixed(2)}`;
+
+      // Generate invoice number if not yet assigned
+      const invoiceNumber = booking.invoiceNumber ?? `INV-${booking.confirmationNo}`;
+      await prisma.booking.update({ where: { id }, data: { invoiceNumber, invoiceSentAt: new Date() } });
+
+      const foodRows = booking.foodOrders.flatMap(o => o.items).map(i =>
+        `<tr><td style="padding:4px 8px">${i.menuItem.name} ×${i.quantity}</td><td style="padding:4px 8px;text-align:right">${fmt(i.quantity * Number(i.unitPrice))}</td></tr>`
+      ).join('');
+      const extraRows = booking.invoiceExtras.map(e =>
+        `<tr><td style="padding:4px 8px">${e.description} ×${e.quantity}</td><td style="padding:4px 8px;text-align:right">${fmt(e.amount * e.quantity)}</td></tr>`
+      ).join('');
+
+      const html = `
+        <div style="font-family:sans-serif;max-width:650px;margin:0 auto;padding:24px;color:#1a1a1a">
+          <div style="text-align:center;margin-bottom:24px">
+            <h1 style="color:#1a6b5e;margin:0">${booking.tenant.name}</h1>
+            <p style="color:#888;margin:4px 0">Invoice / Folio</p>
+          </div>
+
+          <div style="background:#f8f8f8;border-radius:8px;padding:16px;margin-bottom:20px">
+            <table style="width:100%;border-collapse:collapse">
+              <tr><td style="color:#888;padding:2px 0">Invoice #</td><td style="font-weight:bold">${invoiceNumber}</td></tr>
+              <tr><td style="color:#888;padding:2px 0">Guest</td><td>${booking.guest.firstName} ${booking.guest.lastName}</td></tr>
+              <tr><td style="color:#888;padding:2px 0">Room</td><td>${booking.room.name} (#${booking.room.number})</td></tr>
+              <tr><td style="color:#888;padding:2px 0">Check-in</td><td>${new Date(booking.checkIn).toDateString()}</td></tr>
+              <tr><td style="color:#888;padding:2px 0">Check-out</td><td>${new Date(booking.checkOut).toDateString()}</td></tr>
+              <tr><td style="color:#888;padding:2px 0">Confirmation</td><td>${booking.confirmationNo}</td></tr>
+            </table>
+          </div>
+
+          <table style="width:100%;border-collapse:collapse;border-top:2px solid #1a6b5e">
+            <thead>
+              <tr style="background:#1a6b5e;color:#fff">
+                <th style="padding:8px;text-align:left">Description</th>
+                <th style="padding:8px;text-align:right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td style="padding:4px 8px">Room: ${booking.room.name} (${nights}n × ${fmt(Number(booking.room.basePrice))})</td><td style="padding:4px 8px;text-align:right">${fmt(roomTotal)}</td></tr>
+              ${foodRows}
+              ${extraRows}
+              ${booking.tenant.taxRate ? `<tr style="border-top:1px solid #eee"><td style="padding:4px 8px;color:#888">Tax (${booking.tenant.taxRate}%)</td><td style="padding:4px 8px;text-align:right;color:#888">${fmt(taxAmount)}</td></tr>` : ''}
+              <tr style="background:#f0faf8;font-weight:bold;border-top:2px solid #1a6b5e">
+                <td style="padding:8px">Total</td>
+                <td style="padding:8px;text-align:right">${fmt(grandTotal)}</td>
+              </tr>
+              <tr><td style="padding:4px 8px;color:#10b981">Paid</td><td style="padding:4px 8px;text-align:right;color:#10b981">- ${fmt(paidAmount)}</td></tr>
+              <tr style="font-weight:bold;font-size:18px;color:${balanceDue > 0 ? '#ef4444' : '#10b981'}">
+                <td style="padding:8px">Balance Due</td>
+                <td style="padding:8px;text-align:right">${fmt(balanceDue)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <p style="color:#888;font-size:12px;text-align:center;margin-top:32px">Thank you for staying at ${booking.tenant.name}!</p>
+        </div>
+      `;
+
+      await sendEmail({ to: booking.guest.email, subject: `Invoice ${invoiceNumber} — ${booking.tenant.name}`, html });
+
+      return reply.send({ success: true, data: { invoiceNumber, sentTo: booking.guest.email } });
     },
   });
 }

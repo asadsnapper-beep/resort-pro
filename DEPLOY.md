@@ -1,107 +1,194 @@
 # ResortPro — Coolify Deployment Guide
 
+## Architecture
+
+```
+Internet
+   │
+   ▼
+Coolify (Traefik reverse proxy + Let's Encrypt SSL)
+   ├── app.yourdomain.com  → web  (Next.js,  port 3000)
+   ├── api.yourdomain.com  → api  (Fastify,   port 4000)
+   ├── postgres            → internal Docker network only
+   └── redis               → internal Docker network only
+```
+
+---
+
 ## Prerequisites
-- A VPS (DigitalOcean, Hetzner, etc.) with Coolify installed
-- A domain pointed to your server (e.g. `resortpro.app`)
+
+- VPS with **Coolify v4** installed (DigitalOcean, Hetzner, etc.)
+- Domain pointed to your server:
+  ```
+  A    app.yourdomain.com   →  <server IP>
+  A    api.yourdomain.com   →  <server IP>
+  A    *.yourdomain.com     →  <server IP>   ← for tenant custom domains
+  ```
 - GitHub repo connected to Coolify
 
 ---
 
-## Architecture
+## Step 1 — Add Project in Coolify
 
-```
-Internet → Coolify (Traefik reverse proxy + SSL)
-               ├── web  (Next.js)  → :3000
-               ├── api  (Fastify)  → :4000
-               ├── postgres        → :5432 (internal only)
-               └── redis           → :6379 (internal only)
+1. **Projects → New Project** → name it `ResortPro`
+2. Inside the project → **New Resource → Docker Compose**
+3. **Source**: Connect your GitHub repo
+4. **Compose file**: `docker-compose.coolify.yml`  ← use this file, NOT the other one
+5. **Branch**: `main`
+
+---
+
+## Step 2 — Set Environment Variables
+
+In Coolify → **Environment Variables** tab, add every variable below.
+
+> ⚠️ `API_URL` is **baked into the Next.js bundle at build time**.  
+> If it's wrong, the browser can't reach the API. Set it before the first build.
+
+```env
+# === REQUIRED — set these before first deploy ===
+
+# Your API public URL (MUST be https:// — used by the browser)
+API_URL=https://api.yourdomain.com
+
+# Your web app public URL
+WEB_URL=https://app.yourdomain.com
+
+# For Traefik routing labels in docker-compose.coolify.yml
+API_DOMAIN=api.yourdomain.com
+WEB_DOMAIN=app.yourdomain.com
+
+# Platform root domain
+APP_DOMAIN=yourdomain.com
+
+# Database (Postgres will auto-create this DB)
+POSTGRES_USER=resortpro
+POSTGRES_PASSWORD=<strong random password>
+POSTGRES_DB=resortpro
+
+# Auth — generate with:
+# node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+JWT_SECRET=<64-byte hex string>
+JWT_EXPIRES_IN=7d
+
+# === OPTIONAL (app still works without these) ===
+
+# Email — get from https://resend.com/api-keys
+RESEND_API_KEY=re_xxxx
+
+# Stripe — get from https://dashboard.stripe.com/apikeys
+STRIPE_SECRET_KEY=sk_live_xxxx
+STRIPE_WEBHOOK_SECRET=whsec_xxxx
+STRIPE_PRICE_STARTER=price_xxxx
+STRIPE_PRICE_PRO=price_xxxx
+STRIPE_PRICE_ENTERPRISE=price_xxxx
+
+# Super admin logins (comma-separated)
+SUPER_ADMIN_EMAILS=you@yourdomain.com
 ```
 
 ---
 
-## Step-by-Step Coolify Setup
+## Step 3 — Configure Domains in Coolify
 
-### 1. Add a New Project in Coolify
-1. Go to **Projects → New Project** → name it `ResortPro`
+After saving environment variables, go to each service and set its domain:
 
-### 2. Add a Docker Compose Service
-1. Inside the project → **New Resource → Docker Compose**
-2. **Source**: Connect your GitHub repo
-3. **Compose file**: `docker-compose.production.yml`
-4. **Branch**: `main`
+| Service    | Domain                    |
+|------------|---------------------------|
+| `api`      | `api.yourdomain.com`      |
+| `web`      | `app.yourdomain.com`      |
+| `postgres` | *(no domain — internal)*  |
+| `redis`    | *(no domain — internal)*  |
 
-### 3. Set Environment Variables
-In Coolify's **Environment Variables** tab, add all variables from `.env.example`:
+Coolify handles **SSL (Let's Encrypt)** automatically once the domain is set.
 
-| Variable | Example | Notes |
-|----------|---------|-------|
-| `API_URL` | `https://api.yourdomain.com` | Your API's public URL |
-| `WEB_URL` | `https://app.yourdomain.com` | Your web app's public URL |
-| `APP_DOMAIN` | `resortpro.app` | Platform root domain |
-| `APP_IP` | `1.2.3.4` | Server public IP (optional) |
-| `POSTGRES_PASSWORD` | *(strong random string)* | DB password |
-| `REDIS_PASSWORD` | *(strong random string)* | Redis password |
-| `JWT_SECRET` | *(64-byte hex)* | Generate below |
-| `RESEND_API_KEY` | `re_xxx...` | From resend.com |
-| `STRIPE_SECRET_KEY` | `sk_live_xxx...` | From stripe.com |
-| `STRIPE_WEBHOOK_SECRET` | `whsec_xxx...` | From stripe.com |
+---
 
-**Generate JWT_SECRET:**
+## Step 4 — Deploy
+
+Click **Deploy**. Coolify will:
+1. Pull the repo
+2. Build the `api` Docker image (runs `prisma generate` + `tsup` build)
+3. Build the `web` Docker image (runs `next build` with `NEXT_PUBLIC_API_URL` baked in)
+4. Start `postgres` and `redis` first (healthcheck)
+5. Start `api` → runs `prisma migrate deploy` automatically on startup
+6. Start `web`
+
+First build takes ~5-8 minutes (pnpm install + TypeScript compile).
+
+---
+
+## Troubleshooting
+
+### Web loads but API calls fail (network error / 502)
+
+**Cause**: `NEXT_PUBLIC_API_URL` was wrong at build time.
+
+**Fix**:
+1. Correct `API_URL` in Coolify environment variables
+2. **Rebuild** (not just restart) — click **Rebuild** in Coolify
+
+### API container keeps restarting
+
+Check API logs in Coolify. Common causes:
+
+| Log message | Fix |
+|---|---|
+| `connect ECONNREFUSED postgres` | Postgres healthcheck not passing yet — wait or increase `start_period` |
+| `JWT_SECRET is not set` | Add `JWT_SECRET` env var |
+| `migrate deploy` failed | See migration errors below |
+
+### Prisma migration fails on startup
+
+Run the migration manually via Coolify's **Terminal** tab on the `api` container:
 ```bash
-node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+node_modules/.bin/prisma migrate deploy --schema=prisma/schema.prisma
 ```
 
-### 4. Configure Domains in Coolify
-For each service, add a domain in the **Domains** tab:
+### CORS errors in browser console
 
-| Service | Domain example |
-|---------|---------------|
-| `web` | `app.yourdomain.com` |
-| `api` | `api.yourdomain.com` |
-
-Coolify handles **SSL (Let's Encrypt)** automatically.
-
-### 5. Deploy
-Click **Deploy** — Coolify will:
-1. Pull your repo
-2. Build both Docker images
-3. Run `prisma migrate deploy` on first API start
-4. Start all services
-
----
-
-## DNS Records
-
-Point your domain to your server IP:
-
+`CORS_ORIGIN` on the API must match your web app URL exactly (including https, no trailing slash):
 ```
-A    app.yourdomain.com    →  <server IP>
-A    api.yourdomain.com    →  <server IP>
-A    *.yourdomain.com      →  <server IP>   ← for custom tenant domains
+WEB_URL=https://app.yourdomain.com   ← no trailing slash
 ```
 
-The wildcard `*` record enables custom domain white-labelling for resort owners.
+### Tenant custom domains not resolving
 
----
+Add a wildcard DNS record:
+```
+A    *.yourdomain.com   →  <server IP>
+```
 
-## Updating (Zero-downtime)
+### Build fails with "Cannot find module"
 
-Push to `main` → Coolify auto-deploys (if webhook is configured):
+Run `pnpm install` locally and commit the updated `pnpm-lock.yaml`:
 ```bash
-git push origin main
+pnpm install
+git add pnpm-lock.yaml
+git commit -m "update lockfile"
+git push
 ```
+
+---
+
+## Updating (Redeploy)
+
+Push to `main` → Coolify auto-deploys (if webhook is configured).
 
 Or manually click **Redeploy** in Coolify.
+
+> If you changed any `NEXT_PUBLIC_*` env vars, you must **Rebuild** (not just Redeploy) because those values are baked in at build time.
 
 ---
 
 ## Local Production Test
 
-Before deploying to Coolify, test locally:
+Before deploying to Coolify, test the production build locally:
 
 ```bash
 # 1. Copy and fill env file
 cp .env.example .env.production
+# Edit .env.production — set API_URL=http://localhost:4000, WEB_URL=http://localhost:3000
 
 # 2. Build and run
 docker compose -f docker-compose.production.yml --env-file .env.production up --build
@@ -113,33 +200,18 @@ docker compose -f docker-compose.production.yml --env-file .env.production up --
 
 ---
 
-## Useful Commands
+## Useful Coolify Commands (via Terminal tab)
 
 ```bash
-# View logs
-docker compose -f docker-compose.production.yml logs -f api
-docker compose -f docker-compose.production.yml logs -f web
+# View running processes
+ps aux
 
-# Run a DB migration manually
-docker compose -f docker-compose.production.yml exec api \
-  node_modules/.bin/prisma migrate deploy --schema=prisma/schema.prisma
+# Check DB connection
+node_modules/.bin/prisma db pull --schema=prisma/schema.prisma
 
-# Open Prisma Studio (local only)
-docker compose -f docker-compose.production.yml exec api \
-  node_modules/.bin/prisma studio --schema=prisma/schema.prisma
+# Run DB migration manually
+node_modules/.bin/prisma migrate deploy --schema=prisma/schema.prisma
 
-# Restart a service
-docker compose -f docker-compose.production.yml restart api
+# Open Prisma Studio (then expose port temporarily in Coolify)
+node_modules/.bin/prisma studio --schema=prisma/schema.prisma
 ```
-
----
-
-## Troubleshooting
-
-| Issue | Fix |
-|-------|-----|
-| API won't start | Check `DATABASE_URL` is correct and postgres is healthy |
-| Web shows API error | Verify `NEXT_PUBLIC_API_URL` matches your actual API domain |
-| Migrations fail | Run migration command manually (see above) |
-| Custom domains not working | Make sure wildcard DNS `*.yourdomain.com` is set |
-| Build fails (tsup) | Run `pnpm install` locally and commit updated `pnpm-lock.yaml` |

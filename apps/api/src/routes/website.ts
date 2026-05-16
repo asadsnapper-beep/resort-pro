@@ -31,7 +31,7 @@ export async function websiteRoutes(app: FastifyInstance) {
   // GET /api/website — get website content (authenticated)
   app.get('/', {
     schema: { tags: ['website'], summary: 'Get website content', security: [{ bearerAuth: [] }] },
-    preHandler: requireRole('OWNER', 'MANAGER'),
+    preHandler: requireRole('OWNER', 'MANAGER', 'MARKETER', 'DEVELOPER'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const content = await prisma.websiteContent.findUnique({ where: { tenantId } });
@@ -43,7 +43,7 @@ export async function websiteRoutes(app: FastifyInstance) {
   // PUT /api/website — update website content
   app.put('/', {
     schema: { tags: ['website'], summary: 'Update website content', security: [{ bearerAuth: [] }] },
-    preHandler: requireRole('OWNER', 'MANAGER'),
+    preHandler: requireRole('OWNER', 'MANAGER', 'MARKETER', 'DEVELOPER'),
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload;
       const body = websiteSchema.parse(request.body);

@@ -17,32 +17,62 @@ const NAV_LINKS = [
 
 const FEATURES = [
   {
-    icon: '🏨',
+    color: 'bg-resort-100 text-resort-700',
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+        <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>
+      </svg>
+    ),
     title: 'Room & Booking Management',
     desc: 'Drag-and-drop calendar, walk-in, online booking, and group bookings all in one intuitive view.',
   },
   {
-    icon: '💳',
+    color: 'bg-emerald-100 text-emerald-700',
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+        <rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>
+      </svg>
+    ),
     title: 'Online Payments',
     desc: 'bKash, SSL Commerce, Stripe, and manual payments built in — no third-party plugins needed.',
   },
   {
-    icon: '📊',
+    color: 'bg-blue-100 text-blue-700',
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+        <path d="M18 20V10M12 20V4M6 20v-6"/>
+      </svg>
+    ),
     title: 'Analytics & Reports',
     desc: 'Revenue trends, occupancy rates, expense tracking, and profit margin reports in real time.',
   },
   {
-    icon: '🍽️',
+    color: 'bg-orange-100 text-orange-700',
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+        <path d="M3 11l19-9-9 19-2-8-8-2z"/>
+      </svg>
+    ),
     title: 'Restaurant & Room Service',
     desc: 'Menu management, table orders, and room-service requests with live kitchen status.',
   },
   {
-    icon: '👥',
+    color: 'bg-purple-100 text-purple-700',
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+    ),
     title: 'Guest CRM',
     desc: 'Guest profiles, loyalty points, stay history, and communication logs — all in one place.',
   },
   {
-    icon: '🌐',
+    color: 'bg-gold-400/20 text-gold-600',
+    svg: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+        <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+      </svg>
+    ),
     title: 'Embed on Any Website',
     desc: 'Drop booking forms, room listings, menus, and calendars on your site with one line of code.',
   },
@@ -346,6 +376,17 @@ export default function HomePage() {
           </div>
 
           <div className="hidden items-center gap-3 md:flex">
+            {/* Language switcher */}
+            <Link
+              href="/bn"
+              className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors ${
+                scrolled
+                  ? 'border-gray-200 text-gray-500 hover:text-resort-700 hover:border-resort-300'
+                  : 'border-white/20 text-white/60 hover:text-white hover:border-white/40'
+              }`}
+            >
+              বাংলা
+            </Link>
             <Link
               href="/auth/login"
               className={`text-sm font-medium transition-colors ${
@@ -533,7 +574,9 @@ export default function HomePage() {
                 key={f.title}
                 className="group rounded-2xl border border-gray-100 bg-gray-50 p-7 transition-all duration-300 hover:-translate-y-1 hover:border-resort-200 hover:bg-white hover:shadow-lg hover:shadow-resort-100/50"
               >
-                <div className="mb-4 text-4xl">{f.icon}</div>
+                <div className={`mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl ${f.color}`}>
+                  {f.svg}
+                </div>
                 <h3 className="font-semibold text-gray-900">{f.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-gray-500">{f.desc}</p>
               </div>
@@ -934,11 +977,16 @@ export default function HomePage() {
 
           <div className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 sm:flex-row">
             <p className="text-sm text-white/40">
-              &copy; 2025 ResortPro. Built for the hospitality industry.
+              &copy; {new Date().getFullYear()} ResortPro. Built for the hospitality industry.
             </p>
-            <p className="text-xs text-white/30">
-              Bookings &bull; Payments &bull; Analytics &bull; Embed SDK
-            </p>
+            <div className="flex items-center gap-4">
+              <span className="text-xs text-white/40 border border-white/30 rounded px-2 py-1 text-white/60">
+                🌐 English
+              </span>
+              <Link href="/bn" className="text-xs text-white/40 hover:text-white/70 transition-colors border border-white/20 rounded px-2 py-1">
+                🇧🇩 বাংলা
+              </Link>
+            </div>
           </div>
         </div>
       </footer>

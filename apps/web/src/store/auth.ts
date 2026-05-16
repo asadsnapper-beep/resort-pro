@@ -18,6 +18,7 @@ interface AuthState {
   token: string | null;
   refreshToken: string | null;
   setAuth: (user: AuthUser, tenant: Tenant, token: string, refreshToken: string) => void;
+  updateUser: (patch: Partial<AuthUser & { phone: string | null; avatarUrl: string | null }>) => void;
   clearAuth: () => void;
   isAuthenticated: () => boolean;
 }
@@ -34,6 +35,7 @@ export const useAuthStore = create<AuthState>()(
         localStorage.setItem('refreshToken', refreshToken);
         set({ user, tenant, token, refreshToken });
       },
+      updateUser: (patch) => set((s) => ({ user: s.user ? { ...s.user, ...patch } : s.user })),
       clearAuth: () => {
         localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');

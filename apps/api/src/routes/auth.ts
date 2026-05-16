@@ -6,6 +6,8 @@ import { prisma } from '@resort-pro/database';
 import { requireAuth } from '../middleware/auth';
 import { ok, validate } from '../utils/response';
 import { sendEmail } from '../services/email';
+import { createAdminNotification } from '../utils/notifications';
+import { generateReferralCode } from '../utils/referral';
 import type { JwtPayload } from '@resort-pro/types';
 
 const registerSchema = z.object({
@@ -15,6 +17,7 @@ const registerSchema = z.object({
   lastName: z.string().min(1).max(50),
   email: z.string().email(),
   password: z.string().min(8).regex(/(?=.*[A-Z])(?=.*[0-9])/, 'Must contain uppercase and number'),
+  referralCode: z.string().max(20).optional(),  // ?ref=CODE from URL
 });
 
 const loginSchema = z.object({
@@ -58,6 +61,22 @@ export async function authRoutes(app: FastifyInstance) {
       const trialDays = platformSettings?.trialDays ?? 14;
       const trialEndsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
 
+      // Resolve referral — find tenant with matching referralCode
+      let referredById: string | undefined;
+      if (body.referralCode) {
+        const referrer = await prisma.tenant.findUnique({
+          where: { referralCode: body.referralCode },
+          select: { id: true },
+        });
+        if (referrer) referredById = referrer.id;
+      }
+
+      // Generate unique referral code for this new tenant
+      let referralCode = generateReferralCode(body.slug);
+      // Ensure uniqueness (retry if collision)
+      const existing = await prisma.tenant.findUnique({ where: { referralCode } });
+      if (existing) referralCode = generateReferralCode(body.slug + Date.now());
+
       const tenant = await prisma.tenant.create({
         data: {
           name: body.resortName,
@@ -66,6 +85,8 @@ export async function authRoutes(app: FastifyInstance) {
           planStatus: 'trialing',
           trialEndsAt,
           billingEmail: body.email,
+          referralCode,
+          ...(referredById && { referredById }),
           users: {
             create: {
               email: body.email,
@@ -83,6 +104,22 @@ export async function authRoutes(app: FastifyInstance) {
           },
         },
         include: { users: true },
+      });
+
+      // Notify admin of new signup
+      await createAdminNotification({
+        type: 'new_signup',
+        title: 'New resort signed up',
+        message: `${body.resortName} (${body.email}) just started a ${trialDays}-day trial.`,
+        metadata: {
+          tenantId: tenant.id,
+          tenantName: tenant.name,
+          tenantSlug: tenant.slug,
+          ownerEmail: body.email,
+          trialDays,
+          trialEndsAt: trialEndsAt.toISOString(),
+        },
+        linkPath: `/admin/tenants`,
       });
 
       const user = tenant.users[0];
@@ -266,6 +303,55 @@ export async function authRoutes(app: FastifyInstance) {
         select: { id: true, email: true, firstName: true, lastName: true, role: true, phone: true, avatarUrl: true, tenantId: true },
       });
       return ok(user);
+    },
+  });
+
+  // PATCH /api/auth/me — update own profile
+  app.patch('/me', {
+    schema: { tags: ['auth'], summary: 'Update own profile', security: [{ bearerAuth: [] }] },
+    preHandler: requireAuth,
+    handler: async (request, reply) => {
+      const payload = request.user as JwtPayload;
+      const body = z.object({
+        firstName:  z.string().min(1).max(50).optional(),
+        lastName:   z.string().min(1).max(50).optional(),
+        phone:      z.string().max(30).nullable().optional(),
+        avatarUrl:  z.string().url().nullable().optional(),
+      }).parse(request.body);
+
+      const updated = await prisma.user.update({
+        where: { id: payload.sub },
+        data: body,
+        select: { id: true, email: true, firstName: true, lastName: true, role: true, phone: true, avatarUrl: true, tenantId: true },
+      });
+      return ok(updated, 'Profile updated');
+    },
+  });
+
+  // POST /api/auth/change-password
+  app.post('/change-password', {
+    schema: { tags: ['auth'], summary: 'Change own password', security: [{ bearerAuth: [] }] },
+    preHandler: requireAuth,
+    handler: async (request, reply) => {
+      const payload = request.user as JwtPayload;
+      const body = z.object({
+        currentPassword: z.string().min(1),
+        newPassword:     z.string().min(8).regex(/(?=.*[A-Z])(?=.*[0-9])/, 'Must contain uppercase and a number'),
+      }).parse(request.body);
+
+      const user = await prisma.user.findUnique({ where: { id: payload.sub } });
+      if (!user) return reply.status(404).send({ success: false, error: 'User not found' });
+
+      const valid = await bcrypt.compare(body.currentPassword, user.passwordHash);
+      if (!valid) return reply.status(400).send({ success: false, error: 'Current password is incorrect' });
+
+      const hash = await bcrypt.hash(body.newPassword, 12);
+      await prisma.user.update({ where: { id: user.id }, data: { passwordHash: hash } });
+
+      // Invalidate all refresh tokens to force re-login on other devices
+      await prisma.refreshToken.deleteMany({ where: { userId: user.id } });
+
+      return ok(null, 'Password changed successfully');
     },
   });
 
