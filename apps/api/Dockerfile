@@ -16,8 +16,8 @@ COPY . .
 
 RUN pnpm install --no-frozen-lockfile
 
-# Generate Prisma client into the pnpm virtual store
-RUN pnpm --filter @resort-pro/database exec prisma generate
+# Generate Prisma client (explicit schema path — works with shamefully-hoist)
+RUN cd packages/database && npx prisma generate --schema=prisma/schema.prisma
 
 # Bundle API — tsup inlines @resort-pro/* and keeps @prisma/client external
 RUN pnpm --filter @resort-pro/api build
