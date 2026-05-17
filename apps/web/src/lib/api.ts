@@ -186,6 +186,9 @@ export const tenantApi = {
   getEmailSettings: () => api.get('/tenant/email-settings'),
   updateEmailSettings: (data: unknown) => api.patch('/tenant/email-settings', data),
   sendTestEmail: (toEmail: string) => api.post('/tenant/email-settings/test', { toEmail }),
+  // Custom domain
+  setDomain: (domain: string | null) => api.put('/tenant/domain', { domain }),
+  verifyDomain: () => api.post('/tenant/domain/verify', {}),
 };
 
 

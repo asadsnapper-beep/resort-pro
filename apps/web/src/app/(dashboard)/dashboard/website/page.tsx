@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { websiteApi } from '@/lib/api';
+import { websiteApi, tenantApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
-import { Globe, Image, FileText, Palette, Star, Plus, Trash2, Save, Layout, ExternalLink, Share2 } from 'lucide-react';
+import { Globe, Image, FileText, Palette, Star, Plus, Trash2, Save, Layout, ExternalLink, Share2, Link2, CheckCircle2, XCircle, Loader2, AlertTriangle } from 'lucide-react';
 import { ThemePicker } from '@/components/dashboard/website/ThemePicker';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 
@@ -38,12 +38,13 @@ interface WebsiteContent {
 
 
 const TABS = [
-  { id: 'template', label: 'Template', icon: Layout },
-  { id: 'hero', label: 'Hero & About', icon: Globe },
-  { id: 'gallery', label: 'Gallery', icon: Image },
-  { id: 'testimonials', label: 'Testimonials', icon: Star },
-  { id: 'seo', label: 'SEO & Branding', icon: Palette },
-  { id: 'social', label: 'Social Media', icon: Share2 },
+  { id: 'template',    label: 'Template',    icon: Layout  },
+  { id: 'hero',        label: 'Hero & About',icon: Globe   },
+  { id: 'gallery',     label: 'Gallery',     icon: Image   },
+  { id: 'testimonials',label: 'Testimonials',icon: Star    },
+  { id: 'seo',         label: 'SEO & Branding', icon: Palette },
+  { id: 'social',      label: 'Social Media',icon: Share2  },
+  { id: 'domain',      label: 'Custom Domain', icon: Link2 },
 ] as const;
 
 type Tab = typeof TABS[number]['id'];
@@ -133,6 +134,60 @@ export default function WebsitePage() {
     set('testimonials', (form.testimonials ?? []).filter((_, idx) => idx !== i));
 
   const publicUrl = tenant?.slug ? `/${tenant.slug}` : null;
+
+  /* ── Custom domain state ─────────────────────────────────────────────────── */
+  const [domainInput, setDomainInput] = useState('');
+  const [domainInfo,  setDomainInfo]  = useState<{
+    customDomain: string | null;
+    domainVerified: boolean;
+    domainVerifiedAt: string | null;
+    cnameTarget?: string;
+    aRecord?: string | null;
+  } | null>(null);
+
+  const { data: tenantData } = useQuery({
+    queryKey: ['tenant-domain'],
+    queryFn:  () => tenantApi.get(),
+  });
+
+  useEffect(() => {
+    const t = tenantData?.data?.data;
+    if (t) {
+      setDomainInfo({
+        customDomain:    t.customDomain ?? null,
+        domainVerified:  t.domainVerified ?? false,
+        domainVerifiedAt: t.domainVerifiedAt ?? null,
+        cnameTarget: t.slug ? `${t.slug}.resortpro.site` : undefined,
+      });
+      if (t.customDomain) setDomainInput(t.customDomain);
+    }
+  }, [tenantData]);
+
+  const setDomainMut = useMutation({
+    mutationFn: (domain: string | null) => tenantApi.setDomain(domain),
+    onSuccess: (res, domain) => {
+      queryClient.invalidateQueries({ queryKey: ['tenant-domain'] });
+      const d = res?.data?.data;
+      if (d) setDomainInfo(prev => ({ ...prev!, ...d }));
+      toast({ title: domain ? 'Domain saved!' : 'Domain removed', description: domain ? 'Click "Verify Domain" once DNS is configured.' : undefined });
+    },
+    onError: (err: { response?: { data?: { error?: string } } }) =>
+      toast({ title: 'Error', description: err?.response?.data?.error ?? 'Failed to save domain', variant: 'destructive' }),
+  });
+
+  const verifyMut = useMutation({
+    mutationFn: () => tenantApi.verifyDomain(),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['tenant-domain'] });
+      const d = res?.data?.data;
+      if (d?.verified) {
+        setDomainInfo(prev => ({ ...prev!, domainVerified: true, domainVerifiedAt: new Date().toISOString() }));
+        toast({ title: '✓ Domain verified!', description: `${domainInfo?.customDomain} is now live.` });
+      }
+    },
+    onError: (err: { response?: { data?: { error?: string; message?: string } } }) =>
+      toast({ title: 'Verification failed', description: err?.response?.data?.message ?? err?.response?.data?.error ?? 'DNS not configured yet', variant: 'destructive' }),
+  });
 
   if (isLoading) {
     return (
@@ -470,12 +525,188 @@ export default function WebsitePage() {
         </div>
       )}
 
-      {/* Save (bottom) */}
-      <div className="flex justify-end pt-2">
-        <Button className="gap-2 px-8" loading={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
-          <Save className="h-4 w-4" /> Save & Publish
-        </Button>
-      </div>
+      {/* ── Custom Domain ──────────────────────────────────────────────────── */}
+      {tab === 'domain' && (
+        <div className="max-w-2xl space-y-6">
+
+          {/* Subdomain info banner */}
+          {tenant?.slug && (
+            <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4">
+              <Globe className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-blue-800 mb-0.5">Your free subdomain</p>
+                <a href={`https://${tenant.slug}.resortpro.site`} target="_blank" rel="noopener noreferrer"
+                  className="text-sm font-mono text-blue-700 hover:underline flex items-center gap-1">
+                  {tenant.slug}.resortpro.site <ExternalLink className="h-3 w-3" />
+                </a>
+                <p className="mt-1 text-xs text-blue-600">This always works — no setup required.</p>
+              </div>
+            </div>
+          )}
+
+          {/* Custom domain card */}
+          <Card>
+            <CardContent className="p-6 space-y-5">
+              <div className="flex items-center gap-2">
+                <Link2 className="h-5 w-5 text-resort-600" />
+                <h3 className="font-semibold text-gray-900">Connect a Custom Domain</h3>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Use your own domain (e.g. <span className="font-mono bg-gray-100 px-1 py-0.5 rounded text-xs">www.sunsetresort.com</span>) instead of the resortpro.site subdomain.
+              </p>
+
+              {/* Current status */}
+              {domainInfo?.customDomain && (
+                <div className={`flex items-center gap-3 rounded-xl border p-3 ${
+                  domainInfo.domainVerified
+                    ? 'bg-green-50 border-green-200'
+                    : 'bg-amber-50 border-amber-200'
+                }`}>
+                  {domainInfo.domainVerified
+                    ? <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
+                    : <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />
+                  }
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 font-mono truncate">{domainInfo.customDomain}</p>
+                    <p className={`text-xs ${domainInfo.domainVerified ? 'text-green-600' : 'text-amber-600'}`}>
+                      {domainInfo.domainVerified ? `Verified & live` : 'Pending DNS verification'}
+                    </p>
+                  </div>
+                  {domainInfo.domainVerified && (
+                    <a href={`https://${domainInfo.customDomain}`} target="_blank" rel="noopener noreferrer"
+                      className="text-green-600 hover:text-green-800">
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {/* Input */}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">Domain Name</label>
+                <div className="flex gap-2">
+                  <Input
+                    value={domainInput}
+                    onChange={e => setDomainInput(e.target.value.toLowerCase().trim())}
+                    placeholder="www.yourresort.com"
+                    className="font-mono"
+                  />
+                  <Button
+                    onClick={() => setDomainMut.mutate(domainInput || null)}
+                    loading={setDomainMut.isPending}
+                    disabled={!domainInput && !domainInfo?.customDomain}
+                    variant={domainInput ? 'default' : 'outline'}>
+                    {domainInput ? 'Save' : 'Remove'}
+                  </Button>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">Enter the exact domain with www or without — whichever you want to use.</p>
+              </div>
+
+              {/* Verify button */}
+              {domainInfo?.customDomain && !domainInfo.domainVerified && (
+                <Button
+                  variant="outline"
+                  className="w-full gap-2 border-amber-300 text-amber-700 hover:bg-amber-50"
+                  onClick={() => verifyMut.mutate()}
+                  loading={verifyMut.isPending}>
+                  {verifyMut.isPending
+                    ? <><Loader2 className="h-4 w-4 animate-spin" /> Checking DNS…</>
+                    : <><CheckCircle2 className="h-4 w-4" /> Verify Domain</>
+                  }
+                </Button>
+              )}
+
+              {/* Remove domain */}
+              {domainInfo?.customDomain && (
+                <button
+                  onClick={() => { setDomainInput(''); setDomainMut.mutate(null); }}
+                  className="text-xs text-red-500 hover:text-red-700 hover:underline">
+                  Remove custom domain
+                </button>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* DNS setup instructions */}
+          {domainInfo?.customDomain && !domainInfo.domainVerified && (
+            <Card>
+              <CardContent className="p-6 space-y-4">
+                <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-resort-600" /> DNS Setup Instructions
+                </h4>
+                <p className="text-sm text-muted-foreground">
+                  Add <strong>one</strong> of these records in your DNS provider (Cloudflare, GoDaddy, Namecheap, etc.):
+                </p>
+
+                {/* CNAME option */}
+                <div className="rounded-xl bg-gray-50 border p-4 space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Option 1 — CNAME (recommended)</p>
+                  <div className="grid grid-cols-3 gap-3 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Type</p>
+                      <code className="font-mono bg-white border rounded px-2 py-1 text-xs">CNAME</code>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Name / Host</p>
+                      <code className="font-mono bg-white border rounded px-2 py-1 text-xs">
+                        {domainInfo.customDomain.startsWith('www.') ? 'www' : '@'}
+                      </code>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Value / Target</p>
+                      <code className="font-mono bg-white border rounded px-2 py-1 text-xs break-all">
+                        {domainInfo.cnameTarget ?? `${tenant?.slug}.resortpro.site`}
+                      </code>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  DNS changes can take up to <strong>48 hours</strong> to propagate. Once set, click <strong>Verify Domain</strong> above.
+                </p>
+
+                {/* Cloudflare specific tip */}
+                <div className="rounded-xl bg-amber-50 border border-amber-200 p-3">
+                  <p className="text-xs text-amber-700">
+                    <strong>Cloudflare users:</strong> Make sure the CNAME proxy is <strong>DNS only</strong> (grey cloud ☁️), not Proxied (orange cloud 🟠) during initial verification. You can re-enable proxying after verification.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Verified success state */}
+          {domainInfo?.domainVerified && (
+            <div className="rounded-xl bg-green-50 border border-green-200 p-5 flex items-start gap-3">
+              <CheckCircle2 className="h-6 w-6 text-green-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-green-800">Domain is live!</p>
+                <p className="text-sm text-green-700 mt-0.5">
+                  Your website is accessible at{' '}
+                  <a href={`https://${domainInfo.customDomain}`} target="_blank" rel="noopener noreferrer"
+                    className="font-semibold underline">
+                    {domainInfo.customDomain}
+                  </a>
+                </p>
+                {domainInfo.domainVerifiedAt && (
+                  <p className="text-xs text-green-600 mt-1">
+                    Verified on {new Date(domainInfo.domainVerifiedAt).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Save (bottom) — hide on domain tab, it has its own save */}
+      {tab !== 'domain' && (
+        <div className="flex justify-end pt-2">
+          <Button className="gap-2 px-8" loading={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
+            <Save className="h-4 w-4" /> Save & Publish
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
