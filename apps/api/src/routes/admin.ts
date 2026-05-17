@@ -2435,4 +2435,119 @@ export async function adminRoutes(app: FastifyInstance) {
       }
     }
   );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // THEME MANAGEMENT
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // GET /api/admin/themes — সব themes list
+  app.get('/themes', { preHandler: requireAdminRole() }, async (_request, reply) => {
+    const themes = await prisma.theme.findMany({ orderBy: { sortOrder: 'asc' } });
+    return reply.send(ok(themes));
+  });
+
+  // POST /api/admin/themes — নতুন theme register
+  app.post<{
+    Body: {
+      key: string; name: string; description?: string;
+      previewImage?: string; author?: string; version?: string;
+      tags?: string[]; isPremium?: boolean; requiredPlan?: string; sortOrder?: number;
+    };
+  }>('/themes', { preHandler: requireAdminRole(['SUPER_ADMIN']) }, async (request, reply) => {
+    const { key, name, description, previewImage, author, version, tags, isPremium, requiredPlan, sortOrder } = request.body ?? {};
+    if (!key || !name) return reply.status(400).send({ success: false, error: 'key and name required' });
+
+    const existing = await prisma.theme.findUnique({ where: { key } });
+    if (existing) return reply.status(409).send({ success: false, error: `Theme key '${key}' already exists` });
+
+    const theme = await prisma.theme.create({
+      data: { key, name, description, previewImage, author, version, tags, isPremium, requiredPlan, sortOrder },
+    });
+    const adminUser = request.user as any;
+    await logAdminAction({ adminEmail: adminUser.email, action: 'theme_update', targetType: 'theme', targetId: theme.id, targetName: name, metadata: { action: 'create', key }, ipAddress: request.ip });
+    return reply.status(201).send(ok(theme, 'Theme created'));
+  });
+
+  // PUT /api/admin/themes/:key — full update
+  app.put<{
+    Params: { key: string };
+    Body: {
+      name?: string; description?: string; previewImage?: string;
+      author?: string; version?: string; tags?: string[];
+      isActive?: boolean; isDefault?: boolean; isPremium?: boolean;
+      requiredPlan?: string; sortOrder?: number;
+    };
+  }>('/themes/:key', { preHandler: requireAdminRole(['SUPER_ADMIN']) }, async (request, reply) => {
+    const { key } = request.params;
+    const body = request.body ?? {};
+
+    const theme = await prisma.theme.findUnique({ where: { key } });
+    if (!theme) {
+      // upsert — create if not found (add new theme flow)
+      const created = await prisma.theme.create({ data: { key, name: body.name ?? key, ...body } });
+      return reply.status(201).send(ok(created, 'Theme created'));
+    }
+
+    // isDefault → unset others first
+    if (body.isDefault === true) {
+      await prisma.theme.updateMany({ where: { isDefault: true }, data: { isDefault: false } });
+    }
+
+    const updated = await prisma.theme.update({ where: { key }, data: body });
+    const adminUser = request.user as any;
+    await logAdminAction({ adminEmail: adminUser.email, action: 'theme_update', targetType: 'theme', targetId: theme.id, targetName: theme.name, metadata: { changes: body }, ipAddress: request.ip });
+    return reply.send(ok(updated, 'Theme updated'));
+  });
+
+  // PATCH /api/admin/themes/:key/toggle — toggle active status
+  app.patch<{ Params: { key: string } }>(
+    '/themes/:key/toggle',
+    { preHandler: requireAdminRole(['SUPER_ADMIN']) },
+    async (request, reply) => {
+      const { key } = request.params;
+      const theme = await prisma.theme.findUnique({ where: { key } });
+      if (!theme) return reply.status(404).send({ success: false, error: 'Theme not found' });
+
+      const updated = await prisma.theme.update({ where: { key }, data: { isActive: !theme.isActive } });
+      const adminUser = request.user as any;
+      await logAdminAction({ adminEmail: adminUser.email, action: 'theme_toggle', targetType: 'theme', targetId: theme.id, targetName: theme.name, metadata: { isActive: updated.isActive }, ipAddress: request.ip });
+      return reply.send(ok(updated, `Theme ${updated.isActive ? 'activated' : 'deactivated'}`));
+    }
+  );
+
+  // PATCH /api/admin/themes/:key — partial update (isDefault, requiredPlan, etc.)
+  app.patch<{
+    Params: { key: string };
+    Body: { isDefault?: boolean; requiredPlan?: string; sortOrder?: number; };
+  }>('/themes/:key', { preHandler: requireAdminRole(['SUPER_ADMIN']) }, async (request, reply) => {
+    const { key } = request.params;
+    const body = request.body ?? {};
+
+    const theme = await prisma.theme.findUnique({ where: { key } });
+    if (!theme) return reply.status(404).send({ success: false, error: 'Theme not found' });
+
+    if (body.isDefault === true) {
+      await prisma.theme.updateMany({ where: { isDefault: true }, data: { isDefault: false } });
+    }
+
+    const updated = await prisma.theme.update({ where: { key }, data: body });
+    return reply.send(ok(updated, 'Theme updated'));
+  });
+
+  // DELETE /api/admin/themes/:key — theme delete
+  app.delete<{ Params: { key: string } }>(
+    '/themes/:key',
+    { preHandler: requireAdminRole(['SUPER_ADMIN']) },
+    async (request, reply) => {
+      const { key } = request.params;
+      const theme = await prisma.theme.findUnique({ where: { key } });
+      if (!theme) return reply.status(404).send({ success: false, error: 'Theme not found' });
+      if (theme.isDefault) return reply.status(400).send({ success: false, error: 'Cannot delete the default theme. Set another theme as default first.' });
+
+      await prisma.theme.delete({ where: { key } });
+      const adminUser = request.user as any;
+      await logAdminAction({ adminEmail: adminUser.email, action: 'theme_update', targetType: 'theme', targetId: theme.id, targetName: theme.name, metadata: { action: 'delete' }, ipAddress: request.ip });
+      return reply.send(ok(null, 'Theme deleted'));
+    }
+  );
 }
