@@ -12,3 +12,6 @@ test-results
 *.log
 prisma/*.db
 prisma/*.db-journal
+
+# Local file uploads (dev storage)
+apps/api/uploads/

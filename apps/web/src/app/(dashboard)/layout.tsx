@@ -1,15 +1,19 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { TopNav } from '@/components/dashboard/top-nav';
 import { PlatformBanner } from '@/components/dashboard/PlatformBanner';
 import { billingApi } from '@/lib/api';
 
+// Pages that should always render regardless of billing status
+const BILLING_EXEMPT_PATHS = ['/dashboard/upgrade', '/dashboard/suspended', '/dashboard/billing'];
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { isAuthenticated, tenant, setAuth, user, token, refreshToken } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const [statusChecked, setStatusChecked] = useState(false);
@@ -26,11 +30,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       return;
     }
 
+    // If already on an exempt page, skip billing check
+    if (BILLING_EXEMPT_PATHS.some(p => pathname?.startsWith(p))) {
+      setStatusChecked(true);
+      return;
+    }
+
     // Check live subscription status from API
     billingApi.getStatus()
       .then((res) => {
         const data = res.data.data;
-        const { planStatus, trialDaysLeft, isTrialing, isActive } = data;
+        const { planStatus, trialDaysLeft } = data;
 
         // Update tenant in store with fresh status
         if (user && tenant && token && refreshToken) {
@@ -44,18 +54,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         // Account suspended
         if (tenant && !data.tenantIsActive) {
           router.push('/dashboard/suspended');
+          setStatusChecked(true);
           return;
         }
 
         // Trial expired — needs to upgrade
         if (planStatus === 'trialing' && trialDaysLeft <= 0) {
           router.push('/dashboard/upgrade');
+          setStatusChecked(true);
           return;
         }
 
         // Subscription canceled or past_due — needs to upgrade
         if (planStatus === 'canceled' || planStatus === 'past_due') {
           router.push('/dashboard/upgrade');
+          setStatusChecked(true);
           return;
         }
 
@@ -65,7 +78,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         // If API fails, allow access (don't block on network error)
         setStatusChecked(true);
       });
-  }, [mounted, isAuthenticated]);
+  }, [mounted, isAuthenticated, pathname]);
 
   if (!mounted || (!statusChecked && isAuthenticated())) {
     return (

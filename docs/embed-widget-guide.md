@@ -23,10 +23,11 @@
    - [Configure your slug](#72-configure-your-slug)
    - [Use shortcodes](#73-use-shortcodes)
    - [Use Gutenberg blocks](#74-use-gutenberg-blocks)
-8. [Payment gateways on your website](#8-payment-gateways-on-your-website)
-9. [Connecting your website to ResortPro](#9-what-happens-in-resortpro-when-a-guest-books)
-10. [Troubleshooting](#10-troubleshooting)
-11. [Quick reference — all snippets](#11-quick-reference)
+8. [Who can access Embed Settings](#8-who-can-access-embed-settings-in-the-dashboard)
+9. [Payment gateways on your website](#9-payment-gateways-on-your-website)
+10. [Connecting your website to ResortPro](#10-what-happens-in-resortpro-when-a-guest-books)
+11. [Troubleshooting](#11-troubleshooting)
+12. [Quick reference — all snippets](#12-quick-reference)
 
 ---
 
@@ -304,7 +305,23 @@ Each block shows a preview placeholder in the editor. The real widget loads on t
 
 ---
 
-## 8. Payment gateways on your website
+## 8. Who can access Embed Settings in the dashboard?
+
+The **Settings → Embed & Widget** page (where you find your slug, download the WordPress plugin, and manage embed options) is accessible to:
+
+| Role | Can access Embed Settings? |
+|------|---------------------------|
+| Owner | ✅ Yes |
+| Manager | ✅ Yes |
+| Developer | ✅ Yes — designed for web developers setting up the widget |
+| All other roles (Receptionist, Marketer, Staff, Partner) | ❌ No |
+
+> **Tip:** If you are hiring a web developer to add the booking widget to your website, give them the **Developer** role. They will only see the Website and Settings pages — nothing else (no bookings, guests, or financial data).  
+> See the full [User Roles & Permissions Guide](./user-roles-guide.md) for details on all roles.
+
+---
+
+## 9. Payment gateways on your website
 
 When a guest completes a booking through the widget, they can pay using the gateways you have enabled in **ResortPro → Settings → Payment Gateways**.
 
