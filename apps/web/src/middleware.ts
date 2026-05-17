@@ -1,26 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Domains that are OUR own platform — skip custom domain logic
-const PLATFORM_DOMAINS = [
+/* ── Platform / infrastructure domains — skip all tenant logic ─────────────
+   These are our own app domains; never treat them as custom/subdomain tenants.
+─────────────────────────────────────────────────────────────────────────── */
+const PLATFORM_DOMAINS = new Set([
   'localhost',
+  'resortpro.site',       // bare apex — landing page / marketing
+  'www.resortpro.site',
+  'app.resortpro.site',   // dashboard app
+  'api.resortpro.site',   // API
   'resortpro.app',
   'www.resortpro.app',
-  'vercel.app',     // preview deploys
-];
+]);
 
-// Cache: customDomain → slug (in-process, resets on cold start)
-// In production you'd use Redis or an edge KV store (Vercel KV, Cloudflare KV)
+/* ── ResortPro subdomain root ───────────────────────────────────────────────
+   <slug>.resortpro.site  →  rewrite to /<slug>
+─────────────────────────────────────────────────────────────────────────── */
+const SUBDOMAIN_BASE = 'resortpro.site';
+
+/* ── Cache: customDomain → slug ─────────────────────────────────────────────
+   In-process Map (resets on cold start).
+   Production upgrade path: replace with Redis / Cloudflare KV.
+─────────────────────────────────────────────────────────────────────────── */
 const domainCache = new Map<string, { slug: string; ts: number }>();
 const CACHE_TTL   = 5 * 60 * 1000; // 5 minutes
 
-async function resolveSlugForDomain(domain: string): Promise<string | null> {
-  // Check in-process cache first
+async function resolveSlugForCustomDomain(domain: string): Promise<string | null> {
   const cached = domainCache.get(domain);
   if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.slug;
 
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-    const res = await fetch(`${apiUrl}/site/domain/${domain}`, { cache: 'no-store' });
+    const res    = await fetch(`${apiUrl}/site/domain/${domain}`, { cache: 'no-store' });
     if (!res.ok) return null;
     const json = await res.json();
     const slug: string | null = json?.data?.slug ?? null;
@@ -31,40 +42,54 @@ async function resolveSlugForDomain(domain: string): Promise<string | null> {
   }
 }
 
+/* ── Paths that always pass through unchanged ───────────────────────────── */
+const SKIP_PREFIXES = ['/_next', '/api', '/auth', '/dashboard', '/admin'];
+
+function isInternalPath(pathname: string): boolean {
+  if (SKIP_PREFIXES.some(p => pathname.startsWith(p))) return true;
+  if (pathname.includes('.')) return true; // static files (.ico, .png, .js…)
+  return false;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Middleware
+═══════════════════════════════════════════════════════════════════════════ */
 export async function middleware(request: NextRequest) {
   const host     = request.headers.get('host') ?? '';
-  const hostname = host.split(':')[0]; // strip port
-
-  // Skip platform domains — normal routing
-  if (PLATFORM_DOMAINS.some(d => hostname === d || hostname.endsWith(`.${d}`))) {
-    return NextResponse.next();
-  }
-
-  // Skip internal paths
+  const hostname = host.split(':')[0]; // strip :port for local dev
   const pathname = request.nextUrl.pathname;
-  if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/api')   ||
-    pathname.startsWith('/auth')  ||
-    pathname.startsWith('/dashboard') ||
-    pathname.includes('.')          // static files (.ico, .png…)
-  ) {
-    return NextResponse.next();
+
+  // 1. Always skip Next.js internals and static files
+  if (isInternalPath(pathname)) return NextResponse.next();
+
+  // 2. Skip exact platform / Vercel domains
+  if (PLATFORM_DOMAINS.has(hostname)) return NextResponse.next();
+  if (hostname.endsWith('.vercel.app')) return NextResponse.next();
+
+  // 3. *.resortpro.site  →  extract subdomain → rewrite to /<slug>
+  if (hostname.endsWith(`.${SUBDOMAIN_BASE}`)) {
+    const subdomain = hostname.slice(0, hostname.length - SUBDOMAIN_BASE.length - 1);
+
+    // Skip empty or multi-level subdomains (e.g. a.b.resortpro.site)
+    if (!subdomain || subdomain.includes('.')) return NextResponse.next();
+
+    const url    = request.nextUrl.clone();
+    url.pathname = `/${subdomain}`;
+    return NextResponse.rewrite(url);
   }
 
-  // Try to resolve this hostname to a tenant slug
-  const slug = await resolveSlugForDomain(hostname);
-  if (!slug) return NextResponse.next(); // unknown domain — pass through
+  // 4. Custom domain (e.g. sunsetresort.com) → look up slug via API
+  const slug = await resolveSlugForCustomDomain(hostname);
+  if (!slug) return NextResponse.next();
 
-  // Rewrite / → /slug, /anything → /slug (the public one-page site)
-  const url   = request.nextUrl.clone();
+  const url    = request.nextUrl.clone();
   url.pathname = `/${slug}`;
   return NextResponse.rewrite(url);
 }
 
 export const config = {
   matcher: [
-    // Run on all paths except Next.js internals and static assets
+    // Match every path except Next.js static files and optimised images
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };
