@@ -15,6 +15,71 @@ import { syncCalendarsForRoom } from '../jobs/ical-sync';
 import { createGuestPaymentLink } from './billing';
 import type { JwtPayload } from '@resort-pro/types';
 
+/* ── Auto-create invoice when a booking is confirmed ────────────────────── */
+async function autoCreateInvoice(bookingId: string, tenantId: string) {
+  try {
+    // Skip if invoice already exists
+    const existing = await prisma.invoice.findFirst({ where: { bookingId } });
+    if (existing) return;
+
+    const booking = await prisma.booking.findUniqueOrThrow({
+      where: { id: bookingId },
+      include: {
+        guest: true, room: true,
+        invoiceExtras: true,
+        bookingPackages: { include: { package: true } },
+      },
+    });
+    const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
+
+    const nights = Math.max(1, Math.ceil(
+      (new Date(booking.checkOut).getTime() - new Date(booking.checkIn).getTime()) / (1000 * 60 * 60 * 24)
+    ));
+
+    const lineItems: { description: string; category: string; quantity: number; unitPrice: number; total: number }[] = [
+      {
+        description: `${booking.room.name} — ${nights} night${nights > 1 ? 's' : ''} (${new Date(booking.checkIn).toLocaleDateString()} → ${new Date(booking.checkOut).toLocaleDateString()})`,
+        category: 'ROOM',
+        quantity: nights,
+        unitPrice: booking.room.basePrice,
+        total: booking.room.basePrice * nights,
+      },
+    ];
+
+    booking.invoiceExtras.forEach(e => {
+      const amt = Number(e.amount);
+      lineItems.push({ description: e.description, category: 'SERVICE', quantity: e.quantity, unitPrice: amt, total: e.quantity * amt });
+    });
+    booking.bookingPackages.forEach(bp => {
+      lineItems.push({ description: bp.package.name, category: 'SERVICE', quantity: 1, unitPrice: bp.price, total: bp.price });
+    });
+
+    const taxRate  = tenant.taxRate ?? 0;
+    const subtotal = lineItems.reduce((s, i) => s + i.total, 0);
+    const taxAmt   = Math.round(subtotal * (taxRate / 100) * 100) / 100;
+    const total    = subtotal + taxAmt;
+
+    // Generate invoice number
+    const year  = new Date().getFullYear();
+    const count = await prisma.invoice.count({ where: { tenantId } });
+    const invoiceNumber = `INV-${year}-${String(count + 1).padStart(4, '0')}`;
+
+    await prisma.invoice.create({
+      data: {
+        invoiceNumber, tenantId, bookingId,
+        guestName:  `${booking.guest.firstName} ${booking.guest.lastName}`,
+        guestEmail: booking.guest.email ?? undefined,
+        guestPhone: booking.guest.phone ?? undefined,
+        status: 'DRAFT',
+        subtotal, taxRate, taxAmount: taxAmt, discountAmt: 0, total,
+        items: { create: lineItems },
+      },
+    });
+  } catch {
+    // Non-critical — don't fail booking creation
+  }
+}
+
 const createBookingSchema = z.object({
   roomId: z.string().uuid(),
   guestId: z.string().uuid().optional(),
@@ -329,6 +394,9 @@ export async function bookingRoutes(app: FastifyInstance) {
       if (!body.skipEmail) {
         sendBookingConfirmation(booking.id).catch(() => {});
       }
+
+      // Auto-generate invoice draft (fire-and-forget)
+      autoCreateInvoice(booking.id, tenantId).catch(() => {});
 
       return reply.status(201).send(ok(booking, 'Booking created'));
     },

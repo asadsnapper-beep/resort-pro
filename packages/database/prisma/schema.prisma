@@ -368,6 +368,8 @@ model Tenant {
   featureFlags     TenantFeatureFlag[]
   slaAgreement     SlaAgreement?
   invoiceExtras        InvoiceExtra[]
+  invoices             Invoice[]
+  invoicePayments      InvoicePayment[]
   ratePlans            RatePlan[]
   emailSettings        EmailSettings?
   maintenanceTickets   MaintenanceTicket[]
@@ -593,6 +595,7 @@ model Booking {
   supportTickets SupportTicket[]
   invoiceExtras  InvoiceExtra[]
   bookingPackages BookingPackage[]
+  invoice        Invoice?
 
   @@index([tenantId])
   @@index([checkIn, checkOut])
@@ -636,6 +639,101 @@ model InvoiceExtra {
   @@index([tenantId])
   @@index([bookingId])
   @@map("invoice_extras")
+}
+
+// ── Invoice System ───────────────────────────────────────────────────────────
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  PARTIAL
+  OVERDUE
+  CANCELLED
+}
+
+enum InvoiceItemCategory {
+  ROOM
+  FOOD
+  SERVICE
+  LAUNDRY
+  MINIBAR
+  TAX
+  DISCOUNT
+  OTHER
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  invoiceNumber String        @unique   // INV-2026-0001 (auto-generated)
+  tenantId      String
+  bookingId     String?       @unique   // one invoice per booking
+
+  // Guest info snapshot
+  guestName     String
+  guestEmail    String?
+  guestPhone    String?
+
+  status        InvoiceStatus @default(DRAFT)
+
+  // Financials
+  subtotal      Float         @default(0)
+  taxRate       Float         @default(0)   // percentage e.g. 15 = 15%
+  taxAmount     Float         @default(0)
+  discountAmt   Float         @default(0)
+  discountNote  String?
+  total         Float         @default(0)
+
+  // Payment tracking
+  paidAmount    Float         @default(0)
+  dueDate       DateTime?
+  notes         String?
+
+  // Relations
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  booking       Booking?       @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  items         InvoiceItem[]
+  payments      InvoicePayment[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String              @id @default(uuid())
+  invoiceId   String
+  description String
+  category    InvoiceItemCategory @default(OTHER)
+  quantity    Float               @default(1)
+  unitPrice   Float
+  total       Float               // quantity × unitPrice (pre-computed)
+
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("invoice_items")
+}
+
+model InvoicePayment {
+  id        String        @id @default(uuid())
+  invoiceId String
+  tenantId  String
+  amount    Float
+  method    PaymentMethod @default(CASH)
+  reference String?
+  note      String?
+  paidAt    DateTime      @default(now())
+
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([tenantId])
+  @@map("invoice_payments")
 }
 
 model MaintenanceTicket {

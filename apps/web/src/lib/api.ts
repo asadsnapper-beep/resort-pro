@@ -317,3 +317,20 @@ export const externalCalendarsApi = {
   status: (id: string) => api.get(`/external-calendars/${id}/status`),
   testUrl: (url: string) => api.post('/external-calendars/test-url', { url }),
 };
+
+// ── Invoice API ───────────────────────────────────────────────────────────────
+export const invoiceApi = {
+  list:           (params?: Record<string, string>) => api.get('/invoices', { params }),
+  stats:          () => api.get('/invoices/stats'),
+  get:            (id: string)  => api.get(`/invoices/${id}`),
+  fromBooking:    (bookingId: string) => api.post(`/invoices/from-booking/${bookingId}`),
+  create:         (data: unknown) => api.post('/invoices', data),
+  update:         (id: string, data: unknown) => api.patch(`/invoices/${id}`, data),
+  addItem:        (id: string, data: unknown) => api.post(`/invoices/${id}/items`, data),
+  updateItem:     (id: string, itemId: string, data: unknown) => api.patch(`/invoices/${id}/items/${itemId}`, data),
+  deleteItem:     (id: string, itemId: string) => api.delete(`/invoices/${id}/items/${itemId}`),
+  recordPayment:  (id: string, data: unknown) => api.post(`/invoices/${id}/payment`, data),
+  send:           (id: string)  => api.post(`/invoices/${id}/send`),
+  pdfUrl:         (id: string)  => `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/invoices/${id}/pdf`,
+  delete:         (id: string)  => api.delete(`/invoices/${id}`),
+};

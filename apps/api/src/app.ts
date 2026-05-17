@@ -38,6 +38,7 @@ import { loyaltyRoutes } from './routes/loyalty';
 import { externalCalendarRoutes } from './routes/externalCalendars'
 import { paymentRoutes } from './routes/payments'
 import { expenseRoutes } from './routes/expenses';
+import { invoicesRoutes } from './routes/invoices';
 import { embedRoutes } from './routes/embed';
 import { uploadRoutes } from './routes/upload';
 import { startPreArrivalCron } from './jobs/pre-arrival-reminder';
@@ -187,7 +188,8 @@ export async function buildApp() {
   await app.register(loyaltyRoutes, { prefix: '/api/loyalty' });
   await app.register(externalCalendarRoutes, { prefix: '/api/external-calendars' });
   await app.register(paymentRoutes, { prefix: '/api/payments' });
-  await app.register(expenseRoutes, { prefix: '/api/expenses' });
+  await app.register(expenseRoutes,   { prefix: '/api/expenses' });
+  await app.register(invoicesRoutes,  { prefix: '/api/invoices' });
   await app.register(embedRoutes,   { prefix: '/embed' });
   await app.register(uploadRoutes,  { prefix: '/api/upload' });
 

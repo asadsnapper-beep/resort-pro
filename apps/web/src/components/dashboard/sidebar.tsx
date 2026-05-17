@@ -7,7 +7,7 @@ import {
   Sparkles, ClipboardList, UtensilsCrossed, ShoppingBag,
   Package, Ticket, Globe, Bell, Settings, LogOut, Mail,
   CreditCard, BarChart2, LayoutGrid, Tags, Wrench, FileBarChart2,
-  Gift, UsersRound, Star, Link2, Receipt, ChevronDown, LifeBuoy,
+  Gift, UsersRound, Star, Link2, Receipt, ChevronDown, LifeBuoy, FileText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
@@ -52,6 +52,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard',            label: 'Dashboard',       icon: LayoutDashboard, group: 'Overview' },
   { href: '/dashboard/analytics',  label: 'Analytics',       icon: BarChart2,       group: 'Overview',
     roles: ['OWNER', 'MANAGER', 'PARTNER', 'MARKETER'] },
+  { href: '/dashboard/invoices',   label: 'Invoices',        icon: FileText,        group: 'Overview',
+    roles: ['OWNER', 'MANAGER'] },
   { href: '/dashboard/expenses',   label: 'Expenses',        icon: Receipt,         group: 'Overview',
     roles: ['OWNER', 'MANAGER'] },
   { href: '/dashboard/reports',    label: 'Daily Reports',   icon: FileBarChart2,   group: 'Overview',

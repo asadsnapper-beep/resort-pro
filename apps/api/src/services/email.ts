@@ -66,11 +66,13 @@ export async function sendEmail({
   subject,
   html,
   replyTo,
+  attachments,
 }: {
   to: string;
   subject: string;
   html: string;
   replyTo?: string;
+  attachments?: { filename: string; content: Buffer; contentType: string }[];
 }): Promise<{ id: string | null; error: string | null }> {
   try {
     const { data, error } = await resend.emails.send({
@@ -79,6 +81,11 @@ export async function sendEmail({
       subject,
       html,
       replyTo,
+      attachments: attachments?.map(a => ({
+        filename:    a.filename,
+        content:     a.content,
+        contentType: a.contentType,
+      })),
     });
     if (error) return { id: null, error: error.message };
     return { id: data?.id ?? null, error: null };

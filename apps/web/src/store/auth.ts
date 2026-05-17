@@ -10,6 +10,8 @@ interface Tenant {
   planStatus?: string;
   trialEndsAt?: string | null;
   isActive?: boolean;
+  currency?: string;
+  taxRate?: number;
 }
 
 interface AuthState {
