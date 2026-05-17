@@ -6,7 +6,7 @@ import type { ResortData } from '@/components/themes/types';
 async function fetchResortData(slug: string): Promise<ResortData | null> {
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/site/${slug}`, {
-      next: { revalidate: 60 }, // ISR: revalidate every 60s
+      next: { revalidate: 60 },
     });
     if (!res.ok) return null;
     const json = await res.json();
@@ -19,7 +19,6 @@ async function fetchResortData(slug: string): Promise<ResortData | null> {
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const data = await fetchResortData(params.slug);
   if (!data) return { title: 'Resort Not Found' };
-
   return {
     title: data.website?.seoTitle || data.tenant.name,
     description: data.website?.seoDescription || `Welcome to ${data.tenant.name}`,
@@ -31,13 +30,31 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-export default async function ResortWebsitePage({ params }: { params: { slug: string } }) {
+export default async function ResortWebsitePage({
+  params,
+  searchParams,
+}: {
+  params: { slug: string };
+  searchParams: { preview?: string };
+}) {
   const data = await fetchResortData(params.slug);
 
-  if (!data || !data.website) {
-    notFound();
-  }
+  if (!data || !data.website) notFound();
 
-  const ThemeComponent = getTheme(data.website?.templateId);
-  return <ThemeComponent data={data} />;
+  // ?preview=themeKey → show that theme without saving
+  const themeKey = searchParams?.preview || data.website?.templateId;
+  const ThemeComponent = getTheme(themeKey);
+
+  return (
+    <>
+      {/* Preview mode banner */}
+      {searchParams?.preview && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-3 bg-gray-900/95 backdrop-blur-sm text-white text-sm px-5 py-2.5 rounded-full shadow-xl border border-gray-700">
+          <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+          Preview mode — <strong>{themeKey}</strong> theme
+        </div>
+      )}
+      <ThemeComponent data={data} />
+    </>
+  );
 }

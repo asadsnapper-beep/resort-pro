@@ -136,8 +136,10 @@ export const adminEndpoints = {
   // Themes
   getThemes: () => adminApi.get('/themes'),
   updateTheme: (key: string, data: {
-    name: string; description?: string; previewImage?: string;
-    isActive?: boolean; isPremium?: boolean; sortOrder?: number;
+    name?: string; description?: string; previewImage?: string;
+    author?: string; version?: string; tags?: string[];
+    isActive?: boolean; isPremium?: boolean; isDefault?: boolean;
+    requiredPlan?: string; sortOrder?: number;
   }) => adminApi.put(`/themes/${key}`, data),
   toggleTheme: (key: string) => adminApi.patch(`/themes/${key}/toggle`),
 };
