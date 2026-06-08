@@ -1,0 +1,94 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ResortPro — Staging (Local Server / Portainer)
+#
+# এই file টি dev branch push হলে GitHub Actions দিয়ে Portainer-এ deploy হবে।
+# Infrastructure (postgres, redis) backend stack থেকে আলাদা network দিয়ে connect।
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: resortpro-staging
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-resortpro}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-resortpro_staging}
+      POSTGRES_DB: ${POSTGRES_DB:-resortpro_staging}
+    volumes:
+      - postgres_staging_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-resortpro}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_staging_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ── API (Fastify) ────────────────────────────────────────────────────────────
+  api:
+    image: ghcr.io/asadsnapper-beep/resort-pro-api:dev
+    restart: unless-stopped
+    ports:
+      - '4001:4000'
+    environment:
+      NODE_ENV: staging
+      PORT: 4000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://${POSTGRES_USER:-resortpro}:${POSTGRES_PASSWORD:-resortpro_staging}@postgres:5432/${POSTGRES_DB:-resortpro_staging}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-staging_jwt_secret_change_me}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CORS_ORIGIN: ${WEB_URL:-http://192.168.0.138:3001}
+      APP_DOMAIN: ${APP_DOMAIN:-192.168.0.138}
+      APP_IP: ${APP_IP:-192.168.0.138}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      SUPER_ADMIN_EMAILS: ${SUPER_ADMIN_EMAILS:-asadsnapper@gmail.com}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_STARTER: ${STRIPE_PRICE_STARTER:-}
+      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
+      STRIPE_PRICE_ENTERPRISE: ${STRIPE_PRICE_ENTERPRISE:-}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://192.168.0.138:3001}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:4000/health || exit 1']
+      interval: 15s
+      timeout: 10s
+      start_period: 40s
+      retries: 5
+
+  # ── Web (Next.js) ────────────────────────────────────────────────────────────
+  web:
+    image: ghcr.io/asadsnapper-beep/resort-pro-web:dev
+    restart: unless-stopped
+    ports:
+      - '3001:3000'
+    environment:
+      NODE_ENV: staging
+      NEXT_PUBLIC_API_URL: ${API_URL:-http://192.168.0.138:4001}
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres_staging_data:
+  redis_staging_data:
