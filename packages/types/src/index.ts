@@ -2,7 +2,7 @@
 export type UserRole =
   | 'OWNER'
   | 'MANAGER'
-  | 'PARTNER'
+  | 'SHAREHOLDER'
   | 'RECEPTIONIST'
   | 'MARKETER'
   | 'DEVELOPER'

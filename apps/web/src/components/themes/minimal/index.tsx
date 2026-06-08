@@ -9,10 +9,12 @@ import {
   ContactSection, FooterSection,
 } from './sections'
 import { WhatsAppButton } from '../_widgets/SocialLinks'
+import { MenuWidget } from '../_widgets'
 
 const NAV_ITEMS = [
   { id: 'about',        label: 'About' },
   { id: 'rooms',        label: 'Rooms' },
+  { id: 'menu',         label: 'Menu' },
   { id: 'availability', label: 'Availability' },
   { id: 'booking',      label: 'Book' },
   { id: 'contact',      label: 'Contact' },
@@ -122,18 +124,22 @@ export function MinimalTheme({ data }: ThemeProps) {
 
       {/* ── Sections ────────────────────────── */}
       <main>
-        <HeroSection   data={data} scrollTo={scrollTo} />
-        <AboutSection  data={data} />
-        <RoomsSection  data={data} onBookRoom={handleBookRoom} />
-        <AvailabilitySection data={data} onRoomSelect={handleRoomSelect} />
-        <BookingSection
-          data={data}
-          initialCheckIn={calendarCheckIn}
-          initialCheckOut={calendarCheckOut}
-          initialRoomId={calendarRoomId}
-        />
-        <ContactSection data={data} />
-        <FooterSection  data={data} scrollTo={scrollTo} />
+        {(() => {
+          const h = new Set(website.hiddenSections ?? [])
+          const show = (id: string) => !h.has(id)
+          return (
+            <>
+              <HeroSection   data={data} scrollTo={scrollTo} />
+              {show('about')        && <AboutSection  data={data} />}
+              <RoomsSection  data={data} onBookRoom={handleBookRoom} />
+              {show('menu')         && <MenuWidget slug={tenant.slug} primaryColor={primary} accentColor={website.accentColor || '#3b82f6'} currency={tenant.currency} />}
+              {show('availability') && <AvailabilitySection data={data} onRoomSelect={handleRoomSelect} />}
+              <BookingSection data={data} initialCheckIn={calendarCheckIn} initialCheckOut={calendarCheckOut} initialRoomId={calendarRoomId} />
+              {show('contact')      && <ContactSection data={data} />}
+              <FooterSection  data={data} scrollTo={scrollTo} />
+            </>
+          )
+        })()}
       </main>
       <WhatsAppButton whatsappNumber={data.website?.whatsappNumber} />
     </div>

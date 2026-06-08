@@ -199,9 +199,10 @@ async function main() {
 
   // ── Default Themes ─────────────────────────────────────────────────────────
   const defaultThemes = [
-    { key: 'luxe',    name: 'Luxe Gold',      description: 'Elegant luxury design with gold accents',                sortOrder: 1 },
-    { key: 'minimal', name: 'Minimal Clean',   description: 'Clean modern design with focus on whitespace',           sortOrder: 2 },
-    { key: 'coastal', name: 'Coastal Breeze',  description: 'Ocean-inspired design for beach and coastal properties', sortOrder: 3 },
+    { key: 'luxe',                    name: 'Luxe Gold',              description: 'Elegant luxury design with gold accents',                           sortOrder: 1 },
+    { key: 'minimal',                 name: 'Minimal Clean',          description: 'Clean modern design with focus on whitespace',                        sortOrder: 2 },
+    { key: 'coastal',                 name: 'Coastal Breeze',         description: 'Ocean-inspired design for beach and coastal properties',               sortOrder: 3 },
+    { key: 'tea-garden-eco-resort',   name: 'Tea Garden Eco Resort',  description: 'Lush green theme for eco resorts nestled in tea gardens and hillsides', sortOrder: 4, isPremium: true, tags: ['Eco', 'Green', 'Nature', 'Hillside'] },
   ];
 
   for (const theme of defaultThemes) {

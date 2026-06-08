@@ -1,7 +1,8 @@
 'use client'
-import { Bed, Users } from 'lucide-react'
+import { Users } from 'lucide-react'
 import type { ResortData, ResortRoom } from '../../types'
 import { fmt, AmenityIcon } from '../utils'
+import { roomImg } from '../../_utils/images'
 
 interface RoomsSectionProps {
   data: ResortData
@@ -39,15 +40,8 @@ export function RoomsSection({ data, onViewRoom, onBookRoom }: RoomsSectionProps
               >
                 {/* Image */}
                 <div className="relative h-56 overflow-hidden">
-                  {room.images[0] ? (
-                    <img src={room.images[0]} alt={room.name}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center"
-                      style={{ backgroundColor: `${primary}15` }}>
-                      <Bed className="h-12 w-12 opacity-30" style={{ color: primary }} />
-                    </div>
-                  )}
+                  <img src={roomImg(room.images[0], rooms.indexOf(room))} alt={room.name}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
 
                   {/* Room type badge */}
                   <div className="absolute top-4 left-4">

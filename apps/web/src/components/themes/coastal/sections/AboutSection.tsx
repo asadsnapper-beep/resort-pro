@@ -1,5 +1,6 @@
 'use client'
 import type { ResortData } from '../../types'
+import { aboutImg } from '../../_utils/images'
 
 interface AboutSectionProps {
   data: ResortData
@@ -57,14 +58,7 @@ export function AboutSection({ data }: AboutSectionProps) {
               />
               {/* Image */}
               <div className="relative h-80 w-80 rounded-full overflow-hidden ring-4 ring-cyan-400 shadow-2xl">
-                {website?.aboutImage ? (
-                  <img src={website.aboutImage} alt="About" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center"
-                    style={{ background: `linear-gradient(135deg, ${primary}30, ${accent}20)` }}>
-                    <p className="text-slate-400 text-sm">About image</p>
-                  </div>
-                )}
+                <img src={aboutImg(website?.aboutImage)} alt="About" className="w-full h-full object-cover" />
               </div>
               {/* Floating badge */}
               <div

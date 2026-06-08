@@ -1,6 +1,7 @@
 'use client'
 import { Star } from 'lucide-react'
 import type { ResortData } from '../../types'
+import { aboutImg } from '../../_utils/images'
 
 interface AboutSectionProps {
   data: ResortData
@@ -40,14 +41,7 @@ export function AboutSection({ data }: AboutSectionProps) {
           </div>
 
           <div className="relative">
-            {website?.aboutImage ? (
-              <img src={website.aboutImage} alt="About" className="w-full h-96 object-cover rounded-3xl shadow-2xl" />
-            ) : (
-              <div className="w-full h-96 rounded-3xl flex items-center justify-center"
-                style={{ background: `linear-gradient(135deg, ${primary}20, ${accent}20)` }}>
-                <p className="text-gray-400">About image</p>
-              </div>
-            )}
+            <img src={aboutImg(website?.aboutImage)} alt="About" className="w-full h-96 object-cover rounded-3xl shadow-2xl" />
             {/* Floating badge */}
             <div className="absolute -bottom-6 -left-6 rounded-2xl p-4 shadow-xl bg-white">
               <div className="flex items-center gap-2">

@@ -104,7 +104,7 @@ const PLANS = [
     staff: '3 users',
     features: ['Room & booking management', 'bKash & Stripe payments', 'Guest CRM', 'Embed widgets', '24/7 email support'],
     cta: 'Start free trial',
-    ctaHref: '/auth/register',
+    ctaHref: '/auth/register?plan=STARTER',
     highlight: false,
   },
   {
@@ -114,7 +114,7 @@ const PLANS = [
     staff: '10 users',
     features: ['Everything in Starter', 'Advanced analytics & reports', 'Rate plans & channel sync', 'Restaurant & room service', 'Priority support'],
     cta: 'Start free trial',
-    ctaHref: '/auth/register',
+    ctaHref: '/auth/register?plan=PROFESSIONAL',
     highlight: true,
   },
   {
@@ -396,7 +396,7 @@ export default function HomePage() {
               Sign in
             </Link>
             <Link
-              href="/auth/register"
+              href="/plans"
               className="rounded-lg bg-gold-500 px-5 py-2.5 text-sm font-semibold text-resort-900 transition-all hover:bg-gold-400 shadow-sm"
             >
               Start free trial
@@ -431,7 +431,7 @@ export default function HomePage() {
               ))}
               <div className="mt-2 flex flex-col gap-3 border-t border-gray-100 pt-4">
                 <Link href="/auth/login" className="text-center text-sm font-medium text-gray-700">Sign in</Link>
-                <Link href="/auth/register" className="rounded-lg bg-gold-500 py-2.5 text-center text-sm font-semibold text-resort-900">
+                <Link href="/plans" className="rounded-lg bg-gold-500 py-2.5 text-center text-sm font-semibold text-resort-900">
                   Start free trial
                 </Link>
               </div>
@@ -480,16 +480,16 @@ export default function HomePage() {
           {/* CTAs */}
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
-              href="/auth/register"
+              href="/plans"
               className="w-full rounded-xl bg-gold-500 px-8 py-4 text-base font-semibold text-resort-900 shadow-lg shadow-gold-500/25 transition-all hover:bg-gold-400 hover:shadow-gold-400/30 sm:w-auto"
             >
               Start free trial →
             </Link>
             <a
-              href="#how-it-works"
+              href="/demo"
               className="w-full rounded-xl border border-white/25 bg-white/10 px-8 py-4 text-base font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20 sm:w-auto"
             >
-              Watch demo
+              Watch demo →
             </a>
           </div>
 
@@ -871,7 +871,7 @@ export default function HomePage() {
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
-              href="/auth/register"
+              href="/plans"
               className="w-full rounded-xl bg-gold-500 px-8 py-4 text-base font-semibold text-resort-900 shadow-lg shadow-gold-500/25 transition-all hover:bg-gold-400 sm:w-auto"
             >
               Start free trial — it's free for 14 days

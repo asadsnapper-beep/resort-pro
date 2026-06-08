@@ -269,6 +269,7 @@ All resource endpoints follow RESTful conventions and require `Authorization: Be
 
 ```bash
 pnpm test              # Unit + integration tests across all apps
+pnpm test:coverage     # Run coverage across all apps
 pnpm test:e2e          # Playwright E2E tests (requires dev server)
 ```
 
@@ -302,6 +303,17 @@ pnpm test:e2e:ui       # Run with UI mode (interactive)
 ---
 
 ## Deployment
+
+### CI / Production readiness
+
+- The repo uses GitHub Actions to build and publish Docker images on `main`.
+- Add a dedicated CI workflow for test + coverage to ensure every PR verifies unit and integration tests before merge.
+- Production readiness includes:
+  - `NODE_ENV=production` and strong JWT secrets
+  - `DATABASE_URL` for production Postgres
+  - `CORS_ORIGIN` / `NEXT_PUBLIC_API_URL` matching deployed web/API domains
+  - `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` for live billing
+  - optional monitoring via logs, alerting, and error tracking
 
 ### Docker Production Build
 

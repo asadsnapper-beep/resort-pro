@@ -7,18 +7,20 @@ import {
   Sparkles, ClipboardList, UtensilsCrossed, ShoppingBag,
   Package, Ticket, Globe, Bell, Settings, LogOut, Mail,
   CreditCard, BarChart2, LayoutGrid, Tags, Wrench, FileBarChart2,
-  Gift, UsersRound, Star, Link2, Receipt, ChevronDown, LifeBuoy, FileText,
+  Gift, UsersRound, Star, Link2, Receipt, ChevronDown, LifeBuoy, FileText, Megaphone,
+  ShieldCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
-import { authApi } from '@/lib/api';
+import { authApi, tenantApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 // ─────────────────────────────────────────────────────────────────
 // Role type
 // ─────────────────────────────────────────────────────────────────
-type Role = 'OWNER' | 'MANAGER' | 'PARTNER' | 'RECEPTIONIST' | 'MARKETER' | 'DEVELOPER' | 'STAFF' | 'GUEST';
+type Role = 'OWNER' | 'MANAGER' | 'SHAREHOLDER' | 'RECEPTIONIST' | 'MARKETER' | 'DEVELOPER' | 'STAFF' | 'GUEST';
 
 // ─────────────────────────────────────────────────────────────────
 // Role badge config
@@ -26,7 +28,7 @@ type Role = 'OWNER' | 'MANAGER' | 'PARTNER' | 'RECEPTIONIST' | 'MARKETER' | 'DEV
 const ROLE_LABELS: Record<Role, { label: string; color: string }> = {
   OWNER:        { label: 'Owner',        color: 'bg-gold-400/20 text-gold-600' },
   MANAGER:      { label: 'Manager',      color: 'bg-resort-100 text-resort-700' },
-  PARTNER:      { label: 'Partner',      color: 'bg-blue-100 text-blue-700' },
+  SHAREHOLDER:  { label: 'Shareholder',  color: 'bg-amber-100 text-amber-700' },
   RECEPTIONIST: { label: 'Receptionist', color: 'bg-emerald-100 text-emerald-700' },
   MARKETER:     { label: 'Marketer',     color: 'bg-purple-100 text-purple-700' },
   DEVELOPER:    { label: 'Developer',    color: 'bg-gray-100 text-gray-600' },
@@ -51,37 +53,39 @@ const NAV_ITEMS: NavItem[] = [
   // ── Overview ──────────────────────────────────────────────
   { href: '/dashboard',            label: 'Dashboard',       icon: LayoutDashboard, group: 'Overview' },
   { href: '/dashboard/analytics',  label: 'Analytics',       icon: BarChart2,       group: 'Overview',
-    roles: ['OWNER', 'MANAGER', 'PARTNER', 'MARKETER'] },
+    roles: ['OWNER', 'MANAGER', 'SHAREHOLDER', 'MARKETER'] },
   { href: '/dashboard/invoices',   label: 'Invoices',        icon: FileText,        group: 'Overview',
-    roles: ['OWNER', 'MANAGER'] },
+    roles: ['OWNER', 'MANAGER', 'SHAREHOLDER', 'RECEPTIONIST'] },
   { href: '/dashboard/expenses',   label: 'Expenses',        icon: Receipt,         group: 'Overview',
-    roles: ['OWNER', 'MANAGER'] },
+    roles: ['OWNER', 'MANAGER', 'SHAREHOLDER'] },
   { href: '/dashboard/reports',    label: 'Daily Reports',   icon: FileBarChart2,   group: 'Overview',
-    roles: ['OWNER', 'MANAGER'] },
+    roles: ['OWNER', 'MANAGER', 'SHAREHOLDER'] },
 
   // ── Rooms & Bookings ──────────────────────────────────────
   { href: '/dashboard/rooms',          label: 'Rooms & Villas',   icon: BedDouble,    group: 'Rooms & Bookings',
-    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'STAFF'] },
   { href: '/dashboard/rate-plans',     label: 'Rate Plans',       icon: Tags,         group: 'Rooms & Bookings',
-    roles: ['OWNER', 'MANAGER'] },
+    roles: ['OWNER', 'MANAGER', 'MARKETER'] },
   { href: '/dashboard/packages',       label: 'Packages',         icon: Gift,         group: 'Rooms & Bookings',
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'MARKETER'] },
+  { href: '/dashboard/front-desk',     label: 'Front Desk',       icon: ClipboardList, group: 'Rooms & Bookings',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
   { href: '/dashboard/bookings',       label: 'Bookings',         icon: CalendarDays, group: 'Rooms & Bookings',
-    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
+    roles: ['OWNER', 'MANAGER', 'SHAREHOLDER', 'RECEPTIONIST'] },
   { href: '/dashboard/calendar',       label: 'Booking Calendar', icon: LayoutGrid,   group: 'Rooms & Bookings',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
   { href: '/dashboard/group-bookings', label: 'Group Bookings',   icon: UsersRound,   group: 'Rooms & Bookings',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
   { href: '/dashboard/channels',       label: 'Channel Sync',     icon: Link2,        group: 'Rooms & Bookings',
-    roles: ['OWNER', 'MANAGER'] },
+    roles: ['OWNER', 'MANAGER', 'DEVELOPER'] },
 
   // ── Guests ────────────────────────────────────────────────
   { href: '/dashboard/guests',   label: 'Guests',          icon: Users, group: 'Guests',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'MARKETER'] },
   { href: '/dashboard/loyalty',  label: 'Loyalty Program', icon: Star,  group: 'Guests',
-    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'MARKETER'] },
   { href: '/dashboard/support',  label: 'Support',         icon: Ticket, group: 'Guests',
-    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'STAFF'] },
 
   // ── Operations ────────────────────────────────────────────
   { href: '/dashboard/staff',        label: 'Staff',         icon: UserCog,        group: 'Operations',
@@ -100,15 +104,23 @@ const NAV_ITEMS: NavItem[] = [
     roles: ['OWNER', 'MANAGER', 'STAFF'] },
 
   // ── Marketing ─────────────────────────────────────────────
-  { href: '/dashboard/crm',     label: 'CRM & Email', icon: Mail,  group: 'Marketing',
+  { href: '/dashboard/offers',    label: 'Offers',         icon: Ticket,    group: 'Marketing',
     roles: ['OWNER', 'MANAGER', 'MARKETER'] },
-  { href: '/dashboard/website', label: 'Website',     icon: Globe, group: 'Marketing',
+  { href: '/dashboard/crm',       label: 'CRM & Email',   icon: Mail,      group: 'Marketing',
+    roles: ['OWNER', 'MANAGER', 'MARKETER'] },
+  { href: '/dashboard/marketing', label: 'SMS Marketing', icon: Megaphone, group: 'Marketing',
+    roles: ['OWNER', 'MANAGER', 'MARKETER'] },
+  { href: '/dashboard/website',   label: 'Website',       icon: Globe,     group: 'Marketing',
     roles: ['OWNER', 'MANAGER', 'MARKETER', 'DEVELOPER'] },
 
   // ── Account ───────────────────────────────────────────────
-  { href: '/dashboard/billing',  label: 'Billing',  icon: CreditCard, group: 'Account',
+  { href: '/dashboard/billing',   label: 'Billing',            icon: CreditCard,  group: 'Account',
     roles: ['OWNER'] },
-  { href: '/dashboard/settings', label: 'Settings', icon: Settings,   group: 'Account',
+  { href: '/dashboard/referrals', label: 'Referrals',          icon: Gift,        group: 'Account',
+    roles: ['OWNER'] },
+  { href: '/dashboard/roles',     label: 'Roles & Permissions', icon: ShieldCheck, group: 'Account',
+    roles: ['OWNER'] },
+  { href: '/dashboard/settings',  label: 'Settings',           icon: Settings,    group: 'Account',
     roles: ['OWNER', 'MANAGER', 'DEVELOPER'] },
 ];
 
@@ -144,9 +156,27 @@ export function Sidebar() {
   const { tenant, user, clearAuth, refreshToken } = useAuthStore();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
+  const { data: modulesRes } = useQuery({
+    queryKey: ['tenant-modules'],
+    queryFn: () => tenantApi.getModules(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const enabledModules: Record<string, boolean> = Object.fromEntries(
+    ((modulesRes?.data?.data ?? []) as { flag: string; enabled: boolean }[])
+      .map((m) => [m.flag, m.enabled])
+  );
+  // Default restaurant to true while loading (avoids flash of hidden nav)
+  const restaurantEnabled = 'restaurant_module' in enabledModules
+    ? enabledModules['restaurant_module']
+    : true;
+
   const role = (user?.role ?? 'STAFF') as Role;
   const roleConfig = ROLE_LABELS[role] ?? ROLE_LABELS.STAFF;
-  const visibleItems = getVisibleItems(role);
+  const visibleItems = getVisibleItems(role).filter((item) => {
+    if (!restaurantEnabled && item.group === 'Restaurant') return false;
+    return true;
+  });
   const grouped = groupItems(visibleItems);
 
   const handleLogout = async () => {

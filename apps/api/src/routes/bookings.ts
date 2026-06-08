@@ -407,8 +407,13 @@ export async function bookingRoutes(app: FastifyInstance) {
     schema: { tags: ['bookings'], summary: 'Check in a guest', security: [{ bearerAuth: [] }] },
     preHandler: requireAuth,
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { tenantId, sub: checkedInByStaff } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
+      const body = z.object({
+        deposit:   z.number().optional(),
+        roomNotes: z.string().optional(),
+        roomId:    z.string().optional(), // override room assignment
+      }).parse(request.body ?? {});
 
       const booking = await prisma.booking.findFirst({ where: { id, tenantId } });
       if (!booking) return reply.status(404).send({ success: false, error: 'Booking not found' });
@@ -416,18 +421,41 @@ export async function bookingRoutes(app: FastifyInstance) {
         return reply.status(400).send({ success: false, error: 'Booking must be confirmed to check in' });
       }
 
+      const roomId = body.roomId ?? booking.roomId;
       const now = new Date();
+
       const [updated] = await Promise.all([
         prisma.booking.update({
           where: { id },
-          data: { status: 'CHECKED_IN', actualCheckIn: now },
+          data: {
+            status:       'CHECKED_IN',
+            actualCheckIn: now,
+            checkedInBy:  checkedInByStaff,
+            roomId,
+            deposit:      body.deposit,
+            roomNotes:    body.roomNotes,
+          },
           include: {
             guest: { select: { firstName: true, lastName: true, email: true, phone: true } },
-            room: { select: { number: true, name: true, type: true } },
+            room:  { select: { number: true, name: true, type: true } },
             payments: { select: { amount: true, method: true, status: true, processedAt: true } },
           },
         }),
-        prisma.room.update({ where: { id: booking.roomId }, data: { status: 'OCCUPIED' } }),
+        prisma.room.update({ where: { id: roomId }, data: { status: 'OCCUPIED' } }),
+        // Record deposit payment if provided
+        ...(body.deposit
+          ? [prisma.payment.create({
+              data: {
+                tenantId,
+                bookingId: id,
+                amount:    body.deposit,
+                method:    'CASH',
+                status:    'PAID',
+                processedAt: now,
+                notes:     'Deposit collected at check-in',
+              },
+            })]
+          : []),
       ]);
 
       return ok(updated, 'Guest checked in');
@@ -439,8 +467,12 @@ export async function bookingRoutes(app: FastifyInstance) {
     schema: { tags: ['bookings'], summary: 'Check out a guest', security: [{ bearerAuth: [] }] },
     preHandler: requireAuth,
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { tenantId, sub: checkedOutByStaff } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
+      const body = z.object({
+        additionalPayment: z.number().optional(), // extra amount collected at checkout
+        paymentMethod:     z.enum(['CASH', 'CARD', 'BANK_TRANSFER']).optional(),
+      }).parse(request.body ?? {});
 
       const booking = await prisma.booking.findFirst({ where: { id, tenantId } });
       if (!booking) return reply.status(404).send({ success: false, error: 'Booking not found' });
@@ -450,50 +482,62 @@ export async function bookingRoutes(app: FastifyInstance) {
 
       const now = new Date();
 
-      // Compute food order total for cost summary
-      const foodTotal = await prisma.foodOrder.aggregate({
-        where: { bookingId: id, status: { notIn: ['CANCELLED'] } },
-        _sum: { totalAmount: true },
-      });
+      const [foodAgg] = await Promise.all([
+        prisma.foodOrder.aggregate({
+          where: { bookingId: id, status: { notIn: ['CANCELLED'] } },
+          _sum: { totalAmount: true },
+        }),
+      ]);
+      const foodTotal = Number(foodAgg._sum.totalAmount ?? 0);
 
-      const [updated] = await Promise.all([
+      const ops: Promise<unknown>[] = [
         prisma.booking.update({
           where: { id },
-          data: { status: 'CHECKED_OUT', actualCheckOut: now },
+          data: { status: 'CHECKED_OUT', actualCheckOut: now, checkedOutBy: checkedOutByStaff },
           include: {
             guest: { select: { firstName: true, lastName: true, email: true, phone: true } },
-            room: { select: { number: true, name: true, type: true } },
+            room:  { select: { number: true, name: true, type: true } },
             payments: { select: { amount: true, method: true, status: true, processedAt: true } },
           },
         }),
         prisma.room.update({ where: { id: booking.roomId }, data: { status: 'CLEANING' } }),
         prisma.housekeepingTask.create({
-          data: {
-            tenantId,
-            roomId: booking.roomId,
-            type: 'CHECKOUT',
-            status: 'PENDING',
-            scheduledDate: new Date(),
-          },
+          data: { tenantId, roomId: booking.roomId, type: 'CHECKOUT', status: 'PENDING', scheduledDate: now },
         }),
-      ]);
+      ];
+
+      // Record additional checkout payment if provided
+      if (body.additionalPayment && body.additionalPayment > 0) {
+        const method = (body.paymentMethod ?? 'CASH') as 'CASH' | 'CARD' | 'BANK_TRANSFER';
+        ops.push(
+          prisma.payment.create({
+            data: { tenantId, bookingId: id, amount: body.additionalPayment, method, status: 'PAID', processedAt: now },
+          }),
+          prisma.booking.update({
+            where: { id },
+            data: { paidAmount: { increment: body.additionalPayment } },
+          }),
+        );
+      }
+
+      const [updated] = await Promise.all(ops) as Awaited<typeof ops>;
 
       const nights = Math.ceil((booking.checkOut.getTime() - booking.checkIn.getTime()) / 86_400_000);
+      const grandTotal = Number(booking.totalAmount) + foodTotal;
+      const paidAfter  = Number(booking.paidAmount) + (body.additionalPayment ?? 0);
 
-      // Send checkout + invoice email (fire-and-forget)
       sendCheckoutEmail(id).catch(() => {});
-      // Award loyalty points (fire-and-forget)
       awardCheckoutPoints(id).catch(() => {});
 
       return ok({
-        ...updated,
+        ...(updated as object),
         checkoutSummary: {
           nights,
-          roomTotal: Number(booking.totalAmount),
-          foodTotal: Number(foodTotal._sum.totalAmount ?? 0),
-          grandTotal: Number(booking.totalAmount) + Number(foodTotal._sum.totalAmount ?? 0),
-          paidAmount: Number(booking.paidAmount),
-          balanceDue: Math.max(0, Number(booking.totalAmount) - Number(booking.paidAmount)),
+          roomTotal:  Number(booking.totalAmount),
+          foodTotal,
+          grandTotal,
+          paidAmount: paidAfter,
+          balanceDue: Math.max(0, grandTotal - paidAfter),
         },
       }, 'Guest checked out');
     },
@@ -842,6 +886,109 @@ export async function bookingRoutes(app: FastifyInstance) {
       await sendEmail({ to: booking.guest.email, subject: `Invoice ${invoiceNumber} — ${booking.tenant.name}`, html });
 
       return reply.send({ success: true, data: { invoiceNumber, sentTo: booking.guest.email } });
+    },
+  });
+
+  // POST /api/bookings/walk-in — create booking + immediately check in
+  app.post('/walk-in', {
+    schema: { tags: ['bookings'], summary: 'Create walk-in booking and check in', security: [{ bearerAuth: [] }] },
+    preHandler: requireAuth,
+    handler: async (request, reply) => {
+      const { tenantId, sub: staffId } = request.user as JwtPayload;
+      const body = z.object({
+        guestName:     z.string().min(1),
+        guestPhone:    z.string().optional(),
+        adults:        z.number().int().min(1).default(1),
+        children:      z.number().int().min(0).default(0),
+        roomId:        z.string(),
+        checkIn:       z.string(), // YYYY-MM-DD
+        checkOut:      z.string(), // YYYY-MM-DD
+        ratePerNight:  z.number().optional(), // override room base price
+        discount:      z.number().min(0).max(100).default(0), // percentage
+        paymentMethod: z.enum(['CASH', 'CARD', 'BANK_TRANSFER', 'LATER']).default('CASH'),
+        advanceAmount: z.number().optional(),
+        roomNotes:     z.string().optional(),
+      }).parse(request.body);
+
+      const checkInDate  = new Date(body.checkIn);
+      const checkOutDate = new Date(body.checkOut);
+      if (checkOutDate <= checkInDate) {
+        return reply.status(400).send({ success: false, error: 'Check-out must be after check-in' });
+      }
+
+      const room = await prisma.room.findFirst({ where: { id: body.roomId, tenantId, isActive: true } });
+      if (!room) return reply.status(404).send({ success: false, error: 'Room not found' });
+
+      // Sync iCal before booking if external calendars exist
+      const externalCalendars = await prisma.externalCalendar.findMany({
+        where: { roomId: body.roomId, tenantId, isActive: true },
+      });
+      if (externalCalendars.length > 0) await syncCalendarsForRoom(body.roomId, externalCalendars);
+
+      const conflict = await prisma.booking.findFirst({
+        where: {
+          tenantId, roomId: body.roomId,
+          status: { in: ['CONFIRMED', 'CHECKED_IN', 'PENDING'] },
+          checkIn: { lt: checkOutDate }, checkOut: { gt: checkInDate },
+        },
+      });
+      if (conflict) return reply.status(409).send({ success: false, error: 'Room is not available for these dates' });
+
+      // Create or find guest
+      const [firstName, ...rest] = body.guestName.trim().split(' ');
+      const lastName = rest.join(' ') || '-';
+      const email    = `walkin-${Date.now()}@resortpro.local`;
+      const guest    = await prisma.guest.create({
+        data: { tenantId, firstName, lastName, email, phone: body.guestPhone },
+      });
+
+      const nights      = calculateNights(checkInDate, checkOutDate);
+      const rate        = body.ratePerNight ?? Number(room.basePrice);
+      const rawTotal    = rate * nights;
+      const totalAmount = rawTotal * (1 - body.discount / 100);
+      const now         = new Date();
+
+      const booking = await prisma.booking.create({
+        data: {
+          tenantId,
+          roomId:       body.roomId,
+          guestId:      guest.id,
+          checkIn:      checkInDate,
+          checkOut:     checkOutDate,
+          adults:       body.adults,
+          children:     body.children,
+          totalAmount,
+          confirmationNo: generateConfirmationNo(),
+          status:       'CHECKED_IN',
+          actualCheckIn: now,
+          checkedInBy:  staffId,
+          walkIn:       true,
+          roomNotes:    body.roomNotes,
+          source:       'WALK_IN',
+        },
+        include: {
+          guest: { select: { firstName: true, lastName: true, phone: true } },
+          room:  { select: { number: true, name: true, type: true } },
+        },
+      });
+
+      await prisma.room.update({ where: { id: body.roomId }, data: { status: 'OCCUPIED' } });
+
+      // Record advance payment
+      if (body.paymentMethod !== 'LATER' && body.advanceAmount && body.advanceAmount > 0) {
+        const method = (body.paymentMethod ?? 'CASH') as 'CASH' | 'CARD' | 'BANK_TRANSFER';
+        await prisma.payment.create({
+          data: { tenantId, bookingId: booking.id, amount: body.advanceAmount, method, status: 'PAID', processedAt: now },
+        });
+        await prisma.booking.update({
+          where: { id: booking.id },
+          data: { paidAmount: body.advanceAmount, paymentStatus: body.advanceAmount >= totalAmount ? 'PAID' : 'PARTIAL' },
+        });
+      }
+
+      autoCreateInvoice(booking.id, tenantId).catch(() => {});
+
+      return reply.status(201).send({ success: true, data: booking, message: 'Walk-in guest checked in' });
     },
   });
 }

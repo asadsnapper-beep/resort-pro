@@ -88,3 +88,102 @@ Expo Router (file-based routing)
 ├── React Query (same pattern as web)
 └── Push notifications via expo-notifications
 ```
+
+## System Architecture Diagrams
+
+```mermaid
+flowchart LR
+  Web[Web App<br/>(Next.js)]
+  Mobile[Mobile App<br/>(Expo)]
+  Embed[Embed Widget]
+  API[API Service<br/>(Fastify)]
+  DB[PostgreSQL]
+  Redis[Redis]
+  Stripe[Stripe]
+  Email[Resend / SMTP]
+
+  Web -->|REST / GraphQL-style REST| API
+  Mobile -->|REST| API
+  Embed -->|REST| API
+  API --> DB
+  API --> Redis
+  API --> Stripe
+  API --> Email
+```
+
+## Sequence Flows
+
+### Login flow
+
+```mermaid
+sequenceDiagram
+  participant User
+  participant Web
+  participant API
+  participant DB
+
+  User->>Web: Submit credentials
+  Web->>API: POST /auth/login
+  API->>DB: Query user + tenant
+  DB-->>API: User record
+  API-->>Web: Access token + refresh token
+  Web->>User: Store auth state
+```
+
+### Booking creation flow
+
+```mermaid
+sequenceDiagram
+  participant Guest
+  participant Web
+  participant API
+  participant DB
+
+  Guest->>Web: Fill booking form
+  Web->>API: POST /api/bookings
+  API->>DB: Create booking record
+  API->>Stripe: Create payment intent
+  Stripe-->>API: Payment intent
+  API-->>Web: Booking confirmation
+```
+
+## CI / Production Readiness
+
+The repo already has a Docker build workflow for main branch images. For stronger production readiness, add a dedicated CI workflow that:
+
+- installs workspace dependencies using `pnpm install`
+- runs `pnpm test` for unit + integration coverage
+- runs `pnpm test:coverage` for coverage reporting
+- runs `pnpm build` to verify production build output
+- optionally publishes artifacts or coverage reports
+
+### Monitoring and observability
+
+Recommended production observability:
+
+- structured logs from Fastify and `pino`
+- error tracking / exception alerts via Sentry or similar
+- request and uptime monitoring via a lightweight health endpoint
+- Redis and Postgres availability checks in Docker Compose or deployment platform
+- log retention and search for API errors and webhook failures
+
+### Billing and payment readiness
+
+Production billing should include:
+
+- secret environment variables: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_*`
+- payment webhook validation and retry logic for Stripe events
+- pricing plans and feature gating in the tenant model
+- explicit fallback for manual / cash payments when gateway is unavailable
+- invoice and expense reconciliation for revenue vs cost tracking
+
+### Deployment checklist
+
+- `NODE_ENV=production`
+- `JWT_SECRET` and `JWT_REFRESH_SECRET` set securely
+- `DATABASE_URL` points to a managed Postgres instance
+- `CORS_ORIGIN` / `NEXT_PUBLIC_API_URL` match deployed domains
+- `RESEND_API_KEY` configured for email delivery
+- `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` configured for live payments
+- health check endpoint available for uptime probes
+- automatic DB migration on deploy via `prisma migrate deploy`

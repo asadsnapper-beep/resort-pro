@@ -127,27 +127,25 @@ export function LuxeTheme({ data }: ThemeProps) {
       </nav>
 
       {/* ── Sections ──────────────────────────────────────── */}
-      <HeroSection data={data} scrollTo={scrollTo} />
-      <AboutSection data={data} />
-      <RoomsSection
-        data={data}
-        onViewRoom={setSelectedRoom}
-        onBookRoom={setBookingRoom}
-      />
-
-      {/* Menu widget */}
-      <MenuWidget
-        slug={tenant.slug}
-        primaryColor={primary}
-        accentColor={accent}
-        currency={tenant.currency}
-      />
-
-      <GallerySection data={data} />
-      <TestimonialsSection data={data} />
+      {(() => {
+        const h = new Set(website.hiddenSections ?? [])
+        const show = (id: string) => !h.has(id)
+        return (
+          <>
+            <HeroSection data={data} scrollTo={scrollTo} />
+            {show('about') && <AboutSection data={data} />}
+            <RoomsSection data={data} onViewRoom={setSelectedRoom} onBookRoom={setBookingRoom} />
+            {show('menu') && (
+              <MenuWidget slug={tenant.slug} primaryColor={primary} accentColor={accent} currency={tenant.currency} />
+            )}
+            {show('gallery') && <GallerySection data={data} />}
+            {show('testimonials') && <TestimonialsSection data={data} />}
+          </>
+        )
+      })()}
 
       {/* Availability Calendar */}
-      <section id="availability" className="py-20 bg-stone-50">
+      {!(website.hiddenSections ?? []).includes('availability') && <section id="availability" className="py-20 bg-stone-50">
         <div className="max-w-4xl mx-auto px-6">
           <div className="text-center mb-10">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] mb-3" style={{ color: accent }}>
@@ -169,7 +167,7 @@ export function LuxeTheme({ data }: ThemeProps) {
             }}
           />
         </div>
-      </section>
+      </section>}
 
       {/* Booking Form */}
       <section id="booking" className="py-24 bg-gray-50">
@@ -199,7 +197,7 @@ export function LuxeTheme({ data }: ThemeProps) {
       </section>
 
       {/* Feedback / Contact */}
-      <section id="feedback" className="py-24 bg-white">
+      {!(website.hiddenSections ?? []).includes('contact') && <section id="feedback" className="py-24 bg-white">
         <div className="max-w-2xl mx-auto px-6">
           <div className="text-center mb-12">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] mb-3" style={{ color: accent }}>
@@ -215,7 +213,7 @@ export function LuxeTheme({ data }: ThemeProps) {
             currency={tenant.currency}
           />
         </div>
-      </section>
+      </section>}
 
       <FooterSection data={data} scrollTo={scrollTo} />
 

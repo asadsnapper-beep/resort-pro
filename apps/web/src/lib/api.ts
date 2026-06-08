@@ -56,7 +56,7 @@ api.interceptors.response.use(
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export const authApi = {
-  register: (data: { resortName: string; slug: string; firstName: string; lastName: string; email: string; password: string; referralCode?: string }) =>
+  register: (data: { resortName: string; slug: string; firstName: string; lastName: string; email: string; password: string; referralCode?: string; plan?: string }) =>
     api.post('/auth/register', data),
   login: (data: { email: string; password: string; slug: string }) =>
     api.post('/auth/login', data),
@@ -94,8 +94,11 @@ export const bookingsApi = {
   list: (params?: Record<string, unknown>) => api.get('/bookings', { params }),
   get: (id: string) => api.get(`/bookings/${id}`),
   create: (data: unknown) => api.post('/bookings', data),
-  checkIn: (id: string) => api.patch(`/bookings/${id}/check-in`),
-  checkOut: (id: string) => api.patch(`/bookings/${id}/check-out`),
+  checkIn: (id: string, data?: { deposit?: number; roomNotes?: string; roomId?: string }) =>
+    api.patch(`/bookings/${id}/check-in`, data ?? {}),
+  checkOut: (id: string, data?: { additionalPayment?: number; paymentMethod?: string }) =>
+    api.patch(`/bookings/${id}/check-out`, data ?? {}),
+  walkIn: (data: unknown) => api.post('/bookings/walk-in', data),
   cancel: (id: string) => api.patch(`/bookings/${id}/cancel`),
   addPayment: (id: string, data: unknown) => api.post(`/bookings/${id}/payment`, data),
   calendar: (month: number, year: number) => api.get('/bookings/calendar', { params: { month, year } }),
@@ -106,6 +109,12 @@ export const bookingsApi = {
   deleteInvoiceExtra: (id: string, extraId: string) =>
     api.delete(`/bookings/${id}/invoice/extras/${extraId}`),
   sendInvoiceEmail: (id: string) => api.post(`/bookings/${id}/invoice/send-email`),
+};
+
+// ── Front Desk ────────────────────────────────────────────────────────────────
+export const frontDeskApi = {
+  today:   () => api.get('/front-desk/today'),
+  roomMap: () => api.get('/front-desk/room-map'),
 };
 
 // ── Guests ────────────────────────────────────────────────────────────────────
@@ -189,6 +198,17 @@ export const tenantApi = {
   // Custom domain
   setDomain: (domain: string | null) => api.put('/tenant/domain', { domain }),
   verifyDomain: () => api.post('/tenant/domain/verify', {}),
+  // SMS & WhatsApp
+  getSmsSettings: () => api.get('/tenant/sms-settings'),
+  updateSmsSettings: (data: unknown) => api.patch('/tenant/sms-settings', data),
+  saveSmsCredentials: (data: unknown) => api.patch('/tenant/sms-credentials', data),
+  saveWaCredentials: (data: unknown) => api.patch('/tenant/wa-credentials', data),
+  testSms: (to: string) => api.post('/tenant/sms-settings/test-sms', { to }),
+  testWhatsapp: (to: string) => api.post('/tenant/sms-settings/test-whatsapp', { to }),
+  // Module flags (owner-controlled)
+  getModules: () => api.get('/tenant/flags/modules'),
+  toggleModule: (flag: string, enabled: boolean) => api.patch('/tenant/flags/module', { flag, enabled }),
+  getReferrals: () => api.get('/tenant/referrals'),
 };
 
 
@@ -318,6 +338,24 @@ export const externalCalendarsApi = {
   testUrl: (url: string) => api.post('/external-calendars/test-url', { url }),
 };
 
+// ── Marketing API ─────────────────────────────────────────────────────────────
+export const marketingApi = {
+  // Campaigns
+  listCampaigns:    (status?: string)              => api.get('/marketing/campaigns', { params: status ? { status } : {} }),
+  getCampaign:      (id: string)                   => api.get(`/marketing/campaigns/${id}`),
+  createCampaign:   (data: unknown)                => api.post('/marketing/campaigns', data),
+  deleteCampaign:   (id: string)                   => api.delete(`/marketing/campaigns/${id}`),
+  sendCampaign:     (id: string)                   => api.post(`/marketing/campaigns/${id}/send`, {}),
+  cancelCampaign:   (id: string)                   => api.post(`/marketing/campaigns/${id}/cancel`, {}),
+  // Audience
+  audiencePreview:  (data: unknown)                => api.post('/marketing/audience-preview', data),
+  // Templates
+  listTemplates:    ()                             => api.get('/marketing/templates'),
+  createTemplate:   (data: unknown)                => api.post('/marketing/templates', data),
+  updateTemplate:   (id: string, data: unknown)    => api.put(`/marketing/templates/${id}`, data),
+  deleteTemplate:   (id: string)                   => api.delete(`/marketing/templates/${id}`),
+};
+
 // ── Invoice API ───────────────────────────────────────────────────────────────
 export const invoiceApi = {
   list:           (params?: Record<string, string>) => api.get('/invoices', { params }),
@@ -333,4 +371,13 @@ export const invoiceApi = {
   send:           (id: string)  => api.post(`/invoices/${id}/send`),
   pdfUrl:         (id: string)  => `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/invoices/${id}/pdf`,
   delete:         (id: string)  => api.delete(`/invoices/${id}`),
+};
+
+// ── Offers API ────────────────────────────────────────────────────────────────
+export const offersApi = {
+  list:   (status?: string)            => api.get('/offers', { params: status ? { status } : {} }),
+  create: (data: unknown)              => api.post('/offers', data),
+  update: (id: string, data: unknown)  => api.patch(`/offers/${id}`, data),
+  delete: (id: string)                 => api.delete(`/offers/${id}`),
+  stats:  (id: string)                 => api.get(`/offers/${id}/stats`),
 };

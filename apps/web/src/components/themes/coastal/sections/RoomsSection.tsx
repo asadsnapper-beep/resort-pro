@@ -1,9 +1,13 @@
 'use client'
 import { Users } from 'lucide-react'
 import type { ResortData, ResortRoom } from '../../types'
+import { roomImg } from '../../_utils/images'
+import type { PublicOffer } from '../../_widgets/OffersWidget'
+import { getBestOfferForRoom } from '../../_widgets/OffersWidget'
 
 interface RoomsSectionProps {
   data:        ResortData
+  offers?:     PublicOffer[]
   onViewRoom:  (room: ResortRoom) => void
   onBookRoom:  (room: ResortRoom) => void
 }
@@ -12,7 +16,7 @@ function fmt(amount: number, currency: string) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount)
 }
 
-export function RoomsSection({ data, onViewRoom, onBookRoom }: RoomsSectionProps) {
+export function RoomsSection({ data, offers = [], onViewRoom, onBookRoom }: RoomsSectionProps) {
   const { tenant, website, rooms } = data
   const primary = website?.primaryColor || '#0891b2'
   const accent  = website?.accentColor  || '#d97706'
@@ -41,6 +45,7 @@ export function RoomsSection({ data, onViewRoom, onBookRoom }: RoomsSectionProps
                 currency={tenant.currency}
                 primary={primary}
                 accent={accent}
+                offer={getBestOfferForRoom(room.id, offers)}
                 onView={() => onViewRoom(room)}
                 onBook={() => onBookRoom(room)}
               />
@@ -52,14 +57,21 @@ export function RoomsSection({ data, onViewRoom, onBookRoom }: RoomsSectionProps
   )
 }
 
-function RoomCard({ room, currency, primary, accent, onView, onBook }: {
+function RoomCard({ room, currency, primary, accent, offer, onView, onBook }: {
   room:     ResortRoom
   currency: string
   primary:  string
   accent:   string
+  offer?:   PublicOffer | null
   onView:   () => void
   onBook:   () => void
 }) {
+  const offerLabel = offer
+    ? offer.type === 'PERCENTAGE' ? `${offer.value}% OFF`
+    : offer.type === 'FIXED'     ? `$${offer.value} OFF`
+    : `${offer.value} FREE NIGHT${offer.value > 1 ? 'S' : ''}`
+    : null
+
   return (
     <div
       className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer"
@@ -67,18 +79,11 @@ function RoomCard({ room, currency, primary, accent, onView, onBook }: {
     >
       {/* Image */}
       <div className="relative h-52 overflow-hidden">
-        {room.images[0] ? (
-          <img
-            src={room.images[0]}
-            alt={room.name}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-4xl"
-            style={{ backgroundColor: `${primary}15` }}>
-            🌊
-          </div>
-        )}
+        <img
+          src={roomImg(room.images[0])}
+          alt={room.name}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
         {/* Room type badge */}
         <div className="absolute top-3 left-3">
           <span className="text-xs font-semibold text-white px-3 py-1 rounded-full"
@@ -86,6 +91,15 @@ function RoomCard({ room, currency, primary, accent, onView, onBook }: {
             {room.type.replace('_', ' ')}
           </span>
         </div>
+        {/* Offer badge */}
+        {offerLabel && (
+          <div className="absolute bottom-3 left-3">
+            <span className="text-xs font-bold text-white px-3 py-1 rounded-full animate-pulse"
+              style={{ backgroundColor: accent }}>
+              🏷 {offerLabel}
+            </span>
+          </div>
+        )}
         {/* Price tag */}
         <div className="absolute top-3 right-3">
           <span className="text-xs font-bold px-3 py-1 rounded-full text-white"

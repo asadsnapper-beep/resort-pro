@@ -14,8 +14,9 @@ export interface FlagDefinition {
   flag: string;
   label: string;
   description: string;
-  category: 'Analytics' | 'AI' | 'Reporting' | 'UX' | 'Beta';
+  category: 'Analytics' | 'AI' | 'Reporting' | 'UX' | 'Beta' | 'Modules';
   defaultOn: boolean;
+  ownerControllable?: boolean; // if true, owners can toggle this themselves from Settings
 }
 
 export const FLAG_REGISTRY: FlagDefinition[] = [
@@ -81,6 +82,16 @@ export const FLAG_REGISTRY: FlagDefinition[] = [
     description: 'Shows a light/dark mode switcher in the tenant dashboard.',
     category: 'UX',
     defaultOn: false,
+  },
+
+  // ── Modules (owner-controlled) ────────────────────────────────────────────
+  {
+    flag: 'restaurant_module',
+    label: 'Restaurant & F&B',
+    description: 'Restaurant menu, F&B orders, and inventory management. Disable if your resort has no restaurant.',
+    category: 'Modules',
+    defaultOn: true,
+    ownerControllable: true,
   },
 
   // ── Beta ──────────────────────────────────────────────────────────────────

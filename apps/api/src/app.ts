@@ -29,6 +29,7 @@ import { chatRoutes } from './routes/chat';
 import { crmRoutes, crmPublicRoutes } from './routes/crm';
 import { billingRoutes, stripeWebhookRoute } from './routes/billing';
 import { adminRoutes } from './routes/admin';
+import { frontDeskRoutes } from './routes/frontDesk';
 import { ratePlanRoutes } from './routes/ratePlans';
 import { maintenanceRoutes } from './routes/maintenance';
 import { reportRoutes } from './routes/reports';
@@ -36,11 +37,13 @@ import { packageRoutes } from './routes/packages';
 import { groupBookingRoutes } from './routes/groupBookings';
 import { loyaltyRoutes } from './routes/loyalty';
 import { externalCalendarRoutes } from './routes/externalCalendars'
+import { marketingRoutes } from './routes/marketing';
 import { paymentRoutes } from './routes/payments'
 import { expenseRoutes } from './routes/expenses';
 import { invoicesRoutes } from './routes/invoices';
 import { embedRoutes } from './routes/embed';
 import { uploadRoutes } from './routes/upload';
+import { offersRoutes, publicOffersRoutes } from './routes/offers';
 import { startPreArrivalCron } from './jobs/pre-arrival-reminder';
 import { startICalSyncCron } from './jobs/ical-sync';
 import { startAutomationEngine } from './services/automation';
@@ -180,6 +183,7 @@ export async function buildApp() {
   await app.register(billingRoutes, { prefix: '/api/billing' });
   await app.register(stripeWebhookRoute, { prefix: '/api/stripe' });
   await app.register(adminRoutes, { prefix: '/api/admin' });
+  await app.register(frontDeskRoutes, { prefix: '/api/front-desk' });
   await app.register(ratePlanRoutes, { prefix: '/api/rate-plans' });
   await app.register(maintenanceRoutes, { prefix: '/api/maintenance' });
   await app.register(reportRoutes, { prefix: '/api/reports' });
@@ -187,11 +191,14 @@ export async function buildApp() {
   await app.register(groupBookingRoutes, { prefix: '/api/group-bookings' });
   await app.register(loyaltyRoutes, { prefix: '/api/loyalty' });
   await app.register(externalCalendarRoutes, { prefix: '/api/external-calendars' });
+  await app.register(marketingRoutes, { prefix: '/api/marketing' });
   await app.register(paymentRoutes, { prefix: '/api/payments' });
   await app.register(expenseRoutes,   { prefix: '/api/expenses' });
   await app.register(invoicesRoutes,  { prefix: '/api/invoices' });
   await app.register(embedRoutes,   { prefix: '/embed' });
   await app.register(uploadRoutes,  { prefix: '/api/upload' });
+  await app.register(offersRoutes,        { prefix: '/api/offers' });
+  await app.register(publicOffersRoutes,  { prefix: '/site' });
 
   // ── Start automation engine ───────────────────────────────────────────────
   if (process.env.NODE_ENV !== 'test') {

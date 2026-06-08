@@ -53,7 +53,7 @@ export default function StaffPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<'MANAGER' | 'PARTNER' | 'RECEPTIONIST' | 'MARKETER' | 'DEVELOPER' | 'STAFF'>('STAFF');
+  const [inviteRole, setInviteRole] = useState<'MANAGER' | 'SHAREHOLDER' | 'RECEPTIONIST' | 'MARKETER' | 'DEVELOPER' | 'STAFF'>('STAFF');
   const [inviting, setInviting] = useState(false);
   const [editStaff, setEditStaff] = useState<Staff | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
@@ -345,12 +345,12 @@ export default function StaffPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Role</label>
                 <div className="grid grid-cols-3 gap-2">
                   {([
-                    { value: 'STAFF',        emoji: '👤', label: 'Staff' },
+                    { value: 'STAFF',        emoji: '🧹', label: 'Staff' },
                     { value: 'RECEPTIONIST', emoji: '🛎️', label: 'Receptionist' },
-                    { value: 'MANAGER',      emoji: '🛡️', label: 'Manager' },
+                    { value: 'MANAGER',      emoji: '👔', label: 'Manager' },
                     { value: 'MARKETER',     emoji: '📣', label: 'Marketer' },
                     { value: 'DEVELOPER',    emoji: '💻', label: 'Developer' },
-                    { value: 'PARTNER',      emoji: '🤝', label: 'Partner' },
+                    { value: 'SHAREHOLDER',  emoji: '📊', label: 'Shareholder' },
                   ] as const).map(({ value, emoji, label }) => (
                     <button
                       key={value}
@@ -366,12 +366,12 @@ export default function StaffPage() {
                   ))}
                 </div>
                 <p className="mt-2 text-xs text-gray-400">
-                  {inviteRole === 'MANAGER' && 'Full access — manages all hotel operations'}
-                  {inviteRole === 'PARTNER' && 'Read-only analytics & dashboard stats'}
-                  {inviteRole === 'RECEPTIONIST' && 'Bookings, guests, check-in/out, housekeeping'}
-                  {inviteRole === 'MARKETER' && 'CRM, email campaigns, analytics, website'}
-                  {inviteRole === 'DEVELOPER' && 'Website builder & embed settings'}
-                  {inviteRole === 'STAFF' && 'Housekeeping, maintenance, restaurant, orders'}
+                  {inviteRole === 'MANAGER'     && 'Full access except billing — manages all operations'}
+                  {inviteRole === 'SHAREHOLDER' && 'Read-only: dashboard, analytics, reports, expenses'}
+                  {inviteRole === 'RECEPTIONIST'&& 'Bookings, front desk, guests, check-in/out, housekeeping'}
+                  {inviteRole === 'MARKETER'    && 'Website, CRM, email/SMS campaigns, offers, analytics'}
+                  {inviteRole === 'DEVELOPER'   && 'Website builder, embed settings, channel sync'}
+                  {inviteRole === 'STAFF'        && 'Housekeeping tasks, maintenance, restaurant, F&B orders'}
                 </p>
               </div>
             </div>

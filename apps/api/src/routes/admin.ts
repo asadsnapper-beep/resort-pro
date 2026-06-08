@@ -534,6 +534,58 @@ export async function adminRoutes(app: FastifyInstance) {
     });
   });
 
+  // ── GET /api/admin/failed-payments ────────────────────────────────────────
+  app.get('/failed-payments', { preHandler: requireAdminRole(['SUPER_ADMIN', 'FINANCE', 'SUPPORT']) }, async (_req, reply) => {
+    const PLAN_PRICES: Record<string, number> = { STARTER: 49, PROFESSIONAL: 99, ENTERPRISE: 199, FREE: 0 };
+
+    const [pastDue, trialsExpired] = await Promise.all([
+      // Tenants with past_due status — payment actually failed
+      prisma.tenant.findMany({
+        where: { planStatus: 'past_due', isActive: true },
+        orderBy: { currentPeriodEnd: 'asc' },
+        select: { id: true, name: true, slug: true, email: true, plan: true, currentPeriodEnd: true, stripeCustomerId: true },
+      }),
+      // Trials that expired and never converted
+      prisma.tenant.findMany({
+        where: {
+          planStatus: 'trialing',
+          trialEndsAt: { lt: new Date() },
+          isActive: true,
+        },
+        orderBy: { trialEndsAt: 'asc' },
+        select: { id: true, name: true, slug: true, email: true, plan: true, trialEndsAt: true },
+      }),
+    ]);
+
+    const pastDueWithAmount = pastDue.map(t => ({
+      ...t,
+      amount: PLAN_PRICES[t.plan] ?? 0,
+      type: 'past_due' as const,
+      daysOverdue: t.currentPeriodEnd
+        ? Math.floor((Date.now() - new Date(t.currentPeriodEnd).getTime()) / 86_400_000)
+        : null,
+    }));
+
+    const expiredTrials = trialsExpired.map(t => ({
+      ...t,
+      amount: 0,
+      type: 'trial_expired' as const,
+      daysOverdue: t.trialEndsAt
+        ? Math.floor((Date.now() - new Date(t.trialEndsAt).getTime()) / 86_400_000)
+        : null,
+      currentPeriodEnd: null,
+    }));
+
+    return reply.send({
+      success: true,
+      data: {
+        pastDue: pastDueWithAmount,
+        expiredTrials,
+        totalAtRisk: pastDueWithAmount.reduce((s, t) => s + t.amount, 0),
+      },
+    });
+  });
+
   // ── GET /api/admin/me ──────────────────────────────────────────────────
   app.get('/me', { preHandler: requireAdminRole() }, async (request, reply) => {
     const user = request.user as any;
@@ -1002,16 +1054,16 @@ export async function adminRoutes(app: FastifyInstance) {
   });
 
   // ── PUT /api/admin/themes/:key ─────────────────────────────────────────────
-  app.put<{ Params: { key: string }; Body: { name: string; description?: string; previewImage?: string; isActive?: boolean; isPremium?: boolean; sortOrder?: number } }>(
+  app.put<{ Params: { key: string }; Body: { name: string; description?: string; previewImage?: string; screenshots?: string[]; isActive?: boolean; isPremium?: boolean; sortOrder?: number } }>(
     '/themes/:key',
     { preHandler: requireSuperAdmin },
     async (request, reply) => {
       const { key } = request.params;
-      const { name, description, previewImage, isActive, isPremium, sortOrder } = request.body;
+      const { name, description, previewImage, screenshots, isActive, isPremium, sortOrder } = request.body;
       const theme = await prisma.theme.upsert({
         where: { key },
-        update: { name, description, previewImage, isActive, isPremium, sortOrder },
-        create: { key, name, description, previewImage, isActive: isActive ?? true, isPremium: isPremium ?? false, sortOrder: sortOrder ?? 99 },
+        update: { name, description, previewImage, screenshots, isActive, isPremium, sortOrder },
+        create: { key, name, description, previewImage, screenshots: screenshots ?? [], isActive: isActive ?? true, isPremium: isPremium ?? false, sortOrder: sortOrder ?? 99 },
       });
       const adminUser = request.user as any;
       await logAdminAction({
@@ -1050,6 +1102,264 @@ export async function adminRoutes(app: FastifyInstance) {
         ipAddress: request.ip,
       });
       return reply.send(ok(updated, updated.isActive ? 'Theme activated' : 'Theme deactivated'));
+    }
+  );
+
+  // ── POST /api/admin/themes/upload — upload a JSON/ZIP theme package ─────────
+  app.post(
+    '/themes/upload',
+    { preHandler: requireSuperAdmin },
+    async (request, reply) => {
+      const data = await request.file();
+      if (!data) return reply.status(400).send({ success: false, error: 'No file uploaded' });
+
+      const chunks: Buffer[] = [];
+      for await (const chunk of data.file) chunks.push(chunk as Buffer);
+      const buffer = Buffer.concat(chunks);
+
+      if (buffer.byteLength > 512 * 1024) {
+        return reply.status(400).send({ success: false, error: 'File too large (max 512 KB)' });
+      }
+
+      let configJson: Record<string, unknown>;
+
+      if (data.filename.endsWith('.zip')) {
+        // Extract config.json from ZIP
+        const AdmZip = (await import('adm-zip')).default;
+        const zip = new AdmZip(buffer);
+        const entry = zip.getEntry('config.json');
+        if (!entry) return reply.status(400).send({ success: false, error: 'ZIP must contain config.json' });
+        try {
+          configJson = JSON.parse(entry.getData().toString('utf8'));
+        } catch {
+          return reply.status(400).send({ success: false, error: 'config.json is not valid JSON' });
+        }
+      } else if (data.filename.endsWith('.json') || data.mimetype === 'application/json') {
+        try {
+          configJson = JSON.parse(buffer.toString('utf8'));
+        } catch {
+          return reply.status(400).send({ success: false, error: 'File is not valid JSON' });
+        }
+      } else {
+        return reply.status(400).send({ success: false, error: 'Only .json or .zip files are accepted' });
+      }
+
+      // Validate required fields
+      const { key, name, colors, hero, sections } = configJson as Record<string, unknown>;
+      if (!key || typeof key !== 'string') return reply.status(400).send({ success: false, error: 'config.json must have a "key" string field' });
+      if (!name || typeof name !== 'string') return reply.status(400).send({ success: false, error: 'config.json must have a "name" string field' });
+      if (!colors || typeof colors !== 'object') return reply.status(400).send({ success: false, error: 'config.json must have a "colors" object' });
+      if (!hero || typeof hero !== 'object') return reply.status(400).send({ success: false, error: 'config.json must have a "hero" object' });
+      if (!Array.isArray(sections) || sections.length === 0) return reply.status(400).send({ success: false, error: 'config.json must have a "sections" array' });
+
+      // Reject if key collides with a hardcoded theme
+      const HARDCODED_KEYS = new Set(['luxe', 'minimal', 'coastal', 'tea-garden-eco-resort']);
+      if (HARDCODED_KEYS.has(key as string)) {
+        return reply.status(400).send({ success: false, error: `Key "${key}" is reserved for a built-in theme` });
+      }
+
+      // Sanitize customCSS — strip dangerous patterns
+      if (typeof configJson.customCSS === 'string') {
+        configJson.customCSS = configJson.customCSS
+          .replace(/@import\b[^;]*/gi, '')
+          .replace(/expression\s*\(/gi, '')
+          .replace(/javascript:/gi, '')
+          .replace(/url\s*\(\s*['"]?https?:/gi, 'url(');
+      }
+
+      const adminUser = request.user as any;
+      const safeConfig = JSON.parse(JSON.stringify(configJson));
+      const theme = await prisma.theme.upsert({
+        where:  { key: key as string },
+        update: { name: name as string, configJson: safeConfig, themeType: 'UPLOADED', themeStatus: 'PREVIEW', uploadedBy: adminUser.id },
+        create: { key: key as string, name: name as string, configJson: safeConfig, themeType: 'UPLOADED', themeStatus: 'PREVIEW', uploadedBy: adminUser.id, isActive: false },
+      });
+
+      await logAdminAction({
+        adminEmail: adminUser.email,
+        action: 'theme_update',
+        targetType: 'theme',
+        targetId: key as string,
+        targetName: name as string,
+        metadata: { source: 'upload', filename: data.filename },
+        ipAddress: request.ip,
+      });
+
+      return reply.status(201).send(ok({ ...theme, previewUrl: `/theme-preview/${key}` }, 'Theme uploaded successfully'));
+    }
+  );
+
+  // ── POST /api/admin/themes/generate — AI-powered theme generation ──────────
+  app.post<{ Body: { prompt: string; provider?: string; quickOptions?: string[] } }>(
+    '/themes/generate',
+    { preHandler: requireSuperAdmin },
+    async (request, reply) => {
+      const { prompt, provider = 'claude', quickOptions = [] } = request.body;
+      if (!prompt || prompt.trim().length < 10) {
+        return reply.status(400).send({ success: false, error: 'Please provide a description (min 10 characters)' });
+      }
+
+      // Get stored AI API key from settings
+      const settings = await getOrCreateSettings();
+      const apiKey = (settings as any).aiApiKey as string | undefined;
+      if (!apiKey) {
+        return reply.status(400).send({ success: false, error: 'AI API key not configured. Go to Admin → Settings → AI Integration.' });
+      }
+
+      const systemPrompt = `You are a theme config generator for ResortPro, a hotel management SaaS.
+Generate a ThemeConfig JSON for a resort website based on the brief provided.
+
+The JSON must follow this EXACT schema (no extra fields):
+{
+  "key": "kebab-case-slug",
+  "name": "Human Readable Name",
+  "colors": {
+    "primary": "#hexcolor",
+    "accent": "#hexcolor",
+    "background": "#hexcolor",
+    "surface": "#hexcolor",
+    "text": "#hexcolor",
+    "textMuted": "#hexcolor"
+  },
+  "fonts": { "heading": "serif" | "sans-serif", "body": "serif" | "sans-serif" },
+  "navbar": { "style": "transparent-to-white" | "solid" | "transparent", "logoEmoji": "single emoji" },
+  "hero": {
+    "layout": "fullscreen" | "split" | "minimal",
+    "overlayOpacity": 0.0–1.0,
+    "textAlign": "center" | "left",
+    "ctaStyle": "pill" | "rounded" | "sharp",
+    "showStats": true | false
+  },
+  "about": { "layout": "image-right" | "image-left" | "centered", "showBullets": true | false, "bullets": ["..."] },
+  "rooms": { "ctaLabel": "Book Now" },
+  "gallery": { "layout": "masonry" | "grid", "captions": ["8 short captions"] },
+  "footer": { "background": "#hexcolor", "divider": "wave" | "straight" | "none" },
+  "sections": ["hero", "about", "rooms", "gallery", "testimonials", "availability", "booking", "contact"]
+}
+
+Rules:
+- key must be kebab-case, unique, descriptive of the theme style
+- colors must harmonize and fit the described mood
+- Return ONLY valid JSON, no markdown, no explanation, nothing else
+- customCSS must be empty string or omitted
+- bullets array: 3–5 items describing the property's unique features`;
+
+      const userPrompt = `Brief: ${prompt}\nAdditional style hints: ${quickOptions.join(', ') || 'none'}`;
+
+      let configJson: Record<string, unknown>;
+
+      try {
+        if (provider === 'claude') {
+          const Anthropic = (await import('@anthropic-ai/sdk')).default;
+          const client = new Anthropic({ apiKey });
+          const message = await client.messages.create({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 2048,
+            messages: [{ role: 'user', content: userPrompt }],
+            system: systemPrompt,
+          });
+          const text = message.content[0].type === 'text' ? message.content[0].text : '';
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          if (!jsonMatch) throw new Error('AI did not return valid JSON');
+          configJson = JSON.parse(jsonMatch[0]);
+        } else {
+          return reply.status(400).send({ success: false, error: `Provider "${provider}" is not yet supported. Use "claude".` });
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'AI generation failed';
+        return reply.status(500).send({ success: false, error: `AI generation error: ${msg}` });
+      }
+
+      // Validate the generated config has required fields
+      const { key, name } = configJson;
+      if (!key || !name) {
+        return reply.status(500).send({ success: false, error: 'AI returned incomplete config (missing key or name)' });
+      }
+
+      // Make key unique if it already exists
+      let finalKey = key as string;
+      const existing = await prisma.theme.findUnique({ where: { key: finalKey } });
+      if (existing) {
+        finalKey = `${finalKey}-${Date.now().toString(36)}`;
+        configJson.key = finalKey;
+      }
+
+      const adminUser = request.user as any;
+      const safeAiConfig = JSON.parse(JSON.stringify(configJson));
+      const theme = await prisma.theme.create({
+        data: {
+          key:         finalKey,
+          name:        name as string,
+          configJson:  safeAiConfig,
+          themeType:   'AI_GENERATED',
+          themeStatus: 'PREVIEW',
+          aiPrompt:    prompt,
+          aiProvider:  provider,
+          uploadedBy:  adminUser.id,
+          isActive:    false,
+        },
+      });
+
+      await logAdminAction({
+        adminEmail: adminUser.email,
+        action: 'theme_update',
+        targetType: 'theme',
+        targetId: finalKey,
+        targetName: name as string,
+        metadata: { source: 'ai_generated', provider, promptLength: prompt.length },
+        ipAddress: request.ip,
+      });
+
+      return reply.status(201).send(ok({ ...theme, previewUrl: `/theme-preview/${finalKey}` }, 'Theme generated successfully'));
+    }
+  );
+
+  // ── PUT /api/admin/themes/:key/publish — publish or unpublish a custom theme ─
+  app.put<{ Params: { key: string }; Body: { status: 'DRAFT' | 'PREVIEW' | 'PUBLISHED' } }>(
+    '/themes/:key/publish',
+    { preHandler: requireSuperAdmin },
+    async (request, reply) => {
+      const { key } = request.params;
+      const { status } = request.body;
+      const theme = await prisma.theme.findUnique({ where: { key } });
+      if (!theme) return reply.status(404).send({ success: false, error: 'Theme not found' });
+      if (theme.themeType === 'HARDCODED') {
+        return reply.status(400).send({ success: false, error: 'Built-in themes cannot have their status changed this way. Use the toggle endpoint.' });
+      }
+      const updated = await prisma.theme.update({
+        where: { key },
+        data: { themeStatus: status, isActive: status === 'PUBLISHED' },
+      });
+      return reply.send(ok(updated, `Theme status set to ${status}`));
+    }
+  );
+
+  // ── DELETE /api/admin/themes/:key — delete a custom (non-hardcoded) theme ───
+  app.delete<{ Params: { key: string } }>(
+    '/themes/:key',
+    { preHandler: requireSuperAdmin },
+    async (request, reply) => {
+      const { key } = request.params;
+      const theme = await prisma.theme.findUnique({ where: { key } });
+      if (!theme) return reply.status(404).send({ success: false, error: 'Theme not found' });
+      if (theme.themeType === 'HARDCODED') {
+        return reply.status(400).send({ success: false, error: 'Built-in themes cannot be deleted' });
+      }
+      if (theme.isDefault) {
+        return reply.status(400).send({ success: false, error: 'Cannot delete the default theme. Set another theme as default first.' });
+      }
+      await prisma.theme.delete({ where: { key } });
+      const adminUser = request.user as any;
+      await logAdminAction({
+        adminEmail: adminUser.email,
+        action: 'theme_update',
+        targetType: 'theme',
+        targetId: key,
+        targetName: theme.name,
+        metadata: { action: 'delete', themeType: theme.themeType },
+        ipAddress: request.ip,
+      });
+      return reply.send(ok(null, 'Theme deleted'));
     }
   );
 
@@ -1112,83 +1422,281 @@ export async function adminRoutes(app: FastifyInstance) {
     return reply.send(ok(updated, 'Settings updated'));
   });
 
+  // ── PUT /api/admin/settings/ai — save AI API key ──────────────────────────
+  app.put<{ Body: { apiKey: string; provider?: string } }>(
+    '/settings/ai',
+    { preHandler: requireSuperAdmin },
+    async (request, reply) => {
+      const { apiKey, provider = 'claude' } = request.body;
+      if (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length < 10) {
+        return reply.status(400).send({ success: false, error: 'API key is required (min 10 chars)' });
+      }
+      await prisma.platformSettings.upsert({
+        where:  { id: 'singleton' },
+        update: { aiApiKey: apiKey.trim(), aiProvider: provider },
+        create: { id: 'singleton', trialDays: 14, plans: DEFAULT_PLANS, aiApiKey: apiKey.trim(), aiProvider: provider },
+      });
+      const adminUser = request.user as any;
+      await logAdminAction({
+        adminEmail: adminUser.email,
+        action: 'settings_change',
+        targetType: 'settings',
+        targetId: 'singleton',
+        targetName: 'AI Integration Settings',
+        metadata: { provider, keyLength: apiKey.trim().length },
+        ipAddress: request.ip,
+      });
+      return reply.send(ok(null, 'AI API key saved'));
+    }
+  );
+
+  // ── GET /api/admin/settings/ai — check if AI key is configured ────────────
+  app.get(
+    '/settings/ai',
+    { preHandler: requireSuperAdmin },
+    async (_request, reply) => {
+      const settings = await getOrCreateSettings();
+      const hasKey   = !!((settings as any).aiApiKey);
+      const provider = (settings as any).aiProvider || 'claude';
+      // Never return the actual key — just whether it's set
+      return reply.send(ok({ configured: hasKey, provider }));
+    }
+  );
+
+  // ── DELETE /api/admin/settings/ai — remove AI API key ────────────────────
+  app.delete(
+    '/settings/ai',
+    { preHandler: requireSuperAdmin },
+    async (request, reply) => {
+      await prisma.platformSettings.upsert({
+        where:  { id: 'singleton' },
+        update: { aiApiKey: null, aiProvider: null },
+        create: { id: 'singleton', trialDays: 14, plans: DEFAULT_PLANS, aiApiKey: null, aiProvider: null },
+      });
+      const adminUser = request.user as any;
+      await logAdminAction({
+        adminEmail: adminUser.email,
+        action: 'settings_change',
+        targetType: 'settings',
+        targetId: 'singleton',
+        targetName: 'AI Integration Settings',
+        metadata: { action: 'disconnect' },
+        ipAddress: request.ip,
+      });
+      return reply.send(ok(null, 'AI integration disconnected'));
+    }
+  );
+
   // ── GET /api/admin/referrals ──────────────────────────────────────────────
   app.get('/referrals', { preHandler: requireAdminRole() }, async (_req, reply) => {
-    const PRICES: Record<string, number> = { FREE: 0, STARTER: 49, PROFESSIONAL: 99, ENTERPRISE: 199 };
+    const referrals = await prisma.referral.findMany({
+      include: {
+        referrer: { select: { id: true, name: true, slug: true, referralCode: true, plan: true } },
+        referred: { select: { id: true, name: true, slug: true, plan: true, planStatus: true, createdAt: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
 
-    // All tenants that have a referralCode (potential referrers)
-    // + all tenants that were referred (have referredById)
-    const [referrers, referred] = await Promise.all([
-      prisma.tenant.findMany({
-        where: { referralCode: { not: null } },
-        select: {
-          id: true, name: true, slug: true, plan: true, planStatus: true,
-          referralCode: true, createdAt: true, isActive: true,
-          referrals: {
-            select: {
-              id: true, name: true, slug: true, plan: true, planStatus: true,
-              isActive: true, createdAt: true, trialEndsAt: true,
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.tenant.findMany({
-        where: { referredById: { not: null } },
-        select: {
-          id: true, name: true, slug: true, plan: true, planStatus: true,
-          isActive: true, createdAt: true,
-          referrer: { select: { id: true, name: true, slug: true, referralCode: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
-    ]);
+    const total   = referrals.length;
+    const pending = referrals.filter(r => r.status === 'PENDING').length;
+    const rewarded = referrals.filter(r => r.status === 'REWARDED').length;
 
-    // Build per-referrer stats
-    const referrerStats = referrers
-      .filter(r => r.referrals.length > 0)
-      .map(r => {
-        const converted = r.referrals.filter(ref => ref.planStatus === 'active').length;
-        const mrr = r.referrals
-          .filter(ref => ref.planStatus === 'active')
-          .reduce((s, ref) => s + (PRICES[ref.plan] ?? 0), 0);
-        return {
-          id: r.id,
-          name: r.name,
-          slug: r.slug,
-          plan: r.plan,
-          planStatus: r.planStatus,
-          referralCode: r.referralCode,
-          totalReferrals: r.referrals.length,
-          converted,
-          conversionRate: r.referrals.length > 0
-            ? Math.round((converted / r.referrals.length) * 100)
-            : 0,
-          attributedMrr: mrr,
-          referrals: r.referrals,
-        };
-      })
-      .sort((a, b) => b.totalReferrals - a.totalReferrals);
+    return reply.send(ok({ summary: { total, pending, rewarded }, referrals }));
+  });
 
-    // Summary
-    const totalReferred = referred.length;
-    const totalConverted = referred.filter(r => r.planStatus === 'active').length;
-    const totalAttributedMrr = referred
-      .filter(r => r.planStatus === 'active')
-      .reduce((s, r) => s + (PRICES[r.plan] ?? 0), 0);
+  // ── PATCH /api/admin/referrals/:id/reward ─────────────────────────────────
+  app.patch<{
+    Params: { id: string };
+    Body: { type: 'CREDIT' | 'FREE_PLAN' | 'NONE'; amount?: number; plan?: string; months?: number; note?: string };
+  }>('/referrals/:id/reward', { preHandler: requireAdminRole(['SUPER_ADMIN']) }, async (request, reply) => {
+    const { id } = request.params;
+    const { type, amount, plan, months, note } = request.body;
+    const admin = request.user as any;
+
+    const referral = await prisma.referral.findUnique({
+      include: { referrer: true, referred: true },
+      where: { id },
+    });
+    if (!referral) return reply.status(404).send({ success: false, error: 'Referral not found' });
+    if (referral.status === 'REWARDED') return reply.status(400).send({ success: false, error: 'Already rewarded' });
+
+    // Apply reward to referrer tenant
+    if (type === 'CREDIT' && amount && amount > 0) {
+      await prisma.tenant.update({
+        where: { id: referral.referrerId },
+        data: { accountCredit: { increment: amount } },
+      });
+    } else if (type === 'FREE_PLAN' && plan && months && months > 0) {
+      const freeUntil = new Date();
+      freeUntil.setMonth(freeUntil.getMonth() + months);
+      await prisma.tenant.update({
+        where: { id: referral.referrerId },
+        data: { plan, planStatus: 'active', freeUntil },
+      });
+    }
+
+    // Update referral record
+    const updated = await prisma.referral.update({
+      where: { id },
+      data: {
+        status: type === 'NONE' ? 'NO_REWARD' : 'REWARDED',
+        rewardType: type,
+        rewardAmount: type === 'CREDIT' ? amount : null,
+        rewardPlan: type === 'FREE_PLAN' ? plan : null,
+        rewardMonths: type === 'FREE_PLAN' ? months : null,
+        rewardNote: note ?? null,
+        rewardedAt: new Date(),
+        rewardedBy: admin.email,
+      },
+    });
+
+    // Notify referrer
+    if (type !== 'NONE') {
+      const rewardText = type === 'CREDIT'
+        ? `৳${amount?.toLocaleString()} account credit`
+        : `${months} months of ${plan} plan free`;
+      await createAdminNotification({
+        type: 'referral_reward',
+        title: '🎁 Referral reward applied',
+        message: `${referral.referrer.name} received ${rewardText} for referring ${referral.referred.name}.`,
+        metadata: { referralId: id, referrerId: referral.referrerId, type, amount, plan, months },
+        linkPath: '/admin/referrals',
+      }).catch(() => {});
+    }
+
+    return reply.send(ok(updated, 'Reward applied'));
+  });
+
+  // ── POST /api/admin/referrals/custom-link ────────────────────────────────
+  // Admin sets a custom referral code on any tenant.
+  app.post<{
+    Body: { tenantId: string; code?: string };
+  }>('/referrals/custom-link', { preHandler: requireAdminRole(['SUPER_ADMIN']) }, async (request, reply) => {
+    const { tenantId, code } = request.body;
+
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true, slug: true } });
+    if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
+
+    const APP_URL = process.env.CORS_ORIGIN?.split(',')[0]?.trim() || 'http://localhost:3000';
+
+    // Use provided code or generate one
+    let referralCode = code
+      ? code.toUpperCase().replace(/[^A-Z0-9-]/g, '')
+      : tenant.slug.toUpperCase().replace(/-/g, '').slice(0, 8) + Math.random().toString(36).slice(2, 5).toUpperCase();
+
+    // Ensure uniqueness (skip own record)
+    const conflict = await prisma.tenant.findFirst({
+      where: { referralCode, NOT: { id: tenantId } },
+    });
+    if (conflict) return reply.status(409).send({ success: false, error: 'Code already in use' });
+
+    await prisma.tenant.update({ where: { id: tenantId }, data: { referralCode } });
 
     return reply.send(ok({
-      summary: {
-        totalReferred,
-        totalConverted,
-        conversionRate: totalReferred > 0 ? Math.round((totalConverted / totalReferred) * 100) : 0,
-        totalAttributedMrr,
-        activeReferrers: referrerStats.length,
-      },
-      referrers: referrerStats,
-      recentReferrals: referred.slice(0, 20),
-    }));
+      tenantId,
+      tenantName: tenant.name,
+      referralCode,
+      referralLink: `${APP_URL}/auth/register?ref=${referralCode}`,
+    }, 'Custom referral link created'));
   });
+
+  // ── GET /api/admin/referrals/tenants-list ─────────────────────────────────
+  // Lightweight list of active tenants for the custom-link picker.
+  app.get('/referrals/tenants-list', { preHandler: requireAdminRole() }, async (_req, reply) => {
+    const tenants = await prisma.tenant.findMany({
+      where: { isActive: true, isDemo: false },
+      select: { id: true, name: true, slug: true, plan: true, referralCode: true },
+      orderBy: { name: 'asc' },
+    });
+    const APP_URL = process.env.CORS_ORIGIN?.split(',')[0]?.trim() || 'http://localhost:3000';
+    return reply.send(ok(tenants.map(t => ({
+      ...t,
+      referralLink: t.referralCode ? `${APP_URL}/auth/register?ref=${t.referralCode}` : null,
+    }))));
+  });
+
+  // ── GET /api/admin/campaign-links ────────────────────────────────────────
+  app.get('/campaign-links', { preHandler: requireAdminRole() }, async (_req, reply) => {
+    const APP_URL = process.env.CORS_ORIGIN?.split(',')[0]?.trim() || 'http://localhost:3000';
+    const links = await prisma.campaignLink.findMany({ orderBy: { createdAt: 'desc' } });
+
+    // Count signups per code
+    const codes = links.map(l => l.code);
+    const signupCounts = await prisma.tenant.groupBy({
+      by: ['campaignSource'],
+      where: { campaignSource: { in: codes } },
+      _count: { id: true },
+    });
+    const countMap: Record<string, number> = {};
+    for (const s of signupCounts) if (s.campaignSource) countMap[s.campaignSource] = s._count.id;
+
+    return reply.send(ok(links.map(l => ({
+      ...l,
+      signups: countMap[l.code] ?? 0,
+      link: `${APP_URL}/auth/register?ref=${l.code}`,
+    }))));
+  });
+
+  // ── POST /api/admin/campaign-links ────────────────────────────────────────
+  app.post<{
+    Body: { label: string; code?: string };
+  }>('/campaign-links', { preHandler: requireAdminRole(['SUPER_ADMIN']) }, async (request, reply) => {
+    const { label, code } = request.body;
+    const admin = request.user as any;
+    const APP_URL = process.env.CORS_ORIGIN?.split(',')[0]?.trim() || 'http://localhost:3000';
+
+    if (!label?.trim()) return reply.status(400).send({ success: false, error: 'label required' });
+
+    const rawCode = (code?.trim() || label.trim())
+      .toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20);
+    if (!rawCode) return reply.status(400).send({ success: false, error: 'Invalid code' });
+
+    const existing = await prisma.campaignLink.findUnique({ where: { code: rawCode } });
+    if (existing) return reply.status(409).send({ success: false, error: 'Code already in use' });
+
+    const link = await prisma.campaignLink.create({
+      data: { code: rawCode, label: label.trim(), createdBy: admin.email },
+    });
+    return reply.send(ok({ ...link, signups: 0, link: `${APP_URL}/auth/register?ref=${link.code}` }, 'Campaign link created'));
+  });
+
+  // ── PATCH /api/admin/campaign-links/:id ──────────────────────────────────
+  app.patch<{
+    Params: { id: string };
+    Body: { label?: string; isActive?: boolean };
+  }>('/campaign-links/:id', { preHandler: requireAdminRole(['SUPER_ADMIN']) }, async (request, reply) => {
+    const { id } = request.params;
+    const { label, isActive } = request.body;
+    const data: any = {};
+    if (label !== undefined) data.label = label.trim();
+    if (isActive !== undefined) data.isActive = isActive;
+    const updated = await prisma.campaignLink.update({ where: { id }, data });
+    return reply.send(ok(updated));
+  });
+
+  // ── DELETE /api/admin/campaign-links/:id ─────────────────────────────────
+  app.delete<{ Params: { id: string } }>(
+    '/campaign-links/:id', { preHandler: requireAdminRole(['SUPER_ADMIN']) }, async (request, reply) => {
+      await prisma.campaignLink.delete({ where: { id: request.params.id } });
+      return reply.send(ok(null, 'Deleted'));
+    }
+  );
+
+  // ── GET /api/admin/campaign-links/:id/signups ────────────────────────────
+  // Resorts that signed up through a specific campaign link
+  app.get<{ Params: { id: string } }>(
+    '/campaign-links/:id/signups', { preHandler: requireAdminRole() }, async (request, reply) => {
+      const link = await prisma.campaignLink.findUnique({ where: { id: request.params.id } });
+      if (!link) return reply.status(404).send({ success: false, error: 'Not found' });
+
+      const tenants = await prisma.tenant.findMany({
+        where: { campaignSource: link.code },
+        select: { id: true, name: true, slug: true, plan: true, planStatus: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      return reply.send(ok({ link, tenants }));
+    }
+  );
 
   // ── GET /api/admin/churn-risk ─────────────────────────────────────────────
   // Top at-risk tenants for dashboard widget
@@ -2437,14 +2945,8 @@ export async function adminRoutes(app: FastifyInstance) {
   );
 
   // ─────────────────────────────────────────────────────────────────────────
-  // THEME MANAGEMENT
+  // THEME MANAGEMENT (continued)
   // ─────────────────────────────────────────────────────────────────────────
-
-  // GET /api/admin/themes — সব themes list
-  app.get('/themes', { preHandler: requireAdminRole() }, async (_request, reply) => {
-    const themes = await prisma.theme.findMany({ orderBy: { sortOrder: 'asc' } });
-    return reply.send(ok(themes));
-  });
 
   // POST /api/admin/themes — নতুন theme register
   app.post<{
@@ -2468,57 +2970,10 @@ export async function adminRoutes(app: FastifyInstance) {
     return reply.status(201).send(ok(theme, 'Theme created'));
   });
 
-  // PUT /api/admin/themes/:key — full update
-  app.put<{
-    Params: { key: string };
-    Body: {
-      name?: string; description?: string; previewImage?: string;
-      author?: string; version?: string; tags?: string[];
-      isActive?: boolean; isDefault?: boolean; isPremium?: boolean;
-      requiredPlan?: string; sortOrder?: number;
-    };
-  }>('/themes/:key', { preHandler: requireAdminRole(['SUPER_ADMIN']) }, async (request, reply) => {
-    const { key } = request.params;
-    const body = request.body ?? {};
-
-    const theme = await prisma.theme.findUnique({ where: { key } });
-    if (!theme) {
-      // upsert — create if not found (add new theme flow)
-      const created = await prisma.theme.create({ data: { key, name: body.name ?? key, ...body } });
-      return reply.status(201).send(ok(created, 'Theme created'));
-    }
-
-    // isDefault → unset others first
-    if (body.isDefault === true) {
-      await prisma.theme.updateMany({ where: { isDefault: true }, data: { isDefault: false } });
-    }
-
-    const updated = await prisma.theme.update({ where: { key }, data: body });
-    const adminUser = request.user as any;
-    await logAdminAction({ adminEmail: adminUser.email, action: 'theme_update', targetType: 'theme', targetId: theme.id, targetName: theme.name, metadata: { changes: body }, ipAddress: request.ip });
-    return reply.send(ok(updated, 'Theme updated'));
-  });
-
-  // PATCH /api/admin/themes/:key/toggle — toggle active status
-  app.patch<{ Params: { key: string } }>(
-    '/themes/:key/toggle',
-    { preHandler: requireAdminRole(['SUPER_ADMIN']) },
-    async (request, reply) => {
-      const { key } = request.params;
-      const theme = await prisma.theme.findUnique({ where: { key } });
-      if (!theme) return reply.status(404).send({ success: false, error: 'Theme not found' });
-
-      const updated = await prisma.theme.update({ where: { key }, data: { isActive: !theme.isActive } });
-      const adminUser = request.user as any;
-      await logAdminAction({ adminEmail: adminUser.email, action: 'theme_toggle', targetType: 'theme', targetId: theme.id, targetName: theme.name, metadata: { isActive: updated.isActive }, ipAddress: request.ip });
-      return reply.send(ok(updated, `Theme ${updated.isActive ? 'activated' : 'deactivated'}`));
-    }
-  );
-
   // PATCH /api/admin/themes/:key — partial update (isDefault, requiredPlan, etc.)
   app.patch<{
     Params: { key: string };
-    Body: { isDefault?: boolean; requiredPlan?: string; sortOrder?: number; };
+    Body: { isDefault?: boolean; requiredPlan?: string; sortOrder?: number; name?: string; description?: string; previewImage?: string; screenshots?: string[]; author?: string; version?: string; tags?: string[]; isPremium?: boolean; isActive?: boolean; };
   }>('/themes/:key', { preHandler: requireAdminRole(['SUPER_ADMIN']) }, async (request, reply) => {
     const { key } = request.params;
     const body = request.body ?? {};
@@ -2534,20 +2989,4 @@ export async function adminRoutes(app: FastifyInstance) {
     return reply.send(ok(updated, 'Theme updated'));
   });
 
-  // DELETE /api/admin/themes/:key — theme delete
-  app.delete<{ Params: { key: string } }>(
-    '/themes/:key',
-    { preHandler: requireAdminRole(['SUPER_ADMIN']) },
-    async (request, reply) => {
-      const { key } = request.params;
-      const theme = await prisma.theme.findUnique({ where: { key } });
-      if (!theme) return reply.status(404).send({ success: false, error: 'Theme not found' });
-      if (theme.isDefault) return reply.status(400).send({ success: false, error: 'Cannot delete the default theme. Set another theme as default first.' });
-
-      await prisma.theme.delete({ where: { key } });
-      const adminUser = request.user as any;
-      await logAdminAction({ adminEmail: adminUser.email, action: 'theme_update', targetType: 'theme', targetId: theme.id, targetName: theme.name, metadata: { action: 'delete' }, ipAddress: request.ip });
-      return reply.send(ok(null, 'Theme deleted'));
-    }
-  );
 }

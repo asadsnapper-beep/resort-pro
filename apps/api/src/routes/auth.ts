@@ -18,6 +18,7 @@ const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).regex(/(?=.*[A-Z])(?=.*[0-9])/, 'Must contain uppercase and number'),
   referralCode: z.string().max(20).optional(),  // ?ref=CODE from URL
+  plan: z.enum(['STARTER', 'PROFESSIONAL', 'ENTERPRISE']).optional(),
 });
 
 const loginSchema = z.object({
@@ -61,14 +62,24 @@ export async function authRoutes(app: FastifyInstance) {
       const trialDays = platformSettings?.trialDays ?? 14;
       const trialEndsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
 
-      // Resolve referral — find tenant with matching referralCode
+      // Resolve referral — check tenant referralCode first, then campaign link
       let referredById: string | undefined;
+      let campaignSource: string | undefined;
       if (body.referralCode) {
         const referrer = await prisma.tenant.findUnique({
           where: { referralCode: body.referralCode },
           select: { id: true },
         });
-        if (referrer) referredById = referrer.id;
+        if (referrer) {
+          referredById = referrer.id;
+        } else {
+          // Not a tenant code — check if it's a campaign/marketing link
+          const campaignLink = await prisma.campaignLink.findUnique({
+            where: { code: body.referralCode.toUpperCase() },
+            select: { code: true, isActive: true },
+          });
+          if (campaignLink?.isActive) campaignSource = campaignLink.code;
+        }
       }
 
       // Generate unique referral code for this new tenant
@@ -81,12 +92,13 @@ export async function authRoutes(app: FastifyInstance) {
         data: {
           name: body.resortName,
           slug: body.slug,
-          plan: 'STARTER',
+          plan: body.plan ?? 'STARTER',
           planStatus: 'trialing',
           trialEndsAt,
           billingEmail: body.email,
           referralCode,
           ...(referredById && { referredById }),
+          ...(campaignSource && { campaignSource }),
           users: {
             create: {
               email: body.email,
@@ -106,11 +118,23 @@ export async function authRoutes(app: FastifyInstance) {
         include: { users: true },
       });
 
+      // Create Referral record if referred
+      if (referredById) {
+        await prisma.referral.create({
+          data: {
+            referrerId: referredById,
+            referredId: tenant.id,
+            status: 'PENDING',
+          },
+        }).catch(() => {}); // non-blocking
+      }
+
       // Notify admin of new signup
+      const referralNote = referredById ? ` (referred by tenant ${referredById})` : '';
       await createAdminNotification({
         type: 'new_signup',
-        title: 'New resort signed up',
-        message: `${body.resortName} (${body.email}) just started a ${trialDays}-day trial.`,
+        title: referredById ? '🔗 New referral signup' : 'New resort signed up',
+        message: `${body.resortName} (${body.email}) just started a ${trialDays}-day trial${referralNote}.`,
         metadata: {
           tenantId: tenant.id,
           tenantName: tenant.name,
@@ -118,8 +142,10 @@ export async function authRoutes(app: FastifyInstance) {
           ownerEmail: body.email,
           trialDays,
           trialEndsAt: trialEndsAt.toISOString(),
+          isReferral: !!referredById,
+          referredById,
         },
-        linkPath: `/admin/tenants`,
+        linkPath: referredById ? `/admin/referrals` : `/admin/tenants`,
       });
 
       const user = tenant.users[0];
@@ -523,5 +549,80 @@ export async function authRoutes(app: FastifyInstance) {
         tenant,
       }, `Welcome to ${tenant?.name}!`));
     },
+  });
+
+  // ── GET /api/auth/referrer?code=CODE ─────────────────────────────────────
+  // Public endpoint — returns referrer resort name for the register page banner.
+  app.get('/referrer', async (req, reply) => {
+    const { code } = req.query as { code?: string };
+    if (!code) return reply.status(400).send({ error: 'code required' });
+    const tenant = await prisma.tenant.findUnique({
+      where: { referralCode: code.toUpperCase() },
+      select: { name: true },
+    });
+    if (!tenant) return reply.status(404).send({ error: 'Invalid referral code' });
+    return reply.send(ok({ name: tenant.name }));
+  });
+
+  // ── POST /api/auth/demo-login ─────────────────────────────────────────────
+  // No password required — issues a short-lived JWT for the demo tenant.
+  // Accepts optional { role } body to select which demo persona to use.
+  // Safe: demo tenant is completely isolated (separate tenantId, isDemo=true).
+  app.post('/demo-login', async (req, reply) => {
+    const { role: requestedRole } = (req.body as any) ?? {};
+
+    const tenant = await prisma.tenant.findUnique({ where: { slug: 'demo' } });
+    if (!tenant || !tenant.isDemo) {
+      return reply.status(404).send({ error: 'Demo not available' });
+    }
+
+    // Role → email map (matching seed-demo.ts users)
+    const roleEmailMap: Record<string, string> = {
+      OWNER:        'demo@resortpro.app',
+      MANAGER:      'manager@coralbay.demo',
+      SHAREHOLDER:  'partner@coralbay.demo',
+      RECEPTIONIST: 'reception@coralbay.demo',
+      MARKETER:     'marketer@coralbay.demo',
+      DEVELOPER:    'dev@coralbay.demo',
+      STAFF:        'hk@coralbay.demo',
+    };
+
+    const targetEmail = roleEmailMap[requestedRole as string] ?? roleEmailMap.OWNER;
+
+    const user = await prisma.user.findFirst({
+      where: { tenantId: tenant.id, email: targetEmail },
+    });
+
+    if (!user) {
+      return reply.status(404).send({ error: 'Demo user not found' });
+    }
+
+    // Short-lived token: 90 minutes only
+    const payload: Omit<JwtPayload, 'iat' | 'exp'> = {
+      sub:      user.id,
+      email:    user.email,
+      role:     user.role as JwtPayload['role'],
+      tenantId: tenant.id,
+    };
+
+    const token = app.jwt.sign(payload, { expiresIn: '90m' });
+
+    return reply.send(ok({
+      token,
+      isDemo: true,
+      user: {
+        id:        user.id,
+        email:     user.email,
+        firstName: user.firstName,
+        lastName:  user.lastName,
+        role:      user.role,
+      },
+      tenant: {
+        id:   tenant.id,
+        name: tenant.name,
+        slug: tenant.slug,
+        plan: tenant.plan,
+      },
+    }, `Welcome to the ResortPro demo! (${user.role})`));
   });
 }

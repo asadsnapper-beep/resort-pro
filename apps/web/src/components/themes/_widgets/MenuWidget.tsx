@@ -6,6 +6,7 @@ import {
   Utensils, UtensilsCrossed, Coffee, Beef, Cookie, Wine, Sandwich, Soup,
 } from 'lucide-react';
 import type { WidgetProps } from '../types';
+import { foodImg } from '../_utils/images';
 
 /* ── Types ───────────────────────────────────────────────────────────────────── */
 interface MenuItem {
@@ -150,25 +151,19 @@ export function MenuWidget({ slug, primaryColor, accentColor, currency }: Widget
 
         {/* Menu Grid */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {filtered.map(item => {
+          {filtered.map((item, i) => {
             const inCart   = cart.find(ci => ci.item.id === item.id);
             const catColor = CAT_COLORS[item.category] ?? '#6b7280';
             return (
               <div key={item.id}
                 className="group bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 flex flex-col">
                 <div className="relative h-40 overflow-hidden flex-shrink-0">
-                  {item.image ? (
-                    <img src={item.image} alt={item.name}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center"
-                      style={{ background: `linear-gradient(135deg, ${catColor}20, ${catColor}40)` }}>
-                      {(() => {
-                        const Icon = CAT_ICONS[item.category] ?? Utensils;
-                        return <Icon className="h-10 w-10 opacity-40" style={{ color: catColor }} />;
-                      })()}
-                    </div>
-                  )}
+                  <img
+                    src={foodImg(item.image, i)}
+                    alt={item.name}
+                    loading="lazy"
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
                   <div className="absolute top-3 left-3">
                     <span className="text-xs font-bold text-white px-2.5 py-1 rounded-full"
                       style={{ backgroundColor: catColor + 'dd' }}>
@@ -295,10 +290,11 @@ export function MenuWidget({ slug, primaryColor, accentColor, currency }: Widget
                         <div className="space-y-3">
                           {cart.map(ci => (
                             <div key={ci.item.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
-                              {ci.item.image && (
-                                <img src={ci.item.image} alt={ci.item.name}
-                                  className="h-12 w-12 rounded-lg object-cover flex-shrink-0" />
-                              )}
+                              <img
+                                src={foodImg(ci.item.image, menuItems.indexOf(ci.item))}
+                                alt={ci.item.name}
+                                className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
+                              />
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-semibold text-gray-900 truncate">{ci.item.name}</p>
                                 <p className="text-xs text-gray-500">{fmt(Number(ci.item.price), currency)} each</p>

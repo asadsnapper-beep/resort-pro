@@ -1,0 +1,171 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: 'Force deploy even if tests fail'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: asadsnapper-beep
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  # ─── Step 1: Build & push Docker images ───────────────────────────────────
+  build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ github.sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER }}/resort-pro-api:latest
+            ghcr.io/${{ env.OWNER }}/resort-pro-api:${{ github.sha }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Build and push Web image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER }}/resort-pro-web:latest
+            ghcr.io/${{ env.OWNER }}/resort-pro-web:${{ github.sha }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://api.resortpro.site
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+  # ─── Step 2: Run DB migrations on production ──────────────────────────────
+  migrate:
+    name: Run DB Migrations
+    runs-on: ubuntu-latest
+    needs: build
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        run: corepack enable && corepack prepare pnpm@latest --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Prisma migrations
+        run: pnpm --filter @resort-pro/database migrate:deploy
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+
+  # ─── Step 3: Deploy via Coolify webhook ───────────────────────────────────
+  deploy:
+    name: Deploy via Coolify
+    runs-on: ubuntu-latest
+    needs: [build, migrate]
+    environment:
+      name: production
+      url: https://resortpro.site
+
+    steps:
+      - name: Trigger Coolify deploy — API
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            -X GET "${{ secrets.COOLIFY_WEBHOOK_API }}" \
+          | grep -qE '^2' || { echo "Coolify API deploy failed"; exit 1; }
+
+      - name: Trigger Coolify deploy — Web
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            -X GET "${{ secrets.COOLIFY_WEBHOOK_WEB }}" \
+          | grep -qE '^2' || { echo "Coolify Web deploy failed"; exit 1; }
+
+      - name: Wait for health check — API
+        run: |
+          for i in $(seq 1 24); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api.resortpro.site/health)
+            if [ "$STATUS" = "200" ]; then
+              echo "API is healthy (attempt $i)"
+              exit 0
+            fi
+            echo "Attempt $i: status $STATUS, waiting 10s..."
+            sleep 10
+          done
+          echo "API health check timed out after 240s"
+          exit 1
+
+      - name: Wait for health check — Web
+        run: |
+          for i in $(seq 1 24); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://resortpro.site)
+            if [ "$STATUS" = "200" ]; then
+              echo "Web is healthy (attempt $i)"
+              exit 0
+            fi
+            echo "Attempt $i: status $STATUS, waiting 10s..."
+            sleep 10
+          done
+          echo "Web health check timed out after 240s"
+          exit 1
+
+  # ─── Step 4: Post-deploy notification ────────────────────────────────────
+  notify:
+    name: Notify Deploy Status
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: always()
+
+    steps:
+      - name: Deployment success
+        if: needs.deploy.result == 'success'
+        run: |
+          echo "✅ ResortPro deployed successfully!"
+          echo "Commit: ${{ github.sha }}"
+          echo "Actor:  ${{ github.actor }}"
+          echo "URL:    https://resortpro.site"
+
+      - name: Deployment failed
+        if: needs.deploy.result != 'success'
+        run: |
+          echo "❌ ResortPro deployment FAILED"
+          echo "Commit: ${{ github.sha }}"
+          exit 1

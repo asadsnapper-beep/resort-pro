@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Calendar, Bed, CheckCircle, Wifi, Car, Coffee, Waves, Dumbbell, Utensils, Shield, Wind } from 'lucide-react';
+import { Calendar, Bed, CheckCircle, Wifi, Car, Coffee, Waves, Dumbbell, Utensils, Shield, Wind, Tag, X } from 'lucide-react';
 import type { WidgetProps, ResortRoom } from '../types';
 
 /* ── Types ───────────────────────────────────────────────────────────────────── */
@@ -171,7 +171,8 @@ export function BookingForm({
   slug, primaryColor, accentColor, currency, rooms,
   checkInTime, checkOutTime,
   initialCheckIn, initialCheckOut, initialRoomId,
-}: BookingFormProps) {
+  initialPromoCode,
+}: BookingFormProps & { initialPromoCode?: string }) {
   const today = new Date().toISOString().split('T')[0];
   const color = primaryColor || '#1a6b5e';
   const accent = accentColor || primaryColor || '#1a6b5e';
@@ -195,6 +196,14 @@ export function BookingForm({
   const [submitting, setSubmitting]   = useState(false);
   const [error, setError] = useState('');
 
+  // Promo code state
+  const [promoCode, setPromoCode]         = useState(initialPromoCode ?? '');
+  const [promoApplied, setPromoApplied]   = useState<{
+    code: string; discount: number; title: string;
+  } | null>(null);
+  const [promoError, setPromoError]       = useState('');
+  const [promoLoading, setPromoLoading]   = useState(false);
+
   // Payment state
   const [bookingId, setBookingId] = useState('');
   const [confirmation, setConfirmation] = useState<{
@@ -205,6 +214,27 @@ export function BookingForm({
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [stripeClientSecret, setStripeClientSecret] = useState('');
   const [showStripeForm, setShowStripeForm] = useState(false);
+
+  /* ── Promo code validation ─────────────────────────────────────────────────── */
+  const validatePromo = async () => {
+    if (!promoCode.trim() || !selectedRoom || !checkIn || !checkOut) return;
+    setPromoError(''); setPromoLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/site/${slug}/offers/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: promoCode.trim(), roomId: selectedRoom.id, checkIn, checkOut }),
+      });
+      const json = await res.json();
+      if (json.data?.valid) {
+        setPromoApplied({ code: promoCode.toUpperCase(), discount: json.data.discount, title: json.data.offerTitle });
+      } else {
+        setPromoError(json.data?.error || 'Invalid promo code');
+        setPromoApplied(null);
+      }
+    } catch { setPromoError('Could not validate code'); }
+    setPromoLoading(false);
+  };
 
   /* ── API calls ─────────────────────────────────────────────────────────────── */
   const checkAvailability = async () => {
@@ -230,7 +260,10 @@ export function BookingForm({
       const bookRes = await fetch(`${API_BASE}/site/${slug}/book`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, roomId: selectedRoom.id, checkIn, checkOut, adults }),
+        body: JSON.stringify({
+          ...form, roomId: selectedRoom.id, checkIn, checkOut, adults,
+          ...(promoApplied ? { promoCode: promoApplied.code } : {}),
+        }),
       });
       const bookJson = await bookRes.json();
       if (!bookRes.ok) { setError(bookJson.error || 'Booking failed'); setSubmitting(false); return; }
@@ -312,13 +345,15 @@ export function BookingForm({
     setSelectedRoom(null); setConfirmation(null); setBookingId('');
     setActiveGateways(null); setStripeClientSecret(''); setShowStripeForm(false);
     setForm({ firstName: '', lastName: '', email: '', phone: '', specialRequests: '' });
+    setPromoCode(''); setPromoApplied(null); setPromoError('');
   };
 
   const nights = checkIn && checkOut
     ? Math.max(1, Math.ceil((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000))
     : 1;
 
-  const totalCost = selectedRoom ? Number(selectedRoom.basePrice) * nights : 0;
+  const baseCost  = selectedRoom ? Number(selectedRoom.basePrice) * nights : 0;
+  const totalCost = promoApplied ? baseCost - promoApplied.discount : baseCost;
 
   const STEP_LABELS = ['1. Dates', '2. Room', '3. Details', '4. Payment'];
   const STEP_IDS    = ['dates', 'rooms', 'details', 'payment'];
@@ -523,6 +558,64 @@ export function BookingForm({
                 className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 resize-none" />
             </div>
 
+            {/* Promo code */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Promo Code</label>
+              {promoApplied ? (
+                <div className="flex items-center gap-3 rounded-xl border border-green-300 bg-green-50 px-4 py-3">
+                  <Tag className="h-4 w-4 text-green-600 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-green-700">{promoApplied.code}</p>
+                    <p className="text-xs text-green-600">
+                      {promoApplied.title} — saving {fmt(promoApplied.discount, currency)}
+                    </p>
+                  </div>
+                  <button onClick={() => { setPromoApplied(null); setPromoCode(''); }}
+                    className="text-green-400 hover:text-green-600">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    value={promoCode}
+                    onChange={e => { setPromoCode(e.target.value.toUpperCase()); setPromoError(''); }}
+                    onKeyDown={e => e.key === 'Enter' && validatePromo()}
+                    placeholder="Enter promo code"
+                    className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm font-mono uppercase focus:outline-none focus:ring-2"
+                    style={{ '--tw-ring-color': color } as React.CSSProperties}
+                  />
+                  <button
+                    onClick={validatePromo}
+                    disabled={!promoCode.trim() || promoLoading}
+                    className="px-4 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50"
+                    style={{ backgroundColor: color }}
+                  >
+                    {promoLoading ? '…' : 'Apply'}
+                  </button>
+                </div>
+              )}
+              {promoError && <p className="mt-1.5 text-xs text-red-500">{promoError}</p>}
+            </div>
+
+            {/* Price summary with discount */}
+            {promoApplied && (
+              <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 space-y-1">
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Original price</span>
+                  <span>{fmt(baseCost, currency)}</span>
+                </div>
+                <div className="flex justify-between text-sm text-green-600 font-medium">
+                  <span>Discount</span>
+                  <span>−{fmt(promoApplied.discount, currency)}</span>
+                </div>
+                <div className="flex justify-between text-sm font-bold border-t border-green-200 pt-1" style={{ color }}>
+                  <span>Total</span>
+                  <span>{fmt(totalCost, currency)}</span>
+                </div>
+              </div>
+            )}
+
             {error && <p className="text-red-500 text-sm">{error}</p>}
 
             <button onClick={proceedToPayment} disabled={submitting}
@@ -656,6 +749,12 @@ export function BookingForm({
                 <span className="text-gray-500">Total</span>
                 <span className="font-bold text-lg">{fmt(confirmation.totalAmount, currency)}</span>
               </div>
+              {promoApplied && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Discount ({promoApplied.code})</span>
+                  <span className="text-green-600 font-medium">−{fmt(promoApplied.discount, currency)}</span>
+                </div>
+              )}
               {selectedPayment !== 'MANUAL' && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Payment</span>

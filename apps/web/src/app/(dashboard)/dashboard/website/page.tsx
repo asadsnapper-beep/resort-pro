@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
-import { Globe, Image, FileText, Palette, Star, Plus, Trash2, Save, Layout, ExternalLink, Share2, Link2, CheckCircle2, XCircle, Loader2, AlertTriangle } from 'lucide-react';
+import { Globe, Image, FileText, Palette, Star, Plus, Trash2, Save, Layout, LayoutGrid, ExternalLink, Share2, Link2, CheckCircle2, XCircle, Loader2, AlertTriangle } from 'lucide-react';
 import { ThemePicker } from '@/components/dashboard/website/ThemePicker';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 
@@ -34,14 +34,25 @@ interface WebsiteContent {
   youtubeUrl?: string;
   whatsappNumber?: string;
   tripadvisorUrl?: string;
+  hiddenSections?: string[];
 }
 
+const TOGGLEABLE_SECTIONS = [
+  { id: 'about',        label: 'About / Our Story',  desc: 'Resort story, about image' },
+  { id: 'amenities',    label: 'Amenities',           desc: 'Pool, spa, gym etc. (Coastal theme)' },
+  { id: 'menu',         label: 'Restaurant Menu',     desc: 'Food menu with in-room ordering' },
+  { id: 'gallery',      label: 'Photo Gallery',       desc: 'Image gallery grid' },
+  { id: 'testimonials', label: 'Testimonials',        desc: 'Guest reviews & ratings' },
+  { id: 'availability', label: 'Availability Calendar',desc: 'Date picker to check open rooms' },
+  { id: 'contact',      label: 'Contact / Feedback',  desc: 'Contact form and map' },
+] as const;
 
 const TABS = [
   { id: 'template',    label: 'Template',    icon: Layout  },
   { id: 'hero',        label: 'Hero & About',icon: Globe   },
   { id: 'gallery',     label: 'Gallery',     icon: Image   },
   { id: 'testimonials',label: 'Testimonials',icon: Star    },
+  { id: 'sections',    label: 'Sections',    icon: LayoutGrid },
   { id: 'seo',         label: 'SEO & Branding', icon: Palette },
   { id: 'social',      label: 'Social Media',icon: Share2  },
   { id: 'domain',      label: 'Custom Domain', icon: Link2 },
@@ -74,6 +85,7 @@ export default function WebsitePage() {
     youtubeUrl: '',
     whatsappNumber: '',
     tripadvisorUrl: '',
+    hiddenSections: [],
   });
 
   const { data, isLoading } = useQuery({
@@ -105,6 +117,7 @@ export default function WebsitePage() {
         youtubeUrl: content.youtubeUrl ?? '',
         whatsappNumber: content.whatsappNumber ?? '',
         tripadvisorUrl: content.tripadvisorUrl ?? '',
+        hiddenSections: content.hiddenSections ?? [],
       });
     }
   }, [data]);
@@ -452,6 +465,61 @@ export default function WebsitePage() {
         </div>
       )}
 
+      {/* ── Sections Visibility ──────────────────────────────────────────── */}
+      {tab === 'sections' && (
+        <div className="max-w-2xl space-y-4">
+          <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6">
+            <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-1">
+              <LayoutGrid className="h-4 w-4 text-resort-600" /> Section Visibility
+            </h3>
+            <p className="text-xs text-gray-500 mb-6">
+              যে sections hide করবেন সেগুলো আপনার resort website-এ দেখাবে না।
+            </p>
+            <div className="space-y-3">
+              {TOGGLEABLE_SECTIONS.map(sec => {
+                const isHidden = (form.hiddenSections ?? []).includes(sec.id);
+                const toggle = () => set('hiddenSections',
+                  isHidden
+                    ? (form.hiddenSections ?? []).filter(s => s !== sec.id)
+                    : [...(form.hiddenSections ?? []), sec.id]
+                );
+                return (
+                  <div key={sec.id}
+                    className={`flex items-center justify-between p-4 rounded-xl border transition-colors cursor-pointer ${
+                      isHidden
+                        ? 'border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 opacity-60'
+                        : 'border-resort-200 dark:border-resort-800/40 bg-resort-50/50 dark:bg-resort-900/10'
+                    }`}
+                    onClick={toggle}>
+                    <div>
+                      <p className={`text-sm font-medium ${isHidden ? 'text-gray-400 line-through' : 'text-gray-900 dark:text-white'}`}>
+                        {sec.label}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">{sec.desc}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={e => { e.stopPropagation(); toggle(); }}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                        isHidden ? 'bg-gray-300 dark:bg-gray-700' : 'bg-resort-600'
+                      }`}>
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                        isHidden ? 'translate-x-1' : 'translate-x-6'
+                      }`} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
+              <Button onClick={() => saveMutation.mutate()} loading={saveMutation.isPending}>
+                <Save className="h-4 w-4 mr-2" /> Save Changes
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Social Media ─────────────────────────────────────────────────── */}
       {tab === 'social' && (
         <div className="grid gap-6 lg:grid-cols-2">
@@ -473,7 +541,7 @@ export default function WebsitePage() {
                 <div key={key}>
                   <label className="mb-1 block text-sm font-medium text-gray-700">{emoji} {label}</label>
                   <Input
-                    value={(form as Record<string, string>)[key] ?? ''}
+                    value={(form as unknown as Record<string, string>)[key] ?? ''}
                     onChange={e => set(key as keyof WebsiteContent, e.target.value)}
                     placeholder={placeholder}
                     type="url"

@@ -1,17 +1,22 @@
 'use client'
 import type { ResortData } from '../../types'
+import { galleryImg } from '../../_utils/images'
 
 interface GallerySectionProps {
   data: ResortData
 }
 
+const FALLBACK_COUNT = 8
+const CAPTIONS = ['Beachfront', 'Poolside', 'Ocean View', 'Dining', 'Spa', 'Water Sports', 'Sunset', 'Rooms']
+
 export function GallerySection({ data }: GallerySectionProps) {
   const { website } = data
   const accent  = website?.accentColor  || '#d97706'
   const primary = website?.primaryColor || '#0891b2'
-  const images  = website?.galleryImages ?? []
-
-  if (images.length === 0) return null
+  const rawImages = website?.galleryImages ?? []
+  const images = rawImages.length > 0
+    ? rawImages
+    : Array.from({ length: FALLBACK_COUNT }, (_, i) => galleryImg(undefined, i))
 
   return (
     <section id="gallery" className="py-24 bg-white">
@@ -39,13 +44,14 @@ export function GallerySection({ data }: GallerySectionProps) {
                 <img
                   src={img}
                   alt={`Gallery ${i + 1}`}
+                  loading="lazy"
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   style={{ height: isFeature ? '420px' : isWide ? '200px' : '200px' }}
                 />
                 {/* Hover caption overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
                   <span className="text-white text-xs font-medium">
-                    {['Beachfront', 'Poolside', 'Ocean View', 'Dining', 'Spa', 'Water Sports', 'Sunset', 'Rooms'][i % 8]}
+                    {CAPTIONS[i % 8]}
                   </span>
                 </div>
               </div>

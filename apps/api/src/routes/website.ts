@@ -25,6 +25,15 @@ const websiteSchema = z.object({
     avatar: z.string().optional(),
   })).optional(),
   templateId: z.string().optional(),
+  hiddenSections: z.array(z.string()).optional(),
+  // Social media
+  facebookUrl: z.string().url().optional().or(z.literal('')),
+  instagramUrl: z.string().url().optional().or(z.literal('')),
+  twitterUrl: z.string().url().optional().or(z.literal('')),
+  tiktokUrl: z.string().url().optional().or(z.literal('')),
+  youtubeUrl: z.string().url().optional().or(z.literal('')),
+  whatsappNumber: z.string().optional(),
+  tripadvisorUrl: z.string().url().optional().or(z.literal('')),
 });
 
 export async function websiteRoutes(app: FastifyInstance) {
@@ -73,6 +82,20 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
     },
   });
 
+  // GET /site/theme/:key — fetch theme config by key (used by preview page)
+  app.get('/theme/:key', {
+    schema: { tags: ['website'], summary: 'Get theme config JSON by key' },
+    handler: async (request, reply) => {
+      const { key } = request.params as { key: string };
+      const theme = await prisma.theme.findUnique({
+        where: { key },
+        select: { key: true, name: true, themeType: true, configJson: true, themeStatus: true },
+      });
+      if (!theme) return reply.status(404).send({ success: false, error: 'Theme not found' });
+      return reply.send({ success: true, data: theme });
+    },
+  });
+
   // GET /site/:slug — full public resort data
   app.get('/:slug', {
     schema: { tags: ['website'], summary: 'Get public resort website data' },
@@ -90,6 +113,20 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
         },
       });
       if (!tenant || !tenant.isActive) return reply.status(404).send({ success: false, error: 'Resort not found' });
+
+      // Look up theme config if the selected template is a config-driven theme
+      const templateId = tenant.websiteContent?.templateId;
+      let themeConfig = null;
+      if (templateId) {
+        const theme = await prisma.theme.findUnique({
+          where: { key: templateId },
+          select: { themeType: true, configJson: true },
+        });
+        if (theme && theme.themeType !== 'HARDCODED' && theme.configJson) {
+          themeConfig = theme.configJson;
+        }
+      }
+
       return ok({
         tenant: {
           name: tenant.name,
@@ -102,8 +139,9 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
           checkOutTime: tenant.checkOutTime,
           logoUrl: tenant.logoUrl,
         },
-        website: tenant.websiteContent,
-        rooms: tenant.rooms,
+        website:     tenant.websiteContent,
+        rooms:       tenant.rooms,
+        themeConfig,  // null for hardcoded themes, ThemeConfig JSON for uploaded/AI themes
       });
     },
   });
@@ -120,6 +158,7 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
     adults: z.number().int().min(1).default(1),
     children: z.number().int().min(0).default(0),
     specialRequests: z.string().optional(),
+    promoCode: z.string().optional(),
   });
 
   app.post('/:slug/book', {
@@ -157,7 +196,39 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
       }
 
       const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / 86400000);
-      const totalAmount = Number(room.basePrice) * nights;
+      const baseAmount = Number(room.basePrice) * nights;
+
+      // Resolve promo code
+      let appliedOffer: { id: string; discount: number } | null = null;
+      if (body.promoCode) {
+        const now = new Date();
+        const offer = await prisma.offer.findFirst({
+          where: {
+            tenantId: tenant.id,
+            promoCode: body.promoCode.toUpperCase(),
+            isActive: true,
+            validFrom: { lte: now },
+            validTo:   { gte: now },
+          },
+        });
+        if (offer) {
+          const canUse = offer.maxUses === null || offer.usedCount < offer.maxUses;
+          const minOk  = nights >= offer.minStay;
+          const roomOk = offer.roomIds.length === 0 || offer.roomIds.includes(body.roomId);
+          if (canUse && minOk && roomOk) {
+            let disc = 0;
+            if (offer.type === 'PERCENTAGE') disc = baseAmount * (offer.value / 100);
+            else if (offer.type === 'FIXED')  disc = Math.min(offer.value, baseAmount);
+            else if (offer.type === 'FREE_NIGHT') {
+              const perNight = nights > 0 ? baseAmount / nights : 0;
+              disc = Math.min(perNight * offer.value, baseAmount);
+            }
+            appliedOffer = { id: offer.id, discount: disc };
+          }
+        }
+      }
+
+      const totalAmount = appliedOffer ? baseAmount - appliedOffer.discount : baseAmount;
 
       const booking = await prisma.booking.create({
         data: {
@@ -176,7 +247,25 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
         },
       });
 
-      return reply.status(201).send(ok({ id: booking.id, confirmationNo: booking.confirmationNo, totalAmount, nights }, 'Booking request submitted!'));
+      // Record offer usage
+      if (appliedOffer) {
+        await prisma.bookingOffer.create({
+          data: { bookingId: booking.id, offerId: appliedOffer.id, discount: appliedOffer.discount },
+        });
+        await prisma.offer.update({
+          where: { id: appliedOffer.id },
+          data: { usedCount: { increment: 1 } },
+        });
+      }
+
+      return reply.status(201).send(ok({
+        id: booking.id,
+        confirmationNo: booking.confirmationNo,
+        totalAmount,
+        baseAmount,
+        discount: appliedOffer?.discount ?? 0,
+        nights,
+      }, 'Booking request submitted!'));
     },
   });
 

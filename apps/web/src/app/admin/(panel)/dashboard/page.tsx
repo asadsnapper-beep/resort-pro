@@ -12,8 +12,35 @@ import {
   Loader2, ExternalLink, AlertTriangle,
   ShieldAlert, ArrowRight, CheckCircle2,
   UserPlus, Zap, RefreshCw, Eye, TriangleAlert,
+  TrendingDown, Minus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer,
+} from 'recharts';
+
+type FailedTenant = {
+  id: string; name: string; slug: string; email: string | null;
+  plan: string; amount: number; type: 'past_due' | 'trial_expired';
+  daysOverdue: number | null; currentPeriodEnd: string | null; trialEndsAt?: string | null;
+};
+type FailedPaymentsData = {
+  pastDue: FailedTenant[];
+  expiredTrials: FailedTenant[];
+  totalAtRisk: number;
+};
+
+type MrrMonth = {
+  month: string;
+  label: string;
+  mrr: number;
+  newMrr: number;
+  churnedMrr: number;
+  expansionMrr: number;
+  netMrr: number;
+  payingCustomers: number;
+};
 
 type ChurnRiskTenant = {
   id: string;
@@ -139,6 +166,8 @@ export default function AdminOverviewPage() {
   const { setAuth } = useAuthStore();
   const [stats, setStats] = useState<Stats | null>(null);
   const [churnData, setChurnData] = useState<ChurnRiskData | null>(null);
+  const [mrrGrowth, setMrrGrowth] = useState<MrrMonth[] | null>(null);
+  const [failedPayments, setFailedPayments] = useState<FailedPaymentsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [impersonating, setImpersonating] = useState<string | null>(null);
@@ -147,12 +176,16 @@ export default function AdminOverviewPage() {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     try {
-      const [statsRes, churnRes] = await Promise.all([
+      const [statsRes, churnRes, mrrRes, failedRes] = await Promise.all([
         adminEndpoints.stats(),
         adminEndpoints.getChurnRisk(),
+        adminEndpoints.getMrrGrowth(),
+        adminEndpoints.getFailedPayments(),
       ]);
       setStats(statsRes.data.data);
       setChurnData(churnRes.data.data);
+      setMrrGrowth(mrrRes.data.data?.monthly ?? null);
+      setFailedPayments(failedRes.data.data ?? null);
     } catch {
       toast({ title: 'Failed to load stats', variant: 'destructive' });
     } finally {
@@ -269,6 +302,172 @@ export default function AdminOverviewPage() {
           />
         </div>
       </div>
+
+      {/* Smart Alerts — today's action list */}
+      {(() => {
+        const alerts: { level: 'red' | 'yellow' | 'blue'; text: string; action?: React.ReactNode }[] = [];
+
+        // Failed payments
+        if (failedPayments?.pastDue.length) {
+          failedPayments.pastDue.forEach(t => {
+            alerts.push({
+              level: 'red',
+              text: `${t.name} — $${t.amount}/mo payment failed${t.daysOverdue ? ` (${t.daysOverdue}d ago)` : ''}`,
+              action: t.email ? (
+                <a href={`mailto:${t.email}`} className="shrink-0 rounded-lg bg-red-500/20 px-2.5 py-1 text-xs font-medium text-red-300 hover:bg-red-500/30 transition-colors">
+                  Email
+                </a>
+              ) : undefined,
+            });
+          });
+        }
+
+        // Trials ending in ≤ 3 days
+        if (churnData?.atRisk) {
+          const trialsEndingSoon = stats?.recentTenants.filter(t => {
+            if (t.planStatus !== 'trialing' || !t.trialEndsAt) return false;
+            const days = Math.ceil((new Date(t.trialEndsAt).getTime() - Date.now()) / 86_400_000);
+            return days <= 3 && days >= 0;
+          }) ?? [];
+          trialsEndingSoon.forEach(t => {
+            const days = Math.ceil((new Date(t.trialEndsAt!).getTime() - Date.now()) / 86_400_000);
+            alerts.push({
+              level: 'yellow',
+              text: `${t.name} trial ends in ${days === 0 ? 'today' : `${days}d`} — not yet converted`,
+            });
+          });
+        }
+
+        // High churn risk
+        churnData?.atRisk.filter(t => t.churnRisk.level === 'HIGH').slice(0, 2).forEach(t => {
+          alerts.push({
+            level: 'blue',
+            text: `${t.name} — high churn risk (${t.churnRisk.reasons[0] ?? 'inactive'})`,
+            action: (
+              <button
+                onClick={() => handleImpersonate(t.id, t.name)}
+                disabled={impersonating === t.id}
+                className="shrink-0 rounded-lg bg-indigo-500/20 px-2.5 py-1 text-xs font-medium text-indigo-300 hover:bg-indigo-500/30 transition-colors disabled:opacity-50"
+              >
+                {impersonating === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'View'}
+              </button>
+            ),
+          });
+        });
+
+        if (alerts.length === 0) return null;
+
+        const colorMap = {
+          red:    { border: 'border-red-500/20',    bg: 'bg-red-500/8',    dot: 'bg-red-500',    text: 'text-red-300' },
+          yellow: { border: 'border-amber-500/20',  bg: 'bg-amber-500/8',  dot: 'bg-amber-400',  text: 'text-amber-300' },
+          blue:   { border: 'border-indigo-500/20', bg: 'bg-indigo-500/8', dot: 'bg-indigo-400', text: 'text-indigo-300' },
+        };
+
+        return (
+          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <Zap className="h-4 w-4 text-amber-400" />
+              <h2 className="text-sm font-semibold text-white">Today's Action List</h2>
+              <span className="ml-1 rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-400">
+                {alerts.length}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {alerts.map((a, i) => {
+                const c = colorMap[a.level];
+                return (
+                  <div key={i} className={cn('flex items-center gap-3 rounded-xl border px-4 py-2.5', c.border, c.bg)}>
+                    <div className={cn('h-1.5 w-1.5 shrink-0 rounded-full', c.dot)} />
+                    <p className={cn('flex-1 text-xs font-medium', c.text)}>{a.text}</p>
+                    {a.action}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Revenue Breakdown */}
+      {mrrGrowth && mrrGrowth.length > 0 && (() => {
+        const current = mrrGrowth[mrrGrowth.length - 1];
+        const chartData = mrrGrowth.slice(-6).map(m => ({
+          label: m.label.split(' ')[0], // short month name
+          mrr: m.mrr,
+          new: m.newMrr,
+          churned: m.churnedMrr,
+        }));
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* MRR Movement cards */}
+            <div className="flex flex-col gap-3">
+              {[
+                {
+                  label: 'New MRR', value: current.newMrr, icon: TrendingUp,
+                  color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20',
+                  desc: 'New paying customers this month',
+                },
+                {
+                  label: 'Churned MRR', value: current.churnedMrr, icon: TrendingDown,
+                  color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20',
+                  desc: 'Revenue lost this month',
+                },
+                {
+                  label: 'Net MRR Change', value: current.netMrr, icon: Minus,
+                  color: current.netMrr >= 0 ? 'text-blue-400' : 'text-orange-400',
+                  bg: current.netMrr >= 0 ? 'bg-blue-500/10 border-blue-500/20' : 'bg-orange-500/10 border-orange-500/20',
+                  desc: 'New − Churned this month',
+                },
+              ].map(({ label, value, icon: Icon, color, bg, desc }) => (
+                <div key={label} className={cn('flex items-center gap-4 rounded-xl border p-4', bg)}>
+                  <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-900/60')}>
+                    <Icon className={cn('h-4 w-4', color)} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-gray-500">{label}</p>
+                    <p className={cn('text-xl font-bold', color)}>
+                      {value < 0 ? '-' : value > 0 && label !== 'Net MRR Change' ? '+' : value > 0 ? '+' : ''}
+                      ${Math.abs(value).toLocaleString()}
+                    </p>
+                    <p className="text-[10px] text-gray-600 truncate">{desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* MRR Trend Chart */}
+            <div className="lg:col-span-2 rounded-2xl border border-gray-800 bg-gray-900 p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-white">MRR Trend</p>
+                  <p className="text-xs text-gray-500">{current.payingCustomers} paying customers · last 6 months</p>
+                </div>
+                <Link href="/admin/billing" className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+                  Full report <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+              <ResponsiveContainer width="100%" height={160}>
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="mrrGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#6b7280' }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
+                  <Tooltip
+                    contentStyle={{ background: '#111827', border: '1px solid #1f2937', borderRadius: 8, fontSize: 12 }}
+                    formatter={(v: number) => [`$${v.toLocaleString()}`, 'MRR']}
+                  />
+                  <Area type="monotone" dataKey="mrr" stroke="#6366f1" fill="url(#mrrGrad)" strokeWidth={2} dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Secondary stats */}
       <div className="grid grid-cols-3 gap-4">
@@ -417,6 +616,62 @@ export default function AdminOverviewPage() {
           </div>
         </div>
       </div>
+
+      {/* Failed Payments Queue */}
+      {failedPayments && failedPayments.pastDue.length > 0 && (
+        <div className="rounded-2xl border border-red-500/20 bg-gray-900 p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/10">
+                <AlertTriangle className="h-4 w-4 text-red-400" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-white">Failed Payments</h2>
+                <p className="text-xs text-gray-500">
+                  ${failedPayments.totalAtRisk.toLocaleString()} at risk · {failedPayments.pastDue.length} tenant{failedPayments.pastDue.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+            <Link href="/admin/billing" className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300">
+              Billing <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+          <div className="space-y-2">
+            {failedPayments.pastDue.map((t) => (
+              <div key={t.id} className="flex items-center gap-3 rounded-xl border border-red-500/15 bg-red-500/5 px-4 py-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-800 text-xs font-bold uppercase text-gray-300">
+                  {t.name[0]}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-white">{t.name}</p>
+                  <p className="text-xs text-gray-500">
+                    {t.plan} · ${t.amount}/mo
+                    {t.daysOverdue !== null && t.daysOverdue > 0 && (
+                      <span className="ml-2 text-red-400">{t.daysOverdue}d overdue</span>
+                    )}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {t.email && (
+                    <a
+                      href={`mailto:${t.email}?subject=Your ResortPro payment failed`}
+                      className="rounded-lg bg-gray-700 px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-600 hover:text-white"
+                    >
+                      Email
+                    </a>
+                  )}
+                  <Link
+                    href={`/admin/tenants`}
+                    className="rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/30"
+                  >
+                    View
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Churn Risk Widget */}
       {churnData && (

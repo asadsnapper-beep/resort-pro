@@ -1,5 +1,8 @@
 'use client'
 import type { ResortData } from '../../types'
+import { galleryImg } from '../../_utils/images'
+
+const FALLBACK_COUNT = 8
 
 interface GallerySectionProps {
   data: ResortData
@@ -8,9 +11,11 @@ interface GallerySectionProps {
 export function GallerySection({ data }: GallerySectionProps) {
   const { website } = data
   const accent = website?.accentColor || '#d4a853'
-  const images = website?.galleryImages ?? []
-
-  if (images.length === 0) return null
+  const raw = website?.galleryImages ?? []
+  // Always show gallery — fill empty slots with Unsplash fallbacks
+  const images = raw.length > 0
+    ? raw
+    : Array.from({ length: FALLBACK_COUNT }, (_, i) => galleryImg(null, i))
 
   return (
     <section id="gallery" className="py-24 bg-white">
@@ -23,10 +28,10 @@ export function GallerySection({ data }: GallerySectionProps) {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {images.map((img, i) => (
+          {images.map((src, i) => (
             <div key={i} className={`overflow-hidden rounded-2xl ${i === 0 ? 'col-span-2 row-span-2' : ''}`}>
               <img
-                src={img}
+                src={src}
                 alt={`Gallery ${i + 1}`}
                 className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
                 style={{ height: i === 0 ? '400px' : '190px' }}

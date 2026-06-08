@@ -1,0 +1,75 @@
+{
+  "key": "aether-grand",
+  "name": "Aether Grand Hotel",
+  "version": "1.0.0",
+
+  "colors": {
+    "primary":    "#1e3a8a",
+    "accent":     "#818cf8",
+    "background": "#eff6ff",
+    "surface":    "#ffffff",
+    "text":       "#0f172a",
+    "textMuted":  "#475569"
+  },
+
+  "fonts": {
+    "heading": "sans-serif",
+    "body":    "sans-serif",
+    "googleFonts": ["Outfit", "Inter"]
+  },
+
+  "navbar": {
+    "style":     "transparent",
+    "logoEmoji": "✦",
+    "links":     ["about", "rooms", "gallery", "booking", "contact"]
+  },
+
+  "hero": {
+    "layout":        "fullscreen",
+    "overlayColor":  "rgba(219,234,254,0.28)",
+    "textAlign":     "center",
+    "ctaStyle":      "pill",
+    "showStats":     false
+  },
+
+  "about": {
+    "layout":      "image-right",
+    "showBullets": true,
+    "bullets": [
+      "Panoramic rooftop infinity pool & sky lounge on the 35th floor",
+      "Michelin-recognised fine dining with 270° city views",
+      "Signature altitude spa — light therapy & breathwork rituals",
+      "Rotating collection of curated contemporary urban art",
+      "24/7 personal butler & dedicated city concierge team",
+      "Private helipad arrivals & executive fleet transfers"
+    ]
+  },
+
+  "rooms": {
+    "cardBackground": "#ffffff",
+    "ctaLabel":       "Reserve Your Suite"
+  },
+
+  "gallery": {
+    "layout":   "grid",
+    "captions": [
+      "Skyline at Dusk",
+      "Rooftop Infinity",
+      "Sky Dining Room",
+      "Glass Suite",
+      "City Panorama",
+      "Lobby Gallery",
+      "Executive Lounge",
+      "Nightfall View"
+    ]
+  },
+
+  "footer": {
+    "background": "#0f172a",
+    "divider":    "straight"
+  },
+
+  "sections": ["hero", "about", "rooms", "gallery", "testimonials", "availability", "booking", "contact"],
+
+  "customCSS": "nav, .navbar, header { background: rgba(255,255,255,0.10) !important; backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); border-bottom: 1px solid rgba(255,255,255,0.22); } [class*='card'], .room-card { background: rgba(255,255,255,0.52) !important; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.68); box-shadow: 0 8px 32px rgba(30,58,138,0.07), 0 1px 0 rgba(255,255,255,0.9) inset; border-radius: 20px; transition: transform 0.28s cubic-bezier(0.23,1,0.32,1), box-shadow 0.28s ease; } [class*='card']:hover, .room-card:hover { transform: translateY(-7px) scale(1.01); box-shadow: 0 24px 56px rgba(30,58,138,0.14), 0 1px 0 rgba(255,255,255,0.9) inset; } h1 { font-weight: 200; letter-spacing: -0.04em; font-size: clamp(2.8rem, 6vw, 5rem); } h2 { font-weight: 300; letter-spacing: -0.025em; } button, .cta-btn { border-radius: 100px !important; } ::selection { background: rgba(129,140,248,0.28); color: #1e3a8a; } ::-webkit-scrollbar { width: 5px; background: #eff6ff; } ::-webkit-scrollbar-thumb { background: #818cf8; border-radius: 10px; }"
+}

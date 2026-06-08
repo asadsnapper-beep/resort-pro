@@ -10,7 +10,8 @@
     "build:ios": "eas build --platform ios",
     "build:android": "eas build --platform android",
     "lint": "eslint src --ext .ts,.tsx",
-    "test": "jest"
+    "test": "jest",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.0",

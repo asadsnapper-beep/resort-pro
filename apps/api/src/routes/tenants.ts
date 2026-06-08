@@ -121,7 +121,7 @@ export async function tenantRoutes(app: FastifyInstance) {
 
         // Fallback: check A record if IP configured
         if (!verified && APP_IP) {
-          const addrs = await dns.resolve4(tenant.customDomain).catch(() => []);
+          const addrs = await dns.resolve4(tenant.customDomain).catch(() => [] as string[]);
           if (addrs.includes(APP_IP)) {
             verified = true; method = 'A'; resolvedTo = APP_IP;
           }
@@ -233,7 +233,7 @@ export async function tenantRoutes(app: FastifyInstance) {
   // ── GET /api/tenant/flags — returns enabled flags for this tenant ─────────
   app.get('/flags', {
     schema: { tags: ['tenant'], summary: 'Get feature flags for this tenant', security: [{ bearerAuth: [] }] },
-    preHandler: requireRole('OWNER', 'MANAGER', 'PARTNER', 'RECEPTIONIST', 'MARKETER', 'DEVELOPER', 'STAFF'),
+    preHandler: requireRole('OWNER', 'MANAGER', 'SHAREHOLDER', 'RECEPTIONIST', 'MARKETER', 'DEVELOPER', 'STAFF'),
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload;
       const rows = await prisma.tenantFeatureFlag.findMany({
@@ -252,6 +252,57 @@ export async function tenantRoutes(app: FastifyInstance) {
         if (!row.enabled) enabledFlags.delete(row.flag);
       }
       return ok(Array.from(enabledFlags));
+    },
+  });
+
+  // ── PATCH /api/tenant/flags/module — owner toggles an ownerControllable module flag
+  app.patch('/flags/module', {
+    schema: { tags: ['tenant'], summary: 'Toggle an owner-controlled module flag', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER'),
+    handler: async (request, reply) => {
+      const { tenantId } = request.user as JwtPayload;
+      const body = z.object({
+        flag: z.string(),
+        enabled: z.boolean(),
+      }).parse(request.body);
+
+      const flagDef = FLAG_REGISTRY.find((f) => f.flag === body.flag);
+      if (!flagDef || !flagDef.ownerControllable) {
+        return reply.status(403).send({ success: false, error: 'This flag cannot be toggled by owners.' });
+      }
+
+      await prisma.tenantFeatureFlag.upsert({
+        where: { tenantId_flag: { tenantId, flag: body.flag } },
+        create: { tenantId, flag: body.flag, enabled: body.enabled },
+        update: { enabled: body.enabled },
+      });
+
+      return ok({ flag: body.flag, enabled: body.enabled }, 'Module updated');
+    },
+  });
+
+  // ── GET /api/tenant/flags/modules — returns owner-controllable modules with their status
+  app.get('/flags/modules', {
+    schema: { tags: ['tenant'], summary: 'Get owner-controllable module flags and their status', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER', 'MANAGER'),
+    handler: async (request) => {
+      const { tenantId } = request.user as JwtPayload;
+
+      const moduleFlags = FLAG_REGISTRY.filter((f) => f.ownerControllable);
+      const rows = await prisma.tenantFeatureFlag.findMany({
+        where: { tenantId, flag: { in: moduleFlags.map((f) => f.flag) } },
+        select: { flag: true, enabled: true },
+      });
+      const overrides = Object.fromEntries(rows.map((r) => [r.flag, r.enabled]));
+
+      const modules = moduleFlags.map((f) => ({
+        flag: f.flag,
+        label: f.label,
+        description: f.description,
+        enabled: f.flag in overrides ? overrides[f.flag] : f.defaultOn,
+      }));
+
+      return ok(modules);
     },
   });
 
@@ -315,7 +366,7 @@ export async function tenantRoutes(app: FastifyInstance) {
   // Used by tenant dashboard to show in-app banners
   app.get('/announcements', {
     schema: { tags: ['tenant'], summary: 'Get active platform announcements', security: [{ bearerAuth: [] }] },
-    preHandler: requireRole('OWNER', 'MANAGER', 'PARTNER', 'RECEPTIONIST', 'MARKETER', 'DEVELOPER', 'STAFF'),
+    preHandler: requireRole('OWNER', 'MANAGER', 'SHAREHOLDER', 'RECEPTIONIST', 'MARKETER', 'DEVELOPER', 'STAFF'),
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload;
       const tenant = await prisma.tenant.findUnique({
@@ -436,6 +487,201 @@ export async function tenantRoutes(app: FastifyInstance) {
       const { toEmail } = request.body as { toEmail: string };
       await sendTestEmail(tenantId, toEmail);
       return ok({ sent: true, to: toEmail });
+    },
+  });
+
+  // ─── SMS & WhatsApp Settings ────────────────────────────────────────────────
+
+  // GET /api/tenant/sms-settings
+  app.get('/sms-settings', {
+    schema: { tags: ['tenant'], security: [{ bearerAuth: [] }] },
+    preHandler: [requireAuth, requireRole('OWNER', 'MANAGER')],
+    handler: async (request) => {
+      const { tenantId } = request.user as JwtPayload;
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: {
+          smsEnabled: true, smsMode: true, smsProvider: true,
+          smsSenderId: true,
+          // never return raw api keys — mask them
+          smsApiKey: true, smsApiSecret: true,
+          waEnabled: true, waMode: true,
+          waApiToken: true, waPhoneNumberId: true, waBusinessAccId: true,
+          notifBookingConfirm: true, notifPaymentReceived: true,
+          notifCheckinReminder: true, notifCheckoutRemind: true,
+          notifCancellation: true, notifInvoiceSent: true,
+          notifLanguage: true,
+          smsQuotaMonthly: true, smsUsedThisMonth: true, smsCredits: true,
+          waQuotaMonthly: true,  waUsedThisMonth: true,  waCredits: true,
+        },
+      });
+      if (!tenant) return { success: false, error: 'Tenant not found' };
+
+      // Mask API keys — only show last 4 chars if set
+      const mask = (v?: string | null) => v ? '••••••••' + v.slice(-4) : null;
+      return ok({
+        ...tenant,
+        smsApiKey:    mask(tenant.smsApiKey),
+        smsApiSecret: mask(tenant.smsApiSecret),
+        waApiToken:   mask(tenant.waApiToken),
+      });
+    },
+  });
+
+  // PATCH /api/tenant/sms-settings  — toggle, triggers, language
+  app.patch('/sms-settings', {
+    schema: { tags: ['tenant'], security: [{ bearerAuth: [] }] },
+    preHandler: [requireAuth, requireRole('OWNER', 'MANAGER')],
+    handler: async (request) => {
+      const { tenantId } = request.user as JwtPayload;
+      const body = request.body as {
+        smsEnabled?: boolean; waEnabled?: boolean;
+        notifBookingConfirm?: boolean; notifPaymentReceived?: boolean;
+        notifCheckinReminder?: boolean; notifCheckoutRemind?: boolean;
+        notifCancellation?: boolean; notifInvoiceSent?: boolean;
+        notifLanguage?: string;
+      };
+      const updated = await prisma.tenant.update({
+        where: { id: tenantId },
+        data: {
+          ...(body.smsEnabled            !== undefined && { smsEnabled: body.smsEnabled }),
+          ...(body.waEnabled             !== undefined && { waEnabled:  body.waEnabled }),
+          ...(body.notifBookingConfirm   !== undefined && { notifBookingConfirm:  body.notifBookingConfirm }),
+          ...(body.notifPaymentReceived  !== undefined && { notifPaymentReceived: body.notifPaymentReceived }),
+          ...(body.notifCheckinReminder  !== undefined && { notifCheckinReminder: body.notifCheckinReminder }),
+          ...(body.notifCheckoutRemind   !== undefined && { notifCheckoutRemind:  body.notifCheckoutRemind }),
+          ...(body.notifCancellation     !== undefined && { notifCancellation:    body.notifCancellation }),
+          ...(body.notifInvoiceSent      !== undefined && { notifInvoiceSent:     body.notifInvoiceSent }),
+          ...(body.notifLanguage         !== undefined && { notifLanguage:        body.notifLanguage }),
+        },
+        select: {
+          smsEnabled: true, waEnabled: true,
+          notifBookingConfirm: true, notifPaymentReceived: true,
+          notifCheckinReminder: true, notifCheckoutRemind: true,
+          notifCancellation: true, notifInvoiceSent: true,
+          notifLanguage: true,
+        },
+      });
+      return ok(updated, 'Notification settings saved');
+    },
+  });
+
+  // PATCH /api/tenant/sms-credentials  — SMS BYOC credentials
+  app.patch('/sms-credentials', {
+    schema: { tags: ['tenant'], security: [{ bearerAuth: [] }] },
+    preHandler: [requireAuth, requireRole('OWNER')],
+    handler: async (request) => {
+      const { tenantId } = request.user as JwtPayload;
+      const body = request.body as {
+        smsMode: 'platform' | 'own';
+        smsProvider?: string;
+        smsApiKey?: string;
+        smsApiSecret?: string;
+        smsSenderId?: string;
+      };
+
+      const data: Record<string, any> = { smsMode: body.smsMode };
+      if (body.smsMode === 'own') {
+        if (body.smsProvider) data.smsProvider = body.smsProvider;
+        if (body.smsSenderId) data.smsSenderId = body.smsSenderId;
+        // Only update keys if new value provided (not the masked placeholder)
+        if (body.smsApiKey    && !body.smsApiKey.startsWith('••••'))    data.smsApiKey    = body.smsApiKey;
+        if (body.smsApiSecret && !body.smsApiSecret.startsWith('••••')) data.smsApiSecret = body.smsApiSecret;
+      }
+
+      await prisma.tenant.update({ where: { id: tenantId }, data });
+      return ok({ smsMode: body.smsMode }, 'SMS credentials saved');
+    },
+  });
+
+  // PATCH /api/tenant/wa-credentials  — WhatsApp BYOC credentials
+  app.patch('/wa-credentials', {
+    schema: { tags: ['tenant'], security: [{ bearerAuth: [] }] },
+    preHandler: [requireAuth, requireRole('OWNER')],
+    handler: async (request) => {
+      const { tenantId } = request.user as JwtPayload;
+      const body = request.body as {
+        waMode: 'platform' | 'own';
+        waPhoneNumberId?: string;
+        waApiToken?: string;
+        waBusinessAccId?: string;
+      };
+
+      const data: Record<string, any> = { waMode: body.waMode };
+      if (body.waMode === 'own') {
+        if (body.waPhoneNumberId) data.waPhoneNumberId = body.waPhoneNumberId;
+        if (body.waBusinessAccId) data.waBusinessAccId = body.waBusinessAccId;
+        if (body.waApiToken && !body.waApiToken.startsWith('••••')) data.waApiToken = body.waApiToken;
+      }
+
+      await prisma.tenant.update({ where: { id: tenantId }, data });
+      return ok({ waMode: body.waMode }, 'WhatsApp credentials saved');
+    },
+  });
+
+  // POST /api/tenant/sms-settings/test-sms
+  app.post('/sms-settings/test-sms', {
+    schema: { tags: ['tenant'], security: [{ bearerAuth: [] }] },
+    preHandler: [requireAuth, requireRole('OWNER', 'MANAGER')],
+    handler: async (request, reply) => {
+      const { tenantId } = request.user as JwtPayload;
+      const { to } = request.body as { to: string };
+      if (!to) return reply.status(400).send({ success: false, error: 'Phone number required' });
+      // Placeholder — real SMS service will be wired in Phase 1 implementation
+      return ok({ sent: true, to, message: `Test SMS from ResortPro — SMS notifications are configured correctly!` }, 'Test SMS queued (SMS service coming soon)');
+    },
+  });
+
+  // POST /api/tenant/sms-settings/test-whatsapp
+  app.post('/sms-settings/test-whatsapp', {
+    schema: { tags: ['tenant'], security: [{ bearerAuth: [] }] },
+    preHandler: [requireAuth, requireRole('OWNER', 'MANAGER')],
+    handler: async (request, reply) => {
+      const { tenantId } = request.user as JwtPayload;
+      const { to } = request.body as { to: string };
+      if (!to) return reply.status(400).send({ success: false, error: 'Phone number required' });
+      return ok({ sent: true, to }, 'WhatsApp test queued (WhatsApp service coming soon)');
+    },
+  });
+
+  // ── GET /api/tenant/referrals ────────────────────────────────────────────
+  app.get('/referrals', {
+    schema: { tags: ['tenant'], security: [{ bearerAuth: [] }] },
+    preHandler: [requireAuth, requireRole('OWNER')],
+    handler: async (request, reply) => {
+      const { tenantId } = request.user as JwtPayload;
+
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { referralCode: true, accountCredit: true, freeUntil: true, plan: true },
+      });
+      if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
+
+      const referrals = await prisma.referral.findMany({
+        where: { referrerId: tenantId },
+        include: {
+          referred: { select: { name: true, slug: true, plan: true, planStatus: true, createdAt: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const APP_URL = process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:3000';
+      const referralLink = tenant.referralCode
+        ? `${APP_URL}/register?ref=${tenant.referralCode}`
+        : null;
+
+      return reply.send(ok({
+        referralCode: tenant.referralCode,
+        referralLink,
+        accountCredit: tenant.accountCredit,
+        freeUntil: tenant.freeUntil,
+        stats: {
+          total: referrals.length,
+          rewarded: referrals.filter(r => r.status === 'REWARDED').length,
+          pending: referrals.filter(r => r.status === 'PENDING').length,
+        },
+        referrals,
+      }));
     },
   });
 }

@@ -1,6 +1,7 @@
 'use client'
 import { ArrowDown } from 'lucide-react'
 import type { ResortData } from '../../types'
+import { heroImg } from '../../_utils/images'
 
 interface HeroSectionProps {
   data:     ResortData
@@ -14,14 +15,10 @@ export function HeroSection({ data, scrollTo }: HeroSectionProps) {
   return (
     <section id="hero" className="relative h-screen min-h-[600px] flex items-center justify-center overflow-hidden">
       {/* Background */}
-      {website?.heroImage ? (
-        <div className="absolute inset-0">
-          <img src={website.heroImage} alt={tenant.name} className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-black/55" />
-        </div>
-      ) : (
-        <div className="absolute inset-0 bg-slate-900" />
-      )}
+      <div className="absolute inset-0">
+        <img src={heroImg(website?.heroImage)} alt={tenant.name} className="w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-black/55" />
+      </div>
 
       {/* Content */}
       <div className="relative z-10 text-center text-white max-w-3xl mx-auto px-6">

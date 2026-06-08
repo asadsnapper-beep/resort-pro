@@ -1,6 +1,7 @@
 'use client'
-import { Users, BedDouble } from 'lucide-react'
+import { Users } from 'lucide-react'
 import type { ResortData, ResortRoom } from '../../types'
+import { roomImg } from '../../_utils/images'
 
 interface RoomsSectionProps {
   data:       ResortData
@@ -58,17 +59,11 @@ function RoomRow({ room, currency, primary, onBook }: {
     <div className="flex gap-6 py-8 group">
       {/* Thumbnail */}
       <div className="flex-shrink-0 w-48 h-32 overflow-hidden rounded-sm bg-slate-100">
-        {room.images[0] ? (
-          <img
-            src={room.images[0]}
-            alt={room.name}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <BedDouble className="h-8 w-8 text-slate-300" />
-          </div>
-        )}
+        <img
+          src={roomImg(room.images[0])}
+          alt={room.name}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
       </div>
 
       {/* Details */}

@@ -1,0 +1,73 @@
+{
+  "key": "sunset-beach",
+  "name": "Sunset Beach Resort",
+  "version": "1.0.0",
+
+  "colors": {
+    "primary":    "#c0392b",
+    "accent":     "#f39c12",
+    "background": "#fffdf7",
+    "surface":    "#fff8ee",
+    "text":       "#1a1a1a",
+    "textMuted":  "#7f6e5d"
+  },
+
+  "fonts": {
+    "heading": "serif",
+    "body":    "sans-serif",
+    "googleFonts": ["Playfair Display", "Inter"]
+  },
+
+  "navbar": {
+    "style":     "transparent-to-white",
+    "logoEmoji": "🌅",
+    "links":     ["about", "rooms", "gallery", "booking", "contact"]
+  },
+
+  "hero": {
+    "layout":          "fullscreen",
+    "overlayOpacity":  0.45,
+    "overlayColor":    "rgba(180, 50, 20, 0.40)",
+    "textAlign":       "center",
+    "ctaStyle":        "pill",
+    "showStats":       true
+  },
+
+  "about": {
+    "layout":      "image-left",
+    "showBullets": true,
+    "bullets": [
+      "Private beachfront access",
+      "Infinity pool overlooking the ocean",
+      "Award-winning seafood restaurant",
+      "Sunset yoga & wellness center",
+      "Water sports & diving center"
+    ]
+  },
+
+  "rooms": {
+    "cardBackground": "#fff8ee",
+    "ctaLabel":       "Reserve Now"
+  },
+
+  "gallery": {
+    "layout":   "masonry",
+    "captions": [
+      "Golden Hour Beach",
+      "Beachfront Suite",
+      "Infinity Pool",
+      "Seafood Dinner",
+      "Sunset Cruise",
+      "Water Sports",
+      "Spa & Wellness",
+      "Garden Walk"
+    ]
+  },
+
+  "footer": {
+    "background": "#1a0a00",
+    "divider":    "wave"
+  },
+
+  "sections": ["hero", "about", "rooms", "gallery", "testimonials", "availability", "booking", "contact"]
+}

@@ -17,7 +17,7 @@ import { ImageUpload } from '@/components/ui/ImageUpload';
 const ROLE_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   OWNER:        { label: 'Owner',        color: 'text-yellow-700', bg: 'bg-yellow-50 border-yellow-200' },
   MANAGER:      { label: 'Manager',      color: 'text-resort-700', bg: 'bg-resort-50 border-resort-200' },
-  PARTNER:      { label: 'Partner',      color: 'text-blue-700',   bg: 'bg-blue-50 border-blue-200' },
+  SHAREHOLDER:  { label: 'Shareholder',  color: 'text-amber-700',  bg: 'bg-amber-50 border-amber-200' },
   RECEPTIONIST: { label: 'Receptionist', color: 'text-emerald-700',bg: 'bg-emerald-50 border-emerald-200' },
   MARKETER:     { label: 'Marketer',     color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200' },
   DEVELOPER:    { label: 'Developer',    color: 'text-gray-700',   bg: 'bg-gray-100 border-gray-200' },

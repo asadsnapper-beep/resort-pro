@@ -1,0 +1,75 @@
+{
+  "key": "ivory-heights",
+  "name": "Ivory Heights Boutique",
+  "version": "1.0.0",
+
+  "colors": {
+    "primary":    "#1e293b",
+    "accent":     "#7c3aed",
+    "background": "#f9fafb",
+    "surface":    "#ffffff",
+    "text":       "#111827",
+    "textMuted":  "#6b7280"
+  },
+
+  "fonts": {
+    "heading": "sans-serif",
+    "body":    "sans-serif",
+    "googleFonts": ["DM Sans", "Outfit"]
+  },
+
+  "navbar": {
+    "style":     "solid",
+    "logoEmoji": "🏙️",
+    "links":     ["about", "rooms", "gallery", "booking", "contact"]
+  },
+
+  "hero": {
+    "layout":         "split",
+    "overlayOpacity": 0.12,
+    "textAlign":      "left",
+    "ctaStyle":       "rounded",
+    "showStats":      false
+  },
+
+  "about": {
+    "layout":      "centered",
+    "showBullets": true,
+    "bullets": [
+      "Rooftop infinity pool with panoramic city skyline views",
+      "28th floor signature restaurant & sky bar",
+      "Full-service spa, sauna & wellness studio",
+      "State-of-the-art fitness center, open 24 hours",
+      "Personal concierge, city tours & chauffeur transfers",
+      "Private event spaces for up to 200 guests"
+    ]
+  },
+
+  "rooms": {
+    "cardBackground": "#ffffff",
+    "ctaLabel":       "Book Your Stay"
+  },
+
+  "gallery": {
+    "layout":   "grid",
+    "captions": [
+      "Skyline Suite",
+      "Rooftop Pool",
+      "Sky Restaurant",
+      "Executive Lounge",
+      "City View Room",
+      "Spa & Wellness",
+      "Lobby Bar",
+      "Meeting Terrace"
+    ]
+  },
+
+  "footer": {
+    "background": "#0f172a",
+    "divider":    "straight"
+  },
+
+  "sections": ["hero", "about", "rooms", "gallery", "testimonials", "availability", "booking", "contact"],
+
+  "customCSS": "[class*='card'], .room-card { transition: transform 0.22s ease, box-shadow 0.22s ease; } [class*='card']:hover, .room-card:hover { transform: translateY(-5px); box-shadow: 0 16px 40px rgba(0,0,0,0.09); } nav a { position: relative; } nav a::after { content: ''; position: absolute; bottom: -3px; left: 0; width: 0; height: 1.5px; background: #7c3aed; transition: width 0.25s ease; } nav a:hover::after { width: 100%; } ::selection { background: #7c3aed22; color: #1e293b; }"
+}

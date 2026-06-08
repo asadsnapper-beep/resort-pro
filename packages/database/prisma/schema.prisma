@@ -18,11 +18,11 @@ enum TenantPlan {
 
 enum UserRole {
   OWNER        // সব কিছু দেখতে ও করতে পারে
-  MANAGER      // সব কিছু দেখতে ও করতে পারে
-  PARTNER      // শুধু Analytics ও Dashboard stats
+  MANAGER      // Billing বাদে সব
+  SHAREHOLDER  // শুধু Dashboard, Analytics, Reports — read-only
   RECEPTIONIST // Bookings, Calendar, Rooms, Guests, Housekeeping, Support
   MARKETER     // Analytics, Website, CRM & Email, Guests
-  DEVELOPER    // Settings (Embed), Website
+  DEVELOPER    // Settings (Embed), Website, Channel Sync
   STAFF        // Housekeeping, Maintenance, Restaurant, Orders
   GUEST        // (external, not dashboard user)
 }
@@ -39,6 +39,7 @@ enum RoomType {
 enum RoomStatus {
   AVAILABLE
   OCCUPIED
+  CLEANING
   MAINTENANCE
   RESERVED
 }
@@ -268,143 +269,180 @@ enum LoyaltyTxType {
 // ─── Core Models ──────────────────────────────────────────────────────────────
 
 model Tenant {
-  id          String     @id @default(uuid())
-  name        String
-  slug        String     @unique
-  plan        TenantPlan @default(FREE)
-  isActive    Boolean    @default(true)
-  logoUrl     String?
-  address     String?
-  phone       String?
-  email       String?
-  website          String?
-  customDomain            String?   @unique  // e.g. www.sunsetresort.com
-  domainVerified          Boolean   @default(false)
+  id                      String     @id @default(uuid())
+  name                    String
+  slug                    String     @unique
+  plan                    TenantPlan @default(FREE)
+  isActive                Boolean    @default(true)
+  isDemo                  Boolean    @default(false) // demo tenant — read-only, auto-login
+  logoUrl                 String?
+  address                 String?
+  phone                   String?
+  email                   String?
+  website                 String?
+  customDomain            String?    @unique // e.g. www.sunsetresort.com
+  domainVerified          Boolean    @default(false)
   domainVerifiedAt        DateTime?
-  domainVerificationToken String?             // TXT token for ownership proof
-  sslStatus               String?   @default("none")  // none | pending | provisioning | active | error
+  domainVerificationToken String? // TXT token for ownership proof
+  sslStatus               String?    @default("none") // none | pending | provisioning | active | error
   sslProvisionedAt        DateTime?
   sslExpiresAt            DateTime?
-  sslError                String?             // last error message from cert provisioner
-  currency    String     @default("USD")
-  taxRate     Float      @default(0)       // invoice tax percentage e.g. 10 = 10%
-  timezone    String     @default("UTC")
-  checkInTime String     @default("14:00")
-  checkOutTime String    @default("11:00")
+  sslError                String? // last error message from cert provisioner
+  currency                String     @default("USD")
+  taxRate                 Float      @default(0) // invoice tax percentage e.g. 10 = 10%
+  timezone                String     @default("UTC")
+  checkInTime             String     @default("14:00")
+  checkOutTime            String     @default("11:00")
   // Stripe billing
-  stripeCustomerId     String?  @unique
-  stripeSubscriptionId String?  @unique
-  planStatus           String   @default("trialing")  // trialing | active | past_due | canceled | incomplete
-  trialEndsAt          DateTime?
-  currentPeriodEnd     DateTime?
-  billingEmail         String?
-  // Referral
-  referralCode  String?   @unique  // this tenant's shareable code e.g. "SUNSET-A3K9"
-  referredById  String?            // which tenant referred this one
-  referrer      Tenant?   @relation("TenantReferrals", fields: [referredById], references: [id], onDelete: SetNull)
-  referrals     Tenant[]  @relation("TenantReferrals")
+  stripeCustomerId        String?    @unique
+  stripeSubscriptionId    String?    @unique
+  planStatus              String     @default("trialing") // trialing | active | past_due | canceled | incomplete
+  trialEndsAt             DateTime?
+  currentPeriodEnd        DateTime?
+  billingEmail            String?
+  // Referral & marketing attribution
+  referralCode            String?    @unique // this tenant's shareable code e.g. "SUNSET-A3K9"
+  referredById            String? // which tenant referred this one
+  campaignSource          String? // campaign link code used during signup (e.g. "RAKIB2024")
+  referrer                Tenant?    @relation("TenantReferrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals               Tenant[]   @relation("TenantReferrals")
+  accountCredit           Float      @default(0) // ৳ credit balance — deducted from next invoice
+  freeUntil               DateTime? // free plan expiry (set when reward = FREE_PLAN)
+  referralsMade           Referral[] @relation("ReferrerReferrals")
+  referralEntry           Referral?  @relation("ReferredReferrals")
   // GDPR
-  gdprErasureRequestedAt DateTime?  // when tenant/admin requested erasure
-  gdprErasureRequestedBy String?    // "owner" | admin email
-  gdprAnonymizedAt       DateTime?  // when anonymization was completed
-  deletedAt              DateTime?  // soft-delete timestamp (hard purge after 30d)
+  gdprErasureRequestedAt  DateTime? // when tenant/admin requested erasure
+  gdprErasureRequestedBy  String? // "owner" | admin email
+  gdprAnonymizedAt        DateTime? // when anonymization was completed
+  deletedAt               DateTime? // soft-delete timestamp (hard purge after 30d)
   // Payment gateways (owner configures in dashboard)
-  bkashEnabled     Boolean  @default(false)
-  bkashAppKey      String?
-  bkashAppSecret   String?
-  bkashUsername    String?
-  bkashPassword    String?
-  sslEnabled       Boolean  @default(false)
-  sslStoreId       String?
-  sslStorePassword String?
-  sslIsLive        Boolean  @default(false)
-  stripeGuestEnabled Boolean @default(false)
+  bkashEnabled            Boolean    @default(false)
+  bkashAppKey             String?
+  bkashAppSecret          String?
+  bkashUsername           String?
+  bkashPassword           String?
+  sslEnabled              Boolean    @default(false)
+  sslStoreId              String?
+  sslStorePassword        String?
+  sslIsLive               Boolean    @default(false)
+  stripeGuestEnabled      Boolean    @default(false)
+  // SMS & WhatsApp notifications
+  smsEnabled              Boolean    @default(false)
+  smsMode                 String     @default("platform") // "platform" | "own"
+  smsProvider             String? // "ssl_wireless" | "twilio" | "alpha_net"
+  smsApiKey               String?
+  smsApiSecret            String?
+  smsSenderId             String?
+  waEnabled               Boolean    @default(false)
+  waMode                  String     @default("platform") // "platform" | "own"
+  waApiToken              String?
+  waPhoneNumberId         String?
+  waBusinessAccId         String?
+  // Notification triggers
+  notifBookingConfirm     Boolean    @default(true)
+  notifPaymentReceived    Boolean    @default(true)
+  notifCheckinReminder    Boolean    @default(true)
+  notifCheckoutRemind     Boolean    @default(false)
+  notifCancellation       Boolean    @default(true)
+  notifInvoiceSent        Boolean    @default(false)
+  notifLanguage           String     @default("en") // "en" | "bn"
+  // SMS quota & credits
+  smsQuotaMonthly         Int        @default(100)
+  smsUsedThisMonth        Int        @default(0)
+  smsCredits              Int        @default(0)
+  waQuotaMonthly          Int        @default(50)
+  waUsedThisMonth         Int        @default(0)
+  waCredits               Int        @default(0)
   // White-label branding
-  whitelabelEnabled    Boolean  @default(false)
-  brandLogoUrl         String?                  // overrides logoUrl in tenant dashboard header
-  brandPrimaryColor    String?                  // hex e.g. "#1a6b5e"
-  brandAccentColor     String?                  // hex e.g. "#d4a853"
-  companyDisplayName   String?                  // replaces "ResortPro" in UI
+  whitelabelEnabled       Boolean    @default(false)
+  brandLogoUrl            String? // overrides logoUrl in tenant dashboard header
+  brandPrimaryColor       String? // hex e.g. "#1a6b5e"
+  brandAccentColor        String? // hex e.g. "#d4a853"
+  companyDisplayName      String? // replaces "ResortPro" in UI
   // SSO
-  ssoEnabled           Boolean  @default(false)
-  ssoProvider          String?                  // "google" | "microsoft" | "okta" | "saml"
-  ssoClientId          String?
-  ssoClientSecret      String?                  // stored encrypted in production; plain for dev
-  ssoConfig            Json?                    // provider-specific extras (tenant_id, domain, etc.)
+  ssoEnabled              Boolean    @default(false)
+  ssoProvider             String? // "google" | "microsoft" | "okta" | "saml"
+  ssoClientId             String?
+  ssoClientSecret         String? // stored encrypted in production; plain for dev
+  ssoConfig               Json? // provider-specific extras (tenant_id, domain, etc.)
   // Enterprise onboarding
-  onboardingStep        Int      @default(0)    // 0-6; 6 = complete
-  onboardingCompletedAt DateTime?
-  enterpriseNotes       String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  onboardingStep          Int        @default(0) // 0-6; 6 = complete
+  onboardingCompletedAt   DateTime?
+  enterpriseNotes         String?
+  createdAt               DateTime   @default(now())
+  updatedAt               DateTime   @updatedAt
 
   // Relations
-  users            User[]
-  rooms            Room[]
-  guests           Guest[]
-  bookings         Booking[]
-  staff            Staff[]
-  housekeepingTasks HousekeepingTask[]
-  menuItems        MenuItem[]
-  foodOrders       FoodOrder[]
-  inventoryItems   InventoryItem[]
-  inventoryMovements InventoryMovement[]
-  supportTickets   SupportTicket[]
-  amenities        Amenity[]
-  websiteContent   WebsiteContent?
-  notifications    Notification[]
-  payments         Payment[]
+  users               User[]
+  rooms               Room[]
+  guests              Guest[]
+  bookings            Booking[]
+  staff               Staff[]
+  housekeepingTasks   HousekeepingTask[]
+  menuItems           MenuItem[]
+  foodOrders          FoodOrder[]
+  inventoryItems      InventoryItem[]
+  inventoryMovements  InventoryMovement[]
+  supportTickets      SupportTicket[]
+  amenities           Amenity[]
+  websiteContent      WebsiteContent?
+  notifications       Notification[]
+  payments            Payment[]
   // CRM
-  guestTags        GuestTag[]
-  guestScores      GuestScore[]
-  emailConsents    EmailConsent[]
-  guestActivities  GuestActivity[]
-  emailTemplates   EmailTemplate[]
-  campaigns        Campaign[]
-  emailSends       EmailSend[]
-  sequences        Sequence[]
+  guestTags           GuestTag[]
+  guestScores         GuestScore[]
+  emailConsents       EmailConsent[]
+  guestActivities     GuestActivity[]
+  emailTemplates      EmailTemplate[]
+  campaigns           Campaign[]
+  emailSends          EmailSend[]
+  sequences           Sequence[]
   sequenceEnrollments SequenceEnrollment[]
-  staffInvites     StaffInvite[]
-  featureFlags     TenantFeatureFlag[]
-  slaAgreement     SlaAgreement?
-  invoiceExtras        InvoiceExtra[]
-  invoices             Invoice[]
-  invoicePayments      InvoicePayment[]
-  ratePlans            RatePlan[]
-  emailSettings        EmailSettings?
-  maintenanceTickets   MaintenanceTicket[]
-  packages             Package[]
-  groupBookings        GroupBooking[]
-  loyaltyProgram       LoyaltyProgram?
-  loyaltyAccounts      LoyaltyAccount[]
-  loyaltyTransactions  LoyaltyTransaction[]
-  externalCalendars    ExternalCalendar[]
-  expenses             Expense[]
+  staffInvites        StaffInvite[]
+  featureFlags        TenantFeatureFlag[]
+  slaAgreement        SlaAgreement?
+  invoiceExtras       InvoiceExtra[]
+  invoices            Invoice[]
+  invoicePayments     InvoicePayment[]
+  ratePlans           RatePlan[]
+  emailSettings       EmailSettings?
+  maintenanceTickets  MaintenanceTicket[]
+  packages            Package[]
+  groupBookings       GroupBooking[]
+  loyaltyProgram      LoyaltyProgram?
+  loyaltyAccounts     LoyaltyAccount[]
+  loyaltyTransactions LoyaltyTransaction[]
+  externalCalendars   ExternalCalendar[]
+  expenses            Expense[]
+  // SMS & WhatsApp Marketing
+  marketingCampaigns  MarketingCampaign[]
+  messageTemplates    MessageTemplate[]
+  offers              Offer[]
 
   @@map("tenants")
 }
 
 model User {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   tenantId     String
   email        String
   passwordHash String
   firstName    String
   lastName     String
-  role         UserRole @default(STAFF)
+  role         UserRole  @default(STAFF)
   phone        String?
   avatarUrl    String?
-  isActive     Boolean  @default(true)
+  isActive     Boolean   @default(true)
   lastLoginAt  DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   // Relations
-  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  staff             Staff?
-  assignedTickets   SupportTicket[]   @relation("AssignedTickets")
-  chatMessages      ChatMessage[]
-  notifications     Notification[]
+  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staff               Staff?
+  assignedTickets     SupportTicket[]      @relation("AssignedTickets")
+  chatMessages        ChatMessage[]
+  notifications       Notification[]
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
 
@@ -477,12 +515,12 @@ model Room {
   updatedAt    DateTime   @updatedAt
 
   // Relations
-  tenant               Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  bookings             Booking[]
-  housekeepingTasks    HousekeepingTask[]
-  ratePlans            RatePlan[]
-  maintenanceTickets   MaintenanceTicket[]
-  externalCalendars    ExternalCalendar[]
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bookings           Booking[]
+  housekeepingTasks  HousekeepingTask[]
+  ratePlans          RatePlan[]
+  maintenanceTickets MaintenanceTicket[]
+  externalCalendars  ExternalCalendar[]
 
   @@unique([tenantId, number])
   @@index([tenantId])
@@ -524,7 +562,7 @@ model Guest {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant         Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bookings       Booking[]
   foodOrders     FoodOrder[]
   supportTickets SupportTicket[]
@@ -544,58 +582,65 @@ model Guest {
 // ─── Bookings ─────────────────────────────────────────────────────────────────
 
 model Booking {
-  id              String        @id @default(uuid())
-  tenantId        String
-  roomId          String
-  guestId         String
-  checkIn         DateTime      @db.Date
-  checkOut        DateTime      @db.Date
-  status          BookingStatus @default(PENDING)
-  paymentStatus   PaymentStatus @default(PENDING)
-  adults          Int           @default(1)
-  children        Int           @default(0)
-  totalAmount     Decimal       @db.Decimal(10, 2)
-  paidAmount      Decimal       @default(0) @db.Decimal(10, 2)
-  specialRequests String?
-  notes           String?
-  source          String        @default("DIRECT")
-  confirmationNo  String        @unique
-  actualCheckIn   DateTime?     // set when staff clicks Check In
-  actualCheckOut  DateTime?     // set when staff clicks Check Out
+  id                    String        @id @default(uuid())
+  tenantId              String
+  roomId                String
+  guestId               String
+  checkIn               DateTime      @db.Date
+  checkOut              DateTime      @db.Date
+  status                BookingStatus @default(PENDING)
+  paymentStatus         PaymentStatus @default(PENDING)
+  adults                Int           @default(1)
+  children              Int           @default(0)
+  totalAmount           Decimal       @db.Decimal(10, 2)
+  paidAmount            Decimal       @default(0) @db.Decimal(10, 2)
+  specialRequests       String?
+  notes                 String?
+  source                String        @default("DIRECT")
+  confirmationNo        String        @unique
+  actualCheckIn         DateTime? // set when staff clicks Check In
+  actualCheckOut        DateTime? // set when staff clicks Check Out
   // Invoice
-  invoiceNumber   String?       @unique
-  invoiceSentAt   DateTime?
+  invoiceNumber         String?       @unique
+  invoiceSentAt         DateTime?
   // Loyalty
-  loyaltyPointsAwarded Boolean @default(false)
+  loyaltyPointsAwarded  Boolean       @default(false)
   // Group booking
-  groupId         String?
+  groupId               String?
   // Stripe guest payment
   stripePaymentIntentId String?
   stripePaymentLinkId   String?
   paymentLinkUrl        String?
   // Online payment (guest-facing)
-  paymentGateway   String?       // "BKASH" | "SSL" | "STRIPE" | "MANUAL"
-  gatewayTxId      String?       // final transaction ID (bkash trxID / ssl valId / stripe PI id)
-  gatewayPaymentId String?       // intermediate ID (bkash paymentID / ssl tran_id)
-  paidAt           DateTime?     // when payment was confirmed
+  paymentGateway        String? // "BKASH" | "SSL" | "STRIPE" | "MANUAL"
+  gatewayTxId           String? // final transaction ID (bkash trxID / ssl valId / stripe PI id)
+  gatewayPaymentId      String? // intermediate ID (bkash paymentID / ssl tran_id)
+  paidAt                DateTime? // when payment was confirmed
+  // Front desk
+  checkedInBy           String?       // staff userId who did check-in
+  checkedOutBy          String?       // staff userId who did check-out
+  roomNotes             String?       // front desk notes (key card, deposit note, etc.)
+  deposit               Decimal?      @db.Decimal(10, 2) // deposit collected at check-in
+  walkIn                Boolean       @default(false) // true = walk-in, no prior booking
   // External calendar sync
-  externalUid    String?       // iCal VEVENT UID — for duplicate detection
-  externalSource String?       // "BOOKING_COM" | "AIRBNB" | "ICAL" etc.
-  conflictNote   String?       // set when status = CONFLICT
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  externalUid           String? // iCal VEVENT UID — for duplicate detection
+  externalSource        String? // "BOOKING_COM" | "AIRBNB" | "ICAL" etc.
+  conflictNote          String? // set when status = CONFLICT
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
 
   // Relations
-  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  room           Room            @relation(fields: [roomId], references: [id])
-  guest          Guest           @relation(fields: [guestId], references: [id])
-  group          GroupBooking?   @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  payments       Payment[]
-  foodOrders     FoodOrder[]
-  supportTickets SupportTicket[]
-  invoiceExtras  InvoiceExtra[]
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  room            Room             @relation(fields: [roomId], references: [id])
+  guest           Guest            @relation(fields: [guestId], references: [id])
+  group           GroupBooking?    @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  payments        Payment[]
+  foodOrders      FoodOrder[]
+  supportTickets  SupportTicket[]
+  invoiceExtras   InvoiceExtra[]
   bookingPackages BookingPackage[]
-  invoice        Invoice?
+  bookingOffers   BookingOffer[]
+  invoice         Invoice?
 
   @@index([tenantId])
   @@index([checkIn, checkOut])
@@ -603,18 +648,69 @@ model Booking {
   @@map("bookings")
 }
 
+model Offer {
+  id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+  type        OfferType
+  value       Float                    // 30 = 30%, 500 = ৳500, 1 = 1 free night
+  promoCode   String?                  // null = auto-apply, no code needed
+  minStay     Int       @default(1)
+
+  validFrom   DateTime
+  validTo     DateTime
+  maxUses     Int?                     // null = unlimited
+  usedCount   Int       @default(0)
+
+  roomIds     String[]  @default([])  // empty = all rooms
+  showOnBar   Boolean   @default(true)
+  showSection Boolean   @default(true)
+  showOnCards Boolean   @default(true)
+  priority    Int       @default(0)
+  isActive    Boolean   @default(true)
+
+  bookingOffers BookingOffer[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+  @@map("offers")
+}
+
+enum OfferType {
+  PERCENTAGE
+  FIXED
+  FREE_NIGHT
+}
+
+model BookingOffer {
+  id        String  @id @default(cuid())
+  bookingId String
+  offerId   String
+  discount  Float                      // actual amount saved
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  offer     Offer   @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, offerId])
+  @@map("booking_offers")
+}
+
 model Payment {
-  id            String        @id @default(uuid())
-  tenantId      String
-  bookingId     String
-  amount        Decimal       @db.Decimal(10, 2)
-  method        PaymentMethod @default(CASH)
-  status        PaymentStatus @default(PENDING)
-  reference     String?
-  stripeId      String?
-  notes         String?
-  processedAt   DateTime?
-  createdAt     DateTime      @default(now())
+  id          String        @id @default(uuid())
+  tenantId    String
+  bookingId   String
+  amount      Decimal       @db.Decimal(10, 2)
+  method      PaymentMethod @default(CASH)
+  status      PaymentStatus @default(PENDING)
+  reference   String?
+  stripeId    String?
+  notes       String?
+  processedAt DateTime?
+  createdAt   DateTime      @default(now())
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   booking Booking @relation(fields: [bookingId], references: [id])
@@ -664,39 +760,39 @@ enum InvoiceItemCategory {
 }
 
 model Invoice {
-  id            String        @id @default(uuid())
-  invoiceNumber String        @unique   // INV-2026-0001 (auto-generated)
+  id            String  @id @default(uuid())
+  invoiceNumber String  @unique // INV-2026-0001 (auto-generated)
   tenantId      String
-  bookingId     String?       @unique   // one invoice per booking
+  bookingId     String? @unique // one invoice per booking
 
   // Guest info snapshot
-  guestName     String
-  guestEmail    String?
-  guestPhone    String?
+  guestName  String
+  guestEmail String?
+  guestPhone String?
 
-  status        InvoiceStatus @default(DRAFT)
+  status InvoiceStatus @default(DRAFT)
 
   // Financials
-  subtotal      Float         @default(0)
-  taxRate       Float         @default(0)   // percentage e.g. 15 = 15%
-  taxAmount     Float         @default(0)
-  discountAmt   Float         @default(0)
-  discountNote  String?
-  total         Float         @default(0)
+  subtotal     Float   @default(0)
+  taxRate      Float   @default(0) // percentage e.g. 15 = 15%
+  taxAmount    Float   @default(0)
+  discountAmt  Float   @default(0)
+  discountNote String?
+  total        Float   @default(0)
 
   // Payment tracking
-  paidAmount    Float         @default(0)
-  dueDate       DateTime?
-  notes         String?
+  paidAmount Float     @default(0)
+  dueDate    DateTime?
+  notes      String?
 
   // Relations
-  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  booking       Booking?       @relation(fields: [bookingId], references: [id], onDelete: SetNull)
-  items         InvoiceItem[]
-  payments      InvoicePayment[]
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  booking  Booking?         @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  items    InvoiceItem[]
+  payments InvoicePayment[]
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @default(now()) @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
   @@index([tenantId])
   @@index([status])
@@ -710,9 +806,9 @@ model InvoiceItem {
   category    InvoiceItemCategory @default(OTHER)
   quantity    Float               @default(1)
   unitPrice   Float
-  total       Float               // quantity × unitPrice (pre-computed)
+  total       Float // quantity × unitPrice (pre-computed)
 
-  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
   @@map("invoice_items")
@@ -728,8 +824,8 @@ model InvoicePayment {
   note      String?
   paidAt    DateTime      @default(now())
 
-  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
   @@index([tenantId])
@@ -760,19 +856,19 @@ model MaintenanceTicket {
 }
 
 model RatePlan {
-  id          String       @id @default(cuid())
-  tenantId    String
-  roomId      String?      // null = applies to all rooms
-  name        String
-  type        RatePlanType @default(STANDARD)
-  price       Float
-  startDate   DateTime?
-  endDate     DateTime?
-  daysOfWeek  Int[]        // 0=Sun … 6=Sat; empty = every day
-  minNights   Int          @default(1)
-  isActive    Boolean      @default(true)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id         String       @id @default(cuid())
+  tenantId   String
+  roomId     String? // null = applies to all rooms
+  name       String
+  type       RatePlanType @default(STANDARD)
+  price      Float
+  startDate  DateTime?
+  endDate    DateTime?
+  daysOfWeek Int[] // 0=Sun … 6=Sat; empty = every day
+  minNights  Int          @default(1)
+  isActive   Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
 
   room   Room?  @relation(fields: [roomId], references: [id], onDelete: SetNull)
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -783,12 +879,12 @@ model RatePlan {
 }
 
 model EmailSettings {
-  id                  String  @id @default(cuid())
-  tenantId            String  @unique
-  sendConfirmation    Boolean @default(true)
-  sendPreArrival      Boolean @default(true)
-  sendCheckoutInvoice Boolean @default(true)
-  sendCancellation    Boolean @default(true)
+  id                  String   @id @default(cuid())
+  tenantId            String   @unique
+  sendConfirmation    Boolean  @default(true)
+  sendPreArrival      Boolean  @default(true)
+  sendCheckoutInvoice Boolean  @default(true)
+  sendCancellation    Boolean  @default(true)
   replyToEmail        String?
   footerText          String?
   createdAt           DateTime @default(now())
@@ -813,7 +909,7 @@ model Package {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bookings BookingPackage[]
 
   @@index([tenantId])
@@ -821,14 +917,14 @@ model Package {
 }
 
 model BookingPackage {
-  id        String   @id @default(cuid())
-  bookingId String
-  packageId String
+  id          String           @id @default(cuid())
+  bookingId   String
+  packageId   String
   packageName String
-  price     Float
-  priceType PackagePriceType @default(PER_STAY)
-  nights    Int      @default(1)
-  createdAt DateTime @default(now())
+  price       Float
+  priceType   PackagePriceType @default(PER_STAY)
+  nights      Int              @default(1)
+  createdAt   DateTime         @default(now())
 
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
@@ -839,22 +935,22 @@ model BookingPackage {
 }
 
 model GroupBooking {
-  id              String              @id @default(cuid())
-  tenantId        String
-  name            String
-  organization    String?
-  contactName     String
-  contactEmail    String
-  contactPhone    String?
-  eventType       GroupEventType      @default(OTHER)
-  status          GroupBookingStatus  @default(TENTATIVE)
-  checkIn         DateTime            @db.Date
-  checkOut        DateTime            @db.Date
-  discountType    GroupDiscountType   @default(NONE)
-  discountValue   Float               @default(0)
-  notes           String?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  id            String             @id @default(cuid())
+  tenantId      String
+  name          String
+  organization  String?
+  contactName   String
+  contactEmail  String
+  contactPhone  String?
+  eventType     GroupEventType     @default(OTHER)
+  status        GroupBookingStatus @default(TENTATIVE)
+  checkIn       DateTime           @db.Date
+  checkOut      DateTime           @db.Date
+  discountType  GroupDiscountType  @default(NONE)
+  discountValue Float              @default(0)
+  notes         String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 
   tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bookings Booking[]
@@ -865,18 +961,18 @@ model GroupBooking {
 }
 
 model LoyaltyProgram {
-  id                 String  @id @default(cuid())
-  tenantId           String  @unique
-  isEnabled          Boolean @default(false)
-  pointsPerDollar    Float   @default(10)    // pts earned per $1 spent
-  redemptionRate     Float   @default(100)   // pts required per $1 discount
-  bronzeThreshold    Int     @default(0)
-  silverThreshold    Int     @default(500)
-  goldThreshold      Int     @default(2000)
-  platinumThreshold  Int     @default(5000)
-  programName        String  @default("Resort Rewards")
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                String   @id @default(cuid())
+  tenantId          String   @unique
+  isEnabled         Boolean  @default(false)
+  pointsPerDollar   Float    @default(10) // pts earned per $1 spent
+  redemptionRate    Float    @default(100) // pts required per $1 discount
+  bronzeThreshold   Int      @default(0)
+  silverThreshold   Int      @default(500)
+  goldThreshold     Int      @default(2000)
+  platinumThreshold Int      @default(5000)
+  programName       String   @default("Resort Rewards")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -1041,7 +1137,7 @@ model InventoryItem {
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
-  tenant    Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   movements InventoryMovement[]
 
   @@index([tenantId])
@@ -1053,7 +1149,7 @@ model InventoryMovement {
   tenantId        String
   inventoryItemId String
   quantity        Decimal  @db.Decimal(10, 2)
-  type            String   // IN | OUT | ADJUSTMENT
+  type            String // IN | OUT | ADJUSTMENT
   reason          String?
   createdAt       DateTime @default(now())
 
@@ -1068,25 +1164,25 @@ model InventoryMovement {
 // ─── Support ──────────────────────────────────────────────────────────────────
 
 model SupportTicket {
-  id           String          @id @default(uuid())
+  id           String         @id @default(uuid())
   tenantId     String
   guestId      String?
   assignedToId String?
   bookingId    String?
   title        String
   description  String
-  category     TicketCategory  @default(OTHER)
-  priority     TicketPriority  @default(MEDIUM)
-  status       TicketStatus    @default(OPEN)
+  category     TicketCategory @default(OTHER)
+  priority     TicketPriority @default(MEDIUM)
+  status       TicketStatus   @default(OPEN)
   resolvedAt   DateTime?
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
-  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  guest       Guest?        @relation(fields: [guestId], references: [id])
-  assignedTo  User?         @relation("AssignedTickets", fields: [assignedToId], references: [id])
-  booking     Booking?      @relation(fields: [bookingId], references: [id])
-  messages    ChatMessage[]
+  tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  guest      Guest?        @relation(fields: [guestId], references: [id])
+  assignedTo User?         @relation("AssignedTickets", fields: [assignedToId], references: [id])
+  booking    Booking?      @relation(fields: [bookingId], references: [id])
+  messages   ChatMessage[]
 
   @@index([tenantId])
   @@index([status])
@@ -1112,31 +1208,32 @@ model ChatMessage {
 // ─── Website ──────────────────────────────────────────────────────────────────
 
 model WebsiteContent {
-  id            String   @id @default(uuid())
-  tenantId      String   @unique
-  heroTitle     String
-  heroSubtitle  String?
-  heroImage     String?
-  aboutTitle    String?
-  aboutText     String?
-  aboutImage    String?
-  galleryImages String[]
-  testimonials  Json     @default("[]")
-  seoTitle      String?
+  id             String   @id @default(uuid())
+  tenantId       String   @unique
+  heroTitle      String
+  heroSubtitle   String?
+  heroImage      String?
+  aboutTitle     String?
+  aboutText      String?
+  aboutImage     String?
+  galleryImages  String[]
+  testimonials   Json     @default("[]")
+  seoTitle       String?
   seoDescription String?
-  primaryColor  String   @default("#1a6b5e")
-  accentColor   String   @default("#d4a853")
-  templateId    String   @default("luxe")
+  primaryColor   String   @default("#1a6b5e")
+  accentColor    String   @default("#d4a853")
+  templateId     String   @default("luxe")
   // Social media links
   facebookUrl    String?
   instagramUrl   String?
   twitterUrl     String?
   tiktokUrl      String?
   youtubeUrl     String?
-  whatsappNumber String?  // phone number only e.g. "+8801XXXXXXXXX"
+  whatsappNumber String? // phone number only e.g. "+8801XXXXXXXXX"
   tripadvisorUrl String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  hiddenSections String[] @default([]) // sections owner has toggled off e.g. ["menu","gallery"]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -1216,7 +1313,7 @@ model GuestTag {
   color     String   @default("#6b7280")
   createdAt DateTime @default(now())
 
-  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   relations GuestTagRelation[]
 
   @@unique([tenantId, name])
@@ -1239,17 +1336,17 @@ model GuestTagRelation {
 
 // Guest loyalty score + tier
 model GuestScore {
-  id           String    @id @default(uuid())
-  tenantId     String
-  guestId      String    @unique
-  score        Int       @default(0)
-  tier         GuestTier @default(STANDARD)
-  totalStays   Int       @default(0)
-  totalSpend   Decimal   @default(0) @db.Decimal(12, 2)
-  emailOpens   Int       @default(0)
-  emailClicks  Int       @default(0)
-  lastStayAt   DateTime?
-  updatedAt    DateTime  @updatedAt
+  id          String    @id @default(uuid())
+  tenantId    String
+  guestId     String    @unique
+  score       Int       @default(0)
+  tier        GuestTier @default(STANDARD)
+  totalStays  Int       @default(0)
+  totalSpend  Decimal   @default(0) @db.Decimal(12, 2)
+  emailOpens  Int       @default(0)
+  emailClicks Int       @default(0)
+  lastStayAt  DateTime?
+  updatedAt   DateTime  @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   guest  Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
@@ -1261,12 +1358,12 @@ model GuestScore {
 
 // Email consent / unsubscribe
 model EmailConsent {
-  id           String   @id @default(uuid())
-  tenantId     String
-  guestId      String   @unique
-  subscribed   Boolean  @default(true)
+  id             String    @id @default(uuid())
+  tenantId       String
+  guestId        String    @unique
+  subscribed     Boolean   @default(true)
   unsubscribedAt DateTime?
-  updatedAt    DateTime @updatedAt
+  updatedAt      DateTime  @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   guest  Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
@@ -1304,7 +1401,7 @@ model EmailTemplate {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   campaigns Campaign[]
   steps     SequenceStep[]
 
@@ -1314,22 +1411,22 @@ model EmailTemplate {
 
 // Broadcast campaigns (one-time email blasts)
 model Campaign {
-  id           String         @id @default(uuid())
-  tenantId     String
-  templateId   String?
-  name         String
-  subject      String
-  html         String
-  segment      Json?          // filter criteria (tier, tags, lastStayBefore, etc.)
-  status       CampaignStatus @default(DRAFT)
-  scheduledAt  DateTime?
-  sentAt       DateTime?
-  recipientCount Int          @default(0)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id             String         @id @default(uuid())
+  tenantId       String
+  templateId     String?
+  name           String
+  subject        String
+  html           String
+  segment        Json? // filter criteria (tier, tags, lastStayBefore, etc.)
+  status         CampaignStatus @default(DRAFT)
+  scheduledAt    DateTime?
+  sentAt         DateTime?
+  recipientCount Int            @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
-  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  template EmailTemplate?  @relation(fields: [templateId], references: [id])
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  template EmailTemplate? @relation(fields: [templateId], references: [id])
   sends    EmailSend[]
   stats    CampaignStats?
 
@@ -1340,15 +1437,15 @@ model Campaign {
 
 // Aggregate stats per campaign
 model CampaignStats {
-  id          String   @id @default(uuid())
-  campaignId  String   @unique
-  sent        Int      @default(0)
-  delivered   Int      @default(0)
-  opened      Int      @default(0)
-  clicked     Int      @default(0)
-  bounced     Int      @default(0)
-  unsubscribed Int     @default(0)
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  campaignId   String   @unique
+  sent         Int      @default(0)
+  delivered    Int      @default(0)
+  opened       Int      @default(0)
+  clicked      Int      @default(0)
+  bounced      Int      @default(0)
+  unsubscribed Int      @default(0)
+  updatedAt    DateTime @updatedAt
 
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
@@ -1357,20 +1454,20 @@ model CampaignStats {
 
 // Individual email send record (per guest per campaign/sequence)
 model EmailSend {
-  id           String          @id @default(uuid())
-  tenantId     String
-  guestId      String
-  campaignId   String?
+  id             String          @id @default(uuid())
+  tenantId       String
+  guestId        String
+  campaignId     String?
   sequenceStepId String?
-  enrollmentId String?
-  subject      String
-  status       EmailSendStatus @default(PENDING)
-  resendId     String?         // Resend message ID
-  openedAt     DateTime?
-  deliveredAt  DateTime?
-  bouncedAt    DateTime?
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  enrollmentId   String?
+  subject        String
+  status         EmailSendStatus @default(PENDING)
+  resendId       String? // Resend message ID
+  openedAt       DateTime?
+  deliveredAt    DateTime?
+  bouncedAt      DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   guest        Guest         @relation(fields: [guestId], references: [id], onDelete: Cascade)
@@ -1386,10 +1483,10 @@ model EmailSend {
 
 // Link click tracking
 model EmailClick {
-  id         String   @id @default(uuid())
-  sendId     String
-  url        String
-  clickedAt  DateTime @default(now())
+  id        String   @id @default(uuid())
+  sendId    String
+  url       String
+  clickedAt DateTime @default(now())
 
   send EmailSend @relation(fields: [sendId], references: [id], onDelete: Cascade)
 
@@ -1417,6 +1514,8 @@ model PlatformSettings {
   trialDays     Int      @default(14)
   plans         Json     // Array of { key, name, price, features, roomLimit }
   storageConfig Json?    // { driver, endpoint, region, bucket, publicUrl, accessKey, secretKey }
+  aiApiKey      String?  // Encrypted API key for AI theme generation (Claude/GPT)
+  aiProvider    String?  // "claude" | "gpt-4" — default provider
   updatedAt     DateTime @updatedAt
 
   @@map("platform_settings")
@@ -1428,7 +1527,7 @@ model Sequence {
   tenantId    String
   name        String
   trigger     SequenceTrigger
-  triggerMeta Json?           // e.g. { daysOffset: -3 } for pre-arrival
+  triggerMeta Json? // e.g. { daysOffset: -3 } for pre-arrival
   status      SequenceStatus  @default(ACTIVE)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
@@ -1444,19 +1543,19 @@ model Sequence {
 
 // Individual steps inside a sequence (each = one email)
 model SequenceStep {
-  id           String   @id @default(uuid())
-  sequenceId   String
-  templateId   String?
-  stepOrder    Int
-  delayDays    Int      @default(0)   // days after trigger
-  subject      String
-  html         String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id         String   @id @default(uuid())
+  sequenceId String
+  templateId String?
+  stepOrder  Int
+  delayDays  Int      @default(0) // days after trigger
+  subject    String
+  html       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  sequence  Sequence       @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
-  template  EmailTemplate? @relation(fields: [templateId], references: [id])
-  sends     EmailSend[]
+  sequence Sequence       @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  template EmailTemplate? @relation(fields: [templateId], references: [id])
+  sends    EmailSend[]
 
   @@index([sequenceId])
   @@map("sequence_steps")
@@ -1470,7 +1569,7 @@ model SequenceEnrollment {
   guestId     String
   status      EnrollmentStatus @default(ACTIVE)
   currentStep Int              @default(0)
-  triggerMeta Json?            // context at time of enrollment (bookingId, checkIn, etc.)
+  triggerMeta Json? // context at time of enrollment (bookingId, checkIn, etc.)
   enrolledAt  DateTime         @default(now())
   completedAt DateTime?
   updatedAt   DateTime         @updatedAt
@@ -1509,14 +1608,14 @@ model Notification {
 // ─── Admin Notifications ──────────────────────────────────────────────────────
 
 model AdminNotification {
-  id         String   @id @default(cuid())
-  type       String   // new_signup | payment_failed | subscription_canceled | trial_expiring | account_suspended
-  title      String
-  message    String
-  isRead     Boolean  @default(false)
-  metadata   Json?    // { tenantId, tenantName, tenantSlug, plan, amount, ... }
-  linkPath   String?  // e.g. "/admin/tenants?id=xxx" — click → navigate here
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  type      String // new_signup | payment_failed | subscription_canceled | trial_expiring | account_suspended
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  metadata  Json? // { tenantId, tenantName, tenantSlug, plan, amount, ... }
+  linkPath  String? // e.g. "/admin/tenants?id=xxx" — click → navigate here
+  createdAt DateTime @default(now())
 
   @@index([isRead])
   @@index([type])
@@ -1529,11 +1628,11 @@ model AdminNotification {
 model AuditLog {
   id         String   @id @default(cuid())
   adminEmail String
-  action     String   // impersonate | suspend | reactivate | plan_change | extend_trial | export | settings_change | theme_update | theme_toggle
-  targetType String   // tenant | user | theme | settings
+  action     String // impersonate | suspend | reactivate | plan_change | extend_trial | export | settings_change | theme_update | theme_toggle
+  targetType String // tenant | user | theme | settings
   targetId   String?
-  targetName String?  // human-readable label (tenant name, theme key, etc.)
-  metadata   Json?    // { before, after } for plan_change; { days } for extend_trial; etc.
+  targetName String? // human-readable label (tenant name, theme key, etc.)
+  metadata   Json? // { before, after } for plan_change; { days } for extend_trial; etc.
   ipAddress  String?
   createdAt  DateTime @default(now())
 
@@ -1547,18 +1646,18 @@ model AuditLog {
 // ─── Platform Announcements ───────────────────────────────────────────────────
 
 model PlatformAnnouncement {
-  id          String    @id @default(cuid())
-  title       String
-  body        String    // markdown-safe plain text
-  type        String    @default("info")   // info | warning | maintenance | feature
-  targetPlans String[]  @default([])       // [] = all plans; ["STARTER","PROFESSIONAL"] = only those
-  isDismissible Boolean @default(true)
-  startsAt    DateTime  @default(now())
-  endsAt      DateTime?                    // null = indefinite
-  isActive    Boolean   @default(true)
-  createdBy   String                       // admin email
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  title         String
+  body          String // markdown-safe plain text
+  type          String    @default("info") // info | warning | maintenance | feature
+  targetPlans   String[]  @default([]) // [] = all plans; ["STARTER","PROFESSIONAL"] = only those
+  isDismissible Boolean   @default(true)
+  startsAt      DateTime  @default(now())
+  endsAt        DateTime? // null = indefinite
+  isActive      Boolean   @default(true)
+  createdBy     String // admin email
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([isActive])
   @@index([startsAt, endsAt])
@@ -1570,12 +1669,12 @@ model PlatformAnnouncement {
 model TenantFeatureFlag {
   id        String   @id @default(cuid())
   tenantId  String
-  flag      String   // e.g. "beta_analytics", "ai_suggestions"
+  flag      String // e.g. "beta_analytics", "ai_suggestions"
   enabled   Boolean  @default(false)
   updatedAt DateTime @updatedAt
-  updatedBy String?  // admin email who last toggled
+  updatedBy String? // admin email who last toggled
 
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, flag])
   @@index([tenantId])
@@ -1586,20 +1685,20 @@ model TenantFeatureFlag {
 // ─── SLA Agreements ───────────────────────────────────────────────────────────
 
 model SlaAgreement {
-  id             String    @id @default(cuid())
-  tenantId       String    @unique
-  tier           SlaTier   @default(BASIC)
-  uptimePercent  Float     @default(99.0)     // e.g. 99.9
-  responseTimeH  Int       @default(24)       // response SLA in hours
-  contractStart  DateTime
-  contractEnd    DateTime?                    // null = open-ended
-  autoRenew      Boolean   @default(true)
-  notes          String?                      // internal admin notes
-  signedBy       String?                      // tenant owner email who accepted
-  signedAt       DateTime?
-  createdBy      String                       // admin email
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  tenantId      String    @unique
+  tier          SlaTier   @default(BASIC)
+  uptimePercent Float     @default(99.0) // e.g. 99.9
+  responseTimeH Int       @default(24) // response SLA in hours
+  contractStart DateTime
+  contractEnd   DateTime? // null = open-ended
+  autoRenew     Boolean   @default(true)
+  notes         String? // internal admin notes
+  signedBy      String? // tenant owner email who accepted
+  signedAt      DateTime?
+  createdBy     String // admin email
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -1618,7 +1717,7 @@ model AdminUser {
   lastName     String    @default("")
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime?
-  invitedBy    String?   // email of admin who created this account
+  invitedBy    String? // email of admin who created this account
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -1630,16 +1729,16 @@ model AdminUser {
 // ─── External Calendar Sync ───────────────────────────────────────────────────
 
 model ExternalCalendar {
-  id          String   @id @default(cuid())
-  tenantId    String
-  roomId      String
-  name        String   // "Booking.com", "Airbnb", etc. (staff sets this)
-  icalUrl     String   // the iCal URL pasted by staff
-  isActive    Boolean  @default(true)
-  lastSyncAt  DateTime?
-  lastError   String?  // null = last sync ok; otherwise error message
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String    @id @default(cuid())
+  tenantId   String
+  roomId     String
+  name       String // "Booking.com", "Airbnb", etc. (staff sets this)
+  icalUrl    String // the iCal URL pasted by staff
+  isActive   Boolean   @default(true)
+  lastSyncAt DateTime?
+  lastError  String? // null = last sync ok; otherwise error message
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   room   Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
@@ -1659,9 +1758,9 @@ model Expense {
   description String
   amount      Decimal         @db.Decimal(10, 2)
   vendor      String?
-  paymentMode String?         // CASH | BANK | CARD | OTHER
+  paymentMode String? // CASH | BANK | CARD | OTHER
   notes       String?
-  createdBy   String          // user id
+  createdBy   String // user id
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
@@ -1672,24 +1771,154 @@ model Expense {
   @@map("expenses")
 }
 
+// ─── Referrals ────────────────────────────────────────────────────────────────
+
+model Referral {
+  id         String @id @default(cuid())
+  referrerId String // tenant who referred
+  referredId String @unique // tenant who signed up (one referral entry per new tenant)
+  referrer   Tenant @relation("ReferrerReferrals", fields: [referrerId], references: [id], onDelete: Cascade)
+  referred   Tenant @relation("ReferredReferrals", fields: [referredId], references: [id], onDelete: Cascade)
+
+  status       String    @default("PENDING") // PENDING | REWARDED | NO_REWARD
+  rewardType   String? // CREDIT | FREE_PLAN | NONE
+  rewardAmount Float? // ৳ credit amount
+  rewardPlan   String? // "PROFESSIONAL"
+  rewardMonths Int? // 2
+  rewardNote   String?
+  rewardedAt   DateTime?
+  rewardedBy   String? // admin user email
+
+  createdAt DateTime @default(now())
+
+  @@map("referrals")
+}
+
 // ─── Themes ───────────────────────────────────────────────────────────────────
 
+enum ThemeType {
+  HARDCODED    // built-in themes (luxe, minimal, coastal) — rendered by React component
+  UPLOADED     // admin uploaded a config JSON/ZIP package
+  AI_GENERATED // generated via Claude/GPT API
+}
+
+enum ThemeStatus {
+  DRAFT      // saved, not visible to tenants
+  PREVIEW    // previewable by admin only
+  PUBLISHED  // live — tenants can select it
+}
+
 model Theme {
-  id           String   @id @default(uuid())
-  key          String   @unique      // "luxe", "minimal", "coastal"
-  name         String                // "Luxe Gold"
+  id           String      @id @default(uuid())
+  key          String      @unique // "luxe", "minimal", "coastal", "mountain-escape"
+  name         String      // "Luxe Gold"
   description  String?
   previewImage String?
-  author       String   @default("ResortPro Team")
-  version      String   @default("1.0.0")
-  tags         String[] @default([]) // ["Luxury", "Gold Accents"]
-  isActive     Boolean  @default(true)
-  isDefault    Boolean  @default(false)
-  isPremium    Boolean  @default(false)
-  requiredPlan String   @default("STARTER") // STARTER | PROFESSIONAL | ENTERPRISE
-  sortOrder    Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @default(now()) @updatedAt
+  screenshots  String[]    @default([]) // additional preview images
+  author       String      @default("ResortPro Team")
+  version      String      @default("1.0.0")
+  tags         String[]    @default([]) // ["Luxury", "Gold Accents"]
+  isActive     Boolean     @default(true)
+  isDefault    Boolean     @default(false)
+  isPremium    Boolean     @default(false)
+  requiredPlan String      @default("STARTER") // STARTER | PROFESSIONAL | ENTERPRISE
+  sortOrder    Int         @default(0)
+
+  // Dynamic theme fields (Option A & B)
+  themeType    ThemeType   @default(HARDCODED)
+  themeStatus  ThemeStatus @default(PUBLISHED) // HARDCODED themes default to PUBLISHED
+  configJson   Json?       // ThemeConfig JSON — only for UPLOADED and AI_GENERATED
+  aiPrompt     String?     // original prompt used for AI generation
+  aiProvider   String?     // "claude", "gpt-4", etc.
+  uploadedBy   String?     // super admin user id who uploaded/generated
+
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @default(now()) @updatedAt
 
   @@map("themes")
+}
+
+// ─── SMS & WhatsApp Marketing ─────────────────────────────────────────────────
+
+model MarketingCampaign {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name    String
+  channel String // "sms" | "whatsapp" | "both"
+  status  String @default("draft") // draft | scheduled | sending | sent | failed | cancelled
+
+  // Audience
+  audienceType   String @default("all") // all | past | upcoming | date_range | vip | custom
+  audienceFilter Json? // { dateFrom, dateTo, minStays, tags[] }
+  recipientCount Int    @default(0)
+
+  // Message
+  message    String
+  templateId String?
+
+  // Schedule
+  scheduledAt DateTime?
+  sentAt      DateTime?
+
+  // Stats
+  deliveredCount Int @default(0)
+  failedCount    Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  logs CampaignLog[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, scheduledAt])
+  @@map("marketing_campaigns")
+}
+
+model CampaignLog {
+  id         String            @id @default(cuid())
+  campaignId String
+  campaign   MarketingCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  guestId   String?
+  guestName String?
+  phone     String
+  channel   String // "sms" | "whatsapp"
+  status    String    @default("queued") // queued | sent | delivered | failed
+  errorMsg  String?
+  sentAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([campaignId, status])
+  @@map("campaign_logs")
+}
+
+model MessageTemplate {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name       String
+  channel    String // "sms" | "whatsapp" | "both"
+  message    String
+  usageCount Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, channel])
+  @@map("message_templates")
+}
+
+model CampaignLink {
+  id        String   @id @default(cuid())
+  code      String   @unique // e.g. "RAKIB2024" — used in ?ref=CODE
+  label     String   // e.g. "Rakib - BD Sales"
+  createdBy String   // admin email who created this
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("campaign_links")
 }

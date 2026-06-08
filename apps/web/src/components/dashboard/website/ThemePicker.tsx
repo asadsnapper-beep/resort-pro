@@ -216,7 +216,7 @@ export function ThemePicker({ currentTheme, slug, onSelect }: ThemePickerProps) 
 
                 {/* Tags */}
                 <div className="flex flex-wrap gap-1.5 mb-3">
-                  {theme.tags.map(tag => (
+                  {(theme.tags ?? []).map(tag => (
                     <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
                       {tag}
                     </span>
@@ -323,7 +323,7 @@ function ThemePreviewModal({
               </span>
             )}
             <div className="flex gap-1.5">
-              {theme.tags.map(tag => (
+              {(theme.tags ?? []).map(tag => (
                 <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-gray-800 text-gray-400">{tag}</span>
               ))}
             </div>

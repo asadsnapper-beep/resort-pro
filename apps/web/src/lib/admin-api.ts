@@ -58,8 +58,23 @@ export const adminEndpoints = {
   exportTenantCsv: (id: string) => adminApi.get(`/tenants/${id}/export-csv`, { responseType: 'blob' }),
   // MRR Growth
   getMrrGrowth: () => adminApi.get('/mrr-growth'),
+  // Failed Payments
+  getFailedPayments: () => adminApi.get('/failed-payments'),
   // Referrals
   getReferrals: () => adminApi.get('/referrals'),
+  rewardReferral: (id: string, data: { type: 'CREDIT' | 'FREE_PLAN' | 'NONE'; amount?: number; plan?: string; months?: number; note?: string }) =>
+    adminApi.patch(`/referrals/${id}/reward`, data),
+  createCustomLink: (data: { tenantId: string; code?: string }) =>
+    adminApi.post('/referrals/custom-link', data),
+  getReferralTenantsList: () => adminApi.get('/referrals/tenants-list'),
+  // Campaign links (marketing attribution)
+  getCampaignLinks: () => adminApi.get('/campaign-links'),
+  createCampaignLink: (data: { label: string; code?: string }) =>
+    adminApi.post('/campaign-links', data),
+  updateCampaignLink: (id: string, data: { label?: string; isActive?: boolean }) =>
+    adminApi.patch(`/campaign-links/${id}`, data),
+  deleteCampaignLink: (id: string) => adminApi.delete(`/campaign-links/${id}`),
+  getCampaignLinkSignups: (id: string) => adminApi.get(`/campaign-links/${id}/signups`),
   // Churn Risk
   getChurnRisk: () => adminApi.get('/churn-risk'),
   // Notifications
@@ -133,13 +148,29 @@ export const adminEndpoints = {
   }) => adminApi.put(`/tenants/${id}/sso`, data),
   updateOnboarding: (id: string, data: { step?: number; notes?: string; complete?: boolean }) =>
     adminApi.patch(`/tenants/${id}/onboarding`, data),
-  // Themes
+  // Themes — existing
   getThemes: () => adminApi.get('/themes'),
   updateTheme: (key: string, data: {
-    name?: string; description?: string; previewImage?: string;
+    name?: string; description?: string; previewImage?: string; screenshots?: string[];
     author?: string; version?: string; tags?: string[];
     isActive?: boolean; isPremium?: boolean; isDefault?: boolean;
     requiredPlan?: string; sortOrder?: number;
   }) => adminApi.put(`/themes/${key}`, data),
   toggleTheme: (key: string) => adminApi.patch(`/themes/${key}/toggle`),
+  // Themes — dynamic (upload + AI)
+  uploadTheme: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return adminApi.post('/themes/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+  generateTheme: (data: { prompt: string; provider?: string; quickOptions?: string[] }) =>
+    adminApi.post('/themes/generate', data),
+  publishTheme: (key: string, status: 'DRAFT' | 'PREVIEW' | 'PUBLISHED') =>
+    adminApi.put(`/themes/${key}/publish`, { status }),
+  deleteTheme: (key: string) => adminApi.delete(`/themes/${key}`),
+  // AI settings
+  getAiSettings: () => adminApi.get('/settings/ai'),
+  saveAiApiKey: (apiKey: string, provider?: string) =>
+    adminApi.put('/settings/ai', { apiKey, provider }),
+  disconnectAi: () => adminApi.delete('/settings/ai'),
 };

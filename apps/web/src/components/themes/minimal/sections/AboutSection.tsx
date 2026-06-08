@@ -1,5 +1,6 @@
 'use client'
 import type { ResortData } from '../../types'
+import { aboutImg } from '../../_utils/images'
 
 interface AboutSectionProps {
   data: ResortData
@@ -44,17 +45,11 @@ export function AboutSection({ data }: AboutSectionProps) {
 
           {/* Right: image */}
           <div>
-            {website?.aboutImage ? (
-              <img
-                src={website.aboutImage}
-                alt="About"
-                className="w-full aspect-square object-cover rounded-sm shadow-sm"
-              />
-            ) : (
-              <div className="w-full aspect-square bg-slate-100 rounded-sm flex items-center justify-center">
-                <p className="text-slate-300 text-sm">About image</p>
-              </div>
-            )}
+            <img
+              src={aboutImg(website?.aboutImage)}
+              alt="About"
+              className="w-full aspect-square object-cover rounded-sm shadow-sm"
+            />
           </div>
         </div>
       </div>

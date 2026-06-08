@@ -6,6 +6,8 @@ import { useAuthStore } from '@/store/auth';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { TopNav } from '@/components/dashboard/top-nav';
 import { PlatformBanner } from '@/components/dashboard/PlatformBanner';
+import { DemoBanner } from '@/components/dashboard/DemoBanner';
+import { ImpersonationBanner } from '@/components/dashboard/ImpersonationBanner';
 import { billingApi } from '@/lib/api';
 
 // Pages that should always render regardless of billing status
@@ -27,6 +29,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     if (!isAuthenticated()) {
       router.push('/auth/login');
+      return;
+    }
+
+    // Skip billing check for demo tenant
+    if (tenant?.isDemo) {
+      setStatusChecked(true);
       return;
     }
 
@@ -99,6 +107,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopNav />
         <main className="flex-1 overflow-y-auto p-6 animate-fade-in">
+          <ImpersonationBanner />
+          <DemoBanner />
           <PlatformBanner />
           {children}
         </main>

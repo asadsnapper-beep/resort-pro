@@ -12,7 +12,7 @@ import {
   Building2, Globe, Phone, Mail, MapPin, Clock, DollarSign, Save, Info,
   ExternalLink, CheckCircle, XCircle, AlertTriangle, Copy, RefreshCw, Trash2, ShieldCheck, Star,
   FileText, Palette, Lock, CheckCircle2, Circle, Loader2, Shield, Send, ToggleLeft, ToggleRight,
-  CreditCard, Eye, EyeOff, ChevronDown, ChevronRight,
+  CreditCard, Eye, EyeOff, ChevronDown, ChevronRight, Bell, LayoutGrid,
 } from 'lucide-react'
 import { paymentGatewayApi } from '@/lib/api';
 
@@ -63,8 +63,10 @@ const TABS = [
   { id: 'general',    label: 'General',           icon: Building2 },
   { id: 'contact',    label: 'Contact',            icon: Phone },
   { id: 'operations', label: 'Operations',         icon: Clock },
-  { id: 'email',      label: 'Email',              icon: Mail },
-  { id: 'payments',   label: 'Payment Gateways',   icon: CreditCard },
+  { id: 'modules',    label: 'Modules',            icon: LayoutGrid },
+  { id: 'email',         label: 'Email',              icon: Mail },
+  { id: 'notifications', label: 'SMS & WhatsApp',    icon: Send },
+  { id: 'payments',      label: 'Payment Gateways',  icon: CreditCard },
   { id: 'embed',     label: 'Embed & Widget',     icon: ExternalLink },
   { id: 'domain',     label: 'Custom Domain',      icon: Globe },
   { id: 'gdpr',       label: 'Privacy & GDPR',     icon: ShieldCheck },
@@ -762,6 +764,14 @@ export default function SettingsPage() {
         </div>
       )}
 
+      {tab === 'modules' && (
+        <ModulesTab />
+      )}
+
+      {tab === 'notifications' && (
+        <NotificationsTab />
+      )}
+
       {tab === 'payments' && (
         <PaymentGatewaysTab />
       )}
@@ -778,7 +788,7 @@ export default function SettingsPage() {
         <EnterpriseTab />
       )}
 
-      {tab !== 'domain' && tab !== 'gdpr' && tab !== 'enterprise' && tab !== 'payments' && tab !== 'embed' && (
+      {tab !== 'domain' && tab !== 'gdpr' && tab !== 'enterprise' && tab !== 'payments' && tab !== 'embed' && tab !== 'notifications' && tab !== 'modules' && (
         <div className="flex justify-end pt-2">
           <Button className="gap-2 px-8" loading={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
             <Save className="h-4 w-4" /> Save All Changes
@@ -1683,4 +1693,481 @@ function EmbedTab() {
       </Card>
     </div>
   )
+}
+
+
+// ── Modules Tab ───────────────────────────────────────────────────────────────
+
+function ModulesTab() {
+  const qc = useQueryClient();
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['tenant-modules'],
+    queryFn: () => tenantApi.getModules(),
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ flag, enabled }: { flag: string; enabled: boolean }) =>
+      tenantApi.toggleModule(flag, enabled),
+    onSuccess: (_res, { enabled }) => {
+      qc.invalidateQueries({ queryKey: ['tenant-modules'] });
+      toast({ title: enabled ? 'Module enabled' : 'Module disabled' });
+    },
+    onError: () => toast({ title: 'Failed to update module', variant: 'destructive' }),
+  });
+
+  type Module = { flag: string; label: string; description: string; enabled: boolean };
+  const modules: Module[] = data?.data?.data ?? [];
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2].map((i) => (
+          <div key={i} className="h-20 animate-pulse rounded-xl bg-gray-100" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-base font-semibold text-gray-900">Modules</h2>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          Turn off modules your resort doesn't use — they'll be hidden from the sidebar for all staff.
+        </p>
+      </div>
+
+      <Card>
+        <CardContent className="divide-y divide-gray-100 p-0">
+          {modules.map((mod) => {
+            const isPending = toggleMutation.isPending && toggleMutation.variables?.flag === mod.flag;
+            return (
+              <div key={mod.flag} className="flex items-center justify-between px-5 py-4">
+                <div className="min-w-0 pr-6">
+                  <p className="text-sm font-medium text-gray-900">{mod.label}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{mod.description}</p>
+                </div>
+                <button
+                  disabled={isPending}
+                  onClick={() => toggleMutation.mutate({ flag: mod.flag, enabled: !mod.enabled })}
+                  className="shrink-0 disabled:opacity-50"
+                  aria-label={mod.enabled ? `Disable ${mod.label}` : `Enable ${mod.label}`}
+                >
+                  {mod.enabled ? (
+                    <ToggleRight className="h-8 w-8 text-resort-600" />
+                  ) : (
+                    <ToggleLeft className="h-8 w-8 text-gray-300" />
+                  )}
+                </button>
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ── SMS & WhatsApp Notifications Tab ─────────────────────────────────────────
+
+function NotificationsTab() {
+  const qc = useQueryClient();
+  const [activeSection, setActiveSection] = useState<'sms' | 'wa' | 'triggers'>('sms');
+  const [testPhone, setTestPhone] = useState('');
+  const [testWaPhone, setTestWaPhone] = useState('');
+  const [showSmsKey, setShowSmsKey] = useState(false);
+  const [showWaToken, setShowWaToken] = useState(false);
+
+  // SMS credentials form
+  const [smsMode, setSmsMode] = useState<'platform' | 'own'>('platform');
+  const [smsProvider, setSmsProvider] = useState('ssl_wireless');
+  const [smsApiKey, setSmsApiKey] = useState('');
+  const [smsApiSecret, setSmsApiSecret] = useState('');
+  const [smsSenderId, setSmsSenderId] = useState('');
+
+  // WhatsApp credentials form
+  const [waMode, setWaMode] = useState<'platform' | 'own'>('platform');
+  const [waPhoneNumberId, setWaPhoneNumberId] = useState('');
+  const [waApiToken, setWaApiToken] = useState('');
+  const [waBusinessAccId, setWaBusinessAccId] = useState('');
+
+  // Trigger toggles
+  const [triggers, setTriggers] = useState({
+    smsEnabled: false, waEnabled: false,
+    notifBookingConfirm: true, notifPaymentReceived: true,
+    notifCheckinReminder: true, notifCheckoutRemind: false,
+    notifCancellation: true, notifInvoiceSent: false,
+    notifLanguage: 'en',
+  });
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['sms-settings'],
+    queryFn: () => tenantApi.getSmsSettings(),
+  });
+
+  useEffect(() => {
+    if (!data?.data?.data) return;
+    const d = data.data.data;
+    setSmsMode(d.smsMode || 'platform');
+    setSmsProvider(d.smsProvider || 'ssl_wireless');
+    setSmsApiKey(d.smsApiKey || '');
+    setSmsApiSecret(d.smsApiSecret || '');
+    setSmsSenderId(d.smsSenderId || '');
+    setWaMode(d.waMode || 'platform');
+    setWaPhoneNumberId(d.waPhoneNumberId || '');
+    setWaApiToken(d.waApiToken || '');
+    setWaBusinessAccId(d.waBusinessAccId || '');
+    setTriggers({
+      smsEnabled: d.smsEnabled ?? false,
+      waEnabled: d.waEnabled ?? false,
+      notifBookingConfirm: d.notifBookingConfirm ?? true,
+      notifPaymentReceived: d.notifPaymentReceived ?? true,
+      notifCheckinReminder: d.notifCheckinReminder ?? true,
+      notifCheckoutRemind: d.notifCheckoutRemind ?? false,
+      notifCancellation: d.notifCancellation ?? true,
+      notifInvoiceSent: d.notifInvoiceSent ?? false,
+      notifLanguage: d.notifLanguage || 'en',
+    });
+  }, [data]);
+
+  const smsMut = useMutation({
+    mutationFn: () => tenantApi.saveSmsCredentials({ smsMode, smsProvider, smsApiKey, smsApiSecret, smsSenderId }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sms-settings'] }); toast({ title: '✓ SMS credentials saved' }); },
+    onError: () => toast({ title: 'Error', variant: 'destructive', description: 'Could not save SMS credentials' }),
+  });
+
+  const waMut = useMutation({
+    mutationFn: () => tenantApi.saveWaCredentials({ waMode, waPhoneNumberId, waApiToken, waBusinessAccId }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sms-settings'] }); toast({ title: '✓ WhatsApp credentials saved' }); },
+    onError: () => toast({ title: 'Error', variant: 'destructive', description: 'Could not save WhatsApp credentials' }),
+  });
+
+  const triggerMut = useMutation({
+    mutationFn: () => tenantApi.updateSmsSettings(triggers),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sms-settings'] }); toast({ title: '✓ Notification settings saved' }); },
+    onError: () => toast({ title: 'Error', variant: 'destructive' }),
+  });
+
+  const testSmsMut = useMutation({
+    mutationFn: () => tenantApi.testSms(testPhone),
+    onSuccess: () => toast({ title: '✓ Test SMS sent', description: `Sent to ${testPhone}` }),
+    onError: () => toast({ title: 'Failed', variant: 'destructive' }),
+  });
+
+  const testWaMut = useMutation({
+    mutationFn: () => tenantApi.testWhatsapp(testWaPhone),
+    onSuccess: () => toast({ title: '✓ Test WhatsApp sent', description: `Sent to ${testWaPhone}` }),
+    onError: () => toast({ title: 'Failed', variant: 'destructive' }),
+  });
+
+  const d = data?.data?.data;
+  const smsPct = d ? Math.min(100, Math.round((d.smsUsedThisMonth / d.smsQuotaMonthly) * 100)) : 0;
+  const waPct  = d ? Math.min(100, Math.round((d.waUsedThisMonth / d.waQuotaMonthly) * 100)) : 0;
+
+  if (isLoading) return (
+    <div className="flex items-center justify-center py-16">
+      <Loader2 className="h-6 w-6 animate-spin text-resort-600" />
+    </div>
+  );
+
+  const SECTIONS = [
+    { id: 'sms',      label: 'SMS',       icon: Phone },
+    { id: 'wa',       label: 'WhatsApp',  icon: Send },
+    { id: 'triggers', label: 'Triggers',  icon: Bell },
+  ] as const;
+
+  return (
+    <div className="space-y-5">
+      {/* Section tabs */}
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+        {SECTIONS.map(({ id, label, icon: Icon }) => (
+          <button key={id} onClick={() => setActiveSection(id as any)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeSection === id ? 'bg-white text-resort-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            <Icon className="h-4 w-4" /> {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── SMS Section ──────────────────────────────────────────────────────── */}
+      {activeSection === 'sms' && (
+        <div className="space-y-4">
+          {/* Enable toggle */}
+          <div className="bg-white rounded-2xl border p-5 flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-gray-900">SMS Notifications</p>
+              <p className="text-sm text-gray-500 mt-0.5">Booking confirmations, payment receipts, check-in reminders via SMS</p>
+            </div>
+            <button onClick={() => { const v = !triggers.smsEnabled; setTriggers(p => ({ ...p, smsEnabled: v })); triggerMut.mutate(); }}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${triggers.smsEnabled ? 'bg-resort-600' : 'bg-gray-300'}`}>
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${triggers.smsEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+
+          {/* Usage bar */}
+          <div className="bg-white rounded-2xl border p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="font-semibold text-gray-800">Usage This Month</p>
+              <span className="text-sm text-gray-500">{d?.smsUsedThisMonth ?? 0} / {d?.smsQuotaMonthly ?? 100} SMS</span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all ${smsPct >= 90 ? 'bg-red-500' : smsPct >= 70 ? 'bg-amber-500' : 'bg-resort-500'}`}
+                style={{ width: `${smsPct}%` }} />
+            </div>
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <span>Extra credits: <strong className="text-gray-800">{d?.smsCredits ?? 0}</strong></span>
+              <a href="/dashboard/billing" className="text-resort-600 hover:underline font-medium">Buy Credits →</a>
+            </div>
+          </div>
+
+          {/* Provider mode */}
+          <div className="bg-white rounded-2xl border p-5 space-y-4">
+            <p className="font-semibold text-gray-800">SMS Provider</p>
+            <div className="space-y-2">
+              {[
+                { val: 'platform', label: 'ResortPro Platform (included in plan)', desc: 'আমরা পাঠাই — কোনো setup লাগবে না' },
+                { val: 'own', label: 'Use my own SMS gateway credentials', desc: 'নিজের SSL Wireless / Twilio account ব্যবহার করো' },
+              ].map(opt => (
+                <label key={opt.val} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${smsMode === opt.val ? 'border-resort-500 bg-resort-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <input type="radio" className="mt-0.5 accent-resort-600" checked={smsMode === opt.val} onChange={() => setSmsMode(opt.val as any)} />
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{opt.label}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{opt.desc}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            {/* BYOC fields */}
+            {smsMode === 'own' && (
+              <div className="space-y-3 pt-2 border-t border-gray-100">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Provider</label>
+                  <select value={smsProvider} onChange={e => setSmsProvider(e.target.value)}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-resort-500">
+                    <option value="ssl_wireless">SSL Wireless (Bangladesh)</option>
+                    <option value="alpha_net">Alpha.Net (Bangladesh)</option>
+                    <option value="twilio">Twilio (International)</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-gray-700">API Key</label>
+                    <div className="relative">
+                      <Input type={showSmsKey ? 'text' : 'password'} value={smsApiKey} onChange={e => setSmsApiKey(e.target.value)} placeholder="Your API key" />
+                      <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        onClick={() => setShowSmsKey(v => !v)}>
+                        {showSmsKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  {smsProvider === 'twilio' && (
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-700">Auth Token</label>
+                      <Input type="password" value={smsApiSecret} onChange={e => setSmsApiSecret(e.target.value)} placeholder="Auth token" />
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Sender ID <span className="text-gray-400 text-xs">(max 11 chars)</span></label>
+                  <Input value={smsSenderId} onChange={e => setSmsSenderId(e.target.value.slice(0, 11))} placeholder="e.g. RESORT" maxLength={11} />
+                  <p className="text-xs text-gray-400">This name appears as the sender on guest's phone</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Button onClick={() => smsMut.mutate()} loading={smsMut.isPending} size="sm" className="gap-2">
+                <Save className="h-3.5 w-3.5" /> Save SMS Settings
+              </Button>
+            </div>
+          </div>
+
+          {/* Test SMS */}
+          <div className="bg-white rounded-2xl border p-5 space-y-3">
+            <p className="font-semibold text-gray-800">Send Test SMS</p>
+            <div className="flex gap-2">
+              <Input value={testPhone} onChange={e => setTestPhone(e.target.value)} placeholder="+8801XXXXXXXXX" className="flex-1" />
+              <Button onClick={() => testSmsMut.mutate()} loading={testSmsMut.isPending} disabled={!testPhone} variant="outline" className="gap-2 shrink-0">
+                <Send className="h-3.5 w-3.5" /> Send Test
+              </Button>
+            </div>
+            <p className="text-xs text-gray-400">Include country code. e.g. +8801712345678</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── WhatsApp Section ─────────────────────────────────────────────────── */}
+      {activeSection === 'wa' && (
+        <div className="space-y-4">
+          {/* Enable toggle */}
+          <div className="bg-white rounded-2xl border p-5 flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-gray-900">WhatsApp Notifications</p>
+              <p className="text-sm text-gray-500 mt-0.5">Booking confirmations, invoices, reminders via WhatsApp</p>
+            </div>
+            <button onClick={() => { const v = !triggers.waEnabled; setTriggers(p => ({ ...p, waEnabled: v })); triggerMut.mutate(); }}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${triggers.waEnabled ? 'bg-green-500' : 'bg-gray-300'}`}>
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${triggers.waEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+
+          {/* Usage bar */}
+          <div className="bg-white rounded-2xl border p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="font-semibold text-gray-800">Usage This Month</p>
+              <span className="text-sm text-gray-500">{d?.waUsedThisMonth ?? 0} / {d?.waQuotaMonthly ?? 50} conversations</span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all ${waPct >= 90 ? 'bg-red-500' : waPct >= 70 ? 'bg-amber-500' : 'bg-green-500'}`}
+                style={{ width: `${waPct}%` }} />
+            </div>
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <span>Extra credits: <strong className="text-gray-800">{d?.waCredits ?? 0}</strong></span>
+              <a href="/dashboard/billing" className="text-resort-600 hover:underline font-medium">Buy Credits →</a>
+            </div>
+          </div>
+
+          {/* Provider mode */}
+          <div className="bg-white rounded-2xl border p-5 space-y-4">
+            <p className="font-semibold text-gray-800">WhatsApp Provider</p>
+            <div className="space-y-2">
+              {[
+                { val: 'platform', label: 'ResortPro Platform (included in plan)', desc: 'আমরা পাঠাই — কোনো Meta account লাগবে না' },
+                { val: 'own', label: 'Use my own Meta Business account', desc: 'নিজের WhatsApp Business number ব্যবহার করো' },
+              ].map(opt => (
+                <label key={opt.val} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${waMode === opt.val ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <input type="radio" className="mt-0.5 accent-green-600" checked={waMode === opt.val} onChange={() => setWaMode(opt.val as any)} />
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{opt.label}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{opt.desc}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            {/* BYOC fields */}
+            {waMode === 'own' && (
+              <div className="space-y-3 pt-2 border-t border-gray-100">
+                <div className="rounded-xl bg-blue-50 border border-blue-100 px-3 py-2.5 text-xs text-blue-700">
+                  <strong>How to get these:</strong> Meta Business Manager → WhatsApp → API Setup
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Phone Number ID</label>
+                  <Input value={waPhoneNumberId} onChange={e => setWaPhoneNumberId(e.target.value)} placeholder="e.g. 123456789012345" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Business Account ID</label>
+                  <Input value={waBusinessAccId} onChange={e => setWaBusinessAccId(e.target.value)} placeholder="e.g. 987654321098765" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">API Token (Permanent)</label>
+                  <div className="relative">
+                    <Input type={showWaToken ? 'text' : 'password'} value={waApiToken} onChange={e => setWaApiToken(e.target.value)} placeholder="EAAxxxxx..." />
+                    <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      onClick={() => setShowWaToken(v => !v)}>
+                      {showWaToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400">Generate a permanent token from Meta Business Manager</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Button onClick={() => waMut.mutate()} loading={waMut.isPending} size="sm" className="gap-2 bg-green-600 hover:bg-green-700">
+                <Save className="h-3.5 w-3.5" /> Save WhatsApp Settings
+              </Button>
+            </div>
+          </div>
+
+          {/* Test WhatsApp */}
+          <div className="bg-white rounded-2xl border p-5 space-y-3">
+            <p className="font-semibold text-gray-800">Send Test WhatsApp</p>
+            <div className="flex gap-2">
+              <Input value={testWaPhone} onChange={e => setTestWaPhone(e.target.value)} placeholder="+8801XXXXXXXXX" className="flex-1" />
+              <Button onClick={() => testWaMut.mutate()} loading={testWaMut.isPending} disabled={!testWaPhone}
+                className="gap-2 shrink-0 bg-green-600 hover:bg-green-700">
+                <Send className="h-3.5 w-3.5" /> Send Test
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Triggers Section ─────────────────────────────────────────────────── */}
+      {activeSection === 'triggers' && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl border overflow-hidden">
+            <div className="px-5 py-4 border-b bg-gray-50">
+              <p className="font-semibold text-gray-800">Notification Triggers</p>
+              <p className="text-xs text-gray-500 mt-0.5">কোন ঘটনায় guest-কে SMS/WhatsApp পাঠাবে</p>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-gray-50/50">
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Event</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-24">SMS</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-28">WhatsApp</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {[
+                  { key: 'notifBookingConfirm',   label: 'Booking Confirmed',          emoji: '📋' },
+                  { key: 'notifPaymentReceived',   label: 'Payment Received',           emoji: '💰' },
+                  { key: 'notifCheckinReminder',   label: 'Check-in Reminder (1 day)',  emoji: '📅' },
+                  { key: 'notifCheckoutRemind',    label: 'Check-out Reminder',         emoji: '🛎️' },
+                  { key: 'notifCancellation',      label: 'Booking Cancelled',          emoji: '❌' },
+                  { key: 'notifInvoiceSent',       label: 'Invoice Sent',              emoji: '🧾' },
+                ].map(({ key, label, emoji }) => (
+                  <tr key={key} className="hover:bg-gray-50">
+                    <td className="px-5 py-3.5 font-medium text-gray-700">{emoji} {label}</td>
+                    <td className="px-4 py-3.5 text-center">
+                      <input type="checkbox"
+                        checked={!!triggers[key as keyof typeof triggers]}
+                        onChange={e => setTriggers(p => ({ ...p, [key]: e.target.checked }))}
+                        className="h-4 w-4 rounded accent-resort-600" />
+                    </td>
+                    <td className="px-4 py-3.5 text-center">
+                      <input type="checkbox"
+                        checked={!!triggers[key as keyof typeof triggers]}
+                        onChange={e => setTriggers(p => ({ ...p, [key]: e.target.checked }))}
+                        className="h-4 w-4 rounded accent-green-600" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Language */}
+          <div className="bg-white rounded-2xl border p-5 space-y-3">
+            <p className="font-semibold text-gray-800">Message Language</p>
+            <div className="flex gap-3">
+              {[
+                { val: 'en', label: '🇬🇧 English' },
+                { val: 'bn', label: '🇧🇩 বাংলা' },
+                { val: 'both', label: '🌐 Both' },
+              ].map(opt => (
+                <label key={opt.val} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border cursor-pointer transition-colors text-sm font-medium ${
+                  triggers.notifLanguage === opt.val ? 'border-resort-500 bg-resort-50 text-resort-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                }`}>
+                  <input type="radio" className="sr-only" checked={triggers.notifLanguage === opt.val} onChange={() => setTriggers(p => ({ ...p, notifLanguage: opt.val }))} />
+                  {opt.label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button onClick={() => triggerMut.mutate()} loading={triggerMut.isPending} className="gap-2">
+              <Save className="h-4 w-4" /> Save Trigger Settings
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

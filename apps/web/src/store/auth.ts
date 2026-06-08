@@ -10,6 +10,7 @@ interface Tenant {
   planStatus?: string;
   trialEndsAt?: string | null;
   isActive?: boolean;
+  isDemo?: boolean;
   currency?: string;
   taxRate?: number;
 }
@@ -19,7 +20,7 @@ interface AuthState {
   tenant: Tenant | null;
   token: string | null;
   refreshToken: string | null;
-  setAuth: (user: AuthUser, tenant: Tenant, token: string, refreshToken: string) => void;
+  setAuth: (user: AuthUser, tenant: Tenant, token: string, refreshToken?: string) => void;
   updateUser: (patch: Partial<AuthUser & { phone: string | null; avatarUrl: string | null }>) => void;
   clearAuth: () => void;
   isAuthenticated: () => boolean;
@@ -32,10 +33,10 @@ export const useAuthStore = create<AuthState>()(
       tenant: null,
       token: null,
       refreshToken: null,
-      setAuth: (user, tenant, token, refreshToken) => {
+      setAuth: (user, tenant, token, refreshToken?) => {
         localStorage.setItem('token', token);
-        localStorage.setItem('refreshToken', refreshToken);
-        set({ user, tenant, token, refreshToken });
+        if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+        set({ user, tenant, token, refreshToken: refreshToken ?? null });
       },
       updateUser: (patch) => set((s) => ({ user: s.user ? { ...s.user, ...patch } : s.user })),
       clearAuth: () => {

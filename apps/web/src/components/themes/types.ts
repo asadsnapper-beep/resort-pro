@@ -3,6 +3,8 @@
    page.tsx → registry → ThemeComponent এই পুরো chain-এ এই types ব্যবহার হয়।
 ──────────────────────────────────────────────────────────────────────────── */
 
+export type { ThemeConfig } from './config-renderer/config-types'
+
 export interface ResortTenant {
   name: string
   slug: string
@@ -37,6 +39,7 @@ export interface ResortWebsite {
   youtubeUrl?: string
   whatsappNumber?: string
   tripadvisorUrl?: string
+  hiddenSections?: string[]
 }
 
 export interface ResortRoom {
@@ -54,9 +57,10 @@ export interface ResortRoom {
 }
 
 export interface ResortData {
-  tenant: ResortTenant
-  website: ResortWebsite | null
-  rooms: ResortRoom[]
+  tenant:      ResortTenant
+  website:     ResortWebsite | null
+  rooms:       ResortRoom[]
+  themeConfig?: import('./config-renderer/config-types').ThemeConfig | null
 }
 
 /* ── Widget props — সব shared widget-এ এই props থাকবে ─────────────────────── */

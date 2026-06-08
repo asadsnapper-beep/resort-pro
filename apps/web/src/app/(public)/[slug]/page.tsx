@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
 import { getTheme } from '@/components/themes/registry';
+import { ConfigThemeRenderer } from '@/components/themes/config-renderer';
 import type { ResortData } from '@/components/themes/types';
 
 async function fetchResortData(slug: string): Promise<ResortData | null> {
@@ -43,6 +44,9 @@ export default async function ResortWebsitePage({
 
   // ?preview=themeKey → show that theme without saving
   const themeKey = searchParams?.preview || data.website?.templateId;
+
+  // Config-driven theme (uploaded or AI-generated) takes priority over hardcoded
+  const configJson    = data.themeConfig;
   const ThemeComponent = getTheme(themeKey);
 
   return (
@@ -54,7 +58,10 @@ export default async function ResortWebsitePage({
           Preview mode — <strong>{themeKey}</strong> theme
         </div>
       )}
-      <ThemeComponent data={data} />
+      {configJson
+        ? <ConfigThemeRenderer data={data} config={configJson} />
+        : <ThemeComponent data={data} />
+      }
     </>
   );
 }

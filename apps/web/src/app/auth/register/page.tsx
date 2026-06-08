@@ -11,7 +11,13 @@ import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
-import { Gift } from 'lucide-react';
+import { Gift, Zap, Crown, Building2, ArrowLeft } from 'lucide-react';
+
+const PLAN_META: Record<string, { label: string; color: string; icon: React.ElementType; desc: string }> = {
+  STARTER:      { label: 'Starter',      color: '#1a6b5e', icon: Zap,       desc: '$49/mo after trial · Up to 20 rooms' },
+  PROFESSIONAL: { label: 'Professional', color: '#d4a853', icon: Crown,     desc: '$99/mo after trial · Up to 100 rooms' },
+  ENTERPRISE:   { label: 'Enterprise',   color: '#6366f1', icon: Building2, desc: 'Custom pricing · Unlimited rooms' },
+};
 
 const schema = z.object({
   resortName: z.string().min(2, 'Resort name must be at least 2 characters'),
@@ -30,11 +36,22 @@ function RegisterForm() {
   const { setAuth } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [referralCode, setReferralCode] = useState('');
+  const [referrerName, setReferrerName] = useState('');
+  const [selectedPlan, setSelectedPlan] = useState<string>('STARTER');
 
-  // Capture ?ref= from URL on mount
+  // Capture ?ref= and ?plan= from URL on mount
   useEffect(() => {
-    const ref = searchParams.get('ref');
-    if (ref) setReferralCode(ref.toUpperCase());
+    const ref  = searchParams.get('ref');
+    const plan = searchParams.get('plan');
+    if (plan && PLAN_META[plan]) setSelectedPlan(plan);
+    if (!ref) return;
+    const code = ref.toUpperCase();
+    setReferralCode(code);
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    fetch(`${API_URL}/api/auth/referrer?code=${code}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.data?.name) setReferrerName(d.data.name); })
+      .catch(() => {});
   }, [searchParams]);
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
@@ -52,7 +69,11 @@ function RegisterForm() {
   const onSubmit = async (data: FormData) => {
     setLoading(true);
     try {
-      const res = await authApi.register({ ...(data as Required<typeof data>), ...(referralCode && { referralCode }) });
+      const res = await authApi.register({
+        ...(data as Required<typeof data>),
+        ...(referralCode && { referralCode }),
+        plan: selectedPlan,
+      });
       const { user, tenant, token, refreshToken } = res.data.data;
       setAuth(user, tenant, token, refreshToken);
       toast({ title: 'Resort created!', description: `Welcome to ResortPro, ${user.firstName}!` });
@@ -65,13 +86,42 @@ function RegisterForm() {
     }
   };
 
+  const planMeta = PLAN_META[selectedPlan] ?? PLAN_META.STARTER;
+  const PlanIcon = planMeta.icon;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-resort-900 to-resort-700 flex items-center justify-center p-4">
       <div className="w-full max-w-lg">
-        <div className="mb-8 text-center">
+
+        {/* Back to plans */}
+        <div className="mb-6 flex items-center justify-between">
+          <a href="/plans" className="flex items-center gap-1.5 text-white/50 hover:text-white/80 text-sm transition-colors">
+            <ArrowLeft className="h-4 w-4" />
+            Change plan
+          </a>
+          <a href="/auth/login" className="text-white/50 hover:text-white/80 text-sm transition-colors">
+            Sign in
+          </a>
+        </div>
+
+        <div className="mb-6 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gold-500 font-display text-2xl font-bold text-resort-900">R</div>
           <h1 className="font-display text-3xl font-bold text-white">Create your resort</h1>
-          <p className="mt-2 text-white/60">Free for 3 months. No credit card needed.</p>
+          <p className="mt-2 text-white/60">14-day free trial · No credit card needed</p>
+        </div>
+
+        {/* Selected plan badge */}
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-white/10 border border-white/20">
+          <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-white/15 flex-shrink-0">
+            <PlanIcon className="h-4 w-4 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-white text-sm font-semibold">{planMeta.label} Plan — 14-day free trial</p>
+            <p className="text-white/50 text-xs">{planMeta.desc}</p>
+          </div>
+          <a href="/plans" className="text-white/40 hover:text-white/70 text-xs transition-colors flex-shrink-0">
+            Change
+          </a>
         </div>
 
         {/* Referral banner */}
@@ -79,10 +129,12 @@ function RegisterForm() {
           <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/15 border border-amber-500/30">
             <Gift className="w-4 h-4 text-amber-400 shrink-0" />
             <div>
-              <p className="text-amber-300 text-sm font-medium">Referral code applied: <span className="font-mono">{referralCode}</span></p>
+              <p className="text-amber-300 text-sm font-medium">
+                {referrerName ? `Referred by: ${referrerName}` : `Referral code: ${referralCode}`}
+              </p>
               <p className="text-amber-400/70 text-xs mt-0.5">You were invited by a ResortPro member.</p>
             </div>
-            <button onClick={() => setReferralCode('')} className="ml-auto text-amber-500/60 hover:text-amber-300 text-xs">✕</button>
+            <button onClick={() => { setReferralCode(''); setReferrerName(''); }} className="ml-auto text-amber-500/60 hover:text-amber-300 text-xs">✕</button>
           </div>
         )}
 

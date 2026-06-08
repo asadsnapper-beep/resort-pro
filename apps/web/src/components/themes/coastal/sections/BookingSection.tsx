@@ -3,13 +3,14 @@ import { BookingForm } from '../../_widgets'
 import type { ResortData } from '../../types'
 
 interface BookingSectionProps {
-  data:            ResortData
-  initialCheckIn?: string
-  initialCheckOut?:string
-  initialRoomId?:  string
+  data:              ResortData
+  initialCheckIn?:   string
+  initialCheckOut?:  string
+  initialRoomId?:    string
+  initialPromoCode?: string
 }
 
-export function BookingSection({ data, initialCheckIn, initialCheckOut, initialRoomId }: BookingSectionProps) {
+export function BookingSection({ data, initialCheckIn, initialCheckOut, initialRoomId, initialPromoCode }: BookingSectionProps) {
   const { tenant, website, rooms } = data
   const primary = website?.primaryColor || '#0891b2'
   const accent  = website?.accentColor  || '#d97706'
@@ -69,6 +70,7 @@ export function BookingSection({ data, initialCheckIn, initialCheckOut, initialR
             initialCheckIn={initialCheckIn}
             initialCheckOut={initialCheckOut}
             initialRoomId={initialRoomId}
+            initialPromoCode={initialPromoCode}
           />
         </div>
       </div>

@@ -9,14 +9,14 @@ import {
   TestimonialsSection, ContactSection, FooterSection,
 } from './sections'
 import { WhatsAppButton } from '../_widgets/SocialLinks'
-
-// Coastal theme uses a simple inline booking modal instead of a separate file
-// (rooms section scrolls to booking with pre-selected room)
+import { MenuWidget } from '../_widgets'
+import { AnnouncementBar, OffersSection, usePublicOffers } from '../_widgets/OffersWidget'
 
 const NAV_ITEMS = [
   { id: 'about',        label: 'About' },
   { id: 'amenities',    label: 'Amenities' },
   { id: 'rooms',        label: 'Rooms' },
+  { id: 'menu',         label: 'Menu' },
   { id: 'availability', label: 'Availability' },
   { id: 'gallery',      label: 'Gallery' },
   { id: 'booking',      label: 'Book Now' },
@@ -33,11 +33,16 @@ export function CoastalTheme({ data }: ThemeProps) {
   /* ── Nav state ─────────────────────────── */
   const [navOpen,  setNavOpen]  = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [barVisible, setBarVisible] = useState(true)
 
   /* ── Calendar → Booking pre-fill ──────── */
   const [calendarCheckIn,  setCalendarCheckIn]  = useState<string | undefined>()
   const [calendarCheckOut, setCalendarCheckOut] = useState<string | undefined>()
   const [calendarRoomId,   setCalendarRoomId]   = useState<string | undefined>()
+  const [promoCode,        setPromoCode]        = useState<string | undefined>()
+
+  /* ── Public offers ─────────────────────── */
+  const offers = usePublicOffers(tenant.slug)
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 60)
@@ -62,13 +67,29 @@ export function CoastalTheme({ data }: ThemeProps) {
     document.getElementById('booking')?.scrollIntoView({ behavior: 'smooth' })
   }
 
+  const handleApplyCode = (code: string) => {
+    setPromoCode(code)
+    scrollTo('booking')
+  }
+
   return (
     <div className="min-h-screen bg-white text-slate-800 font-sans antialiased overflow-x-hidden">
 
-      {/* ── Navbar ──────────────────────────── */}
-      <header className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${
-        scrolled ? 'bg-white/95 backdrop-blur-md shadow-sm' : 'bg-transparent'
-      }`}>
+      {/* ── Sticky shell: bar + nav stick together ── */}
+      <div className="sticky top-0 z-40">
+        {barVisible && (
+          <AnnouncementBar
+            slug={tenant.slug}
+            primaryColor={primary}
+            accentColor={accent}
+            onHide={() => setBarVisible(false)}
+          />
+        )}
+
+        {/* ── Navbar ────────────────────────── */}
+        <header className={`transition-all duration-300 ${
+          scrolled ? 'bg-white/95 backdrop-blur-md shadow-sm' : 'bg-transparent'
+        }`}>
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
 
           {/* Logo */}
@@ -127,28 +148,31 @@ export function CoastalTheme({ data }: ThemeProps) {
             ))}
           </div>
         )}
-      </header>
+        </header>
+      </div>{/* end sticky shell */}
 
       {/* ── Sections ────────────────────────── */}
-      <HeroSection   data={data} scrollTo={scrollTo} />
-      <AboutSection  data={data} />
-      <AmenitiesSection data={data} />
-      <RoomsSection
-        data={data}
-        onViewRoom={handleBookRoom}
-        onBookRoom={handleBookRoom}
-      />
-      <AvailabilitySection data={data} onRoomSelect={handleRoomSelect} />
-      <BookingSection
-        data={data}
-        initialCheckIn={calendarCheckIn}
-        initialCheckOut={calendarCheckOut}
-        initialRoomId={calendarRoomId}
-      />
-      <GallerySection      data={data} />
-      <TestimonialsSection data={data} />
-      <ContactSection      data={data} />
-      <FooterSection       data={data} scrollTo={scrollTo} />
+      {(() => {
+        const h = new Set(website.hiddenSections ?? [])
+        const show = (id: string) => !h.has(id)
+        const accentLocal = website.accentColor || '#0e7490'
+        return (
+          <>
+            <HeroSection data={data} scrollTo={scrollTo} />
+            {show('about')        && <AboutSection data={data} />}
+            {show('amenities')    && <AmenitiesSection data={data} />}
+            <RoomsSection data={data} offers={offers} onViewRoom={handleBookRoom} onBookRoom={handleBookRoom} />
+            {show('menu')         && <MenuWidget slug={tenant.slug} primaryColor={primary} accentColor={accentLocal} currency={tenant.currency} />}
+            {show('availability') && <AvailabilitySection data={data} onRoomSelect={handleRoomSelect} />}
+            {show('offers')       && <OffersSection slug={tenant.slug} primaryColor={primary} accentColor={accentLocal} onApplyCode={handleApplyCode} />}
+            <BookingSection data={data} initialCheckIn={calendarCheckIn} initialCheckOut={calendarCheckOut} initialRoomId={calendarRoomId} initialPromoCode={promoCode} />
+            {show('gallery')      && <GallerySection data={data} />}
+            {show('testimonials') && <TestimonialsSection data={data} />}
+            {show('contact')      && <ContactSection data={data} />}
+            <FooterSection data={data} scrollTo={scrollTo} />
+          </>
+        )
+      })()}
       <WhatsAppButton whatsappNumber={data.website?.whatsappNumber} />
     </div>
   )

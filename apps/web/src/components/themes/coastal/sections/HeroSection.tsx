@@ -1,6 +1,7 @@
 'use client'
 import { ArrowRight } from 'lucide-react'
 import type { ResortData } from '../../types'
+import { heroImg } from '../../_utils/images'
 
 interface HeroSectionProps {
   data:     ResortData
@@ -16,10 +17,9 @@ export function HeroSection({ data, scrollTo }: HeroSectionProps) {
     <section id="hero" className="relative min-h-screen flex overflow-hidden">
       {/* Left: image (60%) */}
       <div className="relative w-full lg:w-[60%] min-h-screen">
-        {website?.heroImage ? (
-          <>
+        <>
             <img
-              src={website.heroImage}
+              src={heroImg(website?.heroImage)}
               alt={tenant.name}
               className="absolute inset-0 w-full h-full object-cover"
             />
@@ -28,13 +28,7 @@ export function HeroSection({ data, scrollTo }: HeroSectionProps) {
               className="absolute inset-0"
               style={{ background: `linear-gradient(135deg, ${primary}99 0%, transparent 60%, ${accent}55 100%)` }}
             />
-          </>
-        ) : (
-          <div
-            className="absolute inset-0"
-            style={{ background: `linear-gradient(135deg, ${primary} 0%, #0e7490 50%, #164e63 100%)` }}
-          />
-        )}
+        </>
 
         {/* Mobile: text overlay on image */}
         <div className="lg:hidden relative z-10 h-full flex flex-col items-center justify-center text-center text-white px-8 py-32">
