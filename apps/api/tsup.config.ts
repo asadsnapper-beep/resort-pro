@@ -1,7 +1,11 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/index.ts'],
+  entry: [
+    'src/index.ts',
+    'src/scripts/seed-demo.ts',
+    'src/scripts/seed-admin.ts',
+  ],
   format: ['cjs'],
   outDir: 'dist',
   // Workspace packages → inline into the bundle (no TS source in runtime)
