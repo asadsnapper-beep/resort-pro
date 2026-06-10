@@ -54,7 +54,7 @@ jobs:
           push: true
           tags: ghcr.io/${{ env.OWNER }}/resort-pro-web:dev
           build-args: |
-            NEXT_PUBLIC_API_URL=http://192.168.0.138:4001
+            NEXT_PUBLIC_API_URL=https://resortpro-api.webcoronet.com
           cache-from: type=gha,scope=web-dev
           cache-to: type=gha,mode=max,scope=web-dev
 
@@ -65,7 +65,7 @@ jobs:
     needs: build
     environment:
       name: staging
-      url: http://192.168.0.138:3001
+      url: https://resortpro.webcoronet.com
 
     steps:
       - name: Checkout
@@ -131,6 +131,6 @@ jobs:
       - name: Summary
         run: |
           echo "✅ Staging deployed!"
-          echo "🌐 Web:  http://192.168.0.138:3001"
-          echo "🔌 API:  http://192.168.0.138:4001"
+          echo "🌐 Web:  https://resortpro.webcoronet.com"
+          echo "🔌 API:  https://resortpro-api.webcoronet.com"
           echo "📦 Commit: ${{ github.sha }}"

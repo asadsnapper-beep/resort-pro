@@ -53,9 +53,9 @@ services:
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:-staging_jwt_secret_change_me}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
-      CORS_ORIGIN: ${WEB_URL:-http://192.168.0.138:3001}
-      APP_DOMAIN: ${APP_DOMAIN:-192.168.0.138}
-      APP_IP: ${APP_IP:-192.168.0.138}
+      CORS_ORIGIN: ${WEB_URL:-https://resortpro.webcoronet.com}
+      APP_DOMAIN: ${APP_DOMAIN:-resortpro.webcoronet.com}
+      APP_IP: ${APP_IP:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       SUPER_ADMIN_EMAILS: ${SUPER_ADMIN_EMAILS:-asadsnapper@gmail.com}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
@@ -63,7 +63,7 @@ services:
       STRIPE_PRICE_STARTER: ${STRIPE_PRICE_STARTER:-}
       STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
       STRIPE_PRICE_ENTERPRISE: ${STRIPE_PRICE_ENTERPRISE:-}
-      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://192.168.0.138:3001}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://resortpro.webcoronet.com}
     depends_on:
       postgres:
         condition: service_healthy
@@ -84,7 +84,7 @@ services:
       - '3001:3000'
     environment:
       NODE_ENV: staging
-      NEXT_PUBLIC_API_URL: ${API_URL:-http://192.168.0.138:4001}
+      NEXT_PUBLIC_API_URL: ${API_URL:-https://resortpro-api.webcoronet.com}
     depends_on:
       api:
         condition: service_healthy
