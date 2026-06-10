@@ -1,380 +1,616 @@
 /**
- * Payment routes — /api/payments
+ * Payment Gateway Registry Routes — /api/payments
  *
- * Public (no auth):
- *   POST /bkash/initiate          ← guest initiates bKash payment
- *   GET  /bkash/callback          ← bKash redirects here after payment
- *   POST /ssl/initiate            ← guest initiates SSL payment
- *   POST /ssl/success             ← SSL posts here on success
- *   POST /ssl/fail                ← SSL posts here on fail
- *   POST /ssl/cancel              ← SSL posts here on cancel
- *   POST /stripe/intent           ← create PaymentIntent for guest booking
+ * ── Public (no auth) ───────────────────────────────────────────────────────
+ *   GET  /gateways/:countryCode         → available gateways for a country
+ *   GET  /gateways/tenant/:slug         → enabled gateways for a specific resort
+ *   POST /checkout/init                 → initiate payment for a booking
+ *   POST /checkout/verify               → verify after redirect (return URL)
+ *   POST /webhook/:provider             → gateway webhook callbacks
  *
- * Dashboard (auth required):
- *   GET  /settings                ← get payment gateway settings
- *   PATCH /settings               ← save payment gateway credentials
- *   GET  /settings/active/:slug   ← public: which gateways are active for a resort
+ * ── Dashboard (auth required) ─────────────────────────────────────────────
+ *   GET  /config                        → get tenant's payment config
+ *   PUT  /config                        → save gateway credentials (OWNER only)
+ *   GET  /history                       → payment transaction list
+ *   GET  /history/:id                   → single payment detail
  */
 
-import type { FastifyInstance } from 'fastify'
-import { z } from 'zod'
-import Stripe from 'stripe'
-import { prisma } from '@resort-pro/database'
-import { requireAuth } from '../middleware/auth'
-import type { JwtPayload } from '@resort-pro/types'
-import { bkashGrantToken, bkashCreatePayment, bkashExecutePayment } from '../services/bkash'
-import { sslInitPayment, sslValidatePayment } from '../services/ssl-commerce'
+import type { FastifyInstance } from 'fastify';
+import { z }                    from 'zod';
+import { prisma }               from '@resort-pro/database';
+import {
+  getGateway,
+  getGatewaysForCountry,
+  getCurrency,
+  formatAmount,
+  toSmallestUnit,
+  type GatewayId,
+}                               from '@resort-pro/payment-registry';
+import { requireAuth }          from '../middleware/auth';
+import type { JwtPayload }      from '@resort-pro/types';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
-  apiVersion: '2024-06-20' as any,
-})
+const WEB_BASE = process.env.WEB_BASE_URL || 'http://localhost:3000';
+const API_BASE = process.env.API_BASE_URL || 'http://localhost:4000';
 
-const WEB_BASE = process.env.WEB_BASE_URL || 'http://localhost:3000'
-const API_BASE = process.env.API_BASE_URL || 'http://localhost:4000'
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+/** Get credentials for a gateway from TenantPaymentConfig */
+async function getTenantCredentials(
+  tenantId: string,
+  gateway: GatewayId,
+): Promise<Record<string, string>> {
+  const config = await prisma.tenantPaymentConfig.findUnique({
+    where: { tenantId },
+    select: { credentials: true },
+  });
 
-async function getBkashConfig(tenantId: string) {
-  const t = await prisma.tenant.findUnique({
-    where: { id: tenantId },
-    select: { bkashEnabled: true, bkashAppKey: true, bkashAppSecret: true, bkashUsername: true, bkashPassword: true },
-  })
-  if (!t?.bkashEnabled || !t.bkashAppKey || !t.bkashAppSecret || !t.bkashUsername || !t.bkashPassword) {
-    throw new Error('bKash not configured for this tenant')
-  }
-  return { appKey: t.bkashAppKey, appSecret: t.bkashAppSecret, username: t.bkashUsername, password: t.bkashPassword }
+  if (!config) throw new Error('Payment not configured for this tenant');
+
+  const creds = config.credentials as Record<string, Record<string, string>>;
+  const gatewayCreds = creds[gateway];
+
+  if (!gatewayCreds) throw new Error(`Gateway "${gateway}" credentials not found`);
+
+  // TODO: decrypt in production (AES-256)
+  return gatewayCreds;
 }
 
-async function getSslConfig(tenantId: string) {
-  const t = await prisma.tenant.findUnique({
-    where: { id: tenantId },
-    select: { sslEnabled: true, sslStoreId: true, sslStorePassword: true, sslIsLive: true },
-  })
-  if (!t?.sslEnabled || !t.sslStoreId || !t.sslStorePassword) {
-    throw new Error('SSL Commerce not configured for this tenant')
-  }
-  return { storeId: t.sslStoreId, storePassword: t.sslStorePassword, isLive: t.sslIsLive }
-}
-
-async function confirmBooking(bookingId: string, gateway: string, txId: string, paymentId?: string) {
+/** Mark booking as paid after successful payment */
+async function markBookingPaid(
+  bookingId: string,
+  gateway: string,
+  transactionId: string,
+  paymentId: string,
+  amountInSmallest: number,
+) {
   await prisma.booking.update({
     where: { id: bookingId },
     data: {
-      status: 'CONFIRMED',
-      paymentStatus: 'PAID',
-      paymentGateway: gateway,
-      gatewayTxId: txId,
-      gatewayPaymentId: paymentId ?? txId,
-      paidAt: new Date(),
-      paidAmount: await prisma.booking.findUnique({ where: { id: bookingId }, select: { totalAmount: true } })
-        .then(b => b?.totalAmount ?? 0),
+      status:           'CONFIRMED',
+      paymentStatus:    'PAID',
+      paymentGateway:   gateway.toUpperCase(),
+      gatewayTxId:      transactionId,
+      gatewayPaymentId: paymentId,
+      paidAt:           new Date(),
+      paidAmount:       amountInSmallest / 100,
     },
-  })
+  });
 }
 
-// ─── Routes ───────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Routes
+// ─────────────────────────────────────────────────────────────────────────────
 
 export async function paymentRoutes(app: FastifyInstance) {
 
-  // ── GET /settings/active/:slug — which gateways enabled (public) ──────────
-  app.get('/settings/active/:slug', {
-    handler: async (request, reply) => {
-      const { slug } = request.params as { slug: string }
-      const tenant = await prisma.tenant.findUnique({
-        where: { slug },
-        select: {
-          id: true,
-          bkashEnabled: true,
-          sslEnabled: true,
-          stripeGuestEnabled: true,
-          currency: true,
-        },
-      })
-      if (!tenant) return reply.code(404).send({ error: 'Resort not found' })
+  // ── GET /gateways/:countryCode ────────────────────────────────────────────
+  app.get<{ Params: { countryCode: string } }>('/gateways/:countryCode', {
+    schema: { tags: ['Payments'], summary: 'Available gateways for a country' },
+  }, async (req, reply) => {
+    const gateways = getGatewaysForCountry(req.params.countryCode);
+    return reply.send({
+      success: true,
+      data: gateways.map(gw => ({
+        id:           gw.meta.id,
+        name:         gw.meta.name,
+        logo:         gw.meta.logo,
+        methods:      gw.meta.methods,
+        status:       gw.meta.status,
+        redirectFlow: gw.meta.redirectFlow,
+      })),
+    });
+  });
 
+  // ── GET /gateways/tenant/:slug — enabled gateways for a resort ────────────
+  app.get<{ Params: { slug: string } }>('/gateways/tenant/:slug', {
+    schema: { tags: ['Payments'], summary: 'Enabled gateways for a resort slug' },
+  }, async (req, reply) => {
+    const tenant = await prisma.tenant.findUnique({
+      where: { slug: req.params.slug },
+      select: { id: true, country: true, currency: true, paymentConfig: true },
+    });
+
+    if (!tenant) return reply.status(404).send({ success: false, error: 'Resort not found' });
+
+    const config         = tenant.paymentConfig;
+    const country        = tenant.country ?? 'BD';
+    const activeGateway  = (config?.activeGateway ?? 'manual') as GatewayId;
+    // If no config, show all country gateways; otherwise only enabled ones
+    const enabledMethods = config?.enabledMethods ?? null;
+    const allGateways    = getGatewaysForCountry(country);
+
+    return reply.send({
+      success: true,
+      data: {
+        activeGateway,
+        enabledMethods: enabledMethods ?? allGateways.filter(g => g.meta.status === 'active').map(g => g.meta.id),
+        currency:           getCurrency(country),
+        gateways:           allGateways
+          .filter(gw => gw.meta.status === 'active' && (!enabledMethods || enabledMethods.includes(gw.meta.id)))
+          .map(gw => ({
+            id:           gw.meta.id,
+            name:         gw.meta.name,
+            logo:         gw.meta.logo,
+            methods:      gw.meta.methods,
+            redirectFlow: gw.meta.redirectFlow,
+          })),
+        manualInstructions: config?.manualInstructions ?? null,
+      },
+    });
+  });
+
+  // ── GET /checkout/booking/:bookingId — public booking summary for checkout ──
+  app.get<{ Params: { bookingId: string } }>('/checkout/booking/:bookingId', {
+    schema: { tags: ['Payments'], summary: 'Public booking summary for checkout page' },
+  }, async (req, reply) => {
+    const booking = await prisma.booking.findUnique({
+      where: { id: req.params.bookingId },
+      include: {
+        room:   { select: { name: true, type: true } },
+        guest:  { select: { firstName: true, lastName: true, email: true } },
+        tenant: { select: { name: true, slug: true, country: true, currency: true, paymentConfig: true } },
+      },
+    });
+
+    if (!booking) return reply.status(404).send({ success: false, error: 'Booking not found' });
+
+    const nights = Math.ceil(
+      (new Date(booking.checkOut).getTime() - new Date(booking.checkIn).getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    return reply.send({
+      success: true,
+      data: {
+        id:              booking.id,
+        confirmationNo:  booking.confirmationNo,
+        status:          booking.status,
+        paymentStatus:   booking.paymentStatus,
+        checkIn:         booking.checkIn,
+        checkOut:        booking.checkOut,
+        nights,
+        adults:          booking.adults,
+        children:        booking.children,
+        totalAmount:     Number(booking.totalAmount),
+        currency:        getCurrency((booking as any).tenant?.country ?? 'BD'),
+        room:            (booking as any).room ? { name: (booking as any).room.name, type: (booking as any).room.type } : null,
+        guest:           (booking as any).guest ? {
+          name:  `${(booking as any).guest.firstName} ${(booking as any).guest.lastName}`,
+          email: (booking as any).guest.email,
+        } : null,
+        tenant: {
+          name: (booking as any).tenant?.name,
+          slug: (booking as any).tenant?.slug,
+          manualInstructions: (booking as any).tenant?.paymentConfig?.manualInstructions ?? null,
+        },
+      },
+    });
+  });
+
+  // ── POST /checkout/init — initiate payment ────────────────────────────────
+  app.post('/checkout/init', {
+    schema: { tags: ['Payments'], summary: 'Initiate payment for a booking' },
+  }, async (req, reply) => {
+    const body = z.object({
+      bookingId: z.string(),
+      gateway:   z.string(),
+      returnUrl: z.string().url().optional(),
+    }).safeParse(req.body);
+
+    if (!body.success) return reply.status(400).send({ success: false, error: body.error.flatten() });
+
+    const { bookingId, gateway: gatewayId, returnUrl } = body.data;
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        tenant: { select: { id: true, slug: true, country: true, paymentConfig: true } },
+        guest:  { select: { firstName: true, lastName: true, email: true, phone: true } },
+      },
+    });
+
+    if (!booking) return reply.status(404).send({ success: false, error: 'Booking not found' });
+    if (booking.paymentStatus === 'PAID') {
+      return reply.status(400).send({ success: false, error: 'Booking already paid' });
+    }
+
+    const tenant  = booking.tenant;
+    const country = tenant.country ?? 'BD';
+
+    // Manual payment — no gateway needed
+    if (gatewayId === 'manual') {
+      await prisma.booking.update({
+        where: { id: bookingId },
+        data: { status: 'CONFIRMED', paymentStatus: 'PENDING', paymentGateway: 'MANUAL' },
+      });
       return reply.send({
         success: true,
-        data: {
-          tenantId: tenant.id,
-          bkash: tenant.bkashEnabled,
-          ssl: tenant.sslEnabled,
-          stripe: tenant.stripeGuestEnabled,
-          manual: true, // always available
-          currency: tenant.currency,
-        },
-      })
-    },
-  })
+        data: { type: 'manual', message: tenant.paymentConfig?.manualInstructions ?? 'Pay at resort.' },
+      });
+    }
 
-  // ── GET /settings — get gateway settings (dashboard) ─────────────────────
-  app.get('/settings', {
-    preHandler: requireAuth,
-    handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload
-      const t = await prisma.tenant.findUnique({
-        where: { id: tenantId },
-        select: {
-          bkashEnabled: true, bkashAppKey: true, bkashUsername: true,
-          sslEnabled: true, sslStoreId: true, sslIsLive: true,
-          stripeGuestEnabled: true,
-        },
-      })
-      // Don't return secrets/passwords — only show whether they're set
-      return reply.send({
-        success: true,
-        data: {
-          bkash: {
-            enabled: t?.bkashEnabled ?? false,
-            appKey: t?.bkashAppKey ? '••••' + t.bkashAppKey.slice(-4) : '',
-            username: t?.bkashUsername ?? '',
-            configured: !!(t?.bkashAppKey && t?.bkashAppSecret && t?.bkashUsername && t?.bkashPassword),
-          },
-          ssl: {
-            enabled: t?.sslEnabled ?? false,
-            storeId: t?.sslStoreId ?? '',
-            isLive: t?.sslIsLive ?? false,
-            configured: !!(t?.sslStoreId && t?.sslStorePassword),
-          },
-          stripe: {
-            enabled: t?.stripeGuestEnabled ?? false,
-          },
-        },
-      })
-    },
-  })
+    const gw = getGateway(gatewayId as GatewayId);
+    if (gw.meta.status !== 'active') {
+      return reply.status(400).send({ success: false, error: `Gateway "${gatewayId}" is not available yet` });
+    }
 
-  // ── PATCH /settings — save gateway credentials (dashboard) ───────────────
-  const settingsSchema = z.object({
-    bkash: z.object({
-      enabled: z.boolean().optional(),
-      appKey: z.string().optional(),
-      appSecret: z.string().optional(),
-      username: z.string().optional(),
-      password: z.string().optional(),
-    }).optional(),
-    ssl: z.object({
-      enabled: z.boolean().optional(),
-      storeId: z.string().optional(),
-      storePassword: z.string().optional(),
-      isLive: z.boolean().optional(),
-    }).optional(),
-    stripe: z.object({
-      enabled: z.boolean().optional(),
-    }).optional(),
-  })
+    let credentials: Record<string, string>;
+    try {
+      credentials = await getTenantCredentials(tenant.id, gatewayId as GatewayId);
+    } catch (err) {
+      return reply.status(400).send({ success: false, error: String(err) });
+    }
 
-  app.patch('/settings', {
-    preHandler: requireAuth,
-    handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload
-      const body = settingsSchema.parse(request.body)
+    // Create Payment record
+    const amountInSmallest = toSmallestUnit(Number(booking.totalAmount), country);
+    const payment = await prisma.payment.create({
+      data: {
+        tenantId:   tenant.id,
+        bookingId,
+        amount:     booking.totalAmount,
+        currency:   getCurrency(country).code,
+        method:     gatewayId.toUpperCase() as any,
+        gateway:    gatewayId,
+        status:     'PENDING',
+        payerName:  `${booking.guest?.firstName ?? ''} ${booking.guest?.lastName ?? ''}`.trim() || undefined,
+        payerEmail: booking.guest?.email  ?? undefined,
+        payerPhone: booking.guest?.phone  ?? undefined,
+      },
+    });
 
-      const data: Record<string, unknown> = {}
-      if (body.bkash) {
-        if (body.bkash.enabled !== undefined) data.bkashEnabled = body.bkash.enabled
-        if (body.bkash.appKey)    data.bkashAppKey    = body.bkash.appKey
-        if (body.bkash.appSecret) data.bkashAppSecret = body.bkash.appSecret
-        if (body.bkash.username)  data.bkashUsername  = body.bkash.username
-        if (body.bkash.password)  data.bkashPassword  = body.bkash.password
+    const callbackUrl = `${API_BASE}/api/payments/webhook/${gatewayId}`;
+    const successUrl  = returnUrl ?? `${WEB_BASE}/${tenant.slug}/checkout/verify`;
+
+    const result = await gw.initiate(
+      {
+        amount:        amountInSmallest,
+        currency:      getCurrency(country).code,
+        orderId:       payment.id,
+        customerName:  payment.payerName  ?? 'Guest',
+        customerEmail: payment.payerEmail ?? undefined,
+        customerPhone: payment.payerPhone ?? undefined,
+        callbackUrl,
+        returnUrl:     `${successUrl}?paymentId=${payment.id}`,
+        description:   `Booking #${bookingId.slice(-8).toUpperCase()}`,
+      },
+      credentials,
+    );
+
+    if (!result.success) {
+      await prisma.payment.update({ where: { id: payment.id }, data: { status: 'FAILED' } });
+      return reply.status(500).send({ success: false, error: result.error });
+    }
+
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        gatewayPaymentId: result.gatewayPaymentId,
+        gatewayOrderId:   result.gatewayOrderId,
+        gatewaySessionId: result.sessionToken,
+        status:           'PROCESSING',
+      },
+    });
+
+    return reply.send({
+      success: true,
+      data: {
+        paymentId:   payment.id,
+        type:        result.redirectUrl ? 'redirect' : 'inline',
+        redirectUrl: result.redirectUrl,
+        inlineData:  result.inlineData,
+        gateway:     gatewayId,
+        amount:      formatAmount(Number(booking.totalAmount), country),
+      },
+    });
+  });
+
+  // ── POST /checkout/verify — verify after return redirect ──────────────────
+  app.post('/checkout/verify', {
+    schema: { tags: ['Payments'], summary: 'Verify payment after redirect' },
+  }, async (req, reply) => {
+    const body = z.object({
+      paymentId:        z.string(),
+      gatewayPaymentId: z.string().optional(),
+      queryParams:      z.record(z.string()).optional(),
+    }).safeParse(req.body);
+
+    if (!body.success) return reply.status(400).send({ success: false, error: body.error.flatten() });
+
+    const { paymentId, queryParams } = body.data;
+
+    const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
+    if (!payment) return reply.status(404).send({ success: false, error: 'Payment not found' });
+    if (payment.status === 'PAID') {
+      return reply.send({ success: true, data: { status: 'SUCCESS', alreadyPaid: true } });
+    }
+
+    const gw = getGateway(payment.gateway as GatewayId);
+    let credentials: Record<string, string>;
+    try {
+      credentials = await getTenantCredentials(payment.tenantId, payment.gateway as GatewayId);
+    } catch (err) {
+      return reply.status(400).send({ success: false, error: String(err) });
+    }
+
+    const result = await gw.verify(
+      {
+        gatewayPaymentId: payment.gatewayPaymentId ?? body.data.gatewayPaymentId ?? '',
+        gatewayOrderId:   payment.gatewayOrderId   ?? undefined,
+        orderId:          payment.id,
+        queryParams:      queryParams ?? {},
+      },
+      credentials,
+    );
+
+    const dbStatus = { SUCCESS: 'PAID', FAILED: 'FAILED', PENDING: 'PENDING', CANCELLED: 'CANCELLED' }[result.status];
+
+    await prisma.payment.update({
+      where: { id: paymentId },
+      data: {
+        status:           dbStatus as any,
+        gatewayPaymentId: result.gatewayPaymentId ?? payment.gatewayPaymentId,
+        paidAt:           result.status === 'SUCCESS' ? (result.paidAt ?? new Date()) : undefined,
+        webhookData:      result.rawData as any ?? undefined,
+      },
+    });
+
+    if (result.status === 'SUCCESS' && payment.bookingId) {
+      await markBookingPaid(
+        payment.bookingId,
+        payment.gateway ?? 'unknown',
+        result.transactionId ?? result.gatewayPaymentId ?? paymentId,
+        result.gatewayPaymentId ?? paymentId,
+        Number(payment.amount) * 100,
+      );
+    }
+
+    return reply.send({
+      success: result.status === 'SUCCESS',
+      data: {
+        status:        result.status,
+        paymentId,
+        bookingId:     payment.bookingId,
+        transactionId: result.transactionId,
+        error:         result.error,
+      },
+    });
+  });
+
+  // ── POST /webhook/:provider — gateway callbacks ───────────────────────────
+  app.post<{ Params: { provider: string } }>('/webhook/:provider', {
+    schema: { tags: ['Payments'], summary: 'Gateway webhook callback (called by gateway)' },
+  }, async (req, reply) => {
+    const provider = req.params.provider as GatewayId;
+    const rawBody  = (req as any).rawBody as string ?? JSON.stringify(req.body);
+    const headers  = req.headers as Record<string, string>;
+    const body     = (req.body ?? {}) as Record<string, string>;
+    const query    = (req.query ?? {}) as Record<string, string>;
+
+    try {
+      const gw = getGateway(provider);
+
+      // Find orderId in body/query — each gateway sends it differently
+      const orderId =
+        body.orderId  || body.tran_id || body.merchantInvoiceNumber ||
+        query.orderId || query.paymentID || body.paymentID || '';
+
+      if (!orderId) {
+        app.log.warn(`[webhook:${provider}] No orderId in payload`);
+        return reply.status(200).send({ received: true });
       }
-      if (body.ssl) {
-        if (body.ssl.enabled !== undefined)  data.sslEnabled       = body.ssl.enabled
-        if (body.ssl.storeId)                data.sslStoreId       = body.ssl.storeId
-        if (body.ssl.storePassword)          data.sslStorePassword = body.ssl.storePassword
-        if (body.ssl.isLive !== undefined)   data.sslIsLive        = body.ssl.isLive
+
+      const payment = await prisma.payment.findFirst({
+        where: { OR: [{ id: orderId }, { gatewayPaymentId: orderId }] },
+      });
+
+      if (!payment || payment.status === 'PAID' || payment.status === 'FAILED') {
+        return reply.status(200).send({ received: true, skipped: !payment });
       }
-      if (body.stripe) {
-        if (body.stripe.enabled !== undefined) data.stripeGuestEnabled = body.stripe.enabled
-      }
 
-      await prisma.tenant.update({ where: { id: tenantId }, data })
-      return reply.send({ success: true })
-    },
-  })
-
-  // ── POST /bkash/initiate ──────────────────────────────────────────────────
-  app.post('/bkash/initiate', {
-    handler: async (request, reply) => {
-      const { bookingId } = z.object({ bookingId: z.string() }).parse(request.body)
-
-      const booking = await prisma.booking.findUnique({
-        where: { id: bookingId },
-        include: { tenant: true, guest: true },
-      })
-      if (!booking) return reply.code(404).send({ error: 'Booking not found' })
-      if (booking.status === 'CONFIRMED') return reply.code(409).send({ error: 'Already paid' })
-
-      const cfg = await getBkashConfig(booking.tenantId)
-      const idToken = await bkashGrantToken(cfg)
-
-      const callbackUrl = `${API_BASE}/api/payments/bkash/callback?bookingId=${bookingId}`
-      const result = await bkashCreatePayment(cfg, idToken, {
-        amount: Number(booking.totalAmount).toFixed(2),
-        currency: booking.tenant.currency || 'BDT',
-        merchantInvoiceNumber: booking.confirmationNo,
-        callbackURL: callbackUrl,
-      })
-
-      // Save intermediate paymentID
-      await prisma.booking.update({
-        where: { id: bookingId },
-        data: { paymentGateway: 'BKASH', gatewayPaymentId: result.paymentID },
-      })
-
-      return reply.send({ success: true, data: { bkashURL: result.bkashURL, paymentID: result.paymentID } })
-    },
-  })
-
-  // ── GET /bkash/callback ───────────────────────────────────────────────────
-  app.get('/bkash/callback', {
-    handler: async (request, reply) => {
-      const { bookingId, paymentID, status } = request.query as Record<string, string>
-
-      const booking = await prisma.booking.findUnique({
-        where: { id: bookingId },
-        include: { tenant: true },
-      })
-
-      const slug = booking?.tenant?.slug ?? ''
-      const failUrl = `${WEB_BASE}/${slug}?payment=failed`
-      const cancelUrl = `${WEB_BASE}/${slug}?payment=cancelled`
-      const successUrl = `${WEB_BASE}/${slug}?payment=success&ref=${booking?.confirmationNo}`
-
-      if (!booking || !paymentID) return reply.redirect(failUrl)
-      if (status === 'cancel') return reply.redirect(cancelUrl)
-      if (status === 'failure') return reply.redirect(failUrl)
-
-      try {
-        const cfg = await getBkashConfig(booking.tenantId)
-        const idToken = await bkashGrantToken(cfg)
-        const exec = await bkashExecutePayment(cfg, idToken, paymentID)
-
-        if (exec.transactionStatus === 'Completed') {
-          await confirmBooking(bookingId, 'BKASH', exec.trxID, paymentID)
-          return reply.redirect(successUrl)
-        } else {
-          return reply.redirect(failUrl)
+      // Verify signature if gateway supports it
+      if (gw.verifyWebhookSignature) {
+        const creds = await getTenantCredentials(payment.tenantId, provider);
+        if (!gw.verifyWebhookSignature(rawBody, headers, creds)) {
+          app.log.warn(`[webhook:${provider}] Signature invalid`);
+          return reply.status(401).send({ error: 'Invalid signature' });
         }
-      } catch {
-        return reply.redirect(failUrl)
       }
-    },
-  })
 
-  // ── POST /ssl/initiate ────────────────────────────────────────────────────
-  app.post('/ssl/initiate', {
-    handler: async (request, reply) => {
-      const { bookingId } = z.object({ bookingId: z.string() }).parse(request.body)
+      const credentials = await getTenantCredentials(payment.tenantId, provider);
+      const result = await gw.verify(
+        {
+          gatewayPaymentId: payment.gatewayPaymentId ?? orderId,
+          orderId:          payment.id,
+          rawBody,
+          headers,
+          queryParams:      { ...body, ...query },
+        },
+        credentials,
+      );
 
-      const booking = await prisma.booking.findUnique({
-        where: { id: bookingId },
-        include: { tenant: true, guest: true },
-      })
-      if (!booking) return reply.code(404).send({ error: 'Booking not found' })
-      if (booking.status === 'CONFIRMED') return reply.code(409).send({ error: 'Already paid' })
+      app.log.info(`[webhook:${provider}] ${payment.id} → ${result.status}`);
 
-      const cfg = await getSslConfig(booking.tenantId)
-      const slug = booking.tenant.slug
+      const dbStatus = { SUCCESS: 'PAID', FAILED: 'FAILED', PENDING: 'PENDING', CANCELLED: 'CANCELLED' }[result.status];
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          status:           dbStatus as any,
+          gatewayPaymentId: result.gatewayPaymentId ?? payment.gatewayPaymentId,
+          paidAt:           result.status === 'SUCCESS' ? new Date() : undefined,
+          webhookData:      { ...(result.rawData ?? {}), provider } as any,
+        },
+      });
 
-      const result = await sslInitPayment(cfg, {
-        tranId: booking.confirmationNo,
-        amount: Number(booking.totalAmount),
-        currency: booking.tenant.currency || 'BDT',
-        productName: `Room Booking - ${booking.confirmationNo}`,
-        customerName: `${booking.guest.firstName} ${booking.guest.lastName}`,
-        customerEmail: booking.guest.email,
-        customerPhone: booking.guest.phone ?? '01700000000',
-        successUrl: `${API_BASE}/api/payments/ssl/success?bookingId=${bookingId}`,
-        failUrl:    `${API_BASE}/api/payments/ssl/fail?bookingId=${bookingId}`,
-        cancelUrl:  `${API_BASE}/api/payments/ssl/cancel?bookingId=${bookingId}`,
-      })
+      if (result.status === 'SUCCESS' && payment.bookingId) {
+        await markBookingPaid(
+          payment.bookingId, provider,
+          result.transactionId ?? result.gatewayPaymentId ?? orderId,
+          result.gatewayPaymentId ?? orderId,
+          Number(payment.amount) * 100,
+        );
+      }
 
-      // Save tranId
-      await prisma.booking.update({
-        where: { id: bookingId },
-        data: { paymentGateway: 'SSL', gatewayPaymentId: booking.confirmationNo },
-      })
+      return reply.status(200).send({ received: true });
+    } catch (err) {
+      app.log.error(`[webhook:${provider}] ${err}`);
+      return reply.status(200).send({ received: true }); // always 200 to gateway
+    }
+  });
 
-      return reply.send({ success: true, data: { gatewayUrl: result.GatewayPageURL } })
-    },
-  })
+  // ── GET /config ───────────────────────────────────────────────────────────
+  app.get('/config', {
+    preHandler: [requireAuth],
+    schema: { tags: ['Payments'], summary: 'Get tenant payment config' },
+  }, async (req, reply) => {
+    const { tenantId } = req.user as JwtPayload;
 
-  // ── POST /ssl/success ─────────────────────────────────────────────────────
-  app.post('/ssl/success', {
-    handler: async (request, reply) => {
-      const { bookingId } = request.query as { bookingId: string }
-      const body = request.body as Record<string, string>
-      const valId = body.val_id
+    const [config, tenant] = await Promise.all([
+      prisma.tenantPaymentConfig.findUnique({ where: { tenantId } }),
+      prisma.tenant.findUnique({ where: { id: tenantId }, select: { country: true } }),
+    ]);
 
-      const booking = await prisma.booking.findUnique({
-        where: { id: bookingId },
-        include: { tenant: true },
-      })
-      if (!booking) return reply.redirect(`${WEB_BASE}?payment=failed`)
+    const country  = tenant?.country ?? 'BD';
+    const gateways = getGatewaysForCountry(country);
 
-      const slug = booking.tenant.slug
-      try {
-        const cfg = await getSslConfig(booking.tenantId)
-        const validation = await sslValidatePayment(cfg, valId)
-
-        if (validation.status === 'VALID' || validation.status === 'VALIDATED') {
-          await confirmBooking(bookingId, 'SSL', valId, booking.confirmationNo)
-          return reply.redirect(`${WEB_BASE}/${slug}?payment=success&ref=${booking.confirmationNo}`)
-        } else {
-          return reply.redirect(`${WEB_BASE}/${slug}?payment=failed`)
+    // Mask secret credential values for display
+    const safeCredentials: Record<string, Record<string, string>> = {};
+    if (config?.credentials) {
+      const raw = config.credentials as Record<string, Record<string, string>>;
+      for (const [gwId, gwCreds] of Object.entries(raw)) {
+        safeCredentials[gwId] = {};
+        for (const [key, value] of Object.entries(gwCreds)) {
+          const isSecret = /secret|password|key/i.test(key);
+          safeCredentials[gwId][key] = isSecret && value
+            ? '••••••••' + String(value).slice(-4)
+            : value;
         }
-      } catch {
-        return reply.redirect(`${WEB_BASE}/${slug}?payment=failed`)
       }
-    },
-  })
+    }
 
-  // ── POST /ssl/fail ────────────────────────────────────────────────────────
-  app.post('/ssl/fail', {
-    handler: async (request, reply) => {
-      const { bookingId } = request.query as { bookingId: string }
-      const booking = await prisma.booking.findUnique({ where: { id: bookingId }, include: { tenant: true } })
-      const slug = booking?.tenant?.slug ?? ''
-      return reply.redirect(`${WEB_BASE}/${slug}?payment=failed`)
-    },
-  })
+    return reply.send({
+      success: true,
+      data: {
+        activeGateway:      config?.activeGateway  ?? 'manual',
+        enabledMethods:     config?.enabledMethods ?? ['manual'],
+        manualInstructions: config?.manualInstructions ?? '',
+        testMode:           config?.testMode ?? true,
+        credentials:        safeCredentials,
+        country,
+        currency:           getCurrency(country),
+        availableGateways:  gateways.map(gw => ({
+          id:               gw.meta.id,
+          name:             gw.meta.name,
+          logo:             gw.meta.logo,
+          methods:          gw.meta.methods,
+          status:           gw.meta.status,
+          credentialFields: gw.meta.credentialFields,
+        })),
+      },
+    });
+  });
 
-  // ── POST /ssl/cancel ──────────────────────────────────────────────────────
-  app.post('/ssl/cancel', {
-    handler: async (request, reply) => {
-      const { bookingId } = request.query as { bookingId: string }
-      const booking = await prisma.booking.findUnique({ where: { id: bookingId }, include: { tenant: true } })
-      const slug = booking?.tenant?.slug ?? ''
-      return reply.redirect(`${WEB_BASE}/${slug}?payment=cancelled`)
-    },
-  })
+  // ── PUT /config ───────────────────────────────────────────────────────────
+  app.put('/config', {
+    preHandler: [requireAuth],
+    schema: { tags: ['Payments'], summary: 'Save payment gateway config (OWNER only)' },
+  }, async (req, reply) => {
+    const { tenantId, role } = req.user as JwtPayload;
+    if (role !== 'OWNER') return reply.status(403).send({ success: false, error: 'Owner only' });
 
-  // ── POST /stripe/intent ───────────────────────────────────────────────────
-  app.post('/stripe/intent', {
-    handler: async (request, reply) => {
-      const { bookingId } = z.object({ bookingId: z.string() }).parse(request.body)
+    const body = z.object({
+      activeGateway:      z.string(),
+      enabledMethods:     z.array(z.string()).optional(),
+      manualInstructions: z.string().optional(),
+      testMode:           z.boolean().optional(),
+      credentials:        z.record(z.record(z.string())).optional(),
+    }).safeParse(req.body);
 
-      const booking = await prisma.booking.findUnique({
-        where: { id: bookingId },
-        include: { tenant: true },
-      })
-      if (!booking) return reply.code(404).send({ error: 'Booking not found' })
-      if (booking.status === 'CONFIRMED') return reply.code(409).send({ error: 'Already paid' })
-      if (!booking.tenant.stripeGuestEnabled) return reply.code(400).send({ error: 'Stripe not enabled' })
+    if (!body.success) return reply.status(400).send({ success: false, error: body.error.flatten() });
 
-      const amountCents = Math.round(Number(booking.totalAmount) * 100)
-      const pi = await stripe.paymentIntents.create({
-        amount: amountCents,
-        currency: (booking.tenant.currency || 'usd').toLowerCase(),
-        metadata: { bookingId, confirmationNo: booking.confirmationNo, tenantId: booking.tenantId },
-      })
+    const { activeGateway, enabledMethods, manualInstructions, testMode, credentials } = body.data;
 
-      await prisma.booking.update({
-        where: { id: bookingId },
-        data: { paymentGateway: 'STRIPE', stripePaymentIntentId: pi.id },
-      })
+    // Merge credentials — don't overwrite masked values
+    const existing = await prisma.tenantPaymentConfig.findUnique({
+      where: { tenantId }, select: { credentials: true },
+    });
+    const merged = (existing?.credentials ?? {}) as Record<string, Record<string, string>>;
 
-      return reply.send({ success: true, data: { clientSecret: pi.client_secret } })
-    },
-  })
+    if (credentials) {
+      for (const [gwId, gwCreds] of Object.entries(credentials)) {
+        if (!merged[gwId]) merged[gwId] = {};
+        for (const [key, value] of Object.entries(gwCreds)) {
+          if (value.startsWith('••••••••')) continue; // masked — keep existing
+          merged[gwId][key] = value;
+        }
+      }
+    }
+
+    const config = await prisma.tenantPaymentConfig.upsert({
+      where:  { tenantId },
+      create: {
+        tenantId, activeGateway,
+        enabledMethods: enabledMethods ?? ['manual'],
+        manualInstructions,
+        testMode: testMode ?? true,
+        credentials: merged,
+      },
+      update: {
+        activeGateway,
+        ...(enabledMethods              ? { enabledMethods }     : {}),
+        ...(manualInstructions !== undefined ? { manualInstructions } : {}),
+        ...(testMode           !== undefined ? { testMode }       : {}),
+        credentials: merged,
+      },
+    });
+
+    return reply.send({ success: true, data: { id: config.id, activeGateway: config.activeGateway } });
+  });
+
+  // ── GET /history ──────────────────────────────────────────────────────────
+  app.get('/history', {
+    preHandler: [requireAuth],
+    schema: { tags: ['Payments'], summary: 'Payment transaction history' },
+  }, async (req, reply) => {
+    const { tenantId } = req.user as JwtPayload;
+    const q     = req.query as { page?: string; limit?: string; gateway?: string; status?: string };
+    const page  = Math.max(1, parseInt(q.page ?? '1'));
+    const limit = Math.min(50, parseInt(q.limit ?? '20'));
+
+    const where = {
+      tenantId,
+      ...(q.gateway ? { gateway: q.gateway }       : {}),
+      ...(q.status  ? { status: q.status as any } : {}),
+    };
+
+    const [payments, total] = await Promise.all([
+      prisma.payment.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: { booking: { select: { id: true, checkIn: true, checkOut: true } } },
+      }),
+      prisma.payment.count({ where }),
+    ]);
+
+    return reply.send({
+      success: true,
+      data: { payments, pagination: { page, limit, total, pages: Math.ceil(total / limit) } },
+    });
+  });
+
+  // ── GET /history/:id ──────────────────────────────────────────────────────
+  app.get<{ Params: { id: string } }>('/history/:id', {
+    preHandler: [requireAuth],
+    schema: { tags: ['Payments'], summary: 'Single payment record' },
+  }, async (req, reply) => {
+    const { tenantId } = req.user as JwtPayload;
+    const payment = await prisma.payment.findFirst({
+      where: { id: req.params.id, tenantId },
+      include: { booking: { select: { id: true, checkIn: true, checkOut: true, totalAmount: true } } },
+    });
+    if (!payment) return reply.status(404).send({ success: false, error: 'Payment not found' });
+    return reply.send({ success: true, data: payment });
+  });
 }

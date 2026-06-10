@@ -463,7 +463,7 @@ async function markBookingPaid(bookingId: string, stripePaymentIntentId: string,
       amount,
       method: 'STRIPE',
       status: 'PAID',
-      stripeId: stripePaymentIntentId,
+      gatewayPaymentId: stripePaymentIntentId,
       processedAt: new Date(),
     },
   });

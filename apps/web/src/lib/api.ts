@@ -311,18 +311,38 @@ export const expensesApi = {
   trends: () => api.get('/expenses/trends'),
 };
 
-// ── Payment Gateways ──────────────────────────────────────────────────────────
+// ── Payment Gateway Registry ──────────────────────────────────────────────────
 export const paymentGatewayApi = {
-  getSettings: () => api.get('/payments/settings'),
-  saveSettings: (data: {
-    bkash?: { enabled?: boolean; appKey?: string; appSecret?: string; username?: string; password?: string };
-    ssl?: { enabled?: boolean; storeId?: string; storePassword?: string; isLive?: boolean };
-    stripe?: { enabled?: boolean };
-  }) => api.patch('/payments/settings', data),
-  getActive: (slug: string) => api.get(`/payments/settings/active/${slug}`),
-  bkashInitiate: (bookingId: string) => api.post('/payments/bkash/initiate', { bookingId }),
-  sslInitiate: (bookingId: string) => api.post('/payments/ssl/initiate', { bookingId }),
-  stripeIntent: (bookingId: string) => api.post('/payments/stripe/intent', { bookingId }),
+  /** GET /payments/config — returns { activeGateway, credentials (masked), enabledMethods, testMode, manualInstructions, availableGateways } */
+  getConfig: () => api.get('/payments/config'),
+  /** PUT /payments/config — upsert tenant payment config */
+  saveConfig: (data: {
+    activeGateway?: string;
+    credentials?: Record<string, Record<string, string>>;
+    enabledMethods?: string[];
+    testMode?: boolean;
+    manualInstructions?: string;
+  }) => api.put('/payments/config', data),
+  /** GET /payments/gateways/:countryCode — available gateways for a country */
+  getGatewaysForCountry: (countryCode: string) => api.get(`/payments/gateways/${countryCode}`),
+  /** GET /payments/gateways/tenant/:slug — public gateways for guest checkout */
+  getGatewaysForTenant: (slug: string) => api.get(`/payments/gateways/tenant/${slug}`),
+  /** POST /checkout/init — initiate a payment */
+  initiate: (data: {
+    gateway: string; bookingId: string; currency?: string;
+    customerName: string; customerEmail?: string; customerPhone?: string;
+    returnUrl: string;
+  }) => api.post('/payments/checkout/init', data),
+  /** POST /checkout/verify — verify a payment after redirect */
+  verify: (data: { gateway: string; gatewayPaymentId: string; orderId: string; queryParams?: Record<string, string> }) =>
+    api.post('/payments/checkout/verify', data),
+  /** GET /payments/history — paginated payment list */
+  getHistory: (params?: { page?: number; limit?: number; status?: string }) =>
+    api.get('/payments/history', { params }),
+  // Legacy aliases (still used by old code)
+  getSettings: () => api.get('/payments/config'),
+  saveSettings: (data: any) => api.put('/payments/config', data),
+  getActive: (slug: string) => api.get(`/payments/gateways/tenant/${slug}`),
 };
 
 // ── External Calendars (iCal sync) ────────────────────────────────────────────

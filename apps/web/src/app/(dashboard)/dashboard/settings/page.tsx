@@ -801,85 +801,306 @@ export default function SettingsPage() {
 
 // ── Payment Gateways Tab ──────────────────────────────────────────────────
 
+// Gateway metadata for UI display (logo colors, descriptions, docs links)
+const GATEWAY_UI: Record<string, {
+  bg: string; accent: string; logoText?: string; description: string; docsUrl?: string;
+}> = {
+  bkash:      { bg: 'bg-pink-50',   accent: 'text-pink-600',   logoText: '৳',  description: 'Mobile banking — most popular in Bangladesh', docsUrl: 'https://developer.bka.sh' },
+  nagad:      { bg: 'bg-orange-50', accent: 'text-orange-600', logoText: 'ন',  description: 'Bangladesh Post Office digital wallet', docsUrl: 'https://nagad.com.bd/api' },
+  sslcommerz: { bg: 'bg-green-50',  accent: 'text-green-700',  logoText: 'SSL', description: 'Cards, bKash, Nagad, Rocket, bank transfer', docsUrl: 'https://developer.sslcommerz.com' },
+  razorpay:   { bg: 'bg-blue-50',   accent: 'text-blue-700',   logoText: 'R',   description: 'India\'s leading payment gateway — cards, UPI, netbanking', docsUrl: 'https://razorpay.com/docs' },
+  cashfree:   { bg: 'bg-sky-50',    accent: 'text-sky-700',    logoText: 'CF',  description: 'India — fast settlements, low fees', docsUrl: 'https://docs.cashfree.com' },
+  payhere:    { bg: 'bg-teal-50',   accent: 'text-teal-700',   logoText: 'PH',  description: 'Sri Lanka — cards, bank slips, Sampath Vishwa', docsUrl: 'https://support.payhere.lk' },
+  esewa:      { bg: 'bg-emerald-50',accent: 'text-emerald-700',logoText: 'e',   description: 'Nepal\'s leading digital wallet & payment gateway', docsUrl: 'https://developer.esewa.com.np' },
+  khalti:     { bg: 'bg-violet-50', accent: 'text-violet-700', logoText: 'K',   description: 'Nepal — wallet, cards, bank transfer', docsUrl: 'https://docs.khalti.com' },
+  stripe:     { bg: 'bg-indigo-50', accent: 'text-indigo-600', logoText: '💳',  description: 'International cards — Visa, Mastercard, Amex, Apple Pay', docsUrl: 'https://stripe.com/docs' },
+  paypal:     { bg: 'bg-blue-50',   accent: 'text-blue-800',   logoText: 'PP',  description: 'Global — PayPal wallet, cards (coming soon)', docsUrl: 'https://developer.paypal.com' },
+  midtrans:   { bg: 'bg-red-50',    accent: 'text-red-600',    logoText: '🇮🇩',  description: 'Indonesia — GoPay, OVO, cards (coming soon)' },
+  omise:      { bg: 'bg-sky-50',    accent: 'text-sky-600',    logoText: '🇹🇭',  description: 'Thailand — PromptPay, TrueMoney, cards (coming soon)' },
+  ipay88:     { bg: 'bg-amber-50',  accent: 'text-amber-700',  logoText: '🇲🇾',  description: 'Malaysia — FPX, cards (coming soon)' },
+  mpesa:      { bg: 'bg-green-50',  accent: 'text-green-700',  logoText: '🇰🇪',  description: 'Kenya — mobile money (coming soon)' },
+  flutterwave:{ bg: 'bg-orange-50', accent: 'text-orange-600', logoText: '🌍',  description: 'Africa — Nigeria, Ghana, Kenya (coming soon)' },
+  paystack:   { bg: 'bg-teal-50',   accent: 'text-teal-700',   logoText: '🇳🇬',  description: 'Nigeria, Ghana — cards, bank (coming soon)' },
+};
+
+interface GatewayMeta {
+  id: string;
+  name: string;
+  logo: string;
+  countries: string[];
+  methods: string[];
+  status: 'active' | 'stub' | 'coming_soon';
+  testMode: boolean;
+  redirectFlow: boolean;
+  credentialFields: { key: string; label: string; type: 'text' | 'password' | 'select'; required: boolean; placeholder?: string }[];
+}
+
+function GatewayCard({
+  gw,
+  isEnabled,
+  credentials,
+  testMode,
+  onToggle,
+  onCredentialChange,
+  onTestModeChange,
+  onSave,
+  saving,
+}: {
+  gw: GatewayMeta;
+  isEnabled: boolean;
+  credentials: Record<string, string>;
+  testMode: boolean;
+  onToggle: () => void;
+  onCredentialChange: (key: string, value: string) => void;
+  onTestModeChange: (v: boolean) => void;
+  onSave: () => void;
+  saving: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [showPass, setShowPass] = useState<Record<string, boolean>>({});
+  const ui = GATEWAY_UI[gw.id] ?? { bg: 'bg-gray-50', accent: 'text-gray-600', description: gw.name };
+  const isComingSoon = gw.status === 'coming_soon' || gw.status === 'stub';
+
+  return (
+    <Card className={isComingSoon ? 'opacity-70' : ''}>
+      <CardContent className="p-5 space-y-4">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-xl ${ui.bg} flex items-center justify-center flex-shrink-0`}>
+            <span className={`text-sm font-bold ${ui.accent}`}>{ui.logoText ?? gw.logo}</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="font-semibold text-gray-800">{gw.name}</p>
+              {isComingSoon && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">Coming Soon</span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 truncate">{ui.description}</p>
+          </div>
+          {!isComingSoon && (
+            <button type="button" onClick={onToggle} className="flex-shrink-0">
+              {isEnabled
+                ? <ToggleRight className={`h-7 w-7 ${ui.accent}`} />
+                : <ToggleLeft  className="h-7 w-7 text-gray-300" />}
+            </button>
+          )}
+          {!isComingSoon && gw.credentialFields.length > 0 && (
+            <button type="button" onClick={() => setOpen(o => !o)} className="text-gray-400 ml-1 flex-shrink-0">
+              {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </button>
+          )}
+        </div>
+
+        {/* Credential fields (expandable) */}
+        {open && !isComingSoon && (
+          <div className="space-y-3 pt-1 border-t border-gray-100">
+            <div className="grid grid-cols-2 gap-3">
+              {gw.credentialFields.map(field => (
+                <div key={field.key}>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    {field.label}
+                    {field.required && <span className="text-red-400 ml-0.5">*</span>}
+                  </label>
+                  <div className="relative">
+                    <Input
+                      type={field.type === 'password' && !showPass[field.key] ? 'password' : 'text'}
+                      value={credentials[field.key] ?? ''}
+                      onChange={e => onCredentialChange(field.key, e.target.value)}
+                      placeholder={
+                        credentials[field.key]?.startsWith('••••••••')
+                          ? credentials[field.key]  // show masked value as placeholder
+                          : (field.placeholder ?? (field.type === 'password' ? 'Enter to update' : ''))
+                      }
+                      className={field.type === 'password' ? 'pr-9' : ''}
+                    />
+                    {field.type === 'password' && (
+                      <button type="button"
+                        onClick={() => setShowPass(s => ({ ...s, [field.key]: !s[field.key] }))}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                        {showPass[field.key] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Test/Live mode toggle */}
+            {gw.testMode && (
+              <div className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-800">Live Mode</p>
+                  <p className="text-xs text-gray-500">Sandbox for testing — enable Live Mode for real payments</p>
+                </div>
+                <button type="button" onClick={() => onTestModeChange(!testMode)}>
+                  {!testMode
+                    ? <ToggleRight className="h-7 w-7 text-emerald-600" />
+                    : <ToggleLeft  className="h-7 w-7 text-gray-300" />}
+                </button>
+              </div>
+            )}
+
+            {!testMode && (
+              <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+                <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                <p className="text-xs text-amber-700">Live mode is on — real payments will be processed</p>
+              </div>
+            )}
+
+            {ui.docsUrl && (
+              <p className="text-xs text-gray-400">
+                Get credentials from{' '}
+                <a href={ui.docsUrl} target="_blank" rel="noopener noreferrer"
+                  className={`${ui.accent} underline`}>{ui.docsUrl.replace('https://', '').split('/')[0]}</a>.
+                Leave secret fields blank to keep existing values.
+              </p>
+            )}
+
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                onClick={onSave}
+                disabled={saving}
+                className={`gap-2 ${ui.bg.replace('bg-', 'bg-').replace('-50', '-600')} hover:opacity-90 text-white`}
+              >
+                {saving
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <Save className="h-3.5 w-3.5" />}
+                Save {gw.name}
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function PaymentGatewaysTab() {
+  const { tenant } = useAuthStore()
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving] = useState<string | null>(null) // gatewayId being saved
 
-  // bKash
-  const [bkashEnabled, setBkashEnabled]     = useState(false)
-  const [bkashAppKey, setBkashAppKey]       = useState('')
-  const [bkashAppSecret, setBkashAppSecret] = useState('')
-  const [bkashUsername, setBkashUsername]   = useState('')
-  const [bkashPassword, setBkashPassword]   = useState('')
-  const [showBkashSecret, setShowBkashSecret] = useState(false)
-  const [showBkashPass, setShowBkashPass]     = useState(false)
-  const [bkashOpen, setBkashOpen]             = useState(true)
-
-  // SSL Commerce
-  const [sslEnabled, setSslEnabled]         = useState(false)
-  const [sslStoreId, setSslStoreId]         = useState('')
-  const [sslStorePassword, setSslStorePassword] = useState('')
-  const [sslIsLive, setSslIsLive]           = useState(false)
-  const [showSslPass, setShowSslPass]       = useState(false)
-  const [sslOpen, setSslOpen]               = useState(true)
-
-  // Stripe
-  const [stripeEnabled, setStripeEnabled]   = useState(false)
-  const [stripeOpen, setStripeOpen]         = useState(true)
+  // Config state
+  const [enabledMethods, setEnabledMethods] = useState<string[]>(['manual'])
+  const [testMode, setTestMode] = useState(true)
+  const [manualInstructions, setManualInstructions] = useState('')
+  // credentials per gateway: { bkash: { appKey: '...', ... }, ... }
+  const [credentialsMap, setCredentialsMap] = useState<Record<string, Record<string, string>>>({})
+  // Available gateways from registry (for tenant's country)
+  const [gateways, setGateways] = useState<GatewayMeta[]>([])
+  // All gateways for "other options" section
+  const [allGateways, setAllGateways] = useState<GatewayMeta[]>([])
 
   useEffect(() => {
-    paymentGatewayApi.getSettings()
-      .then((r: any) => {
-        const d = r.data.data
-        setBkashEnabled(d.bkash?.enabled ?? false)
-        setBkashAppKey(d.bkash?.appKey ?? '')
-        setBkashUsername(d.bkash?.username ?? '')
-        setSslEnabled(d.ssl?.enabled ?? false)
-        setSslStoreId(d.ssl?.storeId ?? '')
-        setSslIsLive(d.ssl?.isLive ?? false)
-        setStripeEnabled(d.stripe?.enabled ?? false)
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [])
+    const load = async () => {
+      try {
+        const [configRes, gwRes] = await Promise.all([
+          paymentGatewayApi.getConfig(),
+          paymentGatewayApi.getGatewaysForCountry((tenant as any)?.country ?? 'BD'),
+        ])
+        const cfg = configRes.data.data ?? configRes.data
+        setEnabledMethods(cfg.enabledMethods ?? ['manual'])
+        setTestMode(cfg.testMode ?? true)
+        setManualInstructions(cfg.manualInstructions ?? '')
 
-  const handleSave = async (section: 'bkash' | 'ssl' | 'stripe') => {
-    setSaving(true)
-    try {
-      const payload: any = {}
-      if (section === 'bkash') {
-        payload.bkash = {
-          enabled: bkashEnabled,
-          ...(bkashAppKey    && { appKey:    bkashAppKey }),
-          ...(bkashAppSecret && { appSecret: bkashAppSecret }),
-          ...(bkashUsername  && { username:  bkashUsername }),
-          ...(bkashPassword  && { password:  bkashPassword }),
+        // Build credentialsMap from masked credentials
+        // API returns: { bkash: { appKey: '••••••••1234', appSecret: '••••••••abcd' }, ... }
+        const raw = cfg.credentials ?? {}
+        const map: Record<string, Record<string, string>> = {}
+        for (const [gwId, gwCreds] of Object.entries(raw as Record<string, unknown>)) {
+          if (gwCreds && typeof gwCreds === 'object') {
+            map[gwId] = gwCreds as Record<string, string>
+          }
         }
-      } else if (section === 'ssl') {
-        payload.ssl = {
-          enabled: sslEnabled,
-          ...(sslStoreId       && { storeId:       sslStoreId }),
-          ...(sslStorePassword && { storePassword: sslStorePassword }),
-          isLive: sslIsLive,
+        setCredentialsMap(map)
+
+        // Also set from availableGateways if included in config response
+        if (cfg.availableGateways) {
+          setGateways(cfg.availableGateways)
+        } else {
+          setGateways(gwRes.data.data ?? gwRes.data ?? [])
         }
-      } else {
-        payload.stripe = { enabled: stripeEnabled }
+      } catch {
+        // If config endpoint fails (new tenant), just load gateways
+        try {
+          const gwRes = await paymentGatewayApi.getGatewaysForCountry((tenant as any)?.country ?? 'BD')
+          setGateways(gwRes.data.data ?? gwRes.data ?? [])
+        } catch {}
+      } finally {
+        setLoading(false)
       }
-      await paymentGatewayApi.saveSettings(payload)
-      // Clear password fields after save (security)
-      if (section === 'bkash') { setBkashAppSecret(''); setBkashPassword('') }
-      if (section === 'ssl')   { setSslStorePassword('') }
-      toast({ title: '✅ Saved!' })
-    } catch {
-      toast({ title: 'Save failed', variant: 'destructive' })
+    }
+    load()
+  }, [tenant])
+
+  const handleSave = async (gatewayId: string) => {
+    setSaving(gatewayId)
+    try {
+      // Build nested credentials: { bkash: { appKey: '...', appSecret: '...' } }
+      const gwCreds = credentialsMap[gatewayId] ?? {}
+      const nestedCreds: Record<string, Record<string, string>> = {}
+      if (Object.keys(gwCreds).length > 0) {
+        nestedCreds[gatewayId] = gwCreds // API will skip masked '••••••••' values
+      }
+
+      const isEnabled = enabledMethods.includes(gatewayId)
+      const newMethods = isEnabled
+        ? enabledMethods
+        : [...enabledMethods.filter(m => m !== gatewayId)]
+
+      await paymentGatewayApi.saveConfig({
+        activeGateway: enabledMethods[0] ?? gatewayId, // first enabled = primary
+        enabledMethods: newMethods,
+        credentials: nestedCreds,
+        testMode,
+        manualInstructions: manualInstructions || undefined,
+      })
+
+      // Clear entered secrets (security)
+      setCredentialsMap(prev => {
+        const updated = { ...prev }
+        const gw = gateways.find(g => g.id === gatewayId)
+        if (gw) {
+          const cleared = { ...updated[gatewayId] }
+          gw.credentialFields.forEach(f => {
+            if (f.type === 'password' && cleared[f.key] && !cleared[f.key].startsWith('••••••••')) {
+              cleared[f.key] = '' // clear after save
+            }
+          })
+          updated[gatewayId] = cleared
+        }
+        return updated
+      })
+
+      toast({ title: `✅ ${gatewayId === 'manual' ? 'Manual payment' : gatewayId.charAt(0).toUpperCase() + gatewayId.slice(1)} saved!` })
+    } catch (e: any) {
+      toast({ title: 'Save failed', description: e?.response?.data?.error ?? 'Please try again', variant: 'destructive' })
     } finally {
-      setSaving(false)
+      setSaving(null)
     }
   }
 
-  if (loading) {
-    return <div className="h-64 rounded-xl bg-gray-100 animate-pulse" />
+  const toggleGateway = (gatewayId: string) => {
+    setEnabledMethods(prev =>
+      prev.includes(gatewayId)
+        ? prev.filter(m => m !== gatewayId)
+        : [...prev, gatewayId]
+    )
   }
+
+  if (loading) {
+    return (
+      <div className="space-y-4 max-w-2xl">
+        {[1, 2, 3].map(i => <div key={i} className="h-20 rounded-xl bg-gray-100 animate-pulse" />)}
+      </div>
+    )
+  }
+
+  // Split gateways: Phase 1 (active) vs Phase 2 stubs
+  const activeGws  = gateways.filter(g => g.id !== 'manual' && g.status === 'active')
+  const stubGws    = gateways.filter(g => g.id !== 'manual' && g.status !== 'active')
 
   return (
     <div className="space-y-5 max-w-2xl">
@@ -887,241 +1108,115 @@ function PaymentGatewaysTab() {
       <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 px-5 py-3">
         <Info className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
         <p className="text-sm text-blue-700">
-          Enable payment gateways to let guests pay online when booking.
-          Only enabled gateways appear on your booking page.
-          Credentials are stored securely — secrets are never shown again after saving.
+          Enable payment gateways to accept online payments from guests.
+          Toggle a gateway on, enter credentials, and save.
+          Secrets are stored encrypted and never shown in full after saving.
         </p>
       </div>
+
+      {/* Global test mode banner */}
+      {testMode && (
+        <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3">
+          <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0" />
+          <p className="text-sm text-amber-700 flex-1">
+            <strong>Sandbox mode active</strong> — all gateways use test credentials. No real money will be charged.
+          </p>
+          <Button size="sm" variant="outline"
+            className="text-amber-700 border-amber-300 hover:bg-amber-100 text-xs"
+            onClick={() => {
+              setTestMode(false)
+              toast({ title: '⚠️ Live mode enabled', description: 'Real payments will be processed. Make sure your credentials are live keys.' })
+            }}>
+            Enable Live
+          </Button>
+        </div>
+      )}
 
       {/* Manual Payment — always on */}
       <Card>
         <CardContent className="p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-xl">🏨</div>
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-xl flex-shrink-0">🏨</div>
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-1">
+                <p className="font-semibold text-gray-800">Manual Payment (Pay at Hotel)</p>
+                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">Always on</span>
+              </div>
+              <p className="text-xs text-gray-500 mb-3">Guest selects "Pay at Hotel" — booking saved as Pending until you confirm payment.</p>
               <div>
-                <p className="font-semibold text-gray-800">Manual Payment</p>
-                <p className="text-xs text-gray-500">Guest selects "Pay at Hotel" — booking saved as Pending</p>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Payment Instructions (shown to guest)</label>
+                <textarea
+                  value={manualInstructions}
+                  onChange={e => setManualInstructions(e.target.value)}
+                  rows={2}
+                  placeholder="e.g. Pay at front desk on arrival. Bank transfer: ABC Bank, A/C: 1234567890"
+                  className="w-full text-sm rounded-lg border border-gray-200 px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                />
               </div>
-            </div>
-            <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">Always on</span>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* bKash */}
-      <Card>
-        <CardContent className="p-5 space-y-4">
-          {/* Header row */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-pink-50 flex items-center justify-center">
-              <span className="text-lg font-bold text-pink-600">৳</span>
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-gray-800">bKash</p>
-              <p className="text-xs text-gray-500">Mobile banking — best for Bangladeshi guests</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setBkashEnabled(e => !e)}
-              className="flex items-center gap-2"
-            >
-              {bkashEnabled
-                ? <ToggleRight className="h-7 w-7 text-pink-600" />
-                : <ToggleLeft  className="h-7 w-7 text-gray-300" />}
-            </button>
-            <button type="button" onClick={() => setBkashOpen(o => !o)} className="text-gray-400 ml-1">
-              {bkashOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            </button>
-          </div>
-
-          {bkashOpen && (
-            <div className="space-y-3 pt-1 border-t border-gray-100">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">App Key</label>
-                  <Input value={bkashAppKey} onChange={e => setBkashAppKey(e.target.value)} placeholder="Current: ••••{last 4}" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">App Secret</label>
-                  <div className="relative">
-                    <Input
-                      type={showBkashSecret ? 'text' : 'password'}
-                      value={bkashAppSecret}
-                      onChange={e => setBkashAppSecret(e.target.value)}
-                      placeholder="Enter to update"
-                      className="pr-9"
-                    />
-                    <button type="button" onClick={() => setShowBkashSecret(s => !s)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                      {showBkashSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Username</label>
-                  <Input value={bkashUsername} onChange={e => setBkashUsername(e.target.value)} placeholder="bKash username" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Password</label>
-                  <div className="relative">
-                    <Input
-                      type={showBkashPass ? 'text' : 'password'}
-                      value={bkashPassword}
-                      onChange={e => setBkashPassword(e.target.value)}
-                      placeholder="Enter to update"
-                      className="pr-9"
-                    />
-                    <button type="button" onClick={() => setShowBkashPass(s => !s)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                      {showBkashPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <p className="text-xs text-gray-400">
-                Get credentials from{' '}
-                <a href="https://developer.bka.sh" target="_blank" rel="noopener noreferrer"
-                  className="text-pink-600 underline">developer.bka.sh</a>.
-                Leave secret/password blank to keep existing values.
-              </p>
-              <div className="flex justify-end">
-                <Button size="sm" onClick={() => handleSave('bkash')} loading={saving}
-                  className="gap-2 bg-pink-600 hover:bg-pink-700 text-white">
-                  <Save className="h-3.5 w-3.5" /> Save bKash
+              <div className="flex justify-end mt-2">
+                <Button size="sm" onClick={() => handleSave('manual')} disabled={saving === 'manual'}
+                  className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+                  {saving === 'manual' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                  Save Instructions
                 </Button>
               </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* SSL Commerce */}
-      <Card>
-        <CardContent className="p-5 space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-lg">🔒</div>
-            <div className="flex-1">
-              <p className="font-semibold text-gray-800">SSL Commerce</p>
-              <p className="text-xs text-gray-500">Cards, bKash, Nagad, Rocket, bank transfer</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setSslEnabled(e => !e)}
-              className="flex items-center gap-2"
-            >
-              {sslEnabled
-                ? <ToggleRight className="h-7 w-7 text-green-600" />
-                : <ToggleLeft  className="h-7 w-7 text-gray-300" />}
-            </button>
-            <button type="button" onClick={() => setSslOpen(o => !o)} className="text-gray-400 ml-1">
-              {sslOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            </button>
           </div>
-
-          {sslOpen && (
-            <div className="space-y-3 pt-1 border-t border-gray-100">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Store ID</label>
-                  <Input value={sslStoreId} onChange={e => setSslStoreId(e.target.value)} placeholder="e.g. mystore12345" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Store Password</label>
-                  <div className="relative">
-                    <Input
-                      type={showSslPass ? 'text' : 'password'}
-                      value={sslStorePassword}
-                      onChange={e => setSslStorePassword(e.target.value)}
-                      placeholder="Enter to update"
-                      className="pr-9"
-                    />
-                    <button type="button" onClick={() => setShowSslPass(s => !s)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                      {showSslPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Live / Sandbox toggle */}
-              <div className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-gray-800">Live Mode</p>
-                  <p className="text-xs text-gray-500">Use sandbox for testing, enable Live Mode for real payments</p>
-                </div>
-                <button type="button" onClick={() => setSslIsLive(l => !l)}>
-                  {sslIsLive
-                    ? <ToggleRight className="h-7 w-7 text-green-600" />
-                    : <ToggleLeft  className="h-7 w-7 text-gray-300" />}
-                </button>
-              </div>
-
-              {sslIsLive && (
-                <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                  <p className="text-xs text-amber-700">Live mode is on — real payments will be processed</p>
-                </div>
-              )}
-
-              <p className="text-xs text-gray-400">
-                Get credentials from{' '}
-                <a href="https://developer.sslcommerz.com" target="_blank" rel="noopener noreferrer"
-                  className="text-green-600 underline">developer.sslcommerz.com</a>.
-              </p>
-              <div className="flex justify-end">
-                <Button size="sm" onClick={() => handleSave('ssl')} loading={saving}
-                  className="gap-2 bg-green-600 hover:bg-green-700 text-white">
-                  <Save className="h-3.5 w-3.5" /> Save SSL Commerce
-                </Button>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 
-      {/* Stripe */}
-      <Card>
-        <CardContent className="p-5 space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-lg">💳</div>
-            <div className="flex-1">
-              <p className="font-semibold text-gray-800">Stripe</p>
-              <p className="text-xs text-gray-500">International cards — Visa, Mastercard, Amex</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setStripeEnabled(e => !e)}
-              className="flex items-center gap-2"
-            >
-              {stripeEnabled
-                ? <ToggleRight className="h-7 w-7 text-indigo-600" />
-                : <ToggleLeft  className="h-7 w-7 text-gray-300" />}
-            </button>
-            <button type="button" onClick={() => setStripeOpen(o => !o)} className="text-gray-400 ml-1">
-              {stripeOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            </button>
-          </div>
+      {/* Active (Phase 1) gateways */}
+      {activeGws.length > 0 && (
+        <>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-1">Available for your region</p>
+          {activeGws.map(gw => (
+            <GatewayCard
+              key={gw.id}
+              gw={gw}
+              isEnabled={enabledMethods.includes(gw.id)}
+              credentials={credentialsMap[gw.id] ?? {}}
+              testMode={testMode}
+              onToggle={() => toggleGateway(gw.id)}
+              onCredentialChange={(key, val) =>
+                setCredentialsMap(prev => ({ ...prev, [gw.id]: { ...(prev[gw.id] ?? {}), [key]: val } }))
+              }
+              onTestModeChange={setTestMode}
+              onSave={() => handleSave(gw.id)}
+              saving={saving === gw.id}
+            />
+          ))}
+        </>
+      )}
 
-          {stripeOpen && (
-            <div className="space-y-3 pt-1 border-t border-gray-100">
-              <div className="flex items-start gap-3 rounded-lg bg-indigo-50 border border-indigo-200 px-4 py-3">
-                <Info className="h-4 w-4 text-indigo-500 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-indigo-700">
-                  Stripe guest payments use your platform Stripe key configured via environment variables.
-                  Toggle on to enable the inline card form on your booking page.
-                </p>
-              </div>
-              <div className="flex justify-end">
-                <Button size="sm" onClick={() => handleSave('stripe')} loading={saving}
-                  className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
-                  <Save className="h-3.5 w-3.5" /> Save Stripe
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Coming soon stubs */}
+      {stubGws.length > 0 && (
+        <>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1 pt-2">Coming Soon</p>
+          {stubGws.map(gw => (
+            <GatewayCard
+              key={gw.id}
+              gw={gw}
+              isEnabled={false}
+              credentials={{}}
+              testMode={true}
+              onToggle={() => {}}
+              onCredentialChange={() => {}}
+              onTestModeChange={() => {}}
+              onSave={() => {}}
+              saving={false}
+            />
+          ))}
+        </>
+      )}
+
+      {/* No gateways loaded */}
+      {activeGws.length === 0 && stubGws.length === 0 && (
+        <div className="flex flex-col items-center gap-2 py-12 text-gray-400">
+          <CreditCard className="h-8 w-8" />
+          <p className="text-sm">No payment gateways available for your region.</p>
+          <p className="text-xs">Contact support to add gateway support for your country.</p>
+        </div>
+      )}
     </div>
   )
 }

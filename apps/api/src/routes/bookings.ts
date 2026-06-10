@@ -41,8 +41,8 @@ async function autoCreateInvoice(bookingId: string, tenantId: string) {
         description: `${booking.room.name} — ${nights} night${nights > 1 ? 's' : ''} (${new Date(booking.checkIn).toLocaleDateString()} → ${new Date(booking.checkOut).toLocaleDateString()})`,
         category: 'ROOM',
         quantity: nights,
-        unitPrice: booking.room.basePrice,
-        total: booking.room.basePrice * nights,
+        unitPrice: Number(booking.room.basePrice),
+        total: Number(booking.room.basePrice) * nights,
       },
     ];
 
@@ -72,7 +72,7 @@ async function autoCreateInvoice(bookingId: string, tenantId: string) {
         guestPhone: booking.guest.phone ?? undefined,
         status: 'DRAFT',
         subtotal, taxRate, taxAmount: taxAmt, discountAmt: 0, total,
-        items: { create: lineItems },
+        items: { create: lineItems as any },
       },
     });
   } catch {
@@ -224,7 +224,7 @@ export async function bookingRoutes(app: FastifyInstance) {
         ...room,
         bookings: (bookingsByRoom.get(room.id) ?? []).map(b => ({
           id: b.id,
-          confirmationNumber: b.confirmationNumber,
+          confirmationNumber: (b as any).confirmationNo,
           guestName: `${b.guest.firstName} ${b.guest.lastName}`,
           guestId: b.guest.id,
           checkIn: b.checkIn.toISOString().slice(0, 10),
@@ -382,8 +382,8 @@ export async function bookingRoutes(app: FastifyInstance) {
             tenantId,
             bookingId: booking.id,
             amount: totalAmount,
-            method: body.paymentMethod === 'CARD' ? 'CREDIT_CARD' : body.paymentMethod as 'CASH' | 'BANK_TRANSFER',
-            status: 'COMPLETED',
+            method: (body.paymentMethod as string) === 'CREDIT_CARD' ? 'CARD' : body.paymentMethod as 'CASH' | 'BANK_TRANSFER' | 'CARD',
+            status: 'PAID',
             processedAt: now,
           },
         });
@@ -691,7 +691,7 @@ export async function bookingRoutes(app: FastifyInstance) {
         include: {
           guest: true,
           room: true,
-          payments: { where: { status: 'COMPLETED' } },
+          payments: { where: { status: 'PAID' } },
           foodOrders: { include: { items: { include: { menuItem: true } } } },
           invoiceExtras: { orderBy: { createdAt: 'asc' } },
           tenant: { select: { name: true, email: true, phone: true, address: true, currency: true, taxRate: true } },
@@ -806,7 +806,7 @@ export async function bookingRoutes(app: FastifyInstance) {
         include: {
           guest: true,
           room: true,
-          payments: { where: { status: 'COMPLETED' } },
+          payments: { where: { status: 'PAID' } },
           foodOrders: { include: { items: { include: { menuItem: true } } } },
           invoiceExtras: true,
           tenant: { select: { name: true, email: true, currency: true, taxRate: true } },

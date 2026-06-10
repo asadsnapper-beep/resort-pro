@@ -56,18 +56,44 @@ enum BookingStatus {
 
 enum PaymentStatus {
   PENDING
+  PROCESSING
   PARTIAL
   PAID
   REFUNDED
   FAILED
+  CANCELLED
 }
 
 enum PaymentMethod {
+  // Legacy / manual methods
   CASH
   CARD
   BANK_TRANSFER
-  STRIPE
   OTHER
+  // 🇧🇩 Bangladesh
+  BKASH
+  NAGAD
+  SSLCOMMERZ
+  ROCKET
+  // 🇮🇳 India
+  RAZORPAY
+  CASHFREE
+  // 🇱🇰 Sri Lanka
+  PAYHERE
+  // 🇳🇵 Nepal
+  ESEWA
+  KHALTI
+  // 🇹🇭 🇮🇩 🇲🇾 SE Asia (Phase 2)
+  MIDTRANS
+  OMISE
+  IPAY88
+  // 🇰🇪 Africa (Phase 2)
+  MPESA
+  FLUTTERWAVE
+  PAYSTACK
+  // 🌍 Global
+  STRIPE
+  PAYPAL
 }
 
 enum HousekeepingStatus {
@@ -288,9 +314,10 @@ model Tenant {
   sslProvisionedAt        DateTime?
   sslExpiresAt            DateTime?
   sslError                String? // last error message from cert provisioner
-  currency                String     @default("USD")
+  country                 String     @default("BD") // ISO 3166-1 alpha-2: BD, IN, LK, NP, TH, ID, MY, KE...
+  currency                String     @default("BDT")
   taxRate                 Float      @default(0) // invoice tax percentage e.g. 10 = 10%
-  timezone                String     @default("UTC")
+  timezone                String     @default("Asia/Dhaka")
   checkInTime             String     @default("14:00")
   checkOutTime            String     @default("11:00")
   // Stripe billing
@@ -418,6 +445,7 @@ model Tenant {
   marketingCampaigns  MarketingCampaign[]
   messageTemplates    MessageTemplate[]
   offers              Offer[]
+  paymentConfig       TenantPaymentConfig?
 
   @@map("tenants")
 }
@@ -700,24 +728,79 @@ model BookingOffer {
 }
 
 model Payment {
-  id          String        @id @default(uuid())
-  tenantId    String
-  bookingId   String
-  amount      Decimal       @db.Decimal(10, 2)
-  method      PaymentMethod @default(CASH)
-  status      PaymentStatus @default(PENDING)
-  reference   String?
-  stripeId    String?
-  notes       String?
-  processedAt DateTime?
-  createdAt   DateTime      @default(now())
+  id               String        @id @default(uuid())
+  tenantId         String
+  bookingId        String?       // nullable — advance deposit বা direct payment হতে পারে
 
-  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  booking Booking @relation(fields: [bookingId], references: [id])
+  // Amount & currency
+  amount           Decimal       @db.Decimal(10, 2)
+  currency         String        @default("BDT")
+
+  // Payment method & gateway
+  method           PaymentMethod @default(CASH)
+  gateway          String?       // 'bkash' | 'nagad' | 'sslcommerz' | 'razorpay' | 'stripe' | ...
+  gatewayPaymentId String?       // gateway-এর নিজস্ব payment ID
+  gatewayOrderId   String?       // razorpay order_id / stripe payment_intent id
+  gatewaySessionId String?       // SSLCommerz / bKash session token
+
+  status           PaymentStatus @default(PENDING)
+
+  // Payer info
+  payerName        String?
+  payerEmail       String?
+  payerPhone       String?
+
+  // Legacy / extra fields
+  reference        String?       // manual reference number
+  notes            String?
+  metadata         Json?         // gateway-specific extra data
+  webhookData      Json?         // raw webhook payload (debugging)
+
+  processedAt      DateTime?
+  paidAt           DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  booking Booking? @relation(fields: [bookingId], references: [id])
 
   @@index([tenantId])
   @@index([bookingId])
+  @@index([gateway])
+  @@index([status])
+  @@index([gatewayPaymentId])
   @@map("payments")
+}
+
+// ── Payment Gateway Registry ─────────────────────────────────────────────────
+// Tenant-এর payment gateway configuration — credentials encrypted in production
+
+model TenantPaymentConfig {
+  id             String   @id @default(cuid())
+  tenantId       String   @unique
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Active gateway for online checkout
+  activeGateway  String   @default("manual") // 'bkash'|'nagad'|'sslcommerz'|'razorpay'|'payhere'|'esewa'|'khalti'|'stripe'|'manual'
+
+  // Gateway credentials stored as JSON (encrypted in production via AES-256)
+  // Shape: { bkash: { appKey, appSecret, username, password }, stripe: { secretKey, publishableKey }, ... }
+  credentials    Json     @default("{}")
+
+  // Which payment methods to show guests on checkout page
+  // Values: 'mobile_banking' | 'card' | 'net_banking' | 'wallet' | 'manual'
+  enabledMethods String[] @default(["manual"])
+
+  // Manual payment instructions (shown if guest picks "Pay at Resort")
+  manualInstructions String?
+
+  // Test/sandbox mode toggle
+  testMode       Boolean  @default(true)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("tenant_payment_configs")
 }
 
 model InvoiceExtra {

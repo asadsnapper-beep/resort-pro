@@ -1531,7 +1531,7 @@ Rules:
       freeUntil.setMonth(freeUntil.getMonth() + months);
       await prisma.tenant.update({
         where: { id: referral.referrerId },
-        data: { plan, planStatus: 'active', freeUntil },
+        data: { plan: plan as any, planStatus: 'active', freeUntil },
       });
     }
 
@@ -1556,7 +1556,7 @@ Rules:
         ? `৳${amount?.toLocaleString()} account credit`
         : `${months} months of ${plan} plan free`;
       await createAdminNotification({
-        type: 'referral_reward',
+        type: 'referral_reward' as any,
         title: '🎁 Referral reward applied',
         message: `${referral.referrer.name} received ${rewardText} for referring ${referral.referred.name}.`,
         metadata: { referralId: id, referrerId: referral.referrerId, type, amount, plan, months },
