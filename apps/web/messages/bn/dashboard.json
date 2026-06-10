@@ -1,0 +1,45 @@
+{
+  "home": {
+    "title": "ড্যাশবোর্ড",
+    "welcome": "শুভ {time}, {name}",
+    "todayOverview": "আজকের সারসংক্ষেপ",
+    "occupancyRate": "অকুপেন্সি রেট",
+    "totalRevenue": "মোট আয়",
+    "newBookings": "নতুন বুকিং",
+    "checkInsToday": "আজকের চেক-ইন",
+    "checkOutsToday": "আজকের চেক-আউট",
+    "pendingTasks": "বাকি কাজ",
+    "recentBookings": "সাম্প্রতিক বুকিং",
+    "roomStatus": "রুমের অবস্থা",
+    "upcomingArrivals": "আসন্ন আগমন",
+    "quickActions": "দ্রুত কাজ",
+    "newBooking": "নতুন বুকিং",
+    "walkIn": "সরাসরি",
+    "viewCalendar": "ক্যালেন্ডার দেখুন"
+  },
+  "stats": {
+    "thisMonth": "এই মাসে",
+    "lastMonth": "গত মাসে",
+    "vsLastMonth": "গত মাসের তুলনায়",
+    "increase": "বৃদ্ধি",
+    "decrease": "হ্রাস",
+    "rooms": "টি রুম",
+    "guests": "জন অতিথি",
+    "bookings": "টি বুকিং"
+  },
+  "profile": {
+    "title": "আমার প্রোফাইল",
+    "personalInfo": "ব্যক্তিগত তথ্য",
+    "firstName": "প্রথম নাম",
+    "lastName": "শেষ নাম",
+    "email": "ইমেইল",
+    "phone": "ফোন",
+    "role": "ভূমিকা",
+    "changePassword": "পাসওয়ার্ড পরিবর্তন করুন",
+    "currentPassword": "বর্তমান পাসওয়ার্ড",
+    "newPassword": "নতুন পাসওয়ার্ড",
+    "confirmPassword": "নতুন পাসওয়ার্ড নিশ্চিত করুন",
+    "updateProfile": "প্রোফাইল আপডেট করুন",
+    "profileUpdated": "প্রোফাইল সফলভাবে আপডেট হয়েছে।"
+  }
+}

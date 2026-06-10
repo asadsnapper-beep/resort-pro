@@ -1,0 +1,45 @@
+{
+  "home": {
+    "title": "Dashboard",
+    "welcome": "Good {time}, {name}",
+    "todayOverview": "Today's Overview",
+    "occupancyRate": "Occupancy Rate",
+    "totalRevenue": "Total Revenue",
+    "newBookings": "New Bookings",
+    "checkInsToday": "Check-ins Today",
+    "checkOutsToday": "Check-outs Today",
+    "pendingTasks": "Pending Tasks",
+    "recentBookings": "Recent Bookings",
+    "roomStatus": "Room Status",
+    "upcomingArrivals": "Upcoming Arrivals",
+    "quickActions": "Quick Actions",
+    "newBooking": "New Booking",
+    "walkIn": "Walk-in",
+    "viewCalendar": "View Calendar"
+  },
+  "stats": {
+    "thisMonth": "This month",
+    "lastMonth": "Last month",
+    "vsLastMonth": "vs last month",
+    "increase": "increase",
+    "decrease": "decrease",
+    "rooms": "rooms",
+    "guests": "guests",
+    "bookings": "bookings"
+  },
+  "profile": {
+    "title": "My Profile",
+    "personalInfo": "Personal Information",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "email": "Email",
+    "phone": "Phone",
+    "role": "Role",
+    "changePassword": "Change Password",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm New Password",
+    "updateProfile": "Update Profile",
+    "profileUpdated": "Profile updated successfully."
+  }
+}

@@ -51,6 +51,21 @@ function isInternalPath(pathname: string): boolean {
   return false;
 }
 
+/* ── Auto-detect locale from Cloudflare header or cookie ───────────────────
+   Priority: cookie (user choice) > CF-IPCountry (auto) > default 'en'
+─────────────────────────────────────────────────────────────────────────── */
+function detectLocale(request: NextRequest): string | null {
+  // 1. User manually set locale cookie — respect it
+  const cookieLocale = request.cookies.get('locale')?.value;
+  if (cookieLocale === 'en' || cookieLocale === 'bn') return null; // already set, no override
+
+  // 2. No cookie yet → check Cloudflare country header
+  const country = request.headers.get('CF-IPCountry') ?? request.headers.get('cf-ipcountry');
+  if (country === 'BD') return 'bn';
+
+  return null; // default 'en'
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Middleware
 ═══════════════════════════════════════════════════════════════════════════ */
@@ -58,6 +73,18 @@ export async function middleware(request: NextRequest) {
   const host     = request.headers.get('host') ?? '';
   const hostname = host.split(':')[0]; // strip :port for local dev
   const pathname = request.nextUrl.pathname;
+
+  // 0. Auto-detect locale for Bangladesh visitors (only if no cookie set)
+  const autoLocale = detectLocale(request);
+  if (autoLocale) {
+    const response = NextResponse.next();
+    response.cookies.set('locale', autoLocale, {
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365,
+      sameSite: 'lax',
+    });
+    return response;
+  }
 
   // 1. Always skip Next.js internals and static files
   if (isInternalPath(pathname)) return NextResponse.next();
