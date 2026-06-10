@@ -6,12 +6,15 @@ import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useTranslations } from 'next-intl';
 import { authApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
-import type { Metadata } from 'next';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { useLocale } from 'next-intl';
+import type { Locale } from '@/i18n/config';
 
 const schema = z.object({
   slug: z.string().min(1, 'Resort slug required'),
@@ -19,13 +22,19 @@ const schema = z.object({
   password: z.string().min(1, 'Password required'),
 });
 
-type FormData = z.infer<typeof schema>;
+type FormData = {
+  slug: string;
+  email: string;
+  password: string;
+};
 
 export default function LoginPage() {
   const router = useRouter();
   const { setAuth } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const t = useTranslations('auth.login');
+  const locale = useLocale() as Locale;
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -38,10 +47,10 @@ export default function LoginPage() {
       const res = await authApi.login(data);
       const { user, tenant, token, refreshToken } = res.data.data;
       setAuth(user, tenant, token, refreshToken);
-      toast({ title: 'Welcome back!', description: `Logged in as ${user.firstName}`, variant: 'default' });
+      toast({ title: t('title'), description: `${user.firstName}`, variant: 'default' });
       router.push('/dashboard');
     } catch (err: unknown) {
-      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Login failed';
+      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || t('invalidCredentials');
       setLoginError(message);
       toast({ title: 'Error', description: message, variant: 'destructive' });
     } finally {
@@ -51,11 +60,16 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-resort-900 to-resort-700 flex items-center justify-center p-4">
+      {/* Language switcher — top right */}
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher currentLocale={locale} variant="button" />
+      </div>
+
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gold-500 font-display text-2xl font-bold text-resort-900">R</div>
-          <h1 className="font-display text-3xl font-bold text-white">Welcome back</h1>
-          <p className="mt-2 text-white/60">Sign in to your ResortPro dashboard</p>
+          <h1 className="font-display text-3xl font-bold text-white">{t('title')}</h1>
+          <p className="mt-2 text-white/60">{t('subtitle')}</p>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-sm">
@@ -70,7 +84,7 @@ export default function LoginPage() {
               {errors.slug && <p className="mt-1 text-xs text-red-400">{errors.slug.message}</p>}
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-white/80">Email</label>
+              <label className="mb-1.5 block text-sm font-medium text-white/80">{t('email')}</label>
               <Input
                 {...register('email')}
                 type="email"
@@ -80,7 +94,7 @@ export default function LoginPage() {
               {errors.email && <p className="mt-1 text-xs text-red-400">{errors.email.message}</p>}
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-white/80">Password</label>
+              <label className="mb-1.5 block text-sm font-medium text-white/80">{t('password')}</label>
               <Input
                 {...register('password')}
                 type="password"
@@ -93,18 +107,18 @@ export default function LoginPage() {
               <p className="text-sm text-red-400 text-center" role="alert">{loginError}</p>
             )}
             <Button type="submit" variant="gold" size="lg" className="w-full" loading={loading}>
-              Sign in
+              {loading ? t('signingIn') : t('signIn')}
             </Button>
           </form>
           <div className="mt-4 text-center">
             <Link href="/auth/forgot-password" className="text-sm text-white/50 hover:text-gold-400 transition-colors">
-              Forgot password?
+              {t('forgotPassword')}
             </Link>
           </div>
           <p className="mt-4 text-center text-sm text-white/50">
-            No account?{' '}
+            {t('noAccount')}{' '}
             <Link href="/auth/register" className="text-gold-400 hover:text-gold-300 font-medium">
-              Start free trial
+              {t('signUp')}
             </Link>
           </p>
         </div>

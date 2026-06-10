@@ -16,6 +16,9 @@ import { authApi, tenantApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslations, useLocale } from 'next-intl';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import type { Locale } from '@/i18n/config';
 
 // ─────────────────────────────────────────────────────────────────
 // Role type
@@ -43,84 +46,86 @@ const ROLE_LABELS: Record<Role, { label: string; color: string }> = {
 // ─────────────────────────────────────────────────────────────────
 type NavItem = {
   href: string;
-  label: string;
+  labelKey: string;         // translation key
+  labelFallback: string;    // English fallback
   icon: React.ElementType;
-  group?: string;
+  group: string;
+  groupKey: string;         // translation key for group
   roles?: Role[];
 };
 
 const NAV_ITEMS: NavItem[] = [
   // ── Overview ──────────────────────────────────────────────
-  { href: '/dashboard',            label: 'Dashboard',       icon: LayoutDashboard, group: 'Overview' },
-  { href: '/dashboard/analytics',  label: 'Analytics',       icon: BarChart2,       group: 'Overview',
+  { href: '/dashboard',            labelKey: 'nav.dashboard',    labelFallback: 'Dashboard',       icon: LayoutDashboard, group: 'Overview',         groupKey: 'groups.overview' },
+  { href: '/dashboard/analytics',  labelKey: 'nav.analytics',    labelFallback: 'Analytics',       icon: BarChart2,       group: 'Overview',         groupKey: 'groups.overview',
     roles: ['OWNER', 'MANAGER', 'SHAREHOLDER', 'MARKETER'] },
-  { href: '/dashboard/invoices',   label: 'Invoices',        icon: FileText,        group: 'Overview',
+  { href: '/dashboard/invoices',   labelKey: 'nav.invoices',     labelFallback: 'Invoices',        icon: FileText,        group: 'Overview',         groupKey: 'groups.overview',
     roles: ['OWNER', 'MANAGER', 'SHAREHOLDER', 'RECEPTIONIST'] },
-  { href: '/dashboard/expenses',   label: 'Expenses',        icon: Receipt,         group: 'Overview',
+  { href: '/dashboard/expenses',   labelKey: 'nav.expenses',     labelFallback: 'Expenses',        icon: Receipt,         group: 'Overview',         groupKey: 'groups.overview',
     roles: ['OWNER', 'MANAGER', 'SHAREHOLDER'] },
-  { href: '/dashboard/reports',    label: 'Daily Reports',   icon: FileBarChart2,   group: 'Overview',
+  { href: '/dashboard/reports',    labelKey: 'nav.reports',      labelFallback: 'Daily Reports',   icon: FileBarChart2,   group: 'Overview',         groupKey: 'groups.overview',
     roles: ['OWNER', 'MANAGER', 'SHAREHOLDER'] },
 
   // ── Rooms & Bookings ──────────────────────────────────────
-  { href: '/dashboard/rooms',          label: 'Rooms & Villas',   icon: BedDouble,    group: 'Rooms & Bookings',
+  { href: '/dashboard/rooms',          labelKey: 'nav.rooms',         labelFallback: 'Rooms & Villas',   icon: BedDouble,     group: 'Rooms & Bookings', groupKey: 'groups.rooms',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'STAFF'] },
-  { href: '/dashboard/rate-plans',     label: 'Rate Plans',       icon: Tags,         group: 'Rooms & Bookings',
+  { href: '/dashboard/rate-plans',     labelKey: 'nav.ratePlans',     labelFallback: 'Rate Plans',       icon: Tags,          group: 'Rooms & Bookings', groupKey: 'groups.rooms',
     roles: ['OWNER', 'MANAGER', 'MARKETER'] },
-  { href: '/dashboard/packages',       label: 'Packages',         icon: Gift,         group: 'Rooms & Bookings',
+  { href: '/dashboard/packages',       labelKey: 'nav.packages',      labelFallback: 'Packages',         icon: Gift,          group: 'Rooms & Bookings', groupKey: 'groups.rooms',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'MARKETER'] },
-  { href: '/dashboard/front-desk',     label: 'Front Desk',       icon: ClipboardList, group: 'Rooms & Bookings',
+  { href: '/dashboard/front-desk',     labelKey: 'nav.frontDesk',     labelFallback: 'Front Desk',       icon: ClipboardList, group: 'Rooms & Bookings', groupKey: 'groups.rooms',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
-  { href: '/dashboard/bookings',       label: 'Bookings',         icon: CalendarDays, group: 'Rooms & Bookings',
+  { href: '/dashboard/bookings',       labelKey: 'nav.bookings',      labelFallback: 'Bookings',         icon: CalendarDays,  group: 'Rooms & Bookings', groupKey: 'groups.rooms',
     roles: ['OWNER', 'MANAGER', 'SHAREHOLDER', 'RECEPTIONIST'] },
-  { href: '/dashboard/calendar',       label: 'Booking Calendar', icon: LayoutGrid,   group: 'Rooms & Bookings',
+  { href: '/dashboard/calendar',       labelKey: 'nav.calendar',      labelFallback: 'Booking Calendar', icon: LayoutGrid,    group: 'Rooms & Bookings', groupKey: 'groups.rooms',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
-  { href: '/dashboard/group-bookings', label: 'Group Bookings',   icon: UsersRound,   group: 'Rooms & Bookings',
+  { href: '/dashboard/group-bookings', labelKey: 'nav.groupBookings', labelFallback: 'Group Bookings',   icon: UsersRound,    group: 'Rooms & Bookings', groupKey: 'groups.rooms',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
-  { href: '/dashboard/channels',       label: 'Channel Sync',     icon: Link2,        group: 'Rooms & Bookings',
+  { href: '/dashboard/channels',       labelKey: 'nav.channels',      labelFallback: 'Channel Sync',     icon: Link2,         group: 'Rooms & Bookings', groupKey: 'groups.rooms',
     roles: ['OWNER', 'MANAGER', 'DEVELOPER'] },
 
   // ── Guests ────────────────────────────────────────────────
-  { href: '/dashboard/guests',   label: 'Guests',          icon: Users, group: 'Guests',
+  { href: '/dashboard/guests',   labelKey: 'nav.guests',  labelFallback: 'Guests',          icon: Users,  group: 'Guests', groupKey: 'groups.guests',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'MARKETER'] },
-  { href: '/dashboard/loyalty',  label: 'Loyalty Program', icon: Star,  group: 'Guests',
+  { href: '/dashboard/loyalty',  labelKey: 'nav.loyalty', labelFallback: 'Loyalty Program', icon: Star,   group: 'Guests', groupKey: 'groups.guests',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'MARKETER'] },
-  { href: '/dashboard/support',  label: 'Support',         icon: Ticket, group: 'Guests',
+  { href: '/dashboard/support',  labelKey: 'nav.support', labelFallback: 'Support',         icon: Ticket, group: 'Guests', groupKey: 'groups.guests',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'STAFF'] },
 
   // ── Operations ────────────────────────────────────────────
-  { href: '/dashboard/staff',        label: 'Staff',         icon: UserCog,        group: 'Operations',
+  { href: '/dashboard/staff',        labelKey: 'nav.staff',        labelFallback: 'Staff',        icon: UserCog, group: 'Operations', groupKey: 'groups.operations',
     roles: ['OWNER', 'MANAGER'] },
-  { href: '/dashboard/housekeeping', label: 'Housekeeping',  icon: Sparkles,       group: 'Operations',
+  { href: '/dashboard/housekeeping', labelKey: 'nav.housekeeping', labelFallback: 'Housekeeping', icon: Sparkles, group: 'Operations', groupKey: 'groups.operations',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'STAFF'] },
-  { href: '/dashboard/maintenance',  label: 'Maintenance',   icon: Wrench,         group: 'Operations',
+  { href: '/dashboard/maintenance',  labelKey: 'nav.maintenance',  labelFallback: 'Maintenance',  icon: Wrench,   group: 'Operations', groupKey: 'groups.operations',
     roles: ['OWNER', 'MANAGER', 'STAFF'] },
 
   // ── Restaurant ────────────────────────────────────────────
-  { href: '/dashboard/restaurant', label: 'Restaurant',  icon: UtensilsCrossed, group: 'Restaurant',
+  { href: '/dashboard/restaurant', labelKey: 'nav.restaurant', labelFallback: 'Restaurant', icon: UtensilsCrossed, group: 'Restaurant', groupKey: 'groups.restaurant',
     roles: ['OWNER', 'MANAGER', 'STAFF'] },
-  { href: '/dashboard/orders',     label: 'F&B Orders',  icon: ShoppingBag,     group: 'Restaurant',
+  { href: '/dashboard/orders',     labelKey: 'nav.orders',     labelFallback: 'F&B Orders', icon: ShoppingBag,     group: 'Restaurant', groupKey: 'groups.restaurant',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'STAFF'] },
-  { href: '/dashboard/inventory',  label: 'Inventory',   icon: Package,         group: 'Restaurant',
+  { href: '/dashboard/inventory',  labelKey: 'nav.inventory',  labelFallback: 'Inventory',  icon: Package,         group: 'Restaurant', groupKey: 'groups.restaurant',
     roles: ['OWNER', 'MANAGER', 'STAFF'] },
 
   // ── Marketing ─────────────────────────────────────────────
-  { href: '/dashboard/offers',    label: 'Offers',         icon: Ticket,    group: 'Marketing',
+  { href: '/dashboard/offers',    labelKey: 'nav.offers',    labelFallback: 'Offers',       icon: Ticket,   group: 'Marketing', groupKey: 'groups.marketing',
     roles: ['OWNER', 'MANAGER', 'MARKETER'] },
-  { href: '/dashboard/crm',       label: 'CRM & Email',   icon: Mail,      group: 'Marketing',
+  { href: '/dashboard/crm',       labelKey: 'nav.crm',       labelFallback: 'CRM & Email',  icon: Mail,     group: 'Marketing', groupKey: 'groups.marketing',
     roles: ['OWNER', 'MANAGER', 'MARKETER'] },
-  { href: '/dashboard/marketing', label: 'SMS Marketing', icon: Megaphone, group: 'Marketing',
+  { href: '/dashboard/marketing', labelKey: 'nav.marketing', labelFallback: 'SMS Marketing', icon: Megaphone, group: 'Marketing', groupKey: 'groups.marketing',
     roles: ['OWNER', 'MANAGER', 'MARKETER'] },
-  { href: '/dashboard/website',   label: 'Website',       icon: Globe,     group: 'Marketing',
+  { href: '/dashboard/website',   labelKey: 'nav.website',   labelFallback: 'Website',      icon: Globe,    group: 'Marketing', groupKey: 'groups.marketing',
     roles: ['OWNER', 'MANAGER', 'MARKETER', 'DEVELOPER'] },
 
   // ── Account ───────────────────────────────────────────────
-  { href: '/dashboard/billing',   label: 'Billing',            icon: CreditCard,  group: 'Account',
+  { href: '/dashboard/billing',   labelKey: 'nav.billing',   labelFallback: 'Billing',             icon: CreditCard,  group: 'Account', groupKey: 'groups.account',
     roles: ['OWNER'] },
-  { href: '/dashboard/referrals', label: 'Referrals',          icon: Gift,        group: 'Account',
+  { href: '/dashboard/referrals', labelKey: 'nav.referrals', labelFallback: 'Referrals',            icon: Gift,        group: 'Account', groupKey: 'groups.account',
     roles: ['OWNER'] },
-  { href: '/dashboard/roles',     label: 'Roles & Permissions', icon: ShieldCheck, group: 'Account',
+  { href: '/dashboard/roles',     labelKey: 'nav.roles',     labelFallback: 'Roles & Permissions',  icon: ShieldCheck, group: 'Account', groupKey: 'groups.account',
     roles: ['OWNER'] },
-  { href: '/dashboard/settings',  label: 'Settings',           icon: Settings,    group: 'Account',
+  { href: '/dashboard/settings',  labelKey: 'nav.settings',  labelFallback: 'Settings',             icon: Settings,    group: 'Account', groupKey: 'groups.account',
     roles: ['OWNER', 'MANAGER', 'DEVELOPER'] },
 ];
 
@@ -155,6 +160,9 @@ export function Sidebar() {
   const router = useRouter();
   const { tenant, user, clearAuth, refreshToken } = useAuthStore();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const t = useTranslations('common') as (key: string, ...args: any[]) => string;
+  const locale = useLocale() as Locale;
 
   const { data: modulesRes } = useQuery({
     queryKey: ['tenant-modules'],
@@ -210,6 +218,9 @@ export function Sidebar() {
       <nav className="flex-1 overflow-y-auto py-3 scrollbar-hide">
         {Object.entries(grouped).map(([group, items]) => {
           const isCollapsed = collapsed[group];
+          // Get translation key from first item in group (all items in a group share same groupKey)
+          const groupKey = items[0]?.groupKey;
+          const groupLabel: string = groupKey ? t(groupKey) : group;
           return (
             <div key={group} className="mb-1">
               {/* Group header */}
@@ -218,7 +229,7 @@ export function Sidebar() {
                 className="flex w-full items-center justify-between px-4 py-1.5 text-left"
               >
                 <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                  {group}
+                  {groupLabel}
                 </span>
                 <ChevronDown
                   className={cn(
@@ -231,7 +242,8 @@ export function Sidebar() {
               {/* Group items */}
               {!isCollapsed && (
                 <ul className="space-y-0.5 px-3 pb-1">
-                  {items.map(({ href, label, icon: Icon }) => {
+                  {items.map(({ href, labelKey, labelFallback, icon: Icon }) => {
+                    const label: string = t(labelKey) ?? labelFallback;
                     const active =
                       pathname === href ||
                       (href !== '/dashboard' && pathname.startsWith(href));
@@ -259,16 +271,19 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Help link */}
-      <div className="px-3 pb-2">
+      {/* Help link + Language switcher */}
+      <div className="px-3 pb-2 space-y-1">
         <Link
           href="/docs"
           target="_blank"
           className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
         >
           <LifeBuoy className="h-4 w-4 shrink-0" />
-          Help & Docs
+          {t('helpDocs')}
         </Link>
+        <div className="px-1">
+          <LanguageSwitcher currentLocale={locale} variant="dropdown" theme="light" className="w-full" />
+        </div>
       </div>
 
       {/* User footer */}

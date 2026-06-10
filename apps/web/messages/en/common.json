@@ -28,8 +28,19 @@
     "ratePlans": "Rate Plans",
     "channels": "Channels",
     "referrals": "Referrals",
-    "roles": "Roles"
+    "roles": "Roles",
+    "orders": "F&B Orders"
   },
+  "groups": {
+    "overview": "Overview",
+    "rooms": "Rooms & Bookings",
+    "guests": "Guests",
+    "operations": "Operations",
+    "restaurant": "Restaurant",
+    "marketing": "Marketing",
+    "account": "Account"
+  },
+  "helpDocs": "Help & Docs",
   "actions": {
     "save": "Save",
     "cancel": "Cancel",

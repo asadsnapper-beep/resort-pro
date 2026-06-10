@@ -28,8 +28,19 @@
     "ratePlans": "রেট প্ল্যান",
     "channels": "চ্যানেল",
     "referrals": "রেফারেল",
-    "roles": "ভূমিকা"
+    "roles": "ভূমিকা",
+    "orders": "F&B অর্ডার"
   },
+  "groups": {
+    "overview": "সারসংক্ষেপ",
+    "rooms": "রুম ও বুকিং",
+    "guests": "অতিথি",
+    "operations": "পরিচালনা",
+    "restaurant": "রেস্তোরাঁ",
+    "marketing": "মার্কেটিং",
+    "account": "অ্যাকাউন্ট"
+  },
+  "helpDocs": "সাহায্য ও ডকস",
   "actions": {
     "save": "সংরক্ষণ করুন",
     "cancel": "বাতিল করুন",
