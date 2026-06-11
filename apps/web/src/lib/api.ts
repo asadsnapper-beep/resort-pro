@@ -124,6 +124,11 @@ export const guestsApi = {
   create: (data: unknown) => api.post('/guests', data),
   update: (id: string, data: unknown) => api.patch(`/guests/${id}`, data),
   delete: (id: string) => api.delete(`/guests/${id}`),
+  // Documents
+  listDocuments: (id: string) => api.get(`/guests/${id}/documents`),
+  uploadDocument: (id: string, formData: FormData) =>
+    api.post(`/guests/${id}/documents`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  deleteDocument: (guestId: string, docId: string) => api.delete(`/guests/${guestId}/documents/${docId}`),
 };
 
 // ── Staff ─────────────────────────────────────────────────────────────────────

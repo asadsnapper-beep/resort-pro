@@ -1,6 +1,7 @@
 'use client';
 
 import { Bell, Search, Moon, Sun, AlertTriangle, ArrowRight, X } from 'lucide-react';
+import { ElectronStatusBadge } from './ElectronStatusBadge';
 import { useTheme } from 'next-themes';
 import { useQuery } from '@tanstack/react-query';
 import { notificationsApi, billingApi } from '@/lib/api';
@@ -82,6 +83,9 @@ export function TopNav() {
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Online/offline indicator — Electron only */}
+        <ElectronStatusBadge />
+
         <Button
           variant="ghost"
           size="icon"

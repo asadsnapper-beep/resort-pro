@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
@@ -15,6 +15,8 @@ import { toast } from '@/hooks/use-toast';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { useLocale } from 'next-intl';
 import type { Locale } from '@/i18n/config';
+
+// Window.resortpro type is declared globally in src/types/electron.d.ts
 
 const schema = z.object({
   slug: z.string().min(1, 'Resort slug required'),
@@ -31,15 +33,36 @@ type FormData = {
 export default function LoginPage() {
   const router = useRouter();
   const { setAuth } = useAuthStore();
-  const [loading, setLoading] = useState(false);
-  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loading, setLoading]           = useState(false);
+  const [loginError, setLoginError]     = useState<string | null>(null);
   const t = useTranslations('auth.login');
   const locale = useLocale() as Locale;
+
+  // Biometric state (Electron only)
+  const [isElectron, setIsElectron]           = useState(false);
+  const [biometricAvail, setBiometricAvail]   = useState(false);
+  const [hasSavedCreds, setHasSavedCreds]     = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
+  const [showSavePrompt, setShowSavePrompt]   = useState(false);
+  const [lastLoginData, setLastLoginData]     = useState<FormData | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.resortpro?.isElectron) return;
+    setIsElectron(true);
+    Promise.all([
+      window.resortpro.biometricAvailable(),
+      window.resortpro.hasSavedCredentials(),
+    ]).then(([avail, hasCreds]) => {
+      setBiometricAvail(avail);
+      setHasSavedCreds(hasCreds);
+    });
+  }, []);
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
 
+  // Login with credentials (regular flow)
   const onSubmit = async (data: FormData) => {
     setLoading(true);
     setLoginError(null);
@@ -48,6 +71,14 @@ export default function LoginPage() {
       const { user, tenant, token, refreshToken } = res.data.data;
       setAuth(user, tenant, token, refreshToken);
       toast({ title: t('title'), description: `${user.firstName}`, variant: 'default' });
+
+      // Electron: offer to save credentials for biometric login
+      if (isElectron && biometricAvail && !hasSavedCreds) {
+        setLastLoginData(data);
+        setShowSavePrompt(true);
+        return; // don't navigate yet — wait for user choice
+      }
+
       router.push('/dashboard');
     } catch (err: unknown) {
       const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || t('invalidCredentials');
@@ -56,6 +87,39 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Login via Touch ID / Windows Hello
+  const handleBiometricLogin = async () => {
+    if (!window.resortpro) return;
+    setBiometricLoading(true);
+    try {
+      const result = await window.resortpro.authenticateBiometric();
+      if (!result.success || !result.creds) {
+        toast({ title: 'Biometric failed', description: result.error ?? 'Could not verify identity', variant: 'destructive' });
+        return;
+      }
+      // Use the decrypted credentials to login
+      const res = await authApi.login(result.creds);
+      const { user, tenant, token, refreshToken } = res.data.data;
+      setAuth(user, tenant, token, refreshToken);
+      toast({ title: 'Welcome back!', description: user.firstName });
+      router.push('/dashboard');
+    } catch {
+      toast({ title: 'Login failed', variant: 'destructive' });
+    } finally {
+      setBiometricLoading(false);
+    }
+  };
+
+  // Save credentials and go to dashboard
+  const handleSaveCredentials = async () => {
+    if (!window.resortpro || !lastLoginData) return;
+    await window.resortpro.saveCredentials(lastLoginData);
+    setHasSavedCreds(true);
+    setShowSavePrompt(false);
+    toast({ title: 'Touch ID enabled', description: 'You can login with Touch ID next time' });
+    router.push('/dashboard');
   };
 
   return (
@@ -73,6 +137,57 @@ export default function LoginPage() {
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-sm">
+
+          {/* ── Save credentials prompt (after first login) ─────────────── */}
+          {showSavePrompt && (
+            <div className="mb-6 rounded-xl border border-gold-400/30 bg-gold-500/10 p-5 text-center space-y-3">
+              <div className="text-3xl">🔐</div>
+              <p className="font-semibold text-white">Enable Touch ID?</p>
+              <p className="text-sm text-white/60">
+                Login next time with just your fingerprint — no password needed.
+              </p>
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => { setShowSavePrompt(false); router.push('/dashboard'); }}
+                  className="flex-1 rounded-lg border border-white/20 py-2 text-sm text-white/60 hover:bg-white/10 transition-colors"
+                >
+                  Not now
+                </button>
+                <button
+                  onClick={handleSaveCredentials}
+                  className="flex-1 rounded-lg bg-gold-500 py-2 text-sm font-semibold text-resort-900 hover:bg-gold-400 transition-colors"
+                >
+                  Enable Touch ID
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Touch ID button (if credentials are saved) ──────────────── */}
+          {isElectron && biometricAvail && hasSavedCreds && !showSavePrompt && (
+            <div className="mb-6 space-y-3">
+              <button
+                onClick={handleBiometricLogin}
+                disabled={biometricLoading}
+                className="w-full flex items-center justify-center gap-3 rounded-xl border border-white/20 bg-white/10 py-3.5 text-white font-medium hover:bg-white/15 transition-colors disabled:opacity-50"
+              >
+                {biometricLoading ? (
+                  <span className="text-sm">Verifying…</span>
+                ) : (
+                  <>
+                    <span className="text-2xl">🔐</span>
+                    <span>Login with Touch ID</span>
+                  </>
+                )}
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-white/10" />
+                <span className="text-xs text-white/40">or use password</span>
+                <div className="h-px flex-1 bg-white/10" />
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-white/80">Resort slug</label>

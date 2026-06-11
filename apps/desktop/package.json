@@ -1,0 +1,23 @@
+{
+  "name": "@resort-pro/desktop",
+  "version": "0.1.0",
+  "description": "ResortPro Desktop App (Electron)",
+  "main": "dist/src/main.js",
+  "private": true,
+  "scripts": {
+    "dev": "tsc && cp db/schema.sql dist/db/schema.sql && electron dist/src/main.js",
+    "build": "tsc && cp db/schema.sql dist/db/schema.sql",
+    "rebuild-native": "electron-rebuild -f -w better-sqlite3",
+    "start": "electron dist/src/main.js"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.4",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^20.0.0",
+    "electron": "^31.0.0",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.10.0"
+  }
+}

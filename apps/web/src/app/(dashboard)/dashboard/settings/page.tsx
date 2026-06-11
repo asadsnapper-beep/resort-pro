@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tenantApi, api } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
@@ -59,21 +59,58 @@ interface TenantSettings {
   checkOutTime?: string;
 }
 
-const TABS = [
-  { id: 'general',    label: 'General',           icon: Building2 },
-  { id: 'contact',    label: 'Contact',            icon: Phone },
-  { id: 'operations', label: 'Operations',         icon: Clock },
-  { id: 'modules',    label: 'Modules',            icon: LayoutGrid },
-  { id: 'email',         label: 'Email',              icon: Mail },
-  { id: 'notifications', label: 'SMS & WhatsApp',    icon: Send },
-  { id: 'payments',      label: 'Payment Gateways',  icon: CreditCard },
-  { id: 'embed',     label: 'Embed & Widget',     icon: ExternalLink },
-  { id: 'domain',     label: 'Custom Domain',      icon: Globe },
-  { id: 'gdpr',       label: 'Privacy & GDPR',     icon: ShieldCheck },
-  { id: 'enterprise', label: 'Enterprise',         icon: Star },
-] as const;
+type TabId =
+  | 'general' | 'contact' | 'operations' | 'modules'
+  | 'email' | 'notifications'
+  | 'payments' | 'embed' | 'discovery'
+  | 'domain' | 'gdpr' | 'enterprise';
 
-type Tab = typeof TABS[number]['id'];
+type Tab = TabId;
+
+interface TabItem {
+  id: TabId;
+  label: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  icon: React.ComponentType<any>;
+}
+
+const TAB_GROUPS: Array<{ group: string; items: TabItem[] }> = [
+  {
+    group: 'Resort',
+    items: [
+      { id: 'general',    label: 'General',        icon: Building2 },
+      { id: 'contact',    label: 'Contact',         icon: Phone },
+      { id: 'operations', label: 'Operations',      icon: Clock },
+      { id: 'modules',    label: 'Modules',         icon: LayoutGrid },
+    ],
+  },
+  {
+    group: 'Communications',
+    items: [
+      { id: 'email',         label: 'Email',           icon: Mail },
+      { id: 'notifications', label: 'SMS & WhatsApp',  icon: Send },
+    ],
+  },
+  {
+    group: 'Monetisation',
+    items: [
+      { id: 'payments',  label: 'Payment Gateways', icon: CreditCard },
+      { id: 'embed',     label: 'Embed & Widget',   icon: ExternalLink },
+      { id: 'discovery', label: 'Discovery Map',    icon: MapPin },
+    ],
+  },
+  {
+    group: 'Advanced',
+    items: [
+      { id: 'domain',     label: 'Custom Domain',   icon: Globe },
+      { id: 'gdpr',       label: 'Privacy & GDPR',  icon: ShieldCheck },
+      { id: 'enterprise', label: 'Enterprise',      icon: Star },
+    ],
+  },
+];
+
+// Flat list for easy lookup
+const TABS = TAB_GROUPS.flatMap(g => g.items);
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
@@ -287,39 +324,76 @@ export default function SettingsPage() {
     return <div className="h-64 rounded-xl bg-gray-100 animate-pulse" />;
   }
 
+  // Active tab label for mobile breadcrumb
+  const activeTab = TABS.find(t => t.id === tab);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Manage your resort configuration</p>
-        </div>
-        <Button className="gap-2" loading={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
-          <Save className="h-4 w-4" /> Save Changes
-        </Button>
+      {/* Page header */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Manage your resort configuration</p>
       </div>
 
       {/* Tenant Info Banner */}
       {tenant && (
-        <div className="flex items-center gap-3 rounded-xl border border-resort-200 bg-resort-50 px-5 py-3">
+        <div className="flex items-center gap-3 rounded-xl border border-resort-200 bg-resort-50 dark:bg-resort-950/30 dark:border-resort-800 px-5 py-3">
           <Info className="h-4 w-4 text-resort-600 flex-shrink-0" />
-          <p className="text-sm text-resort-700">
-            You are managing <strong>{tenant.name}</strong> — slug: <code className="font-mono bg-resort-100 px-1 rounded">{tenant.slug}</code>
+          <p className="text-sm text-resort-700 dark:text-resort-300">
+            You are managing <strong>{tenant.name}</strong> — slug: <code className="font-mono bg-resort-100 dark:bg-resort-900 px-1.5 py-0.5 rounded text-xs">{tenant.slug}</code>
           </p>
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b">
-        {TABS.map(({ id, label, icon: Icon }) => (
-          <button key={id} onClick={() => setTab(id)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              tab === id ? 'border-resort-600 text-resort-700' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}>
-            <Icon className="h-4 w-4" /> {label}
-          </button>
-        ))}
-      </div>
+      {/* Settings layout: left sidebar + content */}
+      <div className="flex gap-8 items-start">
+
+        {/* ── Left sidebar nav ───────────────────────────────────────────── */}
+        <aside className="hidden md:flex flex-col gap-6 w-52 flex-shrink-0 sticky top-4">
+          {TAB_GROUPS.map(({ group, items }) => (
+            <div key={group}>
+              <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                {group}
+              </p>
+              <nav className="flex flex-col gap-0.5">
+                {items.map(({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    onClick={() => setTab(id)}
+                    className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors text-left w-full ${
+                      tab === id
+                        ? 'bg-resort-50 dark:bg-resort-900/40 text-resort-700 dark:text-resort-300'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100'
+                    }`}
+                  >
+                    <Icon className={`h-4 w-4 flex-shrink-0 ${tab === id ? 'text-resort-600 dark:text-resort-400' : 'text-gray-400'}`} />
+                    {label}
+                  </button>
+                ))}
+              </nav>
+            </div>
+          ))}
+        </aside>
+
+        {/* ── Mobile tab selector ────────────────────────────────────────── */}
+        <div className="md:hidden w-full">
+          <select
+            value={tab}
+            onChange={e => setTab(e.target.value as Tab)}
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-resort-500"
+          >
+            {TAB_GROUPS.map(({ group, items }) => (
+              <optgroup key={group} label={group}>
+                {items.map(({ id, label }) => (
+                  <option key={id} value={id}>{label}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+
+        {/* ── Content area ───────────────────────────────────────────────── */}
+        <div className="flex-1 min-w-0 space-y-6">
 
       {/* General */}
       {tab === 'general' && (
@@ -788,13 +862,21 @@ export default function SettingsPage() {
         <EnterpriseTab />
       )}
 
-      {tab !== 'domain' && tab !== 'gdpr' && tab !== 'enterprise' && tab !== 'payments' && tab !== 'embed' && tab !== 'notifications' && tab !== 'modules' && (
+      {tab === 'discovery' && (
+        <DiscoveryMapTab />
+      )}
+
+      {/* Save — general tabs (general, contact, operations, email) */}
+      {(tab === 'general' || tab === 'contact' || tab === 'operations') && (
         <div className="flex justify-end pt-2">
           <Button className="gap-2 px-8" loading={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
-            <Save className="h-4 w-4" /> Save All Changes
+            <Save className="h-4 w-4" /> Save Changes
           </Button>
         </div>
       )}
+
+        </div>
+      </div>
     </div>
   );
 }
@@ -2263,6 +2345,442 @@ function NotificationsTab() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Discovery Map Tab ──────────────────────────────────────────────────────────
+
+function DiscoveryMapTab() {
+  const { tenant } = useAuthStore();
+  const queryClient = useQueryClient();
+
+  const [form, setForm] = useState({
+    mapVisible:           false,
+    latitude:             '',
+    longitude:            '',
+    resortCategory:       '',
+    priceFrom:            '',
+    shortDescription:     '',
+    coverImageUrl:        '',
+    // Revenue / premium fields
+    affiliateUrl:         '',
+    affiliateSource:      '',
+    bookingPhone:         '',
+    instagramHandle:      '',
+    galleryImages:        '' as string,    // newline-separated URLs
+    amenitiesHighlights:  '' as string,    // newline-separated items
+  });
+
+  // New gallery image input
+  const [newGalleryUrl, setNewGalleryUrl] = useState('');
+  const [newAmenity,    setNewAmenity]    = useState('');
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['discovery-settings'],
+    queryFn:  () => api.get('/discovery/admin/settings').then(r => r.data.data),
+    enabled:  !!tenant,
+  });
+
+  useEffect(() => {
+    if (data) {
+      setForm({
+        mapVisible:           data.mapVisible         ?? false,
+        latitude:             data.latitude           != null ? String(data.latitude)  : '',
+        longitude:            data.longitude          != null ? String(data.longitude) : '',
+        resortCategory:       data.resortCategory     ?? '',
+        priceFrom:            data.priceFrom          != null ? String(data.priceFrom) : '',
+        shortDescription:     data.shortDescription   ?? '',
+        coverImageUrl:        data.coverImageUrl      ?? '',
+        affiliateUrl:         data.affiliateUrl       ?? '',
+        affiliateSource:      data.affiliateSource    ?? '',
+        bookingPhone:         data.bookingPhone       ?? '',
+        instagramHandle:      data.instagramHandle    ?? '',
+        galleryImages:        (data.galleryImages      ?? []).join('\n'),
+        amenitiesHighlights:  (data.amenitiesHighlights ?? []).join('\n'),
+      });
+    }
+  }, [data]);
+
+  const galleryArr    = form.galleryImages.split('\n').map(s => s.trim()).filter(Boolean);
+  const amenitiesArr  = form.amenitiesHighlights.split('\n').map(s => s.trim()).filter(Boolean);
+
+  const addGallery = () => {
+    if (!newGalleryUrl.trim()) return;
+    setForm(f => ({ ...f, galleryImages: [...galleryArr, newGalleryUrl.trim()].join('\n') }));
+    setNewGalleryUrl('');
+  };
+  const removeGallery = (url: string) => {
+    setForm(f => ({ ...f, galleryImages: galleryArr.filter(u => u !== url).join('\n') }));
+  };
+
+  const addAmenity = () => {
+    if (!newAmenity.trim()) return;
+    setForm(f => ({ ...f, amenitiesHighlights: [...amenitiesArr, newAmenity.trim()].join('\n') }));
+    setNewAmenity('');
+  };
+  const removeAmenity = (item: string) => {
+    setForm(f => ({ ...f, amenitiesHighlights: amenitiesArr.filter(a => a !== item).join('\n') }));
+  };
+
+  const saveMut = useMutation({
+    mutationFn: () => api.patch('/discovery/admin/settings', {
+      mapVisible:           form.mapVisible,
+      latitude:             form.latitude             ? parseFloat(form.latitude)  : null,
+      longitude:            form.longitude            ? parseFloat(form.longitude) : null,
+      resortCategory:       form.resortCategory       || null,
+      priceFrom:            form.priceFrom            ? parseFloat(form.priceFrom) : null,
+      shortDescription:     form.shortDescription     || null,
+      coverImageUrl:        form.coverImageUrl        || null,
+      affiliateUrl:         form.affiliateUrl         || null,
+      affiliateSource:      form.affiliateSource      || null,
+      bookingPhone:         form.bookingPhone         || null,
+      instagramHandle:      form.instagramHandle      || null,
+      galleryImages:        galleryArr,
+      amenitiesHighlights:  amenitiesArr,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['discovery-settings'] });
+      toast({ title: 'Discovery settings saved!', description: 'Your resort will appear on the map.' });
+    },
+    onError: () => toast({ title: 'Save failed', variant: 'destructive' }),
+  });
+
+  const CATEGORIES = [
+    { value: 'eco',      label: '🌿 Eco Resort' },
+    { value: 'agro',     label: '🌾 Agro Resort' },
+    { value: 'beach',    label: '🏖️ Beach Resort' },
+    { value: 'hill',     label: '⛰️ Hill Resort' },
+    { value: 'city',     label: '🏙️ City Hotel' },
+    { value: 'heritage', label: '🏛️ Heritage Property' },
+    { value: 'resort',   label: '🏨 Resort' },
+  ];
+
+  const AFFILIATE_SOURCES = [
+    { value: 'booking.com', label: 'Booking.com' },
+    { value: 'agoda',       label: 'Agoda' },
+    { value: 'direct',      label: 'Direct (own booking page)' },
+    { value: 'custom',      label: 'Custom / Other' },
+  ];
+
+  if (isLoading) {
+    return <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-[#1a6b5e]" /></div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="rounded-2xl bg-gradient-to-r from-[#1a6b5e] to-[#145a4f] text-white p-5">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+            <MapPin className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="font-bold text-base">stay.resortpro.site</h2>
+            <p className="text-xs text-white/70">Public resort discovery map</p>
+          </div>
+        </div>
+        <p className="text-sm text-white/80">
+          Enable your resort on the public discovery map so travelers can find you.
+        </p>
+        {form.mapVisible && (
+          <a
+            href={`https://stay.resortpro.site/resort/${tenant?.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 mt-2 text-xs bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full transition-colors">
+            <ExternalLink className="w-3 h-3" /> View on discovery map →
+          </a>
+        )}
+      </div>
+
+      {/* Visibility toggle */}
+      <div className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl">
+        <div>
+          <p className="font-medium text-gray-800">Show on Discovery Map</p>
+          <p className="text-xs text-gray-500 mt-0.5">Make your resort visible to travelers on stay.resortpro.site</p>
+        </div>
+        <button
+          onClick={() => setForm(f => ({ ...f, mapVisible: !f.mapVisible }))}
+          className={`flex items-center gap-2 text-sm font-semibold transition-colors ${
+            form.mapVisible ? 'text-[#1a6b5e]' : 'text-gray-400'
+          }`}>
+          {form.mapVisible
+            ? <ToggleRight className="w-8 h-8 text-[#1a6b5e]" />
+            : <ToggleLeft  className="w-8 h-8 text-gray-300" />}
+        </button>
+      </div>
+
+      {form.mapVisible && (
+        <>
+          {/* Location */}
+          <Card>
+            <CardContent className="pt-5 space-y-4">
+              <h3 className="font-semibold text-gray-700 flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-[#1a6b5e]" /> Map Location
+              </h3>
+              <p className="text-xs text-gray-400">
+                Get your coordinates from{' '}
+                <a href="https://www.latlong.net" target="_blank" rel="noopener noreferrer" className="text-[#1a6b5e] underline">
+                  latlong.net
+                </a>
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Latitude</label>
+                  <Input
+                    placeholder="e.g. 22.3569"
+                    value={form.latitude}
+                    onChange={e => setForm(f => ({ ...f, latitude: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Longitude</label>
+                  <Input
+                    placeholder="e.g. 91.7832"
+                    value={form.longitude}
+                    onChange={e => setForm(f => ({ ...f, longitude: e.target.value }))}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Resort info */}
+          <Card>
+            <CardContent className="pt-5 space-y-4">
+              <h3 className="font-semibold text-gray-700">Resort Information</h3>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Category</label>
+                  <select
+                    value={form.resortCategory}
+                    onChange={e => setForm(f => ({ ...f, resortCategory: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a6b5e]/30">
+                    <option value="">Select category</option>
+                    {CATEGORIES.map(c => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Starting Price / Night</label>
+                  <Input
+                    placeholder="e.g. 5000"
+                    value={form.priceFrom}
+                    onChange={e => setForm(f => ({ ...f, priceFrom: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Short Description (1-2 lines)</label>
+                <textarea
+                  rows={2}
+                  placeholder="A peaceful eco resort nestled in the hills of Bandarban..."
+                  value={form.shortDescription}
+                  onChange={e => setForm(f => ({ ...f, shortDescription: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1a6b5e]/30"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Cover Image URL</label>
+                <Input
+                  placeholder="https://..."
+                  value={form.coverImageUrl}
+                  onChange={e => setForm(f => ({ ...f, coverImageUrl: e.target.value }))}
+                />
+                {form.coverImageUrl && (
+                  <img
+                    src={form.coverImageUrl}
+                    alt="Preview"
+                    className="mt-2 h-28 w-full object-cover rounded-lg border border-gray-100"
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Booking & Contact */}
+          <Card>
+            <CardContent className="pt-5 space-y-4">
+              <h3 className="font-semibold text-gray-700 flex items-center gap-2">
+                📞 Booking & Contact
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Booking Phone / WhatsApp</label>
+                  <Input
+                    placeholder="+880 1XXX-XXXXXX"
+                    value={form.bookingPhone}
+                    onChange={e => setForm(f => ({ ...f, bookingPhone: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Instagram Handle</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">@</span>
+                    <Input
+                      className="pl-7"
+                      placeholder="yourresort"
+                      value={form.instagramHandle}
+                      onChange={e => setForm(f => ({ ...f, instagramHandle: e.target.value.replace('@', '') }))}
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Affiliate Booking Link */}
+          <Card>
+            <CardContent className="pt-5 space-y-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-semibold text-gray-700 flex items-center gap-2">
+                    🔗 Affiliate / Booking Link
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    When travelers click "Book", they'll be sent here. We track the click.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Booking Source</label>
+                  <select
+                    value={form.affiliateSource}
+                    onChange={e => setForm(f => ({ ...f, affiliateSource: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a6b5e]/30">
+                    <option value="">Select source</option>
+                    {AFFILIATE_SOURCES.map(s => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Booking URL</label>
+                  <Input
+                    placeholder="https://booking.com/hotel/..."
+                    value={form.affiliateUrl}
+                    onChange={e => setForm(f => ({ ...f, affiliateUrl: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              {form.affiliateUrl && (
+                <div className="flex items-center gap-2 p-2.5 bg-[#f0faf8] rounded-lg text-xs text-[#1a6b5e]">
+                  <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="truncate">Travelers will be sent to: <strong>{form.affiliateUrl}</strong></span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Gallery Images */}
+          <Card>
+            <CardContent className="pt-5 space-y-4">
+              <div>
+                <h3 className="font-semibold text-gray-700 flex items-center gap-2">
+                  🖼️ Gallery Images
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Add photo URLs to showcase on your premium profile (up to 8 images).
+                </p>
+              </div>
+
+              {/* Existing gallery */}
+              {galleryArr.length > 0 && (
+                <div className="grid grid-cols-4 gap-2">
+                  {galleryArr.map((url, i) => (
+                    <div key={i} className="relative group">
+                      <img
+                        src={url}
+                        alt={`Gallery ${i + 1}`}
+                        className="w-full aspect-square object-cover rounded-lg border border-gray-100"
+                        onError={e => { (e.target as HTMLImageElement).style.opacity = '0.3'; }}
+                      />
+                      <button
+                        onClick={() => removeGallery(url)}
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add new */}
+              {galleryArr.length < 8 && (
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="https://... (image URL)"
+                    value={newGalleryUrl}
+                    onChange={e => setNewGalleryUrl(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addGallery()}
+                    className="flex-1"
+                  />
+                  <Button variant="outline" size="sm" onClick={addGallery} className="flex-shrink-0">
+                    Add
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Amenities */}
+          <Card>
+            <CardContent className="pt-5 space-y-4">
+              <div>
+                <h3 className="font-semibold text-gray-700 flex items-center gap-2">
+                  ✨ Amenity Highlights
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Key features shown as chips on your profile (e.g. "Swimming Pool", "Free WiFi").
+                </p>
+              </div>
+
+              {/* Existing amenities */}
+              {amenitiesArr.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {amenitiesArr.map((item, i) => (
+                    <span key={i} className="inline-flex items-center gap-1 bg-[#f0faf8] border border-[#b2ddd6] text-[#1a6b5e] text-xs font-medium px-2.5 py-1 rounded-full">
+                      {item}
+                      <button onClick={() => removeAmenity(item)} className="ml-0.5 hover:text-red-500 transition-colors">×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {amenitiesArr.length < 12 && (
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="e.g. Swimming Pool, Free WiFi, Restaurant…"
+                    value={newAmenity}
+                    onChange={e => setNewAmenity(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addAmenity()}
+                    className="flex-1"
+                  />
+                  <Button variant="outline" size="sm" onClick={addAmenity} className="flex-shrink-0">
+                    Add
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {/* Save */}
+      <div className="flex justify-end pt-2">
+        <Button onClick={() => saveMut.mutate()} loading={saveMut.isPending} className="gap-2 px-8">
+          <Save className="h-4 w-4" /> Save Discovery Settings
+        </Button>
+      </div>
     </div>
   );
 }

@@ -396,6 +396,27 @@ model Tenant {
   onboardingStep          Int        @default(0) // 0-6; 6 = complete
   onboardingCompletedAt   DateTime?
   enterpriseNotes         String?
+  // stay.resortpro.site — Public discovery map
+  mapVisible              Boolean    @default(false) // show on public map
+  latitude                Float?     // e.g. 22.3569
+  longitude               Float?     // e.g. 91.7832
+  resortCategory          String?    // "eco" | "agro" | "beach" | "hill" | "city" | "heritage"
+  priceFrom               Float?     // starting price per night (display only)
+  shortDescription        String?    // 1-2 line blurb for map popup & list card
+  coverImageUrl           String?    // hero image for resort card on discovery page
+  // stay.resortpro.site — Revenue features
+  isFeatured              Boolean    @default(false) // sponsored / featured listing
+  featuredUntil           DateTime?  // expiry of featured status
+  featuredBadge           String?    // "Sponsored" | "Top Pick" | "Editor's Choice"
+  affiliateUrl            String?    // booking.com / agoda / direct affiliate link
+  affiliateSource         String?    // "booking.com" | "agoda" | "direct" | "custom"
+  discoveryTier           String     @default("free") // "free" | "basic" | "premium"
+  // Gallery (premium feature — up to 6 extra images)
+  galleryImages           String[]   @default([])
+  // Profile extras (premium)
+  amenitiesHighlights     String[]   @default([]) // e.g. ["Pool", "WiFi", "Restaurant"]
+  bookingPhone            String?    // WhatsApp / call button on discovery page
+  instagramHandle         String?    // @handle
   createdAt               DateTime   @default(now())
   updatedAt               DateTime   @updatedAt
 
@@ -446,6 +467,8 @@ model Tenant {
   messageTemplates    MessageTemplate[]
   offers              Offer[]
   paymentConfig       TenantPaymentConfig?
+  discoveryClicks     DiscoveryClick[]
+  guestDocuments      GuestDocument[]
 
   @@map("tenants")
 }
@@ -601,10 +624,29 @@ model Guest {
   emailSends     EmailSend[]
   enrollments    SequenceEnrollment[]
   loyaltyAccount LoyaltyAccount?
+  documents      GuestDocument[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
   @@map("guests")
+}
+
+model GuestDocument {
+  id         String   @id @default(uuid())
+  guestId    String
+  tenantId   String
+  docType    String   // PASSPORT | NATIONAL_ID | DRIVERS_LICENSE | VISA | OTHER
+  imageUrl   String
+  notes      String?
+  uploadedAt DateTime @default(now())
+  uploadedBy String?  // staff user ID
+
+  guest  Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([guestId])
+  @@index([tenantId])
+  @@map("guest_documents")
 }
 
 // ─── Bookings ─────────────────────────────────────────────────────────────────
@@ -1875,6 +1917,25 @@ model Referral {
   createdAt DateTime @default(now())
 
   @@map("referrals")
+}
+
+// ─── Discovery Click Tracking ─────────────────────────────────────────────────
+
+model DiscoveryClick {
+  id        String   @id @default(cuid())
+  tenantId  String
+  type      String   // "map_pin" | "list_card" | "affiliate" | "whatsapp" | "profile_view"
+  source    String?  // "map" | "list" | "blog" | "direct"
+  country   String?  // visitor country (from CF-IPCountry or IP)
+  userAgent String?
+  referrer  String?
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, type])
+  @@map("discovery_clicks")
 }
 
 // ─── Themes ───────────────────────────────────────────────────────────────────

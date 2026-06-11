@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { guestsApi } from '@/lib/api';
 import { X, Mail, Phone, Globe, CreditCard, MapPin, FileText, Pencil, Trash2, CalendarDays } from 'lucide-react';
+import { GuestDocumentList } from './GuestDocumentList';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/badge';
 import { formatCurrency, formatDate, getInitials } from '@/lib/utils';
@@ -120,6 +121,12 @@ export function GuestDetailSheet({ guest, onClose, onEdit, onDelete }: Props) {
                 <p className="text-sm text-gray-600 bg-amber-50 border border-amber-100 rounded-lg p-3">{guest.notes}</p>
               </div>
             )}
+
+            {/* Documents */}
+            <GuestDocumentList
+              guestId={guest.id}
+              guestName={`${guest.firstName} ${guest.lastName}`}
+            />
 
             {/* Booking History */}
             <div>

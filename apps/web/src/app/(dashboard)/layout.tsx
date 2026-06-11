@@ -8,6 +8,7 @@ import { TopNav } from '@/components/dashboard/top-nav';
 import { PlatformBanner } from '@/components/dashboard/PlatformBanner';
 import { DemoBanner } from '@/components/dashboard/DemoBanner';
 import { ImpersonationBanner } from '@/components/dashboard/ImpersonationBanner';
+import { OfflineBar } from '@/components/dashboard/OfflineBar';
 import { billingApi } from '@/lib/api';
 
 // Pages that should always render regardless of billing status
@@ -45,7 +46,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
 
     // Check live subscription status from API
-    billingApi.getStatus()
+    // Timeout after 5s — don't block the dashboard if the API is slow/offline
+    const billingTimeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('billing timeout')), 5000)
+    );
+    Promise.race([billingApi.getStatus(), billingTimeout])
       .then((res) => {
         const data = res.data.data;
         const { planStatus, trialDaysLeft } = data;
@@ -106,6 +111,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopNav />
+        <OfflineBar />
         <main className="flex-1 overflow-y-auto p-6 animate-fade-in">
           <ImpersonationBanner />
           <DemoBanner />

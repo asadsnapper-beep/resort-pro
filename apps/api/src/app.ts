@@ -44,6 +44,9 @@ import { invoicesRoutes } from './routes/invoices';
 import { embedRoutes } from './routes/embed';
 import { uploadRoutes } from './routes/upload';
 import { offersRoutes, publicOffersRoutes } from './routes/offers';
+import { discoveryRoutes } from './routes/discovery';
+import { syncRoutes } from './routes/sync';
+import { guestDocumentRoutes } from './routes/guestDocuments';
 import { startPreArrivalCron } from './jobs/pre-arrival-reminder';
 import { startICalSyncCron } from './jobs/ical-sync';
 import { startAutomationEngine } from './services/automation';
@@ -167,7 +170,8 @@ export async function buildApp() {
   await app.register(tenantRoutes, { prefix: '/api/tenant' });
   await app.register(roomRoutes, { prefix: '/api/rooms' });
   await app.register(bookingRoutes, { prefix: '/api/bookings' });
-  await app.register(guestRoutes, { prefix: '/api/guests' });
+  await app.register(guestRoutes,         { prefix: '/api/guests' });
+  await app.register(guestDocumentRoutes, { prefix: '/api/guests' });
   await app.register(staffRoutes, { prefix: '/api/staff' });
   await app.register(housekeepingRoutes, { prefix: '/api/housekeeping' });
   await app.register(menuRoutes, { prefix: '/api/menu' });
@@ -199,6 +203,8 @@ export async function buildApp() {
   await app.register(uploadRoutes,  { prefix: '/api/upload' });
   await app.register(offersRoutes,        { prefix: '/api/offers' });
   await app.register(publicOffersRoutes,  { prefix: '/site' });
+  await app.register(discoveryRoutes,     { prefix: '/api' });
+  await app.register(syncRoutes,          { prefix: '/api/sync' });
 
   // ── Start automation engine ───────────────────────────────────────────────
   if (process.env.NODE_ENV !== 'test') {
