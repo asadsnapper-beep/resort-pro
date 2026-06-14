@@ -128,7 +128,7 @@ export async function ticketWebhookRoutes(app: FastifyInstance) {
   // ── GET /telegram/info ────────────────────────────────────────────────────
   app.get('/telegram/info', {
     schema: { tags: ['ticket-webhooks'], security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload
       const tenant = await prisma.tenant.findUnique({
@@ -166,7 +166,7 @@ export async function ticketWebhookRoutes(app: FastifyInstance) {
   // ── GET /whatsapp/info ────────────────────────────────────────────────────
   app.get('/whatsapp/info', {
     schema: { tags: ['ticket-webhooks'], security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload
       const tenant = await prisma.tenant.findUnique({

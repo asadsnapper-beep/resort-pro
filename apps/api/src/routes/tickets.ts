@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '@resort-pro/database';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams, validate } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
 import { forwardReplyToChannel } from '../services/ticketChannels';
@@ -18,7 +18,7 @@ const ticketSchema = z.object({
 export async function ticketRoutes(app: FastifyInstance) {
   app.get('/', {
     schema: { tags: ['tickets'], summary: 'List support tickets', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload;
       const query = request.query as { page?: number; limit?: number; status?: string; priority?: string };
@@ -45,7 +45,7 @@ export async function ticketRoutes(app: FastifyInstance) {
 
   app.get('/:id', {
     schema: { tags: ['tickets'], summary: 'Get ticket with messages', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
@@ -64,7 +64,7 @@ export async function ticketRoutes(app: FastifyInstance) {
 
   app.post('/', {
     schema: { tags: ['tickets'], summary: 'Create support ticket', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const body = ticketSchema.parse(request.body);
@@ -75,7 +75,7 @@ export async function ticketRoutes(app: FastifyInstance) {
 
   app.patch('/:id/status', {
     schema: { tags: ['tickets'], summary: 'Update ticket status', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
@@ -92,7 +92,7 @@ export async function ticketRoutes(app: FastifyInstance) {
 
   app.patch('/:id/assign', {
     schema: { tags: ['tickets'], summary: 'Assign ticket to staff', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
@@ -106,7 +106,7 @@ export async function ticketRoutes(app: FastifyInstance) {
 
   app.post('/:id/messages', {
     schema: { tags: ['tickets'], summary: 'Add message to ticket', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId, sub: userId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };

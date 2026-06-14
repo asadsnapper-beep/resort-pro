@@ -20,7 +20,7 @@ export async function packageRoutes(app: FastifyInstance) {
   // ── GET /api/packages ─────────────────────────────────────────────────────
   app.get('/', {
     schema: { tags: ['packages'], security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const packages = await prisma.package.findMany({
@@ -93,7 +93,7 @@ export async function packageRoutes(app: FastifyInstance) {
   // List bookings that have this package applied
   app.get('/:id/bookings', {
     schema: { tags: ['packages'], security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
@@ -122,7 +122,7 @@ export async function packageRoutes(app: FastifyInstance) {
   // Apply a package to a booking
   app.post('/apply', {
     schema: { tags: ['packages'], security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { bookingId, packageId } = z.object({
@@ -176,7 +176,7 @@ export async function packageRoutes(app: FastifyInstance) {
   // Remove a package from a booking
   app.delete('/remove', {
     schema: { tags: ['packages'], security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { bookingId, packageId } = z.object({
@@ -212,7 +212,7 @@ export async function packageRoutes(app: FastifyInstance) {
   // List all packages on a specific booking
   app.get('/booking/:bookingId', {
     schema: { tags: ['packages'], security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { bookingId } = request.params as { bookingId: string };

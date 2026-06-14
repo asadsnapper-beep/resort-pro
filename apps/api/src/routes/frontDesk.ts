@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '@resort-pro/database';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireRole } from '../middleware/auth';
 import { ok } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
 
@@ -9,7 +9,7 @@ export async function frontDeskRoutes(app: FastifyInstance) {
   // GET /api/front-desk/today — arrivals, departures, in-house summary
   app.get('/today', {
     schema: { tags: ['front-desk'], summary: 'Today front desk summary', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
 
@@ -107,7 +107,7 @@ export async function frontDeskRoutes(app: FastifyInstance) {
   // GET /api/front-desk/room-map — visual room grid with occupancy
   app.get('/room-map', {
     schema: { tags: ['front-desk'], summary: 'Room map with live status', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
 

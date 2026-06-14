@@ -1,4 +1,9 @@
 import { defineConfig } from 'vitest/config';
+import { config } from 'dotenv';
+import { resolve } from 'path';
+
+// Load .env BEFORE any test modules are collected so Prisma gets DATABASE_URL
+config({ path: resolve(__dirname, '.env') });
 
 export default defineConfig({
   test: {

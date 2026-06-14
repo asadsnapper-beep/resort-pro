@@ -8,7 +8,7 @@
 
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '@resort-pro/database';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireRole } from '../middleware/auth';
 import { uploadToStorage, deleteFromStorage } from '../services/storage';
 import type { JwtPayload } from '@resort-pro/types';
 
@@ -24,7 +24,7 @@ export async function guestDocumentRoutes(app: FastifyInstance) {
   // ── Upload document ───────────────────────────────────────────────────────
   app.post<{ Params: { id: string } }>('/:id/documents', {
     schema: { tags: ['guests'], summary: 'Upload guest document', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId, id: uploadedBy } = request.user as JwtPayload;
       const { id: guestId } = request.params;
@@ -101,7 +101,7 @@ export async function guestDocumentRoutes(app: FastifyInstance) {
   // ── List documents ────────────────────────────────────────────────────────
   app.get<{ Params: { id: string } }>('/:id/documents', {
     schema: { tags: ['guests'], summary: 'List guest documents', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id: guestId } = request.params;
@@ -132,7 +132,7 @@ export async function guestDocumentRoutes(app: FastifyInstance) {
   // ── Delete document ───────────────────────────────────────────────────────
   app.delete<{ Params: { id: string; docId: string } }>('/:id/documents/:docId', {
     schema: { tags: ['guests'], summary: 'Delete guest document', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id: guestId, docId } = request.params;

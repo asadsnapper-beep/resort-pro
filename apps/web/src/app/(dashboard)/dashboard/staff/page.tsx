@@ -14,7 +14,7 @@ import { toast } from '@/hooks/use-toast';
 import { useDebounce } from '@/hooks/use-debounce';
 import {
   Plus, Search, Users, Building2, ChevronLeft, ChevronRight,
-  Mail, X, Clock,
+  X, Clock, Monitor, ShieldOff,
 } from 'lucide-react';
 
 interface Staff {
@@ -45,22 +45,34 @@ interface PendingInvite {
 const DEPARTMENTS = ['', 'FRONT_DESK', 'HOUSEKEEPING', 'RESTAURANT', 'MAINTENANCE', 'SECURITY', 'MANAGEMENT'] as const;
 
 const DEPT_COLORS: Record<string, string> = {
-  FRONT_DESK:  'bg-blue-100 text-blue-700 border-blue-200',
-  HOUSEKEEPING:'bg-green-100 text-green-700 border-green-200',
-  RESTAURANT:  'bg-orange-100 text-orange-700 border-orange-200',
-  MAINTENANCE: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-  SECURITY:    'bg-red-100 text-red-700 border-red-200',
-  MANAGEMENT:  'bg-purple-100 text-purple-700 border-purple-200',
+  FRONT_DESK:   'bg-blue-100 text-blue-700 border-blue-200',
+  HOUSEKEEPING: 'bg-green-100 text-green-700 border-green-200',
+  RESTAURANT:   'bg-orange-100 text-orange-700 border-orange-200',
+  MAINTENANCE:  'bg-yellow-100 text-yellow-700 border-yellow-200',
+  SECURITY:     'bg-red-100 text-red-700 border-red-200',
+  MANAGEMENT:   'bg-purple-100 text-purple-700 border-purple-200',
 };
 
 const ROLE_COLORS: Record<string, string> = {
   OWNER:        'bg-yellow-100 text-yellow-800',
   MANAGER:      'bg-purple-100 text-purple-700',
   RECEPTIONIST: 'bg-blue-100 text-blue-700',
+  CHEF:         'bg-red-100 text-red-700',
   MARKETER:     'bg-pink-100 text-pink-700',
   DEVELOPER:    'bg-indigo-100 text-indigo-700',
   SHAREHOLDER:  'bg-amber-100 text-amber-700',
   STAFF:        'bg-gray-100 text-gray-600',
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  OWNER:        'Owner',
+  MANAGER:      'Manager',
+  RECEPTIONIST: 'Receptionist',
+  CHEF:         'Chef',
+  MARKETER:     'Marketer',
+  DEVELOPER:    'Developer',
+  SHAREHOLDER:  'Shareholder',
+  STAFF:        'Staff',
 };
 
 function formatDept(d: string) { return d.replace(/_/g, ' '); }
@@ -68,23 +80,17 @@ function formatDept(d: string) { return d.replace(/_/g, ' '); }
 export default function StaffPage() {
   const queryClient = useQueryClient();
 
-  /* ── Filter state ── */
   const [deptFilter, setDeptFilter] = useState('');
-  const [searchInput, setSearchInput]   = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const search = useDebounce(searchInput, 350);
   const [page, setPage] = useState(1);
 
-  /* ── Modal state ── */
   const [addOpen,         setAddOpen]         = useState(false);
-  const [inviteOpen,      setInviteOpen]       = useState(false);
-  const [inviteEmail,     setInviteEmail]      = useState('');
-  const [inviteRole, setInviteRole] = useState<'MANAGER'|'SHAREHOLDER'|'RECEPTIONIST'|'MARKETER'|'DEVELOPER'|'STAFF'>('STAFF');
   const [editStaff,       setEditStaff]        = useState<Staff | null>(null);
   const [selectedStaff,   setSelectedStaff]    = useState<Staff | null>(null);
   const [deactivateStaff, setDeactivateStaff]  = useState<Staff | null>(null);
   const [reactivateStaff, setReactivateStaff]  = useState<Staff | null>(null);
 
-  /* ── Queries ── */
   const { data, isLoading } = useQuery({
     queryKey: ['staff', deptFilter, search, page],
     queryFn:  () => staffApi.list({ department: deptFilter || undefined, search: search || undefined, page, limit: 20 }),
@@ -95,7 +101,6 @@ export default function StaffPage() {
     queryFn:  () => staffApi.listInvites(),
   });
 
-  /* ── Mutations ── */
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['staff'] });
     queryClient.invalidateQueries({ queryKey: ['staff-invites'] });
@@ -110,73 +115,57 @@ export default function StaffPage() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: unknown }) => staffApi.update(id, data),
-    onSuccess: () => {
-      invalidate();
-      toast({ title: 'Staff updated' });
-      setEditStaff(null);
-      setSelectedStaff(null);
-    },
+    onSuccess: () => { invalidate(); toast({ title: 'Staff updated' }); setEditStaff(null); setSelectedStaff(null); },
     onError: () => toast({ title: 'Error', description: 'Failed to update', variant: 'destructive' }),
   });
 
   const deactivateMutation = useMutation({
     mutationFn: (id: string) => staffApi.delete(id),
-    onSuccess: () => {
-      invalidate();
-      toast({ title: 'Staff member deactivated' });
-      setDeactivateStaff(null);
-      setSelectedStaff(null);
-    },
+    onSuccess: () => { invalidate(); toast({ title: 'Staff member deactivated' }); setDeactivateStaff(null); setSelectedStaff(null); },
     onError: () => toast({ title: 'Error', description: 'Failed to deactivate', variant: 'destructive' }),
   });
 
   const reactivateMutation = useMutation({
     mutationFn: (id: string) => staffApi.reactivate(id),
-    onSuccess: () => {
-      invalidate();
-      toast({ title: '✓ Staff member reactivated' });
-      setReactivateStaff(null);
-      setSelectedStaff(null);
-    },
+    onSuccess: () => { invalidate(); toast({ title: 'Staff member reactivated' }); setReactivateStaff(null); setSelectedStaff(null); },
     onError: () => toast({ title: 'Error', description: 'Failed to reactivate', variant: 'destructive' }),
   });
 
   const cancelInviteMutation = useMutation({
     mutationFn: (id: string) => staffApi.cancelInvite(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['staff-invites'] });
-      toast({ title: 'Invite cancelled' });
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['staff-invites'] }); toast({ title: 'Invite cancelled' }); },
     onError: (err: { response?: { data?: { error?: string } } }) =>
       toast({ title: 'Error', description: err?.response?.data?.error ?? 'Failed to cancel invite', variant: 'destructive' }),
   });
 
   const inviteMutation = useMutation({
     mutationFn: (data: { email: string; role: string }) => staffApi.invite(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['staff-invites'] });
-      toast({ title: 'Invite sent!', description: `Invite email sent to ${inviteEmail}` });
-      setInviteOpen(false);
-      setInviteEmail('');
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['staff-invites'] }); },
     onError: (err: { response?: { data?: { error?: string } } }) =>
-      toast({ title: 'Error', description: err?.response?.data?.error ?? 'Failed to send invite', variant: 'destructive' }),
+      toast({ title: 'Invite failed', description: err?.response?.data?.error ?? 'Failed to send invite', variant: 'destructive' }),
   });
 
-  /* ── Invite ── */
-  const handleSendInvite = () => {
-    if (!inviteEmail) return;
-    inviteMutation.mutate({ email: inviteEmail, role: inviteRole });
+  // Handle StaffModal submit — either HR-only or HR + invite
+  const handleAddStaff = async (data: Record<string, unknown>, giveAccess: boolean) => {
+    const { email, role, ...staffData } = data;
+
+    // Always create the HR record first
+    await createMutation.mutateAsync(giveAccess
+      ? { ...staffData, email, password: Math.random().toString(36).slice(2) + 'Aa1!', role }
+      : staffData
+    );
+
+    // If system access requested, send invite
+    if (giveAccess && email && role) {
+      await inviteMutation.mutateAsync({ email: email as string, role: role as string });
+      toast({ title: 'Staff added & invite sent!', description: `Invite email sent to ${email}` });
+    }
   };
 
-  /* ── Data ── */
-  const staff: Staff[]      = data?.data?.data ?? [];
-  const pagination          = data?.data?.pagination;
-  const total               = pagination?.total ?? 0;
+  const staff: Staff[] = data?.data?.data ?? [];
+  const pagination     = data?.data?.pagination;
+  const total          = pagination?.total ?? 0;
   const pendingInvites: PendingInvite[] = inviteData?.data?.data ?? [];
-
-  const pendingInviteCount = pendingInvites.length;
-  const deptCount          = DEPARTMENTS.filter(Boolean).length; // always 6
 
   return (
     <div className="space-y-6">
@@ -186,25 +175,20 @@ export default function StaffPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Staff</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {total > 0 ? `${total} staff member${total !== 1 ? 's' : ''} registered` : 'Manage your team'}
+            {total > 0 ? `${total} team member${total !== 1 ? 's' : ''}` : 'Manage your team'}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-2 border-[#1a6b5e] text-[#1a6b5e] hover:bg-[#f0faf8]" onClick={() => setInviteOpen(true)}>
-            <Mail className="h-4 w-4" /> Invite by Email
-          </Button>
-          <Button className="gap-2" onClick={() => setAddOpen(true)}>
-            <Plus className="h-4 w-4" /> Add Staff
-          </Button>
-        </div>
+        <Button className="gap-2" onClick={() => setAddOpen(true)}>
+          <Plus className="h-4 w-4" /> Add Staff
+        </Button>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Total Staff',     value: total || 0,         icon: Users,     color: 'bg-resort-50 border-resort-200 text-resort-700' },
-          { label: 'Pending Invites', value: pendingInviteCount, icon: Mail,      color: 'bg-amber-50 border-amber-200 text-amber-700' },
-          { label: 'Departments',     value: deptCount,          icon: Building2, color: 'bg-blue-50 border-blue-200 text-blue-700' },
+          { label: 'Total Staff',     value: total || 0,            icon: Users,     color: 'bg-resort-50 border-resort-200 text-resort-700' },
+          { label: 'Pending Invites', value: pendingInvites.length, icon: Clock,     color: 'bg-amber-50 border-amber-200 text-amber-700' },
+          { label: 'Departments',     value: DEPARTMENTS.filter(Boolean).length, icon: Building2, color: 'bg-blue-50 border-blue-200 text-blue-700' },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className={`rounded-xl border p-4 ${color}`}>
             <div className="flex items-center gap-2 mb-1">
@@ -229,13 +213,15 @@ export default function StaffPage() {
             {pendingInvites.map(inv => (
               <div key={inv.id} className="flex items-center justify-between bg-white rounded-lg px-4 py-2.5 border border-amber-100">
                 <div className="flex items-center gap-3">
-                  <div className="h-7 w-7 rounded-full bg-amber-100 flex items-center justify-center text-amber-700">
-                    <Mail className="h-3.5 w-3.5" />
+                  <div className="h-7 w-7 rounded-full bg-amber-100 flex items-center justify-center">
+                    <Clock className="h-3.5 w-3.5 text-amber-600" />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-900">{inv.email}</p>
                     <p className="text-xs text-muted-foreground">
-                      Role: <span className={`font-semibold px-1.5 py-0.5 rounded ${ROLE_COLORS[inv.role] ?? ROLE_COLORS.STAFF}`}>{inv.role}</span>
+                      <span className={`font-semibold px-1.5 py-0.5 rounded ${ROLE_COLORS[inv.role] ?? ROLE_COLORS.STAFF}`}>
+                        {ROLE_LABELS[inv.role] ?? inv.role}
+                      </span>
                       {' · '}Sent {formatDate(inv.createdAt)}
                       {' · '}Expires {new Date(inv.expiresAt).toLocaleDateString()}
                     </p>
@@ -311,7 +297,7 @@ export default function StaffPage() {
                     <th className="px-5 py-3 text-left">Staff Member</th>
                     <th className="px-5 py-3 text-left">Department</th>
                     <th className="px-5 py-3 text-left">Position</th>
-                    <th className="px-5 py-3 text-left hidden md:table-cell">Role</th>
+                    <th className="px-5 py-3 text-left hidden md:table-cell">System Access</th>
                     <th className="px-5 py-3 text-left hidden lg:table-cell">Hired</th>
                     <th className="px-5 py-3 text-left">Status</th>
                   </tr>
@@ -319,7 +305,8 @@ export default function StaffPage() {
                 <tbody className="divide-y">
                   {staff.map(s => {
                     const deptClass = DEPT_COLORS[s.department] ?? 'bg-gray-100 text-gray-600 border-gray-200';
-                    const roleClass = ROLE_COLORS[s.user.role ?? 'STAFF'] ?? ROLE_COLORS.STAFF;
+                    const hasAccess = !!s.user.role;
+                    const roleClass = ROLE_COLORS[s.user.role ?? ''] ?? ROLE_COLORS.STAFF;
                     return (
                       <tr key={s.id}
                         className="hover:bg-gray-50 transition-colors cursor-pointer"
@@ -345,9 +332,19 @@ export default function StaffPage() {
                         </td>
                         <td className="px-5 py-4 text-sm text-gray-700">{s.position}</td>
                         <td className="px-5 py-4 hidden md:table-cell">
-                          <span className={`text-xs px-2 py-0.5 rounded font-semibold ${roleClass}`}>
-                            {s.user.role ?? 'STAFF'}
-                          </span>
+                          {hasAccess ? (
+                            <div className="flex items-center gap-1.5">
+                              <Monitor className="h-3.5 w-3.5 text-[#1a6b5e]" />
+                              <span className={`text-xs px-2 py-0.5 rounded font-semibold ${roleClass}`}>
+                                {ROLE_LABELS[s.user.role ?? ''] ?? s.user.role}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 text-gray-400">
+                              <ShieldOff className="h-3.5 w-3.5" />
+                              <span className="text-xs">No access</span>
+                            </div>
+                          )}
                         </td>
                         <td className="px-5 py-4 text-sm text-muted-foreground hidden lg:table-cell">
                           {formatDate(s.hireDate)}
@@ -384,19 +381,19 @@ export default function StaffPage() {
         </div>
       )}
 
-      {/* ── Modals ── */}
+      {/* Modals */}
       <StaffModal
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        loading={createMutation.isPending}
-        onSubmit={d => createMutation.mutate(d)}
+        loading={createMutation.isPending || inviteMutation.isPending}
+        onSubmit={(d, giveAccess) => handleAddStaff(d as Record<string, unknown>, giveAccess)}
       />
       <StaffModal
         open={!!editStaff}
         onClose={() => setEditStaff(null)}
         staff={editStaff}
         loading={updateMutation.isPending}
-        onSubmit={d => editStaff && updateMutation.mutate({ id: editStaff.id, data: d })}
+        onSubmit={(d) => editStaff && updateMutation.mutate({ id: editStaff.id, data: d })}
       />
       <StaffDetailSheet
         staff={selectedStaff}
@@ -411,7 +408,7 @@ export default function StaffPage() {
         onConfirm={() => deactivateStaff && deactivateMutation.mutate(deactivateStaff.id)}
         loading={deactivateMutation.isPending}
         title="Deactivate Staff Member"
-        description={`Are you sure you want to deactivate ${deactivateStaff?.user.firstName} ${deactivateStaff?.user.lastName}? They will lose access to the system.`}
+        description={`Remove ${deactivateStaff?.user.firstName} ${deactivateStaff?.user.lastName}? They will lose dashboard access.`}
         confirmLabel="Deactivate"
       />
       <ConfirmModal
@@ -420,74 +417,9 @@ export default function StaffPage() {
         onConfirm={() => reactivateStaff && reactivateMutation.mutate(reactivateStaff.id)}
         loading={reactivateMutation.isPending}
         title="Reactivate Staff Member"
-        description={`Reactivate ${reactivateStaff?.user.firstName} ${reactivateStaff?.user.lastName}? They will regain access to the system.`}
+        description={`Reactivate ${reactivateStaff?.user.firstName} ${reactivateStaff?.user.lastName}?`}
         confirmLabel="Reactivate"
       />
-
-      {/* ── Invite Modal ── */}
-      {inviteOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between p-6 border-b">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">Invite Staff Member</h2>
-                <p className="text-sm text-gray-500 mt-0.5">They'll receive an email to set up their account</p>
-              </div>
-              <button onClick={() => setInviteOpen(false)} className="text-gray-400 hover:text-gray-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Email Address</label>
-                <Input
-                  type="email"
-                  value={inviteEmail}
-                  onChange={e => setInviteEmail(e.target.value)}
-                  placeholder="staff@yourresort.com"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Role</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {([
-                    { value: 'STAFF',        emoji: '🧹', label: 'Staff' },
-                    { value: 'RECEPTIONIST', emoji: '🛎️', label: 'Receptionist' },
-                    { value: 'MANAGER',      emoji: '👔', label: 'Manager' },
-                    { value: 'MARKETER',     emoji: '📣', label: 'Marketer' },
-                    { value: 'DEVELOPER',    emoji: '💻', label: 'Developer' },
-                    { value: 'SHAREHOLDER',  emoji: '📊', label: 'Shareholder' },
-                  ] as const).map(({ value, emoji, label }) => (
-                    <button key={value} onClick={() => setInviteRole(value)}
-                      className={`py-2.5 rounded-lg border text-xs font-medium transition-colors text-center ${
-                        inviteRole === value
-                          ? 'border-[#1a6b5e] bg-[#f0faf8] text-[#1a6b5e]'
-                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
-                      }`}>
-                      {emoji} {label}
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-2 text-xs text-gray-400">
-                  {inviteRole === 'MANAGER'      && 'Full access except billing — manages all operations'}
-                  {inviteRole === 'SHAREHOLDER'  && 'Read-only: dashboard, analytics, reports, expenses'}
-                  {inviteRole === 'RECEPTIONIST' && 'Bookings, front desk, guests, check-in/out, housekeeping'}
-                  {inviteRole === 'MARKETER'     && 'Website, CRM, email/SMS campaigns, offers, analytics'}
-                  {inviteRole === 'DEVELOPER'    && 'Website builder, embed settings, channel sync'}
-                  {inviteRole === 'STAFF'        && 'Housekeeping tasks, maintenance, restaurant, F&B orders'}
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-3 p-6 pt-0">
-              <Button variant="outline" className="flex-1" onClick={() => setInviteOpen(false)}>Cancel</Button>
-              <Button className="flex-1 bg-[#1a6b5e] hover:bg-[#145a4f]"
-                onClick={handleSendInvite} disabled={!inviteEmail || inviteMutation.isPending}>
-                {inviteMutation.isPending ? 'Sending…' : 'Send Invite'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

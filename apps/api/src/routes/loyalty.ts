@@ -10,7 +10,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
   // ── GET /api/loyalty/program ───────────────────────────────────────────────
   app.get('/program', {
     schema: { tags: ['loyalty'], security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       let prog = await prisma.loyaltyProgram.findUnique({ where: { tenantId } });
@@ -52,7 +52,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
   // ── GET /api/loyalty/accounts ──────────────────────────────────────────────
   app.get('/accounts', {
     schema: { tags: ['loyalty'], security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { search, tier, page = '1', limit = '50' } = request.query as Record<string, string>;
@@ -100,7 +100,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
   // ── GET /api/loyalty/accounts/:guestId ────────────────────────────────────
   app.get('/accounts/:guestId', {
     schema: { tags: ['loyalty'], security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { guestId } = request.params as { guestId: string };
@@ -132,7 +132,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
   // ── POST /api/loyalty/accounts/:guestId/enroll ────────────────────────────
   app.post('/accounts/:guestId/enroll', {
     schema: { tags: ['loyalty'], security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { guestId } = request.params as { guestId: string };
@@ -169,7 +169,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
   // ── POST /api/loyalty/accounts/:guestId/redeem ────────────────────────────
   app.post('/accounts/:guestId/redeem', {
     schema: { tags: ['loyalty'], security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { guestId } = request.params as { guestId: string };
@@ -242,7 +242,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
   // ── GET /api/loyalty/leaderboard ──────────────────────────────────────────
   app.get('/leaderboard', {
     schema: { tags: ['loyalty'], security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const accounts = await prisma.loyaltyAccount.findMany({

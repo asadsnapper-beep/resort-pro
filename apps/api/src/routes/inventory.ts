@@ -25,7 +25,7 @@ export async function inventoryRoutes(app: FastifyInstance) {
   // GET /stats — accurate counts across all items (not just current page)
   app.get('/stats', {
     schema: { tags: ['inventory'], summary: 'Get inventory stats', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload;
       const [total, allItems] = await Promise.all([
@@ -48,7 +48,7 @@ export async function inventoryRoutes(app: FastifyInstance) {
 
   app.get('/', {
     schema: { tags: ['inventory'], summary: 'List inventory items', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload;
       const query = request.query as { page?: number; limit?: number; category?: string; lowStock?: string; search?: string };
@@ -113,7 +113,7 @@ export async function inventoryRoutes(app: FastifyInstance) {
 
   app.get('/:id/movements', {
     schema: { tags: ['inventory'], summary: 'Get movement history for an item', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
@@ -130,7 +130,7 @@ export async function inventoryRoutes(app: FastifyInstance) {
 
   app.post('/:id/movement', {
     schema: { tags: ['inventory'], summary: 'Record stock movement', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };

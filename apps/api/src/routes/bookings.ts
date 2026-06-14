@@ -113,7 +113,7 @@ export async function bookingRoutes(app: FastifyInstance) {
       summary: 'List all bookings',
       security: [{ bearerAuth: [] }],
     },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload;
       const query = request.query as {
@@ -165,7 +165,7 @@ export async function bookingRoutes(app: FastifyInstance) {
   // GET /api/bookings/calendar
   app.get('/calendar', {
     schema: { tags: ['bookings'], summary: 'Get booking calendar view', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload;
       const { month, year } = request.query as { month?: string; year?: string };
@@ -199,7 +199,7 @@ export async function bookingRoutes(app: FastifyInstance) {
   // GET /api/bookings/gantt?from=YYYY-MM-DD&to=YYYY-MM-DD  (Gantt / room-grid view)
   app.get('/gantt', {
     schema: { tags: ['bookings'], summary: 'Gantt calendar — rooms × dates', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload;
       const { from, to } = request.query as { from?: string; to?: string };
@@ -276,7 +276,7 @@ export async function bookingRoutes(app: FastifyInstance) {
   // GET /api/bookings/:id
   app.get('/:id', {
     schema: { tags: ['bookings'], summary: 'Get booking by ID', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
@@ -300,7 +300,7 @@ export async function bookingRoutes(app: FastifyInstance) {
   // POST /api/bookings
   app.post('/', {
     schema: { tags: ['bookings'], summary: 'Create a new booking', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const body = createBookingSchema.parse(request.body);
@@ -429,7 +429,7 @@ export async function bookingRoutes(app: FastifyInstance) {
   // PATCH /api/bookings/:id/check-in
   app.patch('/:id/check-in', {
     schema: { tags: ['bookings'], summary: 'Check in a guest', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId, sub: checkedInByStaff } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
@@ -489,7 +489,7 @@ export async function bookingRoutes(app: FastifyInstance) {
   // PATCH /api/bookings/:id/check-out
   app.patch('/:id/check-out', {
     schema: { tags: ['bookings'], summary: 'Check out a guest', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId, sub: checkedOutByStaff } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
@@ -570,7 +570,7 @@ export async function bookingRoutes(app: FastifyInstance) {
   // PATCH /api/bookings/:id/cancel
   app.patch('/:id/cancel', {
     schema: { tags: ['bookings'], summary: 'Cancel a booking', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
@@ -593,7 +593,7 @@ export async function bookingRoutes(app: FastifyInstance) {
   // POST /api/bookings/:id/payment
   app.post('/:id/payment', {
     schema: { tags: ['bookings'], summary: 'Record a payment', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
@@ -626,7 +626,7 @@ export async function bookingRoutes(app: FastifyInstance) {
   // POST /api/bookings/:id/payment-link — generate Stripe payment link for guest
   app.post('/:id/payment-link', {
     schema: { tags: ['bookings'], summary: 'Generate guest payment link', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
@@ -705,7 +705,7 @@ export async function bookingRoutes(app: FastifyInstance) {
   // GET /api/bookings/:id/invoice  — compute invoice data
   app.get('/:id/invoice', {
     schema: { tags: ['bookings'], security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { id } = request.params as { id: string };
       const { tenantId } = request.user as JwtPayload;
@@ -918,7 +918,7 @@ export async function bookingRoutes(app: FastifyInstance) {
   // POST /api/bookings/walk-in — create booking + immediately check in
   app.post('/walk-in', {
     schema: { tags: ['bookings'], summary: 'Create walk-in booking and check in', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId, sub: staffId } = request.user as JwtPayload;
       const body = z.object({

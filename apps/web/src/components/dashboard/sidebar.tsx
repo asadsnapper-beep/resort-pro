@@ -8,7 +8,6 @@ import {
   Package, Ticket, Globe, Bell, Settings, LogOut, Mail,
   CreditCard, BarChart2, LayoutGrid, Tags, Wrench, FileBarChart2,
   Gift, UsersRound, Star, Link2, Receipt, ChevronDown, LifeBuoy, FileText, Megaphone,
-  ShieldCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
@@ -124,8 +123,6 @@ const NAV_ITEMS: NavItem[] = [
     roles: ['OWNER'] },
   { href: '/dashboard/referrals', labelKey: 'nav.referrals', labelFallback: 'Referrals',            icon: Gift,        group: 'Account', groupKey: 'groups.account',
     roles: ['OWNER'] },
-  { href: '/dashboard/roles',     labelKey: 'nav.roles',     labelFallback: 'Roles & Permissions',  icon: ShieldCheck, group: 'Account', groupKey: 'groups.account',
-    roles: ['OWNER'] },
   { href: '/dashboard/settings',  labelKey: 'nav.settings',  labelFallback: 'Settings',             icon: Settings,    group: 'Account', groupKey: 'groups.account',
     roles: ['OWNER', 'MANAGER', 'DEVELOPER'] },
 ];
@@ -192,7 +189,7 @@ export function Sidebar() {
     const isDemo = !!tenant?.isDemo;
     if (refreshToken) await authApi.logout(refreshToken).catch(() => {});
     clearAuth();
-    router.push(isDemo ? '/demo' : '/auth/login');
+    router.push(isDemo ? '/try' : '/auth/login');
   };
 
   const toggleGroup = (group: string) => {

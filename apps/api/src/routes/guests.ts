@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '@resort-pro/database';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams, validate } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
 
@@ -21,7 +21,7 @@ const guestSchema = z.object({
 export async function guestRoutes(app: FastifyInstance) {
   app.get('/', {
     schema: { tags: ['guests'], summary: 'List all guests', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload;
       const query = request.query as { page?: number; limit?: number; search?: string };
@@ -49,7 +49,7 @@ export async function guestRoutes(app: FastifyInstance) {
 
   app.get('/:id', {
     schema: { tags: ['guests'], summary: 'Get guest by ID', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
@@ -64,7 +64,7 @@ export async function guestRoutes(app: FastifyInstance) {
 
   app.post('/', {
     schema: { tags: ['guests'], summary: 'Create a guest', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const body = guestSchema.parse(request.body);
@@ -85,7 +85,7 @@ export async function guestRoutes(app: FastifyInstance) {
 
   app.patch('/:id', {
     schema: { tags: ['guests'], summary: 'Update guest', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
@@ -115,7 +115,7 @@ export async function guestRoutes(app: FastifyInstance) {
 
   app.delete('/:id', {
     schema: { tags: ['guests'], summary: 'Delete guest', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };

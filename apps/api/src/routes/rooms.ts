@@ -24,7 +24,7 @@ export async function roomRoutes(app: FastifyInstance) {
   // Must be registered BEFORE /:id to avoid Fastify treating "stats" as a param
   app.get('/stats', {
     schema: { tags: ['rooms'], summary: 'Room status counts', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload;
 
@@ -56,7 +56,7 @@ export async function roomRoutes(app: FastifyInstance) {
         },
       },
     },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload;
       const q = request.query as { page?: number; limit?: number; status?: string; type?: string; search?: string };
@@ -87,7 +87,7 @@ export async function roomRoutes(app: FastifyInstance) {
   /* ── GET /api/rooms/availability ──────────────────────────────────────────── */
   app.get('/availability', {
     schema: { tags: ['rooms'], summary: 'Check room availability for date range', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload;
       const { checkIn, checkOut } = request.query as { checkIn: string; checkOut: string };
@@ -128,7 +128,7 @@ export async function roomRoutes(app: FastifyInstance) {
   /* ── GET /api/rooms/:id ────────────────────────────────────────────────────── */
   app.get('/:id', {
     schema: { tags: ['rooms'], summary: 'Get room by ID (with current booking)', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
@@ -198,7 +198,7 @@ export async function roomRoutes(app: FastifyInstance) {
   /* ── PATCH /api/rooms/:id/status ───────────────────────────────────────────── */
   app.patch('/:id/status', {
     schema: { tags: ['rooms'], summary: 'Update room status', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };

@@ -60,7 +60,7 @@ export async function externalCalendarRoutes(app: FastifyInstance) {
 
   // ── GET / — list all for tenant ───────────────────────────────────────────
   app.get('/', {
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload
       const cals = await prisma.externalCalendar.findMany({
@@ -175,7 +175,7 @@ export async function externalCalendarRoutes(app: FastifyInstance) {
 
   // ── GET /:id/status ───────────────────────────────────────────────────────
   app.get('/:id/status', {
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload
       const { id } = request.params as { id: string }

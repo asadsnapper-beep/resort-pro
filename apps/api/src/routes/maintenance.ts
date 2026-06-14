@@ -41,7 +41,7 @@ export async function maintenanceRoutes(app: FastifyInstance) {
   // GET /api/maintenance
   app.get('/', {
     schema: { tags: ['maintenance'], security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { status, roomId, priority } = request.query as {
@@ -75,7 +75,7 @@ export async function maintenanceRoutes(app: FastifyInstance) {
   // GET /api/maintenance/summary
   app.get('/summary', {
     schema: { tags: ['maintenance'], security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const todayStart = new Date();
@@ -95,7 +95,7 @@ export async function maintenanceRoutes(app: FastifyInstance) {
   // POST /api/maintenance
   app.post('/', {
     schema: { tags: ['maintenance'], security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId, sub: userId } = request.user as JwtPayload;
       const body = createSchema.parse(request.body);
@@ -126,7 +126,7 @@ export async function maintenanceRoutes(app: FastifyInstance) {
   // PATCH /api/maintenance/:id
   app.patch('/:id', {
     schema: { tags: ['maintenance'], security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { id } = request.params as { id: string };
       const { tenantId } = request.user as JwtPayload;
@@ -162,7 +162,7 @@ export async function maintenanceRoutes(app: FastifyInstance) {
   // PATCH /api/maintenance/:id/resolve
   app.patch('/:id/resolve', {
     schema: { tags: ['maintenance'], security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
       const { id } = request.params as { id: string };
       const { tenantId } = request.user as JwtPayload;

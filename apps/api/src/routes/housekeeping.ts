@@ -20,7 +20,7 @@ export async function housekeepingRoutes(app: FastifyInstance) {
   // GET /stats — total counts by status (for accurate dashboard cards)
   app.get('/stats', {
     schema: { tags: ['housekeeping'], summary: 'Get housekeeping stats', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST', 'STAFF'),
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload;
       const query = request.query as { date?: string };
@@ -40,7 +40,7 @@ export async function housekeepingRoutes(app: FastifyInstance) {
 
   app.get('/', {
     schema: { tags: ['housekeeping'], summary: 'List housekeeping tasks', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST', 'STAFF'),
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload;
       const query = request.query as { page?: number; limit?: number; status?: string; date?: string; search?: string };
@@ -102,7 +102,7 @@ export async function housekeepingRoutes(app: FastifyInstance) {
 
   app.patch('/:id/status', {
     schema: { tags: ['housekeeping'], summary: 'Update task status', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST', 'STAFF'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
@@ -138,7 +138,7 @@ export async function housekeepingRoutes(app: FastifyInstance) {
 
   app.patch('/:id/assign', {
     schema: { tags: ['housekeeping'], summary: 'Assign task to staff', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };

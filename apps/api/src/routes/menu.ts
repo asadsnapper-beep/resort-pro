@@ -17,7 +17,7 @@ const menuItemSchema = z.object({
 export async function menuRoutes(app: FastifyInstance) {
   app.get('/', {
     schema: { tags: ['menu'], summary: 'List menu items', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST', 'CHEF'),
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload;
       const query = request.query as { page?: number; limit?: number; category?: string };

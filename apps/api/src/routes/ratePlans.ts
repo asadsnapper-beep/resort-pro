@@ -85,7 +85,7 @@ export async function ratePlanRoutes(app: FastifyInstance) {
   // GET /api/rate-plans
   app.get('/', {
     schema: { tags: ['rate-plans'], security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const plans = await prisma.ratePlan.findMany({
@@ -174,7 +174,7 @@ export async function ratePlanRoutes(app: FastifyInstance) {
   // GET /api/rate-plans/resolve?roomId=&checkIn=&checkOut=
   app.get('/resolve', {
     schema: { tags: ['rate-plans'], security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { roomId, checkIn, checkOut } = request.query as { roomId: string; checkIn: string; checkOut: string };

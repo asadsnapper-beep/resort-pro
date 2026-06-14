@@ -486,7 +486,7 @@ export default function HomePage() {
               Start free trial →
             </Link>
             <a
-              href="/demo"
+              href="/try"
               className="w-full rounded-xl border border-white/25 bg-white/10 px-8 py-4 text-base font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20 sm:w-auto"
             >
               Watch demo →
