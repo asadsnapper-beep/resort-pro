@@ -128,8 +128,10 @@ export default function DemoPage() {
       );
 
       router.replace('/dashboard');
-    } catch {
+    } catch (err: unknown) {
       setLoading(null);
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      alert(`Demo login failed: ${msg ?? 'API server may be down. Please try again.'}`);
     }
   };
 
