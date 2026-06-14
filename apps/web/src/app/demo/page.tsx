@@ -92,6 +92,18 @@ const ROLES = [
     badgeColor:  'bg-amber-900/60 text-amber-300',
     features:    ['Housekeeping Tasks', 'Room Status', 'Maintenance Logs', 'Food Orders'],
   },
+  {
+    role:        'CHEF',
+    title:       'Chef',
+    titleBn:     'শেফ',
+    emoji:       '👨‍🍳',
+    description: 'View incoming food orders and update order status in real-time.',
+    descBn:      'F&B অর্ডার দেখুন এবং রান্নার status update করুন',
+    border:      'border-red-500',
+    badge:       'Kitchen View',
+    badgeColor:  'bg-red-900/60 text-red-300',
+    features:    ['F&B Orders', 'Order Status Update', 'Live Order Queue'],
+  },
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────

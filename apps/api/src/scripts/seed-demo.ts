@@ -94,7 +94,13 @@ async function main() {
     create: { tenantId: demo.id, email: 'dev@coralbay.demo', passwordHash, firstName: 'Shanto', lastName: 'Das', role: UserRole.DEVELOPER },
   });
 
-  console.log('✅ Users (owner, manager, receptionist, staff, partner, marketer, developer)');
+  await prisma.user.upsert({
+    where: { tenantId_email: { tenantId: demo.id, email: 'chef@coralbay.demo' } },
+    update: {},
+    create: { tenantId: demo.id, email: 'chef@coralbay.demo', passwordHash, firstName: 'Karim', lastName: 'Molla', role: UserRole.CHEF },
+  });
+
+  console.log('✅ Users (owner, manager, receptionist, staff, partner, marketer, developer, chef)');
 
   // ── Staff Records ─────────────────────────────────────────────────────────────
   await prisma.staff.upsert({ where: { userId: demoOwner.id }, update: {}, create: { tenantId: demo.id, userId: demoOwner.id, department: StaffDepartment.MANAGEMENT, position: 'Resort Owner', hireDate: new Date('2022-01-01') } });

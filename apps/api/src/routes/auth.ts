@@ -585,6 +585,7 @@ export async function authRoutes(app: FastifyInstance) {
       MARKETER:     'marketer@coralbay.demo',
       DEVELOPER:    'dev@coralbay.demo',
       STAFF:        'hk@coralbay.demo',
+      CHEF:         'chef@coralbay.demo',
     };
 
     const targetEmail = roleEmailMap[requestedRole as string] ?? roleEmailMap.OWNER;
