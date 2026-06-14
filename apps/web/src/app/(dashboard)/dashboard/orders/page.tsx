@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { foodOrdersApi, menuApi, guestsApi } from '@/lib/api';
+import { useAuthStore } from '@/store/auth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,9 +11,10 @@ import { Modal } from '@/components/ui/modal';
 import { StatusBadge } from '@/components/ui/badge';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 import {
   Plus, ShoppingBag, Clock, ChefHat, CheckCircle2, XCircle,
-  Trash2, ChevronLeft, ChevronRight,
+  Trash2, ChevronLeft, ChevronRight, UtensilsCrossed, Bell,
 } from 'lucide-react';
 
 interface OrderItem {
@@ -58,6 +60,30 @@ const STATUS_LABEL: Record<string, string> = {
   READY: 'Mark Delivered',
 };
 
+// ── Kitchen status config ─────────────────────────────────────────────────────
+const KITCHEN_STATUS: Record<string, { bg: string; border: string; label: string; dot: string }> = {
+  PENDING:   { bg: 'bg-amber-50',  border: 'border-amber-400',  label: 'NEW ORDER',  dot: 'bg-amber-500' },
+  PREPARING: { bg: 'bg-orange-50', border: 'border-orange-400', label: 'PREPARING',  dot: 'bg-orange-500' },
+  READY:     { bg: 'bg-green-50',  border: 'border-green-400',  label: 'READY ✓',    dot: 'bg-green-500' },
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function minutesAgo(dateStr: string) {
+  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
+  if (diff < 1) return 'just now';
+  if (diff === 1) return '1 min ago';
+  return `${diff} min ago`;
+}
+
+function isToday(dateStr: string) {
+  const d = new Date(dateStr);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+}
+
+// ── New Order Modal ───────────────────────────────────────────────────────────
 function NewOrderModal({ open, onClose, loading, onSubmit }: {
   open: boolean; onClose: () => void; loading: boolean;
   onSubmit: (data: Record<string, unknown>) => void;
@@ -72,14 +98,8 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
   const [notes, setNotes] = useState('');
   const [cart, setCart] = useState<{ menuItemId: string; name: string; price: number; quantity: number; notes: string }[]>([]);
 
-  // Reset all fields each time the modal opens
   useEffect(() => {
-    if (open) {
-      setGuestId('');
-      setTableNumber('');
-      setNotes('');
-      setCart([]);
-    }
+    if (open) { setGuestId(''); setTableNumber(''); setNotes(''); setCart([]); }
   }, [open]);
 
   const addToCart = (item: MenuItem) => {
@@ -127,8 +147,6 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
             <Input value={tableNumber} onChange={e => setTableNumber(e.target.value)} placeholder="Table 4, Room 201..." />
           </div>
         </div>
-
-        {/* Menu Items */}
         <div>
           <label className="mb-2 block text-sm font-medium text-gray-700">Menu Items</label>
           <div className="max-h-48 overflow-y-auto rounded-lg border divide-y">
@@ -147,8 +165,6 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
             {menuItems.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">No available menu items</p>}
           </div>
         </div>
-
-        {/* Cart */}
         {cart.length > 0 && (
           <div className="rounded-lg border">
             <div className="px-3 py-2 border-b bg-gray-50 text-xs font-semibold text-muted-foreground uppercase">Order Summary</div>
@@ -176,12 +192,10 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
             </div>
           </div>
         )}
-
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Order Notes</label>
           <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Allergies, preferences..." />
         </div>
-
         <div className="flex gap-3 justify-end pt-2 border-t">
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
           <Button type="submit" loading={loading} disabled={cart.length === 0}>Place Order ({cart.length} items · {formatCurrency(total)})</Button>
@@ -191,14 +205,11 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
   );
 }
 
-// Per-order action card — has its own mutation so only THAT card shows loading
+// ── Standard order card (non-chef) ───────────────────────────────────────────
 function OrderCard({ order, expanded, onToggleExpand }: {
-  order: FoodOrder;
-  expanded: boolean;
-  onToggleExpand: () => void;
+  order: FoodOrder; expanded: boolean; onToggleExpand: () => void;
 }) {
   const queryClient = useQueryClient();
-
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => foodOrdersApi.updateStatus(id, status),
     onSuccess: () => {
@@ -208,7 +219,6 @@ function OrderCard({ order, expanded, onToggleExpand }: {
     },
     onError: () => toast({ title: 'Error', description: 'Failed to update order', variant: 'destructive' }),
   });
-
   const nextStatus = STATUS_NEXT[order.status];
 
   return (
@@ -246,7 +256,6 @@ function OrderCard({ order, expanded, onToggleExpand }: {
             )}
           </div>
         </div>
-
         {expanded && (
           <div className="mt-3 pt-3 border-t space-y-1.5">
             {order.items.map(item => (
@@ -263,7 +272,237 @@ function OrderCard({ order, expanded, onToggleExpand }: {
   );
 }
 
+// ── Kitchen Display Card (Chef mode) ─────────────────────────────────────────
+function KitchenCard({ order }: { order: FoodOrder }) {
+  const queryClient = useQueryClient();
+  const [tick, setTick] = useState(0);
+
+  // Update time display every minute
+  useEffect(() => {
+    const t = setInterval(() => setTick(v => v + 1), 60000);
+    return () => clearInterval(t);
+  }, []);
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) => foodOrdersApi.updateStatus(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['food-orders-today'] });
+      queryClient.invalidateQueries({ queryKey: ['food-orders-stats'] });
+    },
+    onError: () => toast({ title: 'Error', description: 'Failed to update', variant: 'destructive' }),
+  });
+
+  const cfg = KITCHEN_STATUS[order.status] ?? KITCHEN_STATUS['PENDING'];
+  const nextStatus = STATUS_NEXT[order.status];
+  const nextLabel = STATUS_LABEL[order.status];
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  void tick; // force re-render for live time
+
+  return (
+    <div className={cn(
+      'rounded-2xl border-2 p-5 transition-all',
+      cfg.bg, cfg.border,
+      order.status === 'PENDING' && 'shadow-lg shadow-amber-100',
+    )}>
+      {/* Header */}
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className={cn('h-2.5 w-2.5 rounded-full animate-pulse', cfg.dot)} />
+            <span className="text-xs font-bold tracking-widest text-gray-500">{cfg.label}</span>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {order.tableNumber && (
+              <span className="text-2xl font-black text-gray-900">📍 {order.tableNumber}</span>
+            )}
+            {order.guest && (
+              <span className="text-lg font-semibold text-gray-700">{order.guest.firstName} {order.guest.lastName}</span>
+            )}
+            {!order.tableNumber && !order.guest && (
+              <span className="text-2xl font-black text-gray-900">Walk-in</span>
+            )}
+          </div>
+        </div>
+        <span className="text-xs text-gray-400 shrink-0">{minutesAgo(order.createdAt)}</span>
+      </div>
+
+      {/* Items — large, easy to read */}
+      <div className="space-y-2 mb-4">
+        {order.items.map(item => (
+          <div key={item.id} className="flex items-baseline gap-3">
+            <span className="text-3xl font-black text-gray-900 w-10 shrink-0">{item.quantity}×</span>
+            <span className="text-xl font-bold text-gray-800 leading-tight">{item.menuItem.name}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Notes */}
+      {order.notes && (
+        <div className="mb-4 rounded-xl bg-yellow-50 border border-yellow-200 px-3 py-2">
+          <p className="text-sm font-semibold text-yellow-800">📝 {order.notes}</p>
+        </div>
+      )}
+
+      {/* Action button */}
+      {nextStatus && (
+        <button
+          onClick={() => statusMutation.mutate({ id: order.id, status: nextStatus })}
+          disabled={statusMutation.isPending}
+          className={cn(
+            'w-full rounded-xl py-4 text-lg font-bold transition-all active:scale-95',
+            order.status === 'PENDING'   && 'bg-orange-500 hover:bg-orange-600 text-white shadow-md',
+            order.status === 'PREPARING' && 'bg-green-500 hover:bg-green-600 text-white shadow-md',
+            order.status === 'READY'     && 'bg-blue-500 hover:bg-blue-600 text-white shadow-md',
+            statusMutation.isPending && 'opacity-60 cursor-not-allowed',
+          )}>
+          {statusMutation.isPending ? '...' : nextLabel}
+        </button>
+      )}
+      {order.status === 'READY' && (
+        <div className="mt-2 text-center text-sm font-semibold text-green-600">✓ Waiting for delivery</div>
+      )}
+    </div>
+  );
+}
+
+// ── Kitchen Display (Chef view) ───────────────────────────────────────────────
+function KitchenDisplay() {
+  const queryClient = useQueryClient();
+  const prevCountRef = useRef(0);
+  const [newOrderAlert, setNewOrderAlert] = useState(false);
+  const [clock, setClock] = useState(new Date());
+
+  // Live clock
+  useEffect(() => {
+    const t = setInterval(() => setClock(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Poll every 15 seconds
+  const { data, isLoading } = useQuery({
+    queryKey: ['food-orders-today'],
+    queryFn: () => foodOrdersApi.list({ limit: 100 }),
+    refetchInterval: 15000,
+    refetchIntervalInBackground: true,
+  });
+
+  const { data: statsData } = useQuery({
+    queryKey: ['food-orders-stats'],
+    queryFn: () => foodOrdersApi.stats(),
+    refetchInterval: 15000,
+  });
+
+  // All today's active orders (not delivered/cancelled)
+  const allOrders: FoodOrder[] = (data?.data?.data ?? []).filter(
+    (o: FoodOrder) => isToday(o.createdAt) && o.status !== 'DELIVERED' && o.status !== 'CANCELLED'
+  );
+
+  // Sort: PENDING first, then PREPARING, then READY
+  const ORDER_PRIORITY: Record<string, number> = { PENDING: 0, PREPARING: 1, READY: 2 };
+  const orders = [...allOrders].sort((a, b) =>
+    (ORDER_PRIORITY[a.status] ?? 9) - (ORDER_PRIORITY[b.status] ?? 9) ||
+    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
+
+  // Flash alert when new orders arrive
+  useEffect(() => {
+    const pending = orders.filter(o => o.status === 'PENDING').length;
+    if (pending > prevCountRef.current) {
+      setNewOrderAlert(true);
+      setTimeout(() => setNewOrderAlert(false), 3000);
+    }
+    prevCountRef.current = pending;
+  }, [orders]);
+
+  const stats = statsData?.data?.data ?? {};
+  const pendingCount   = stats.pending   ?? 0;
+  const preparingCount = stats.preparing ?? 0;
+  const readyCount     = stats.ready     ?? 0;
+
+  return (
+    <div className="min-h-screen bg-gray-950 text-white p-4 space-y-4">
+      {/* Header bar */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-600">
+            <UtensilsCrossed className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-black tracking-tight">Kitchen Display</h1>
+            <p className="text-xs text-gray-400">Live order queue — auto refreshes every 15s</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-2xl font-black tabular-nums">
+            {clock.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+          </p>
+          <p className="text-xs text-gray-400">{clock.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
+        </div>
+      </div>
+
+      {/* New order alert */}
+      {newOrderAlert && (
+        <div className="flex items-center gap-3 rounded-xl bg-amber-500 px-4 py-3 animate-pulse">
+          <Bell className="h-5 w-5 text-white" />
+          <span className="font-bold text-white text-lg">🔔 New order received!</span>
+        </div>
+      )}
+
+      {/* Stats bar */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: 'NEW', value: pendingCount,   bg: 'bg-amber-500/20 border-amber-500/40',  text: 'text-amber-400' },
+          { label: 'PREPARING', value: preparingCount, bg: 'bg-orange-500/20 border-orange-500/40', text: 'text-orange-400' },
+          { label: 'READY', value: readyCount,    bg: 'bg-green-500/20 border-green-500/40',  text: 'text-green-400' },
+        ].map(s => (
+          <div key={s.label} className={cn('rounded-xl border px-4 py-3 text-center', s.bg)}>
+            <p className={cn('text-3xl font-black', s.text)}>{s.value}</p>
+            <p className="text-xs text-gray-400 font-semibold tracking-widest mt-0.5">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Orders grid */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(3)].map((_, i) => <div key={i} className="h-48 rounded-2xl bg-gray-800 animate-pulse" />)}
+        </div>
+      ) : orders.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <ChefHat className="h-16 w-16 text-gray-700 mb-4" />
+          <p className="text-2xl font-bold text-gray-500">All caught up!</p>
+          <p className="text-gray-600 mt-2">No active orders right now</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {orders.map(order => (
+            <KitchenCard key={order.id} order={order} />
+          ))}
+        </div>
+      )}
+
+      {/* Refresh indicator */}
+      <div className="text-center text-xs text-gray-600">
+        Last updated: {clock.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+        {' · '}
+        <button onClick={() => queryClient.invalidateQueries({ queryKey: ['food-orders-today'] })}
+          className="text-gray-500 hover:text-gray-300 underline">
+          Refresh now
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function OrdersPage() {
+  const { user } = useAuthStore();
+  const isChef = user?.role === 'CHEF';
+
+  // Chef sees Kitchen Display
+  if (isChef) return <KitchenDisplay />;
+
+  // ── Standard view (non-Chef) ──────────────────────────────────────────────
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -296,11 +535,7 @@ export default function OrdersPage() {
   const orders: FoodOrder[] = data?.data?.data ?? [];
   const pagination = data?.data?.pagination;
   const total = pagination?.total ?? 0;
-
-  const stats = statsData?.data?.data ?? { total: 0, pending: 0, preparing: 0, ready: 0 };
-  const pendingCount   = stats.pending   ?? 0;
-  const preparingCount = stats.preparing ?? 0;
-  const readyCount     = stats.ready     ?? 0;
+  const stats = statsData?.data?.data ?? {};
 
   return (
     <div className="space-y-6">
@@ -312,13 +547,12 @@ export default function OrdersPage() {
         <Button className="gap-2" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> New Order</Button>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-4 gap-4">
         {[
-          { label: 'Total Orders', value: total, icon: ShoppingBag, color: 'bg-resort-50 border-resort-200 text-resort-700' },
-          { label: 'Pending', value: pendingCount, icon: Clock, color: 'bg-amber-50 border-amber-200 text-amber-700' },
-          { label: 'Preparing', value: preparingCount, icon: ChefHat, color: 'bg-orange-50 border-orange-200 text-orange-700' },
-          { label: 'Ready', value: readyCount, icon: CheckCircle2, color: 'bg-green-50 border-green-200 text-green-700' },
+          { label: 'Total Orders', value: total,                   icon: ShoppingBag,  color: 'bg-resort-50 border-resort-200 text-resort-700' },
+          { label: 'Pending',      value: stats.pending   ?? 0,    icon: Clock,        color: 'bg-amber-50 border-amber-200 text-amber-700' },
+          { label: 'Preparing',    value: stats.preparing ?? 0,    icon: ChefHat,      color: 'bg-orange-50 border-orange-200 text-orange-700' },
+          { label: 'Ready',        value: stats.ready     ?? 0,    icon: CheckCircle2, color: 'bg-green-50 border-green-200 text-green-700' },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className={`rounded-xl border p-4 ${color}`}>
             <div className="flex items-center gap-2 mb-1"><Icon className="h-4 w-4 opacity-70" /><p className="text-xs font-medium opacity-70">{label}</p></div>
@@ -327,7 +561,6 @@ export default function OrdersPage() {
         ))}
       </div>
 
-      {/* Status Filters */}
       <div className="flex gap-2 flex-wrap">
         {STATUS_FILTERS.map(s => (
           <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
@@ -337,7 +570,6 @@ export default function OrdersPage() {
         ))}
       </div>
 
-      {/* Orders */}
       <div className="space-y-3">
         {isLoading ? (
           [...Array(5)].map((_, i) => <div key={i} className="h-24 rounded-xl bg-gray-100 animate-pulse" />)
@@ -350,17 +582,12 @@ export default function OrdersPage() {
           </div>
         ) : (
           orders.map(order => (
-            <OrderCard
-              key={order.id}
-              order={order}
-              expanded={expanded === order.id}
-              onToggleExpand={() => setExpanded(expanded === order.id ? null : order.id)}
-            />
+            <OrderCard key={order.id} order={order} expanded={expanded === order.id}
+              onToggleExpand={() => setExpanded(expanded === order.id ? null : order.id)} />
           ))
         )}
       </div>
 
-      {/* Pagination */}
       {pagination && pagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} of {total}</p>
