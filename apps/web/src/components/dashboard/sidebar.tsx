@@ -156,7 +156,7 @@ function groupItems(items: NavItem[]) {
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { tenant, user, clearAuth, refreshToken } = useAuthStore();
+  const { tenant, user, clearAuth } = useAuthStore();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const t = useTranslations('common') as (key: string, ...args: any[]) => string;
@@ -187,7 +187,7 @@ export function Sidebar() {
 
   const handleLogout = async () => {
     const isDemo = !!tenant?.isDemo;
-    if (refreshToken) await authApi.logout(refreshToken).catch(() => {});
+    await authApi.logout().catch(() => {});
     clearAuth();
     router.push(isDemo ? '/try' : '/auth/login');
   };

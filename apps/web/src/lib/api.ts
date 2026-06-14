@@ -5,6 +5,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 export const api = axios.create({
   baseURL: `${API_URL}/api`,
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
 });
 
 function getAuthState() {
@@ -14,12 +15,12 @@ function getAuthState() {
   } catch { return null; }
 }
 
-function setAuthTokens(token: string, refreshToken: string) {
+function setAuthToken(token: string) {
   try {
     const raw = localStorage.getItem('resort-pro-auth');
     const stored = raw ? JSON.parse(raw) : { state: {}, version: 0 };
     stored.state.token = token;
-    stored.state.refreshToken = refreshToken;
+    delete stored.state.refreshToken;
     localStorage.setItem('resort-pro-auth', JSON.stringify(stored));
   } catch { /* ignore */ }
 }
@@ -36,12 +37,12 @@ api.interceptors.response.use(
   (res) => res,
   async (error) => {
     if (error.response?.status === 401 && typeof window !== 'undefined') {
-      const refreshToken = getAuthState()?.refreshToken;
-      if (refreshToken) {
+      const hasToken = !!getAuthState()?.token;
+      if (hasToken) {
         try {
-          const res = await axios.post(`${API_URL}/api/auth/refresh`, { refreshToken });
-          const { token, refreshToken: newRefresh } = res.data.data;
-          setAuthTokens(token, newRefresh);
+          const res = await axios.post(`${API_URL}/api/auth/refresh`, {}, { withCredentials: true });
+          const { token } = res.data.data;
+          setAuthToken(token);
           error.config.headers.Authorization = `Bearer ${token}`;
           return api.request(error.config);
         } catch {
@@ -61,7 +62,7 @@ export const authApi = {
   login: (data: { email: string; password: string; slug: string }) =>
     api.post('/auth/login', data),
   me: () => api.get('/auth/me'),
-  logout: (refreshToken: string) => api.post('/auth/logout', { refreshToken }),
+  logout: () => api.post('/auth/logout', {}),
   updateProfile: (data: { firstName?: string; lastName?: string; phone?: string | null; avatarUrl?: string | null }) =>
     api.patch('/auth/me', data),
   changePassword: (data: { currentPassword: string; newPassword: string }) =>

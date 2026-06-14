@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { prisma } from '@resort-pro/database';
+import { prisma, Prisma } from '@resort-pro/database';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams, validate } from '../utils/response';
 import { generateConfirmationNo, calculateNights } from '../utils/booking';
@@ -324,88 +324,112 @@ export async function bookingRoutes(app: FastifyInstance) {
         await syncCalendarsForRoom(body.roomId, externalCalendars);
       }
 
-      // Check room availability
-      const conflict = await db.booking.findFirst({
-        where: {
-          roomId: body.roomId,
-          status: { in: ['CONFIRMED', 'CHECKED_IN', 'PENDING'] },
-          checkIn: { lt: checkOutDate },
-          checkOut: { gt: checkInDate },
-        },
-      });
-
-      if (conflict) {
-        const reason = conflict.externalSource
-          ? `Room is already booked via ${conflict.externalSource} for these dates`
-          : 'Room is not available for the selected dates';
-        return reply.status(409).send({ success: false, error: reason });
-      }
-
-      // Resolve or create guest
-      let guestId = body.guestId;
-      if (!guestId) {
-        // Walk-in: create/find guest by name+phone
-        if (!body.guestFirstName || !body.guestLastName) {
-          return reply.status(400).send({ success: false, error: 'Guest name is required for walk-in bookings' });
-        }
-        const email = body.guestEmail ?? `walkin-${Date.now()}@resortpro.local`;
-        const existing = body.guestEmail
-          ? await db.guest.findFirst({ where: { email } })
-          : null;
-        const guest = existing ?? await db.guest.create({
-          data: {
-            firstName: body.guestFirstName,
-            lastName: body.guestLastName,
-            email,
-            phone: body.guestPhone,
-          },
-        });
-        guestId = guest.id;
-      }
-
+      // ── Atomic: conflict-check + create inside a serializable transaction ──
+      // Serializable isolation prevents two concurrent requests from booking
+      // the same room for overlapping dates (read-then-write race condition).
+      let booking: Awaited<ReturnType<typeof prisma.booking.findFirst>> & object;
+      const now = new Date();
       const nights = calculateNights(checkInDate, checkOutDate);
       const totalAmount = Number(room.basePrice) * nights;
-      const now = new Date();
 
-      const booking = await db.booking.create({
-        data: {
-          roomId: body.roomId,
-          guestId,
-          checkIn: checkInDate,
-          checkOut: checkOutDate,
-          adults: body.adults,
-          children: body.children,
-          totalAmount,
-          specialRequests: body.specialRequests,
-          notes: body.notes,
-          confirmationNo: generateConfirmationNo(),
-          status: body.autoCheckIn ? 'CHECKED_IN' : 'CONFIRMED',
-          source: body.source,
-          actualCheckIn: body.autoCheckIn ? now : undefined,
-        },
-        include: {
-          guest: { select: { firstName: true, lastName: true, email: true } },
-          room: { select: { number: true, name: true } },
-        },
-      });
-
-      // If auto check-in, mark room as OCCUPIED
-      if (body.autoCheckIn) {
-        await db.room.update({ where: { id: body.roomId }, data: { status: 'OCCUPIED' } });
+      // Resolve or validate guest before entering transaction
+      if (!body.guestId && (!body.guestFirstName || !body.guestLastName)) {
+        return reply.status(400).send({ success: false, error: 'Guest name is required for walk-in bookings' });
       }
 
-      // Record initial payment if provided
-      if (body.paymentMethod && body.paymentMethod !== 'ONLINE') {
-        await db.payment.create({
-          data: {
-            bookingId: booking.id,
-            amount: totalAmount,
-            method: (body.paymentMethod as string) === 'CREDIT_CARD' ? 'CARD' : body.paymentMethod as 'CASH' | 'BANK_TRANSFER' | 'CARD',
-            status: 'PAID',
-            processedAt: now,
-          },
-        });
-        await db.booking.update({ where: { id: booking.id }, data: { paidAmount: totalAmount, paymentStatus: 'PAID' } });
+      try {
+        booking = await prisma.$transaction(async (tx) => {
+          // 1. Conflict check (inside transaction — reads are now serialized)
+          const conflict = await tx.booking.findFirst({
+            where: {
+              tenantId,
+              roomId: body.roomId,
+              status: { in: ['CONFIRMED', 'CHECKED_IN', 'PENDING'] },
+              checkIn: { lt: checkOutDate },
+              checkOut: { gt: checkInDate },
+            },
+          });
+          if (conflict) {
+            const reason = conflict.externalSource
+              ? `Room is already booked via ${conflict.externalSource} for these dates`
+              : 'Room is not available for the selected dates';
+            throw Object.assign(new Error(reason), { statusCode: 409 });
+          }
+
+          // 2. Resolve or create guest
+          let guestId = body.guestId;
+          if (!guestId) {
+            const email = body.guestEmail ?? `walkin-${Date.now()}@resortpro.local`;
+            const existing = body.guestEmail
+              ? await tx.guest.findFirst({ where: { tenantId, email } })
+              : null;
+            const guest = existing ?? await tx.guest.create({
+              data: {
+                tenantId,
+                firstName: body.guestFirstName!,
+                lastName: body.guestLastName!,
+                email,
+                phone: body.guestPhone,
+              },
+            });
+            guestId = guest.id;
+          }
+
+          // 3. Create booking
+          const newBooking = await tx.booking.create({
+            data: {
+              tenantId,
+              roomId: body.roomId,
+              guestId,
+              checkIn: checkInDate,
+              checkOut: checkOutDate,
+              adults: body.adults,
+              children: body.children,
+              totalAmount,
+              specialRequests: body.specialRequests,
+              notes: body.notes,
+              confirmationNo: generateConfirmationNo(),
+              status: body.autoCheckIn ? 'CHECKED_IN' : 'CONFIRMED',
+              source: body.source,
+              actualCheckIn: body.autoCheckIn ? now : undefined,
+            },
+            include: {
+              guest: { select: { firstName: true, lastName: true, email: true } },
+              room: { select: { number: true, name: true } },
+            },
+          });
+
+          // 4. If auto check-in, mark room OCCUPIED inside same transaction
+          if (body.autoCheckIn) {
+            await tx.room.update({ where: { id: body.roomId }, data: { status: 'OCCUPIED' } });
+          }
+
+          // 5. Record initial payment if provided (cash/card/bank)
+          if (body.paymentMethod && body.paymentMethod !== 'ONLINE') {
+            await tx.payment.create({
+              data: {
+                tenantId,
+                bookingId: newBooking.id,
+                amount: totalAmount,
+                method: (body.paymentMethod as string) === 'CREDIT_CARD' ? 'CARD' : body.paymentMethod as 'CASH' | 'BANK_TRANSFER' | 'CARD',
+                status: 'PAID',
+                processedAt: now,
+              },
+            });
+            await tx.booking.update({
+              where: { id: newBooking.id },
+              data: { paidAmount: totalAmount, paymentStatus: 'PAID' },
+            });
+          }
+
+          return newBooking;
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      } catch (err: unknown) {
+        const e = err as { statusCode?: number; message?: string };
+        if (e.statusCode === 409) {
+          return reply.status(409).send({ success: false, error: e.message });
+        }
+        throw err;
       }
 
       // Send confirmation email (skip for walk-in if opted out)
@@ -946,53 +970,64 @@ export async function bookingRoutes(app: FastifyInstance) {
       });
       if (externalCalendars.length > 0) await syncCalendarsForRoom(body.roomId, externalCalendars);
 
-      const conflict = await db.booking.findFirst({
-        where: {
-          roomId: body.roomId,
-          status: { in: ['CONFIRMED', 'CHECKED_IN', 'PENDING'] },
-          checkIn: { lt: checkOutDate }, checkOut: { gt: checkInDate },
-        },
-      });
-      if (conflict) return reply.status(409).send({ success: false, error: 'Room is not available for these dates' });
-
-      // Create or find guest
-      const [firstName, ...rest] = body.guestName.trim().split(' ');
-      const lastName = rest.join(' ') || '-';
-      const email    = `walkin-${Date.now()}@resortpro.local`;
-      const guest    = await db.guest.create({
-        data: { firstName, lastName, email, phone: body.guestPhone },
-      });
-
+      // ── Atomic: conflict-check + create in serializable transaction ─────────
       const nights      = calculateNights(checkInDate, checkOutDate);
       const rate        = body.ratePerNight ?? Number(room.basePrice);
-      const rawTotal    = rate * nights;
-      const totalAmount = rawTotal * (1 - body.discount / 100);
+      const totalAmount = rate * nights * (1 - body.discount / 100);
       const now         = new Date();
 
-      const booking = await db.booking.create({
-        data: {
-          roomId:       body.roomId,
-          guestId:      guest.id,
-          checkIn:      checkInDate,
-          checkOut:     checkOutDate,
-          adults:       body.adults,
-          children:     body.children,
-          totalAmount,
-          confirmationNo: generateConfirmationNo(),
-          status:       'CHECKED_IN',
-          actualCheckIn: now,
-          checkedInBy:  staffId,
-          walkIn:       true,
-          roomNotes:    body.roomNotes,
-          source:       'WALK_IN',
-        },
-        include: {
-          guest: { select: { firstName: true, lastName: true, phone: true } },
-          room:  { select: { number: true, name: true, type: true } },
-        },
-      });
+      let booking: Awaited<ReturnType<typeof prisma.booking.findFirst>> & object;
+      try {
+        booking = await prisma.$transaction(async (tx) => {
+          const conflict = await tx.booking.findFirst({
+            where: {
+              tenantId,
+              roomId: body.roomId,
+              status: { in: ['CONFIRMED', 'CHECKED_IN', 'PENDING'] },
+              checkIn: { lt: checkOutDate },
+              checkOut: { gt: checkInDate },
+            },
+          });
+          if (conflict) throw Object.assign(new Error('Room is not available for these dates'), { statusCode: 409 });
 
-      await db.room.update({ where: { id: body.roomId }, data: { status: 'OCCUPIED' } });
+          const [firstName, ...rest] = body.guestName.trim().split(' ');
+          const lastName = rest.join(' ') || '-';
+          const guest = await tx.guest.create({
+            data: { tenantId, firstName, lastName, email: `walkin-${Date.now()}@resortpro.local`, phone: body.guestPhone },
+          });
+
+          const newBooking = await tx.booking.create({
+            data: {
+              tenantId,
+              roomId:        body.roomId,
+              guestId:       guest.id,
+              checkIn:       checkInDate,
+              checkOut:      checkOutDate,
+              adults:        body.adults,
+              children:      body.children,
+              totalAmount,
+              confirmationNo: generateConfirmationNo(),
+              status:        'CHECKED_IN',
+              actualCheckIn: now,
+              checkedInBy:   staffId,
+              walkIn:        true,
+              roomNotes:     body.roomNotes,
+              source:        'WALK_IN',
+            },
+            include: {
+              guest: { select: { firstName: true, lastName: true, phone: true } },
+              room:  { select: { number: true, name: true, type: true } },
+            },
+          });
+
+          await tx.room.update({ where: { id: body.roomId }, data: { status: 'OCCUPIED' } });
+          return newBooking;
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      } catch (err: unknown) {
+        const e = err as { statusCode?: number; message?: string };
+        if (e.statusCode === 409) return reply.status(409).send({ success: false, error: e.message });
+        throw err;
+      }
 
       // Record advance payment
       if (body.paymentMethod !== 'LATER' && body.advanceAmount && body.advanceAmount > 0) {

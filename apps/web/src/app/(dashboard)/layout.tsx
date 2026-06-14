@@ -17,7 +17,7 @@ const BILLING_EXEMPT_PATHS = ['/dashboard/upgrade', '/dashboard/suspended', '/da
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isAuthenticated, tenant, setAuth, user, token, refreshToken } = useAuthStore();
+  const { isAuthenticated, tenant, setAuth, user, token } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const [statusChecked, setStatusChecked] = useState(false);
 
@@ -56,12 +56,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         const { planStatus, trialDaysLeft } = data;
 
         // Update tenant in store with fresh status
-        if (user && tenant && token && refreshToken) {
+        if (user && tenant && token) {
           setAuth(user, {
             ...tenant,
             planStatus,
             trialEndsAt: data.trialEndsAt,
-          }, token, refreshToken);
+          }, token);
         }
 
         // Account suspended

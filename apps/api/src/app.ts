@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import { ZodError } from 'zod';
 import cors from '@fastify/cors';
+import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
 import rateLimit from '@fastify/rate-limit';
@@ -68,6 +69,8 @@ export async function buildApp() {
 
   // ── Plugins ──────────────────────────────────────────────────────────────
   await app.register(helmet, { contentSecurityPolicy: false });
+
+  await app.register(cookie, { secret: process.env.COOKIE_SECRET || process.env.JWT_SECRET || 'cookie-secret' });
 
   await app.register(cors, {
     origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000'],

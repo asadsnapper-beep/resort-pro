@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { randomBytes } from 'crypto';
@@ -9,6 +9,30 @@ import { sendEmail } from '../services/email';
 import { createAdminNotification } from '../utils/notifications';
 import { generateReferralCode } from '../utils/referral';
 import type { JwtPayload } from '@resort-pro/types';
+
+const REFRESH_COOKIE = 'rp_refresh';
+const COOKIE_MAX_AGE = 7 * 24 * 60 * 60; // 7 days in seconds
+
+function setRefreshCookie(reply: FastifyReply, token: string) {
+  reply.setCookie(REFRESH_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/api/auth',
+    maxAge: COOKIE_MAX_AGE,
+  });
+}
+
+function clearRefreshCookie(reply: FastifyReply) {
+  reply.clearCookie(REFRESH_COOKIE, { path: '/api/auth' });
+}
+
+function getRefreshToken(request: { cookies: Record<string, string | undefined>; body: unknown }): string | undefined {
+  // Cookie takes precedence; fall back to body for backward-compat during transition
+  return request.cookies[REFRESH_COOKIE] ??
+    (request.body as Record<string, string> | null)?.[REFRESH_COOKIE] ??
+    (request.body as Record<string, string> | null)?.['refreshToken'];
+}
 
 const registerSchema = z.object({
   resortName: z.string().min(2).max(100),
@@ -198,9 +222,9 @@ export async function authRoutes(app: FastifyInstance) {
         `,
       }).catch(() => {}); // don't block registration if email fails
 
+      setRefreshCookie(reply, refreshToken);
       return reply.status(201).send(ok({
         token,
-        refreshToken,
         user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role },
         tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug, plan: tenant.plan, planStatus: tenant.planStatus, trialEndsAt: tenant.trialEndsAt, isActive: tenant.isActive },
       }, 'Resort registered successfully'));
@@ -267,9 +291,9 @@ export async function authRoutes(app: FastifyInstance) {
         },
       });
 
+      setRefreshCookie(reply, refreshToken);
       return ok({
         token,
-        refreshToken,
         user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role },
         tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug, plan: tenant.plan, planStatus: tenant.planStatus, trialEndsAt: tenant.trialEndsAt, isActive: tenant.isActive },
       });
@@ -280,13 +304,14 @@ export async function authRoutes(app: FastifyInstance) {
   app.post('/refresh', {
     schema: { tags: ['auth'], summary: 'Refresh access token' },
     handler: async (request, reply) => {
-      const { refreshToken } = request.body as { refreshToken: string };
+      const refreshToken = getRefreshToken(request);
       if (!refreshToken) {
         return reply.status(400).send({ success: false, error: 'Refresh token required' });
       }
 
       const stored = await prisma.refreshToken.findUnique({ where: { token: refreshToken }, include: { user: true } });
       if (!stored || stored.expiresAt < new Date()) {
+        clearRefreshCookie(reply);
         return reply.status(401).send({ success: false, error: 'Invalid or expired refresh token' });
       }
 
@@ -307,14 +332,11 @@ export async function authRoutes(app: FastifyInstance) {
       const newRefreshToken = app.jwt.sign({ sub: user.id, type: 'refresh' }, { expiresIn: '7d' });
 
       await prisma.refreshToken.create({
-        data: {
-          userId: user.id,
-          token: newRefreshToken,
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        },
+        data: { userId: user.id, token: newRefreshToken, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
       });
 
-      return ok({ token: newToken, refreshToken: newRefreshToken });
+      setRefreshCookie(reply, newRefreshToken);
+      return ok({ token: newToken });
     },
   });
 
@@ -385,10 +407,11 @@ export async function authRoutes(app: FastifyInstance) {
   app.post('/logout', {
     schema: { tags: ['auth'], summary: 'Logout (invalidate refresh token)' },
     handler: async (request, reply) => {
-      const { refreshToken } = request.body as { refreshToken?: string };
+      const refreshToken = getRefreshToken(request);
       if (refreshToken) {
         await prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
       }
+      clearRefreshCookie(reply);
       return reply.send(ok(null, 'Logged out'));
     },
   });
@@ -542,9 +565,9 @@ export async function authRoutes(app: FastifyInstance) {
         data: { userId: user.id, token: refreshToken, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
       });
 
+      setRefreshCookie(reply, refreshToken);
       return reply.status(201).send(ok({
         token,
-        refreshToken,
         user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role },
         tenant,
       }, `Welcome to ${tenant?.name}!`));
