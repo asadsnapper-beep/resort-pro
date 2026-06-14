@@ -9,10 +9,11 @@ export default defineConfig({
   format: ['cjs'],
   outDir: 'dist',
   // Workspace packages → inline into the bundle (no TS source in runtime)
-  noExternal: ['@resort-pro/types', '@resort-pro/database'],
+  noExternal: ['@resort-pro/types', '@resort-pro/database', '@resort-pro/payment-registry'],
   // Keep these as runtime require()s — they have native binaries or are huge
   external: [
     '@prisma/client',
+    'better-sqlite3',
     'fsevents',
     'bufferutil',
     'utf-8-validate',
