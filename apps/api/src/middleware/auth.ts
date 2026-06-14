@@ -1,9 +1,12 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { JwtPayload, UserRole } from '@resort-pro/types';
+import { tenantPrisma } from '@resort-pro/database';
 
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
   try {
     await request.jwtVerify();
+    const { tenantId } = request.user as JwtPayload;
+    request.db = tenantPrisma(tenantId);
   } catch {
     return reply.status(401).send({ success: false, error: 'Unauthorized' });
   }
@@ -17,6 +20,7 @@ export function requireRole(...roles: UserRole[]) {
       if (!roles.includes(user.role)) {
         return reply.status(403).send({ success: false, error: 'Forbidden: insufficient permissions' });
       }
+      request.db = tenantPrisma(user.tenantId);
     } catch {
       return reply.status(401).send({ success: false, error: 'Unauthorized' });
     }

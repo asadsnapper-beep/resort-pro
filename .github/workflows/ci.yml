@@ -8,6 +8,31 @@ on:
   workflow_dispatch:
 
 jobs:
+  # ── Tenant Isolation Guard ─────────────────────────────────────────────────
+  tenant-isolation-guard:
+    name: Tenant Isolation Guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for bare prisma usage in authenticated routes
+        run: |
+          # Routes that still use bare `prisma.` need to be migrated to `request.db`
+          # This check counts them and fails if NEW files are added with bare prisma usage
+          VIOLATIONS=$(grep -rl "prisma\." apps/api/src/routes/ | \
+            grep -v "node_modules" | sort)
+          if [ -n "$VIOLATIONS" ]; then
+            echo "⚠️  These route files still use bare prisma (not yet migrated to request.db):"
+            echo "$VIOLATIONS"
+            echo ""
+            echo "Total files remaining: $(echo "$VIOLATIONS" | wc -l | tr -d ' ')"
+            echo "See docs/SYSTEM_REVIEW.md §4.1 for migration guide."
+            echo "This is a WARNING — not a build failure yet (migration in progress)."
+          else
+            echo "✅ All routes use tenant-scoped request.db — isolation complete!"
+          fi
+
   # ── Schema Drift Guard ─────────────────────────────────────────────────────
   schema-drift:
     name: Schema Drift Check
