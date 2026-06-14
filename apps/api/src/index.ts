@@ -1,6 +1,12 @@
 import 'dotenv/config';
 import { buildApp } from './app';
 
+// Refuse to start in production without a real JWT secret
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET environment variable is required in production.');
+  process.exit(1);
+}
+
 const start = async () => {
   const app = await buildApp();
 

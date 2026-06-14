@@ -8,6 +8,59 @@ on:
   workflow_dispatch:
 
 jobs:
+  # ── Schema Drift Guard ─────────────────────────────────────────────────────
+  schema-drift:
+    name: Schema Drift Check
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: resortpro
+          POSTGRES_PASSWORD: resortpro
+          POSTGRES_DB: resortpro_drift
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://resortpro:resortpro@localhost:5432/resortpro_drift
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        run: corepack enable && corepack prepare pnpm@latest --activate
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Create shadow DB
+        run: PGPASSWORD=resortpro psql -h localhost -U resortpro -d resortpro_drift -c "CREATE DATABASE resortpro_shadow;"
+
+      - name: Check schema is in sync with migrations
+        working-directory: packages/database
+        run: |
+          npx prisma migrate diff \
+            --from-migrations prisma/migrations \
+            --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url "postgresql://resortpro:resortpro@localhost:5432/resortpro_shadow" \
+            --script \
+            --exit-code
+        # exit code 2 = drift detected, fail the build
+
   # ── Layer 1: API Permission Tests (Vitest integration) ─────────────────────
   api-tests:
     name: API Permission Tests
