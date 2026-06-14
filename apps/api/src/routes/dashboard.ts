@@ -1,8 +1,6 @@
 import type { FastifyInstance } from 'fastify';
-import { prisma } from '@resort-pro/database';
 import { requireAuth } from '../middleware/auth';
 import { ok } from '../utils/response';
-import type { JwtPayload } from '@resort-pro/types';
 import dayjs from 'dayjs';
 
 export async function dashboardRoutes(app: FastifyInstance) {
@@ -14,7 +12,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
     },
     preHandler: requireAuth,
     handler: async (request) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const today = dayjs().startOf('day').toDate();
       const tomorrow = dayjs().add(1, 'day').startOf('day').toDate();
       const monthStart = dayjs().startOf('month').toDate();
@@ -36,26 +34,26 @@ export async function dashboardRoutes(app: FastifyInstance) {
         pendingHousekeeping,
         openMaintenance,
       ] = await Promise.all([
-        prisma.room.count({ where: { tenantId, isActive: true } }),
-        prisma.room.count({ where: { tenantId, status: 'AVAILABLE', isActive: true } }),
-        prisma.room.count({ where: { tenantId, status: 'OCCUPIED', isActive: true } }),
-        prisma.booking.count({ where: { tenantId, checkIn: { gte: today, lt: tomorrow }, status: { in: ['CONFIRMED', 'PENDING'] } } }),
-        prisma.booking.count({ where: { tenantId, checkOut: { gte: today, lt: tomorrow }, status: 'CHECKED_IN' } }),
-        prisma.booking.count({ where: { tenantId, status: { in: ['CONFIRMED', 'CHECKED_IN'] } } }),
-        prisma.supportTicket.count({ where: { tenantId, status: { in: ['OPEN', 'IN_PROGRESS'] } } }),
-        prisma.payment.aggregate({ where: { tenantId, processedAt: { gte: monthStart }, status: 'PAID' }, _sum: { amount: true } }),
-        prisma.payment.aggregate({ where: { tenantId, processedAt: { gte: lastMonthStart, lte: lastMonthEnd }, status: 'PAID' }, _sum: { amount: true } }),
-        prisma.booking.findMany({
-          where: { tenantId },
+        db.room.count({ where: { isActive: true } }),
+        db.room.count({ where: { status: 'AVAILABLE', isActive: true } }),
+        db.room.count({ where: { status: 'OCCUPIED', isActive: true } }),
+        db.booking.count({ where: { checkIn: { gte: today, lt: tomorrow }, status: { in: ['CONFIRMED', 'PENDING'] } } }),
+        db.booking.count({ where: { checkOut: { gte: today, lt: tomorrow }, status: 'CHECKED_IN' } }),
+        db.booking.count({ where: { status: { in: ['CONFIRMED', 'CHECKED_IN'] } } }),
+        db.supportTicket.count({ where: { status: { in: ['OPEN', 'IN_PROGRESS'] } } }),
+        db.payment.aggregate({ where: { processedAt: { gte: monthStart }, status: 'PAID' }, _sum: { amount: true } }),
+        db.payment.aggregate({ where: { processedAt: { gte: lastMonthStart, lte: lastMonthEnd }, status: 'PAID' }, _sum: { amount: true } }),
+        db.booking.findMany({
+          where: {},
           take: 5,
           orderBy: { createdAt: 'desc' },
           include: { guest: { select: { firstName: true, lastName: true } }, room: { select: { name: true, number: true } } },
         }),
-        prisma.inventoryItem.findMany({
-          where: { tenantId },
+        db.inventoryItem.findMany({
+          where: {},
         }),
-        prisma.housekeepingTask.count({ where: { tenantId, status: { in: ['PENDING', 'IN_PROGRESS'] }, scheduledDate: { lte: tomorrow } } }),
-        prisma.maintenanceTicket.count({ where: { tenantId, status: { not: 'RESOLVED' } } }),
+        db.housekeepingTask.count({ where: { status: { in: ['PENDING', 'IN_PROGRESS'] }, scheduledDate: { lte: tomorrow } } }),
+        db.maintenanceTicket.count({ where: { status: { not: 'RESOLVED' } } }),
       ]);
 
       const monthlyRevenue = Number(monthRevenue._sum.amount || 0);
@@ -100,7 +98,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
     },
     preHandler: requireAuth,
     handler: async (request) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
 
       const months = Array.from({ length: 12 }, (_, i) => {
         const d = dayjs().subtract(11 - i, 'month');
@@ -109,8 +107,8 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
       const revenueData = await Promise.all(
         months.map(async ({ label, start, end }) => {
-          const agg = await prisma.payment.aggregate({
-            where: { tenantId, processedAt: { gte: start, lte: end }, status: 'PAID' },
+          const agg = await db.payment.aggregate({
+            where: { processedAt: { gte: start, lte: end }, status: 'PAID' },
             _sum: { amount: true },
           });
           return { month: label, revenue: Number(agg._sum.amount || 0) };
@@ -130,8 +128,8 @@ export async function dashboardRoutes(app: FastifyInstance) {
     },
     preHandler: requireAuth,
     handler: async (request) => {
-      const { tenantId } = request.user as JwtPayload;
-      const totalRooms = await prisma.room.count({ where: { tenantId, isActive: true } });
+      const { db } = request;
+      const totalRooms = await db.room.count({ where: { isActive: true } });
 
       const days = Array.from({ length: 30 }, (_, i) => {
         const d = dayjs().subtract(29 - i, 'day');
@@ -140,9 +138,8 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
       const occupancyData = await Promise.all(
         days.map(async ({ label, date }) => {
-          const occupied = await prisma.booking.count({
+          const occupied = await db.booking.count({
             where: {
-              tenantId,
               checkIn: { lte: date },
               checkOut: { gt: date },
               status: { in: ['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT'] },
@@ -169,14 +166,13 @@ export async function dashboardRoutes(app: FastifyInstance) {
     },
     preHandler: requireAuth,
     handler: async (request) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
 
       const now    = dayjs();
       const ytdStart      = now.startOf('year').toDate();
       const monthStart    = now.startOf('month').toDate();
       const lastMoStart   = now.subtract(1, 'month').startOf('month').toDate();
       const lastMoEnd     = now.subtract(1, 'month').endOf('month').toDate();
-      const prev7Start    = now.subtract(7, 'day').toDate();
       const prev30Start   = now.subtract(30, 'day').toDate();
       const prev90Start   = now.subtract(90, 'day').toDate();
 
@@ -195,40 +191,40 @@ export async function dashboardRoutes(app: FastifyInstance) {
         revenueByMonth,            // last 12 months
       ] = await Promise.all([
         // YTD revenue
-        prisma.payment.aggregate({ where: { tenantId, status: 'PAID', processedAt: { gte: ytdStart } }, _sum: { amount: true } }),
+        db.payment.aggregate({ where: { status: 'PAID', processedAt: { gte: ytdStart } }, _sum: { amount: true } }),
         // MTD revenue
-        prisma.payment.aggregate({ where: { tenantId, status: 'PAID', processedAt: { gte: monthStart } }, _sum: { amount: true } }),
+        db.payment.aggregate({ where: { status: 'PAID', processedAt: { gte: monthStart } }, _sum: { amount: true } }),
         // Last month revenue
-        prisma.payment.aggregate({ where: { tenantId, status: 'PAID', processedAt: { gte: lastMoStart, lte: lastMoEnd } }, _sum: { amount: true } }),
+        db.payment.aggregate({ where: { status: 'PAID', processedAt: { gte: lastMoStart, lte: lastMoEnd } }, _sum: { amount: true } }),
         // Bookings last 30d
-        prisma.booking.count({ where: { tenantId, createdAt: { gte: prev30Start } } }),
+        db.booking.count({ where: { createdAt: { gte: prev30Start } } }),
         // Bookings 30-60d ago
-        prisma.booking.count({ where: { tenantId, createdAt: { gte: dayjs().subtract(60, 'day').toDate(), lt: prev30Start } } }),
+        db.booking.count({ where: { createdAt: { gte: dayjs().subtract(60, 'day').toDate(), lt: prev30Start } } }),
         // Active confirmed/checked-in
-        prisma.booking.count({ where: { tenantId, status: { in: ['CONFIRMED', 'CHECKED_IN'] } } }),
+        db.booking.count({ where: { status: { in: ['CONFIRMED', 'CHECKED_IN'] } } }),
         // Total rooms
-        prisma.room.count({ where: { tenantId, isActive: true } }),
+        db.room.count({ where: { isActive: true } }),
         // Currently occupied
-        prisma.room.count({ where: { tenantId, status: 'OCCUPIED' } }),
+        db.room.count({ where: { status: 'OCCUPIED' } }),
         // Total unique guests
-        prisma.guest.count({ where: { tenantId } }),
+        db.guest.count({ where: {} }),
         // Bookings by source last 90d
-        prisma.booking.groupBy({
+        db.booking.groupBy({
           by: ['source'],
-          where: { tenantId, createdAt: { gte: prev90Start } },
+          where: { createdAt: { gte: prev90Start } },
           _count: { source: true },
         }),
         // All bookings last 90d with room type (for room breakdown)
-        prisma.booking.findMany({
-          where: { tenantId, createdAt: { gte: prev90Start }, status: { not: 'CANCELLED' } },
+        db.booking.findMany({
+          where: { createdAt: { gte: prev90Start }, status: { not: 'CANCELLED' } },
           select: { totalAmount: true, checkIn: true, checkOut: true, room: { select: { type: true } } },
         }),
         // Last 12 months revenue
         Promise.all(
           Array.from({ length: 12 }, (_, i) => {
             const d = dayjs().subtract(11 - i, 'month');
-            return prisma.payment.aggregate({
-              where: { tenantId, status: 'PAID', processedAt: { gte: d.startOf('month').toDate(), lte: d.endOf('month').toDate() } },
+            return db.payment.aggregate({
+              where: { status: 'PAID', processedAt: { gte: d.startOf('month').toDate(), lte: d.endOf('month').toDate() } },
               _sum: { amount: true },
             }).then((agg) => ({ month: d.format('MMM YY'), revenue: Number(agg._sum.amount || 0) }));
           })
@@ -237,11 +233,11 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
       // ── Expense data ──────────────────────────────────────────────────────────
       const [mtdExpensesAgg, prevMoExpensesAgg, expenseByCategory] = await Promise.all([
-        prisma.expense.aggregate({ where: { tenantId, date: { gte: monthStart } }, _sum: { amount: true } }),
-        prisma.expense.aggregate({ where: { tenantId, date: { gte: lastMoStart, lte: lastMoEnd } }, _sum: { amount: true } }),
-        prisma.expense.groupBy({
+        db.expense.aggregate({ where: { date: { gte: monthStart } }, _sum: { amount: true } }),
+        db.expense.aggregate({ where: { date: { gte: lastMoStart, lte: lastMoEnd } }, _sum: { amount: true } }),
+        db.expense.groupBy({
           by: ['category'],
-          where: { tenantId, date: { gte: monthStart } },
+          where: { date: { gte: monthStart } },
           _sum: { amount: true },
           orderBy: { _sum: { amount: 'desc' } },
         }),
@@ -294,10 +290,10 @@ export async function dashboardRoutes(app: FastifyInstance) {
       })).sort((a, b) => b.count - a.count);
 
       // ── Guest stats ────────────────────────────────────────────────────────
-      const newGuests = await prisma.guest.count({ where: { tenantId, createdAt: { gte: prev30Start } } });
-      const nationalities = await prisma.guest.groupBy({
+      const newGuests = await db.guest.count({ where: { createdAt: { gte: prev30Start } } });
+      const nationalities = await db.guest.groupBy({
         by: ['nationality'],
-        where: { tenantId, nationality: { not: null } },
+        where: { nationality: { not: null } },
         _count: { nationality: true },
         orderBy: { _count: { nationality: 'desc' } },
         take: 8,
@@ -352,15 +348,14 @@ export async function dashboardRoutes(app: FastifyInstance) {
     schema: { tags: ['dashboard'], summary: "Today's arrivals and departures", security: [{ bearerAuth: [] }] },
     preHandler: requireAuth,
     handler: async (request) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
       const todayEnd   = new Date(); todayEnd.setHours(23, 59, 59, 999);
 
       const [arrivals, departures, inHouse] = await Promise.all([
         // Arriving today (checkIn = today, status CONFIRMED or CHECKED_IN)
-        prisma.booking.findMany({
+        db.booking.findMany({
           where: {
-            tenantId,
             checkIn: { gte: todayStart, lte: todayEnd },
             status: { in: ['CONFIRMED', 'CHECKED_IN', 'PENDING'] },
           },
@@ -371,9 +366,8 @@ export async function dashboardRoutes(app: FastifyInstance) {
           orderBy: { checkIn: 'asc' },
         }),
         // Departing today (checkOut = today, still checked in)
-        prisma.booking.findMany({
+        db.booking.findMany({
           where: {
-            tenantId,
             checkOut: { gte: todayStart, lte: todayEnd },
             status: { in: ['CONFIRMED', 'CHECKED_IN'] },
           },
@@ -384,8 +378,8 @@ export async function dashboardRoutes(app: FastifyInstance) {
           orderBy: { checkOut: 'asc' },
         }),
         // Currently in-house (checked in, not yet out)
-        prisma.booking.count({
-          where: { tenantId, status: 'CHECKED_IN' },
+        db.booking.count({
+          where: { status: 'CHECKED_IN' },
         }),
       ]);
 

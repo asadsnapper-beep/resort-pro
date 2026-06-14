@@ -20,16 +20,15 @@ export async function ticketRoutes(app: FastifyInstance) {
     schema: { tags: ['tickets'], summary: 'List support tickets', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const query = request.query as { page?: number; limit?: number; status?: string; priority?: string };
       const { page, limit, skip } = parsePageParams(query);
       const where = {
-        tenantId,
         ...(query.status && { status: query.status as never }),
         ...(query.priority && { priority: query.priority as never }),
       };
       const [tickets, total] = await Promise.all([
-        prisma.supportTicket.findMany({
+        db.supportTicket.findMany({
           where, skip, take: limit, orderBy: { createdAt: 'desc' },
           include: {
             guest: { select: { firstName: true, lastName: true, email: true } },
@@ -37,7 +36,7 @@ export async function ticketRoutes(app: FastifyInstance) {
             _count: { select: { messages: true } },
           },
         }),
-        prisma.supportTicket.count({ where }),
+        db.supportTicket.count({ where }),
       ]);
       return paginated(tickets, total, page, limit);
     },
@@ -47,10 +46,10 @@ export async function ticketRoutes(app: FastifyInstance) {
     schema: { tags: ['tickets'], summary: 'Get ticket with messages', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
-      const ticket = await prisma.supportTicket.findFirst({
-        where: { id, tenantId },
+      const ticket = await db.supportTicket.findFirst({
+        where: { id },
         include: {
           guest: true,
           assignedTo: { select: { firstName: true, lastName: true, email: true } },
@@ -66,9 +65,9 @@ export async function ticketRoutes(app: FastifyInstance) {
     schema: { tags: ['tickets'], summary: 'Create support ticket', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const body = ticketSchema.parse(request.body);
-      const ticket = await prisma.supportTicket.create({ data: { tenantId, ...body } });
+      const ticket = await db.supportTicket.create({ data: { ...body } });
       return reply.status(201).send(ok(ticket, 'Ticket created'));
     },
   });
@@ -77,12 +76,12 @@ export async function ticketRoutes(app: FastifyInstance) {
     schema: { tags: ['tickets'], summary: 'Update ticket status', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
       const { status } = request.body as { status: string };
-      const ticket = await prisma.supportTicket.findFirst({ where: { id, tenantId } });
+      const ticket = await db.supportTicket.findFirst({ where: { id } });
       if (!ticket) return reply.status(404).send({ success: false, error: 'Ticket not found' });
-      const updated = await prisma.supportTicket.update({
+      const updated = await db.supportTicket.update({
         where: { id },
         data: { status: status as never, resolvedAt: status === 'RESOLVED' ? new Date() : null },
       });
@@ -94,12 +93,12 @@ export async function ticketRoutes(app: FastifyInstance) {
     schema: { tags: ['tickets'], summary: 'Assign ticket to staff', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
       const { userId } = request.body as { userId: string };
-      const ticket = await prisma.supportTicket.findFirst({ where: { id, tenantId } });
+      const ticket = await db.supportTicket.findFirst({ where: { id } });
       if (!ticket) return reply.status(404).send({ success: false, error: 'Ticket not found' });
-      const updated = await prisma.supportTicket.update({ where: { id }, data: { assignedToId: userId, status: 'IN_PROGRESS' } });
+      const updated = await db.supportTicket.update({ where: { id }, data: { assignedToId: userId, status: 'IN_PROGRESS' } });
       return ok(updated, 'Ticket assigned');
     },
   });
@@ -108,14 +107,15 @@ export async function ticketRoutes(app: FastifyInstance) {
     schema: { tags: ['tickets'], summary: 'Add message to ticket', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
+      const { db } = request;
       const { tenantId, sub: userId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
       const { message } = z.object({ message: z.string().min(1, 'Message cannot be empty') }).parse(request.body);
 
-      const ticket = await prisma.supportTicket.findFirst({ where: { id, tenantId } });
+      const ticket = await db.supportTicket.findFirst({ where: { id } });
       if (!ticket) return reply.status(404).send({ success: false, error: 'Ticket not found' });
 
-      const chatMessage = await prisma.chatMessage.create({
+      const chatMessage = await db.chatMessage.create({
         data: { ticketId: id, senderId: userId, senderType: 'STAFF', message },
         include: { sender: { select: { firstName: true, lastName: true } } },
       });

@@ -14,10 +14,8 @@
 
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { prisma } from '@resort-pro/database'
 import { requireAuth, requireRole } from '../middleware/auth'
 import { ok } from '../utils/response'
-import type { JwtPayload } from '@resort-pro/types'
 import { parseIcal } from '../utils/ical-parser'
 import { syncCalendarsForRoom } from '../jobs/ical-sync'
 
@@ -62,9 +60,9 @@ export async function externalCalendarRoutes(app: FastifyInstance) {
   app.get('/', {
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload
-      const cals = await prisma.externalCalendar.findMany({
-        where: { tenantId },
+      const { db } = request;
+      const cals = await db.externalCalendar.findMany({
+        where: {},
         include: {
           room: { select: { id: true, number: true, name: true } },
         },
@@ -72,9 +70,9 @@ export async function externalCalendarRoutes(app: FastifyInstance) {
       })
 
       // Attach imported booking count per calendar (single query via groupBy)
-      const countRows = await prisma.booking.groupBy({
+      const countRows = await db.booking.groupBy({
         by: ['externalSource'],
-        where: { tenantId, externalSource: { not: null } },
+        where: { externalSource: { not: null } },
         _count: { id: true },
       })
       const countBySource = Object.fromEntries(
@@ -94,16 +92,15 @@ export async function externalCalendarRoutes(app: FastifyInstance) {
   app.post('/', {
     preHandler: [requireAuth, requireRole('OWNER', 'MANAGER')],
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload
+      const { db } = request;
       const body = createSchema.parse(request.body)
 
       // Verify room belongs to tenant
-      const room = await prisma.room.findFirst({ where: { id: body.roomId, tenantId } })
+      const room = await db.room.findFirst({ where: { id: body.roomId } })
       if (!room) return reply.code(404).send({ error: 'Room not found' })
 
-      const cal = await prisma.externalCalendar.create({
+      const cal = await db.externalCalendar.create({
         data: {
-          tenantId,
           roomId: body.roomId,
           name: body.name,
           icalUrl: body.icalUrl,
@@ -123,14 +120,14 @@ export async function externalCalendarRoutes(app: FastifyInstance) {
   app.patch('/:id', {
     preHandler: [requireAuth, requireRole('OWNER', 'MANAGER')],
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload
+      const { db } = request;
       const { id } = request.params as { id: string }
       const body = updateSchema.parse(request.body)
 
-      const existing = await prisma.externalCalendar.findFirst({ where: { id, tenantId } })
+      const existing = await db.externalCalendar.findFirst({ where: { id } })
       if (!existing) return reply.code(404).send({ error: 'Calendar not found' })
 
-      const updated = await prisma.externalCalendar.update({
+      const updated = await db.externalCalendar.update({
         where: { id },
         data: body,
         include: { room: { select: { id: true, number: true, name: true } } },
@@ -144,13 +141,13 @@ export async function externalCalendarRoutes(app: FastifyInstance) {
   app.delete('/:id', {
     preHandler: [requireAuth, requireRole('OWNER', 'MANAGER')],
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload
+      const { db } = request;
       const { id } = request.params as { id: string }
 
-      const existing = await prisma.externalCalendar.findFirst({ where: { id, tenantId } })
+      const existing = await db.externalCalendar.findFirst({ where: { id } })
       if (!existing) return reply.code(404).send({ error: 'Calendar not found' })
 
-      await prisma.externalCalendar.delete({ where: { id } })
+      await db.externalCalendar.delete({ where: { id } })
       return ok({ deleted: true })
     },
   })
@@ -159,16 +156,16 @@ export async function externalCalendarRoutes(app: FastifyInstance) {
   app.post('/:id/sync', {
     preHandler: [requireAuth, requireRole('OWNER', 'MANAGER')],
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload
+      const { db } = request;
       const { id } = request.params as { id: string }
 
-      const cal = await prisma.externalCalendar.findFirst({ where: { id, tenantId } })
+      const cal = await db.externalCalendar.findFirst({ where: { id } })
       if (!cal) return reply.code(404).send({ error: 'Calendar not found' })
 
       // Run sync (await so we can return fresh status)
       await syncCalendarsForRoom(cal.roomId, [cal])
 
-      const refreshed = await prisma.externalCalendar.findUnique({ where: { id } })
+      const refreshed = await db.externalCalendar.findUnique({ where: { id } })
       return ok({ calendar: refreshed })
     },
   })
@@ -177,11 +174,11 @@ export async function externalCalendarRoutes(app: FastifyInstance) {
   app.get('/:id/status', {
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload
+      const { db } = request;
       const { id } = request.params as { id: string }
 
-      const cal = await prisma.externalCalendar.findFirst({
-        where: { id, tenantId },
+      const cal = await db.externalCalendar.findFirst({
+        where: { id },
         include: { room: { select: { id: true, number: true, name: true } } },
       })
       if (!cal) return reply.code(404).send({ error: 'Calendar not found' })

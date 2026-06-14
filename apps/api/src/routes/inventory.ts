@@ -1,9 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { prisma } from '@resort-pro/database';
-import { requireAuth, requireRole } from '../middleware/auth';
-import { ok, paginated, parsePageParams, validate } from '../utils/response';
-import type { JwtPayload } from '@resort-pro/types';
+import { requireRole } from '../middleware/auth';
+import { ok, paginated, parsePageParams } from '../utils/response';
 
 const itemSchema = z.object({
   name: z.string().min(1),
@@ -27,11 +25,11 @@ export async function inventoryRoutes(app: FastifyInstance) {
     schema: { tags: ['inventory'], summary: 'Get inventory stats', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const [total, allItems] = await Promise.all([
-        prisma.inventoryItem.count({ where: { tenantId } }),
-        prisma.inventoryItem.findMany({
-          where: { tenantId },
+        db.inventoryItem.count({ where: {} }),
+        db.inventoryItem.findMany({
+          where: {},
           select: { currentStock: true, minimumStock: true, unitCost: true },
         }),
       ]);
@@ -50,13 +48,12 @@ export async function inventoryRoutes(app: FastifyInstance) {
     schema: { tags: ['inventory'], summary: 'List inventory items', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const query = request.query as { page?: number; limit?: number; category?: string; lowStock?: string; search?: string };
       const { page, limit, skip } = parsePageParams(query);
 
-      // Base where: tenantId + optional category + optional search
+      // Base where: optional category + optional search
       const baseWhere = {
-        tenantId,
         ...(query.category && { category: query.category as never }),
         ...(query.search && {
           OR: [
@@ -69,7 +66,7 @@ export async function inventoryRoutes(app: FastifyInstance) {
       // lowStock filter requires column-to-column comparison (currentStock <= minimumStock)
       // Prisma doesn't support this natively, so fetch all matching items and paginate in JS
       if (query.lowStock === 'true') {
-        const allItems = await prisma.inventoryItem.findMany({
+        const allItems = await db.inventoryItem.findMany({
           where: baseWhere,
           orderBy: { name: 'asc' },
         });
@@ -79,8 +76,8 @@ export async function inventoryRoutes(app: FastifyInstance) {
       }
 
       const [items, total] = await Promise.all([
-        prisma.inventoryItem.findMany({ where: baseWhere, skip, take: limit, orderBy: { name: 'asc' } }),
-        prisma.inventoryItem.count({ where: baseWhere }),
+        db.inventoryItem.findMany({ where: baseWhere, skip, take: limit, orderBy: { name: 'asc' } }),
+        db.inventoryItem.count({ where: baseWhere }),
       ]);
       return paginated(items, total, page, limit);
     },
@@ -90,9 +87,9 @@ export async function inventoryRoutes(app: FastifyInstance) {
     schema: { tags: ['inventory'], summary: 'Add inventory item', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'STAFF'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const body = itemSchema.parse(request.body);
-      const item = await prisma.inventoryItem.create({ data: { tenantId, ...body } });
+      const item = await db.inventoryItem.create({ data: { ...body } });
       return reply.status(201).send(ok(item, 'Inventory item added'));
     },
   });
@@ -101,12 +98,12 @@ export async function inventoryRoutes(app: FastifyInstance) {
     schema: { tags: ['inventory'], summary: 'Update inventory item', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'STAFF'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
       const body = itemSchema.partial().parse(request.body);
-      const item = await prisma.inventoryItem.findFirst({ where: { id, tenantId } });
+      const item = await db.inventoryItem.findFirst({ where: { id } });
       if (!item) return reply.status(404).send({ success: false, error: 'Item not found' });
-      const updated = await prisma.inventoryItem.update({ where: { id }, data: body });
+      const updated = await db.inventoryItem.update({ where: { id }, data: body });
       return ok(updated, 'Item updated');
     },
   });
@@ -115,12 +112,12 @@ export async function inventoryRoutes(app: FastifyInstance) {
     schema: { tags: ['inventory'], summary: 'Get movement history for an item', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
-      const item = await prisma.inventoryItem.findFirst({ where: { id, tenantId } });
+      const item = await db.inventoryItem.findFirst({ where: { id } });
       if (!item) return reply.status(404).send({ success: false, error: 'Item not found' });
-      const movements = await prisma.inventoryMovement.findMany({
-        where: { inventoryItemId: id, tenantId },
+      const movements = await db.inventoryMovement.findMany({
+        where: { inventoryItemId: id },
         orderBy: { createdAt: 'desc' },
         take: 50,
       });
@@ -132,11 +129,11 @@ export async function inventoryRoutes(app: FastifyInstance) {
     schema: { tags: ['inventory'], summary: 'Record stock movement', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
       const body = movementSchema.parse(request.body);
 
-      const item = await prisma.inventoryItem.findFirst({ where: { id, tenantId } });
+      const item = await db.inventoryItem.findFirst({ where: { id } });
       if (!item) return reply.status(404).send({ success: false, error: 'Item not found' });
 
       const newStock = body.type === 'IN'
@@ -148,8 +145,8 @@ export async function inventoryRoutes(app: FastifyInstance) {
       if (newStock < 0) return reply.status(400).send({ success: false, error: 'Insufficient stock' });
 
       const [movement] = await Promise.all([
-        prisma.inventoryMovement.create({ data: { tenantId, inventoryItemId: id, ...body } }),
-        prisma.inventoryItem.update({ where: { id }, data: { currentStock: newStock } }),
+        db.inventoryMovement.create({ data: { inventoryItemId: id, ...body } }),
+        db.inventoryItem.update({ where: { id }, data: { currentStock: newStock } }),
       ]);
 
       return reply.status(201).send(ok(movement, 'Movement recorded'));

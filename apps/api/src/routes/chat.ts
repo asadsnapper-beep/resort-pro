@@ -1,5 +1,4 @@
 import type { FastifyInstance } from 'fastify';
-import { prisma } from '@resort-pro/database';
 import { requireAuth } from '../middleware/auth';
 import { ok } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
@@ -11,10 +10,11 @@ export async function chatRoutes(app: FastifyInstance) {
     websocket: true,
     preHandler: requireAuth,
     handler: async (socket, request) => {
-      const { tenantId, sub: userId } = request.user as JwtPayload;
+      const { db } = request;
+      const { sub: userId } = request.user as JwtPayload;
       const { ticketId } = request.params as { ticketId: string };
 
-      const ticket = await prisma.supportTicket.findFirst({ where: { id: ticketId, tenantId } });
+      const ticket = await db.supportTicket.findFirst({ where: { id: ticketId } });
       if (!ticket) {
         socket.send(JSON.stringify({ type: 'error', message: 'Ticket not found' }));
         socket.close();
@@ -26,7 +26,7 @@ export async function chatRoutes(app: FastifyInstance) {
           const { message } = JSON.parse(rawMessage.toString());
           if (!message?.trim()) return;
 
-          const chatMessage = await prisma.chatMessage.create({
+          const chatMessage = await db.chatMessage.create({
             data: { ticketId, senderId: userId, senderType: 'STAFF', message: message.trim() },
             include: { sender: { select: { firstName: true, lastName: true } } },
           });
@@ -48,9 +48,9 @@ export async function chatRoutes(app: FastifyInstance) {
     schema: { tags: ['chat'], summary: 'Get unread message count', security: [{ bearerAuth: [] }] },
     preHandler: requireAuth,
     handler: async (request) => {
-      const { tenantId } = request.user as JwtPayload;
-      const count = await prisma.chatMessage.count({
-        where: { isRead: false, ticket: { tenantId } },
+      const { db } = request;
+      const count = await db.chatMessage.count({
+        where: { isRead: false },
       });
       return ok({ unreadCount: count });
     },

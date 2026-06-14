@@ -1,8 +1,6 @@
 import type { FastifyInstance } from 'fastify';
-import { prisma } from '@resort-pro/database';
-import { requireAuth, requireRole } from '../middleware/auth';
+import { requireRole } from '../middleware/auth';
 import { ok } from '../utils/response';
-import type { JwtPayload } from '@resort-pro/types';
 
 export async function frontDeskRoutes(app: FastifyInstance) {
 
@@ -11,7 +9,7 @@ export async function frontDeskRoutes(app: FastifyInstance) {
     schema: { tags: ['front-desk'], summary: 'Today front desk summary', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
 
       const today     = new Date();
       const todayDate = today.toISOString().split('T')[0];
@@ -34,9 +32,8 @@ export async function frontDeskRoutes(app: FastifyInstance) {
 
       const [arrivals, departures, inHouse, rooms] = await Promise.all([
         // Today's arrivals: checkIn = today, status CONFIRMED or PENDING
-        prisma.booking.findMany({
+        db.booking.findMany({
           where: {
-            tenantId,
             checkIn: { gte: new Date(todayDate), lt: new Date(tomorrowDate) },
             status: { in: ['CONFIRMED', 'PENDING'] },
           },
@@ -45,9 +42,8 @@ export async function frontDeskRoutes(app: FastifyInstance) {
         }),
 
         // Today's departures: checkOut = today, status CHECKED_IN
-        prisma.booking.findMany({
+        db.booking.findMany({
           where: {
-            tenantId,
             checkOut: { gte: new Date(todayDate), lt: new Date(tomorrowDate) },
             status: 'CHECKED_IN',
           },
@@ -56,15 +52,15 @@ export async function frontDeskRoutes(app: FastifyInstance) {
         }),
 
         // Currently in-house: status CHECKED_IN
-        prisma.booking.findMany({
-          where: { tenantId, status: 'CHECKED_IN' },
+        db.booking.findMany({
+          where: { status: 'CHECKED_IN' },
           select: { ...bookingBase, guest: { select: guestSelect }, room: { select: roomSelect } },
           orderBy: { checkIn: 'asc' },
         }),
 
         // All rooms summary
-        prisma.room.findMany({
-          where: { tenantId, isActive: true },
+        db.room.findMany({
+          where: { isActive: true },
           select: { id: true, number: true, name: true, type: true, status: true, floor: true, basePrice: true },
           orderBy: [{ floor: 'asc' }, { number: 'asc' }],
         }),
@@ -109,16 +105,16 @@ export async function frontDeskRoutes(app: FastifyInstance) {
     schema: { tags: ['front-desk'], summary: 'Room map with live status', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
 
       const [rooms, activeBookings] = await Promise.all([
-        prisma.room.findMany({
-          where: { tenantId, isActive: true },
+        db.room.findMany({
+          where: { isActive: true },
           select: { id: true, number: true, name: true, type: true, status: true, floor: true, basePrice: true, maxOccupancy: true },
           orderBy: [{ floor: 'asc' }, { number: 'asc' }],
         }),
-        prisma.booking.findMany({
-          where: { tenantId, status: { in: ['CHECKED_IN', 'CONFIRMED'] } },
+        db.booking.findMany({
+          where: { status: { in: ['CHECKED_IN', 'CONFIRMED'] } },
           select: {
             id: true, roomId: true, status: true, checkIn: true, checkOut: true,
             adults: true, children: true, confirmationNo: true,

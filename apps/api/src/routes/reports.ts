@@ -320,6 +320,7 @@ export async function reportRoutes(app: FastifyInstance) {
     schema: { tags: ['reports'], security: [{ bearerAuth: [] }] },
     preHandler: [requireAuth, requireRole('OWNER', 'MANAGER')],
     handler: async (request, reply) => {
+      const { db } = request;
       const { tenantId } = request.user as JwtPayload;
       const { date } = request.query as { date?: string };
       const { toEmail } = request.body as { toEmail?: string };
@@ -327,7 +328,7 @@ export async function reportRoutes(app: FastifyInstance) {
 
       const report = await buildDailyReport(tenantId, dateStr);
 
-      const tenant = await prisma.tenant.findUnique({
+      const tenant = await db.tenant.findUnique({
         where: { id: tenantId },
         select: { email: true, brandPrimaryColor: true },
       });
@@ -350,8 +351,9 @@ export async function reportRoutes(app: FastifyInstance) {
   app.get('/dispatch', {
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
+      const { db } = request;
       const { tenantId } = request.user as JwtPayload;
-      const settings = await prisma.reportDispatchSettings.findUnique({ where: { tenantId } });
+      const settings = await db.reportDispatchSettings.findUnique({ where: { tenantId } });
       return ok(settings ?? {
         enabled: false,
         dispatchTime: '22:00',
@@ -370,6 +372,7 @@ export async function reportRoutes(app: FastifyInstance) {
   app.put('/dispatch', {
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
+      const { db } = request;
       const { tenantId } = request.user as JwtPayload;
       const body = request.body as {
         enabled?: boolean;
@@ -381,7 +384,7 @@ export async function reportRoutes(app: FastifyInstance) {
         whatsappPhone?: string | null;
       };
 
-      const settings = await prisma.reportDispatchSettings.upsert({
+      const settings = await db.reportDispatchSettings.upsert({
         where: { tenantId },
         create: {
           tenantId,
@@ -412,10 +415,11 @@ export async function reportRoutes(app: FastifyInstance) {
   app.post('/dispatch/test', {
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
+      const { db } = request;
       const { tenantId } = request.user as JwtPayload;
       const body = request.body as { channel: 'telegram' | 'whatsapp' };
 
-      const settings = await prisma.reportDispatchSettings.findUnique({ where: { tenantId } });
+      const settings = await db.reportDispatchSettings.findUnique({ where: { tenantId } });
       if (!settings) return reply.code(400).send({ success: false, error: 'No dispatch settings found. Save settings first.' });
 
       const dateStr = new Date().toISOString().slice(0, 10);
@@ -441,7 +445,7 @@ export async function reportRoutes(app: FastifyInstance) {
           return reply.code(400).send({ success: false, error: 'WhatsApp phone number is required.' });
         }
         // Use tenant WA config
-        const tenant = await prisma.tenant.findUnique({
+        const tenant = await db.tenant.findUnique({
           where: { id: tenantId },
           select: { waMode: true, waApiToken: true, waPhoneNumberId: true },
         });

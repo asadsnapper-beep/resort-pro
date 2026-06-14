@@ -43,14 +43,13 @@ export async function maintenanceRoutes(app: FastifyInstance) {
     schema: { tags: ['maintenance'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { status, roomId, priority } = request.query as {
         status?: string; roomId?: string; priority?: string;
       };
 
-      const tickets = await prisma.maintenanceTicket.findMany({
+      const tickets = await db.maintenanceTicket.findMany({
         where: {
-          tenantId,
           ...(status && { status: status as 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' }),
           ...(roomId && { roomId }),
           ...(priority && { priority: priority as 'URGENT' | 'HIGH' | 'NORMAL' | 'LOW' }),
@@ -77,15 +76,15 @@ export async function maintenanceRoutes(app: FastifyInstance) {
     schema: { tags: ['maintenance'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
       const [open, inProgress, resolvedToday, urgent] = await Promise.all([
-        prisma.maintenanceTicket.count({ where: { tenantId, status: 'OPEN' } }),
-        prisma.maintenanceTicket.count({ where: { tenantId, status: 'IN_PROGRESS' } }),
-        prisma.maintenanceTicket.count({ where: { tenantId, status: 'RESOLVED', resolvedAt: { gte: todayStart } } }),
-        prisma.maintenanceTicket.count({ where: { tenantId, status: { not: 'RESOLVED' }, priority: 'URGENT' } }),
+        db.maintenanceTicket.count({ where: { status: 'OPEN' } }),
+        db.maintenanceTicket.count({ where: { status: 'IN_PROGRESS' } }),
+        db.maintenanceTicket.count({ where: { status: 'RESOLVED', resolvedAt: { gte: todayStart } } }),
+        db.maintenanceTicket.count({ where: { status: { not: 'RESOLVED' }, priority: 'URGENT' } }),
       ]);
 
       return ok({ open, inProgress, resolvedToday, urgent });
@@ -97,15 +96,15 @@ export async function maintenanceRoutes(app: FastifyInstance) {
     schema: { tags: ['maintenance'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
+      const { db } = request;
       const { tenantId, sub: userId } = request.user as JwtPayload;
       const body = createSchema.parse(request.body);
 
-      const room = await prisma.room.findFirst({ where: { id: body.roomId, tenantId } });
+      const room = await db.room.findFirst({ where: { id: body.roomId } });
       if (!room) return reply.status(404).send({ error: 'Room not found' });
 
-      const ticket = await prisma.maintenanceTicket.create({
+      const ticket = await db.maintenanceTicket.create({
         data: {
-          tenantId,
           roomId: body.roomId,
           issueType: body.issueType,
           description: body.description,
@@ -117,7 +116,7 @@ export async function maintenanceRoutes(app: FastifyInstance) {
       });
 
       // Set room status to MAINTENANCE
-      await prisma.room.update({ where: { id: body.roomId }, data: { status: 'MAINTENANCE' } });
+      await db.room.update({ where: { id: body.roomId }, data: { status: 'MAINTENANCE' } });
 
       return reply.status(201).send({ success: true, data: ticket });
     },
@@ -128,14 +127,15 @@ export async function maintenanceRoutes(app: FastifyInstance) {
     schema: { tags: ['maintenance'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
+      const { db } = request;
       const { id } = request.params as { id: string };
       const { tenantId } = request.user as JwtPayload;
       const body = updateSchema.parse(request.body);
 
-      const existing = await prisma.maintenanceTicket.findFirst({ where: { id, tenantId } });
+      const existing = await db.maintenanceTicket.findFirst({ where: { id } });
       if (!existing) return reply.status(404).send({ error: 'Ticket not found' });
 
-      const ticket = await prisma.maintenanceTicket.update({
+      const ticket = await db.maintenanceTicket.update({
         where: { id },
         data: {
           ...(body.status !== undefined && {
@@ -164,15 +164,16 @@ export async function maintenanceRoutes(app: FastifyInstance) {
     schema: { tags: ['maintenance'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
+      const { db } = request;
       const { id } = request.params as { id: string };
       const { tenantId } = request.user as JwtPayload;
       const { notes } = request.body as { notes?: string };
 
-      const existing = await prisma.maintenanceTicket.findFirst({ where: { id, tenantId } });
+      const existing = await db.maintenanceTicket.findFirst({ where: { id } });
       if (!existing) return reply.status(404).send({ error: 'Ticket not found' });
       if (existing.status === 'RESOLVED') return reply.status(400).send({ error: 'Already resolved' });
 
-      const ticket = await prisma.maintenanceTicket.update({
+      const ticket = await db.maintenanceTicket.update({
         where: { id },
         data: { status: 'RESOLVED', resolvedAt: new Date(), notes: notes ?? existing.notes },
         include: { room: { select: { id: true, name: true, number: true } } },
@@ -190,13 +191,14 @@ export async function maintenanceRoutes(app: FastifyInstance) {
     schema: { tags: ['maintenance'], security: [{ bearerAuth: [] }] },
     preHandler: [requireAuth, requireRole('OWNER', 'MANAGER', 'STAFF')],
     handler: async (request, reply) => {
+      const { db } = request;
       const { id } = request.params as { id: string };
       const { tenantId } = request.user as JwtPayload;
 
-      const existing = await prisma.maintenanceTicket.findFirst({ where: { id, tenantId } });
+      const existing = await db.maintenanceTicket.findFirst({ where: { id } });
       if (!existing) return reply.status(404).send({ error: 'Ticket not found' });
 
-      await prisma.maintenanceTicket.delete({ where: { id } });
+      await db.maintenanceTicket.delete({ where: { id } });
       await restoreRoomIfClear(tenantId, existing.roomId);
 
       return ok({ deleted: true });

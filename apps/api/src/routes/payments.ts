@@ -463,11 +463,12 @@ export async function paymentRoutes(app: FastifyInstance) {
     preHandler: [requireAuth],
     schema: { tags: ['Payments'], summary: 'Get tenant payment config' },
   }, async (req, reply) => {
+    const { db } = req;
     const { tenantId } = req.user as JwtPayload;
 
     const [config, tenant] = await Promise.all([
-      prisma.tenantPaymentConfig.findUnique({ where: { tenantId } }),
-      prisma.tenant.findUnique({ where: { id: tenantId }, select: { country: true } }),
+      db.tenantPaymentConfig.findUnique({ where: { tenantId } }),
+      db.tenant.findUnique({ where: { id: tenantId }, select: { country: true } }),
     ]);
 
     const country  = tenant?.country ?? 'BD';
@@ -515,6 +516,7 @@ export async function paymentRoutes(app: FastifyInstance) {
     preHandler: [requireAuth],
     schema: { tags: ['Payments'], summary: 'Save payment gateway config (OWNER only)' },
   }, async (req, reply) => {
+    const { db } = req;
     const { tenantId, role } = req.user as JwtPayload;
     if (role !== 'OWNER') return reply.status(403).send({ success: false, error: 'Owner only' });
 
@@ -531,7 +533,7 @@ export async function paymentRoutes(app: FastifyInstance) {
     const { activeGateway, enabledMethods, manualInstructions, testMode, credentials } = body.data;
 
     // Merge credentials — don't overwrite masked values
-    const existing = await prisma.tenantPaymentConfig.findUnique({
+    const existing = await db.tenantPaymentConfig.findUnique({
       where: { tenantId }, select: { credentials: true },
     });
     const merged = (existing?.credentials ?? {}) as Record<string, Record<string, string>>;
@@ -546,7 +548,7 @@ export async function paymentRoutes(app: FastifyInstance) {
       }
     }
 
-    const config = await prisma.tenantPaymentConfig.upsert({
+    const config = await db.tenantPaymentConfig.upsert({
       where:  { tenantId },
       create: {
         tenantId, activeGateway,
@@ -572,26 +574,25 @@ export async function paymentRoutes(app: FastifyInstance) {
     preHandler: [requireAuth],
     schema: { tags: ['Payments'], summary: 'Payment transaction history' },
   }, async (req, reply) => {
-    const { tenantId } = req.user as JwtPayload;
+    const { db } = req;
     const q     = req.query as { page?: string; limit?: string; gateway?: string; status?: string };
     const page  = Math.max(1, parseInt(q.page ?? '1'));
     const limit = Math.min(50, parseInt(q.limit ?? '20'));
 
     const where = {
-      tenantId,
       ...(q.gateway ? { gateway: q.gateway }       : {}),
       ...(q.status  ? { status: q.status as any } : {}),
     };
 
     const [payments, total] = await Promise.all([
-      prisma.payment.findMany({
+      db.payment.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
         include: { booking: { select: { id: true, checkIn: true, checkOut: true } } },
       }),
-      prisma.payment.count({ where }),
+      db.payment.count({ where }),
     ]);
 
     return reply.send({
@@ -605,9 +606,9 @@ export async function paymentRoutes(app: FastifyInstance) {
     preHandler: [requireAuth],
     schema: { tags: ['Payments'], summary: 'Single payment record' },
   }, async (req, reply) => {
-    const { tenantId } = req.user as JwtPayload;
-    const payment = await prisma.payment.findFirst({
-      where: { id: req.params.id, tenantId },
+    const { db } = req;
+    const payment = await db.payment.findFirst({
+      where: { id: req.params.id },
       include: { booking: { select: { id: true, checkIn: true, checkOut: true, totalAmount: true } } },
     });
     if (!payment) return reply.status(404).send({ success: false, error: 'Payment not found' });

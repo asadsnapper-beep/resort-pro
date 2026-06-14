@@ -91,6 +91,7 @@ export async function ticketWebhookRoutes(app: FastifyInstance) {
     schema: { tags: ['ticket-webhooks'], security: [{ bearerAuth: [] }] },
     preHandler: [requireAuth, requireRole('OWNER', 'MANAGER')],
     handler: async (request, reply) => {
+      const { db } = request
       const { tenantId } = request.user as JwtPayload
       const { botToken, notifChatId } = z.object({
         botToken: z.string().min(10),
@@ -104,7 +105,7 @@ export async function ticketWebhookRoutes(app: FastifyInstance) {
       }
 
       // Save to tenant
-      await prisma.tenant.update({
+      await db.tenant.update({
         where: { id: tenantId },
         data: {
           telegramBotToken: botToken,
@@ -130,8 +131,9 @@ export async function ticketWebhookRoutes(app: FastifyInstance) {
     schema: { tags: ['ticket-webhooks'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request) => {
+      const { db } = request
       const { tenantId } = request.user as JwtPayload
-      const tenant = await prisma.tenant.findUnique({
+      const tenant = await db.tenant.findUnique({
         where: { id: tenantId },
         select: { telegramBotToken: true, telegramNotifChatId: true },
       })
@@ -154,8 +156,9 @@ export async function ticketWebhookRoutes(app: FastifyInstance) {
     schema: { tags: ['ticket-webhooks'], security: [{ bearerAuth: [] }] },
     preHandler: [requireAuth, requireRole('OWNER', 'MANAGER')],
     handler: async (request) => {
+      const { db } = request
       const { tenantId } = request.user as JwtPayload
-      await prisma.tenant.update({
+      await db.tenant.update({
         where: { id: tenantId },
         data: { telegramBotToken: null, telegramNotifChatId: null },
       })
@@ -168,8 +171,9 @@ export async function ticketWebhookRoutes(app: FastifyInstance) {
     schema: { tags: ['ticket-webhooks'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request) => {
+      const { db } = request
       const { tenantId } = request.user as JwtPayload
-      const tenant = await prisma.tenant.findUnique({
+      const tenant = await db.tenant.findUnique({
         where: { id: tenantId },
         select: { waEnabled: true, waPhoneNumberId: true, waBusinessAccId: true },
       })

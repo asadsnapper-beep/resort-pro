@@ -91,13 +91,13 @@ export async function marketingRoutes(app: FastifyInstance) {
   app.get('/campaigns', {
     preHandler: requireRole('OWNER', 'MANAGER', 'MARKETER'),
   }, async (req, reply) => {
-    const user = req.user as JwtPayload;
+    const { db } = req;
     const { status } = req.query as { status?: string };
 
-    const where: any = { tenantId: user.tenantId };
+    const where: any = {};
     if (status && status !== 'all') where.status = status;
 
-    const campaigns = await prisma.marketingCampaign.findMany({
+    const campaigns = await db.marketingCampaign.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       include: { _count: { select: { logs: true } } },
@@ -110,15 +110,15 @@ export async function marketingRoutes(app: FastifyInstance) {
   app.post('/campaigns', {
     preHandler: requireRole('OWNER', 'MANAGER', 'MARKETER'),
   }, async (req, reply) => {
+    const { db } = req;
     const user = req.user as JwtPayload;
     const body = validate(campaignCreateSchema, req.body, reply);
     if (!body) return;
 
     const recipients = await resolveRecipients(user.tenantId, body.audienceType ?? 'all', body.audienceFilter ?? null);
 
-    const campaign = await prisma.marketingCampaign.create({
+    const campaign = await db.marketingCampaign.create({
       data: {
-        tenantId:       user.tenantId,
         name:           body.name,
         channel:        body.channel,
         audienceType:   body.audienceType,
@@ -138,11 +138,11 @@ export async function marketingRoutes(app: FastifyInstance) {
   app.get('/campaigns/:id', {
     preHandler: requireRole('OWNER', 'MANAGER', 'MARKETER'),
   }, async (req, reply) => {
-    const user = req.user as JwtPayload;
+    const { db } = req;
     const { id } = req.params as { id: string };
 
-    const campaign = await prisma.marketingCampaign.findFirst({
-      where: { id, tenantId: user.tenantId },
+    const campaign = await db.marketingCampaign.findFirst({
+      where: { id },
       include: { logs: { orderBy: { createdAt: 'desc' }, take: 200 } },
     });
 
@@ -154,16 +154,16 @@ export async function marketingRoutes(app: FastifyInstance) {
   app.delete('/campaigns/:id', {
     preHandler: requireRole('OWNER', 'MANAGER'),
   }, async (req, reply) => {
-    const user = req.user as JwtPayload;
+    const { db } = req;
     const { id } = req.params as { id: string };
 
-    const campaign = await prisma.marketingCampaign.findFirst({ where: { id, tenantId: user.tenantId } });
+    const campaign = await db.marketingCampaign.findFirst({ where: { id } });
     if (!campaign) return reply.status(404).send({ error: 'Campaign not found' });
     if (!['draft', 'failed', 'cancelled'].includes(campaign.status)) {
       return reply.status(400).send({ error: 'Only draft/failed/cancelled campaigns can be deleted' });
     }
 
-    await prisma.marketingCampaign.delete({ where: { id } });
+    await db.marketingCampaign.delete({ where: { id } });
     return reply.send(ok({ deleted: true }));
   });
 
@@ -173,16 +173,17 @@ export async function marketingRoutes(app: FastifyInstance) {
   app.post('/campaigns/:id/send', {
     preHandler: requireRole('OWNER', 'MANAGER'),
   }, async (req, reply) => {
+    const { db } = req;
     const user = req.user as JwtPayload;
     const { id } = req.params as { id: string };
 
-    const campaign = await prisma.marketingCampaign.findFirst({ where: { id, tenantId: user.tenantId } });
+    const campaign = await db.marketingCampaign.findFirst({ where: { id } });
     if (!campaign) return reply.status(404).send({ error: 'Campaign not found' });
     if (!['draft', 'scheduled'].includes(campaign.status)) {
       return reply.status(400).send({ error: 'Campaign already sent or sending' });
     }
 
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await db.tenant.findUnique({
       where: { id: user.tenantId },
       select: {
         smsEnabled: true, waEnabled: true,
@@ -240,14 +241,14 @@ export async function marketingRoutes(app: FastifyInstance) {
     }
 
     // Mark as sending + create log entries
-    await prisma.marketingCampaign.update({
+    await db.marketingCampaign.update({
       where: { id },
       data: { status: 'sending', recipientCount: recipients.length },
     });
 
     const channels = needsSms && needsWa ? ['sms', 'whatsapp'] : needsSms ? ['sms'] : ['whatsapp'];
 
-    await prisma.campaignLog.createMany({
+    await db.campaignLog.createMany({
       data: recipients.flatMap(r =>
         channels.map(ch => ({
           campaignId: id,
@@ -272,16 +273,16 @@ export async function marketingRoutes(app: FastifyInstance) {
   app.post('/campaigns/:id/cancel', {
     preHandler: requireRole('OWNER', 'MANAGER'),
   }, async (req, reply) => {
-    const user = req.user as JwtPayload;
+    const { db } = req;
     const { id } = req.params as { id: string };
 
-    const campaign = await prisma.marketingCampaign.findFirst({ where: { id, tenantId: user.tenantId } });
+    const campaign = await db.marketingCampaign.findFirst({ where: { id } });
     if (!campaign) return reply.status(404).send({ error: 'Campaign not found' });
     if (campaign.status !== 'scheduled') {
       return reply.status(400).send({ error: 'Only scheduled campaigns can be cancelled' });
     }
 
-    await prisma.marketingCampaign.update({ where: { id }, data: { status: 'cancelled' } });
+    await db.marketingCampaign.update({ where: { id }, data: { status: 'cancelled' } });
     return reply.send(ok({ cancelled: true }));
   });
 
@@ -296,9 +297,9 @@ export async function marketingRoutes(app: FastifyInstance) {
   app.get('/templates', {
     preHandler: requireRole('OWNER', 'MANAGER', 'MARKETER'),
   }, async (req, reply) => {
-    const user = req.user as JwtPayload;
-    const templates = await prisma.messageTemplate.findMany({
-      where: { tenantId: user.tenantId },
+    const { db } = req;
+    const templates = await db.messageTemplate.findMany({
+      where: {},
       orderBy: [{ usageCount: 'desc' }, { createdAt: 'desc' }],
     });
     return reply.send(ok(templates));
@@ -308,11 +309,11 @@ export async function marketingRoutes(app: FastifyInstance) {
   app.post('/templates', {
     preHandler: requireRole('OWNER', 'MANAGER', 'MARKETER'),
   }, async (req, reply) => {
-    const user = req.user as JwtPayload;
+    const { db } = req;
     const body = validate(templateSchema, req.body, reply);
     if (!body) return;
-    const template = await prisma.messageTemplate.create({
-      data: { tenantId: user.tenantId, name: body.name, channel: body.channel, message: body.message },
+    const template = await db.messageTemplate.create({
+      data: { name: body.name, channel: body.channel, message: body.message },
     });
     return reply.status(201).send(ok(template));
   });
@@ -321,15 +322,15 @@ export async function marketingRoutes(app: FastifyInstance) {
   app.put('/templates/:id', {
     preHandler: requireRole('OWNER', 'MANAGER', 'MARKETER'),
   }, async (req, reply) => {
-    const user = req.user as JwtPayload;
+    const { db } = req;
     const { id } = req.params as { id: string };
     const body = validate(templateSchema, req.body, reply);
     if (!body) return;
 
-    const existing = await prisma.messageTemplate.findFirst({ where: { id, tenantId: user.tenantId } });
+    const existing = await db.messageTemplate.findFirst({ where: { id } });
     if (!existing) return reply.status(404).send({ error: 'Template not found' });
 
-    const template = await prisma.messageTemplate.update({
+    const template = await db.messageTemplate.update({
       where: { id },
       data: { name: body.name, channel: body.channel, message: body.message },
     });
@@ -340,13 +341,13 @@ export async function marketingRoutes(app: FastifyInstance) {
   app.delete('/templates/:id', {
     preHandler: requireRole('OWNER', 'MANAGER'),
   }, async (req, reply) => {
-    const user = req.user as JwtPayload;
+    const { db } = req;
     const { id } = req.params as { id: string };
 
-    const existing = await prisma.messageTemplate.findFirst({ where: { id, tenantId: user.tenantId } });
+    const existing = await db.messageTemplate.findFirst({ where: { id } });
     if (!existing) return reply.status(404).send({ error: 'Template not found' });
 
-    await prisma.messageTemplate.delete({ where: { id } });
+    await db.messageTemplate.delete({ where: { id } });
     return reply.send(ok({ deleted: true }));
   });
 }

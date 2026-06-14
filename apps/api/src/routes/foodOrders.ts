@@ -1,9 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { prisma } from '@resort-pro/database';
-import { requireAuth, requireRole } from '../middleware/auth';
-import { ok, paginated, parsePageParams, validate } from '../utils/response';
-import type { JwtPayload } from '@resort-pro/types';
+import { requireRole } from '../middleware/auth';
+import { ok, paginated, parsePageParams } from '../utils/response';
 
 const orderSchema = z.object({
   bookingId: z.string().uuid().optional(),
@@ -19,14 +17,14 @@ export async function foodOrderRoutes(app: FastifyInstance) {
     schema: { tags: ['food-orders'], summary: 'Get order stats by status', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST', 'CHEF'),
     handler: async (request) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const [pending, preparing, ready, delivered, cancelled, total] = await Promise.all([
-        prisma.foodOrder.count({ where: { tenantId, status: 'PENDING' } }),
-        prisma.foodOrder.count({ where: { tenantId, status: 'PREPARING' } }),
-        prisma.foodOrder.count({ where: { tenantId, status: 'READY' } }),
-        prisma.foodOrder.count({ where: { tenantId, status: 'DELIVERED' } }),
-        prisma.foodOrder.count({ where: { tenantId, status: 'CANCELLED' } }),
-        prisma.foodOrder.count({ where: { tenantId } }),
+        db.foodOrder.count({ where: { status: 'PENDING' } }),
+        db.foodOrder.count({ where: { status: 'PREPARING' } }),
+        db.foodOrder.count({ where: { status: 'READY' } }),
+        db.foodOrder.count({ where: { status: 'DELIVERED' } }),
+        db.foodOrder.count({ where: { status: 'CANCELLED' } }),
+        db.foodOrder.count({ where: {} }),
       ]);
       return ok({ total, pending, preparing, ready, delivered, cancelled });
     },
@@ -36,16 +34,16 @@ export async function foodOrderRoutes(app: FastifyInstance) {
     schema: { tags: ['food-orders'], summary: 'List food orders', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST', 'CHEF'),
     handler: async (request) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const query = request.query as { page?: number; limit?: number; status?: string };
       const { page, limit, skip } = parsePageParams(query);
-      const where = { tenantId, ...(query.status && { status: query.status as never }) };
+      const where = { ...(query.status && { status: query.status as never }) };
       const [orders, total] = await Promise.all([
-        prisma.foodOrder.findMany({
+        db.foodOrder.findMany({
           where, skip, take: limit, orderBy: { createdAt: 'desc' },
           include: { items: { include: { menuItem: { select: { name: true, price: true } } } }, guest: { select: { firstName: true, lastName: true } } },
         }),
-        prisma.foodOrder.count({ where }),
+        db.foodOrder.count({ where }),
       ]);
       return paginated(orders, total, page, limit);
     },
@@ -55,13 +53,13 @@ export async function foodOrderRoutes(app: FastifyInstance) {
     schema: { tags: ['food-orders'], summary: 'Place a food order', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const body = orderSchema.parse(request.body);
 
       // Deduplicate IDs before lookup (duplicate menuItemIds in request would give wrong count)
       const uniqueIds = [...new Set(body.items.map((i) => i.menuItemId))];
-      const menuItems = await prisma.menuItem.findMany({
-        where: { tenantId, id: { in: uniqueIds } },
+      const menuItems = await db.menuItem.findMany({
+        where: { id: { in: uniqueIds } },
       });
 
       if (menuItems.length !== uniqueIds.length) {
@@ -82,9 +80,8 @@ export async function foodOrderRoutes(app: FastifyInstance) {
         return sum + Number(menuItem.price) * item.quantity;
       }, 0);
 
-      const order = await prisma.foodOrder.create({
+      const order = await db.foodOrder.create({
         data: {
-          tenantId,
           bookingId: body.bookingId,
           guestId: body.guestId,
           tableNumber: body.tableNumber,
@@ -108,14 +105,14 @@ export async function foodOrderRoutes(app: FastifyInstance) {
     schema: { tags: ['food-orders'], summary: 'Update order status', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST', 'CHEF'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
       const { status } = z.object({
         status: z.enum(['PENDING', 'PREPARING', 'READY', 'DELIVERED', 'CANCELLED']),
       }).parse(request.body);
-      const order = await prisma.foodOrder.findFirst({ where: { id, tenantId } });
+      const order = await db.foodOrder.findFirst({ where: { id } });
       if (!order) return reply.status(404).send({ success: false, error: 'Order not found' });
-      const updated = await prisma.foodOrder.update({ where: { id }, data: { status: status as never } });
+      const updated = await db.foodOrder.update({ where: { id }, data: { status: status as never } });
       return ok(updated, 'Order status updated');
     },
   });

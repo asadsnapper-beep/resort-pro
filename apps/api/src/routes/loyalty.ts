@@ -1,6 +1,5 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { prisma } from '@resort-pro/database';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { ok } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
@@ -12,12 +11,11 @@ export async function loyaltyRoutes(app: FastifyInstance) {
     schema: { tags: ['loyalty'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
+      const { db } = request;
       const { tenantId } = request.user as JwtPayload;
-      let prog = await prisma.loyaltyProgram.findUnique({ where: { tenantId } });
+      let prog = await db.loyaltyProgram.findUnique({ where: { tenantId } });
       if (!prog) {
-        prog = await prisma.loyaltyProgram.create({
-          data: { tenantId },
-        });
+        prog = await db.loyaltyProgram.create({ data: {} });
       }
       return ok(prog);
     },
@@ -28,6 +26,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
     schema: { tags: ['loyalty'], security: [{ bearerAuth: [] }] },
     preHandler: [requireAuth, requireRole('OWNER', 'MANAGER', 'RECEPTIONIST')],
     handler: async (request, reply) => {
+      const { db } = request;
       const { tenantId } = request.user as JwtPayload;
       const schema = z.object({
         isEnabled: z.boolean().optional(),
@@ -40,10 +39,10 @@ export async function loyaltyRoutes(app: FastifyInstance) {
         programName: z.string().min(1).optional(),
       });
       const data = schema.parse(request.body);
-      const prog = await prisma.loyaltyProgram.upsert({
+      const prog = await db.loyaltyProgram.upsert({
         where: { tenantId },
         update: data,
-        create: { tenantId, ...data },
+        create: { ...data },
       });
       return ok(prog);
     },
@@ -54,27 +53,28 @@ export async function loyaltyRoutes(app: FastifyInstance) {
     schema: { tags: ['loyalty'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { search, tier, page = '1', limit = '50' } = request.query as Record<string, string>;
 
       const skip = (parseInt(page) - 1) * parseInt(limit);
 
-      const accounts = await prisma.loyaltyAccount.findMany({
-        where: {
-          tenantId,
-          ...(tier ? { tier: tier as any } : {}),
-          ...(search
-            ? {
-                guest: {
-                  OR: [
-                    { firstName: { contains: search, mode: 'insensitive' } },
-                    { lastName: { contains: search, mode: 'insensitive' } },
-                    { email: { contains: search, mode: 'insensitive' } },
-                  ],
-                },
-              }
-            : {}),
-        },
+      const where = {
+        ...(tier ? { tier: tier as any } : {}),
+        ...(search
+          ? {
+              guest: {
+                OR: [
+                  { firstName: { contains: search, mode: 'insensitive' as const } },
+                  { lastName: { contains: search, mode: 'insensitive' as const } },
+                  { email: { contains: search, mode: 'insensitive' as const } },
+                ],
+              },
+            }
+          : {}),
+      };
+
+      const accounts = await db.loyaltyAccount.findMany({
+        where,
         include: {
           guest: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
           _count: { select: { transactions: true } },
@@ -84,12 +84,12 @@ export async function loyaltyRoutes(app: FastifyInstance) {
         take: parseInt(limit),
       });
 
-      const total = await prisma.loyaltyAccount.count({ where });
+      const total = await db.loyaltyAccount.count({ where });
 
       // Summary stats
-      const stats = await prisma.loyaltyAccount.groupBy({
+      const stats = await db.loyaltyAccount.groupBy({
         by: ['tier'],
-        where: { tenantId },
+        where: {},
         _count: true,
       });
 
@@ -102,10 +102,11 @@ export async function loyaltyRoutes(app: FastifyInstance) {
     schema: { tags: ['loyalty'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
+      const { db } = request;
       const { tenantId } = request.user as JwtPayload;
       const { guestId } = request.params as { guestId: string };
 
-      const account = await prisma.loyaltyAccount.findUnique({
+      const account = await db.loyaltyAccount.findUnique({
         where: { guestId },
         include: {
           guest: { select: { id: true, firstName: true, lastName: true, email: true } },
@@ -116,14 +117,14 @@ export async function loyaltyRoutes(app: FastifyInstance) {
         },
       });
 
-      if (!account || account.tenantId !== tenantId) {
+      if (!account) {
         // Return empty account stub if not enrolled yet
-        const guest = await prisma.guest.findFirst({ where: { id: guestId, tenantId } });
+        const guest = await db.guest.findFirst({ where: { id: guestId } });
         if (!guest) return reply.status(404).send({ error: 'Guest not found' });
         return ok({ account: null, guest });
       }
 
-      const prog = await prisma.loyaltyProgram.findUnique({ where: { tenantId } });
+      const prog = await db.loyaltyProgram.findUnique({ where: { tenantId } });
 
       return ok({ account, prog });
     },
@@ -134,10 +135,11 @@ export async function loyaltyRoutes(app: FastifyInstance) {
     schema: { tags: ['loyalty'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
+      const { db } = request;
       const { tenantId } = request.user as JwtPayload;
       const { guestId } = request.params as { guestId: string };
 
-      const guest = await prisma.guest.findFirst({ where: { id: guestId, tenantId } });
+      const guest = await db.guest.findFirst({ where: { id: guestId } });
       if (!guest) return reply.status(404).send({ error: 'Guest not found' });
 
       const account = await getOrCreateAccount(tenantId, guestId);
@@ -150,6 +152,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
     schema: { tags: ['loyalty'], security: [{ bearerAuth: [] }] },
     preHandler: [requireAuth, requireRole('OWNER', 'MANAGER', 'RECEPTIONIST')],
     handler: async (request, reply) => {
+      const { db } = request;
       const { tenantId } = request.user as JwtPayload;
       const { guestId } = request.params as { guestId: string };
       const { points, description, bookingId } = z.object({
@@ -158,7 +161,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
         bookingId: z.string().optional(),
       }).parse(request.body);
 
-      const guest = await prisma.guest.findFirst({ where: { id: guestId, tenantId } });
+      const guest = await db.guest.findFirst({ where: { id: guestId } });
       if (!guest) return reply.status(404).send({ error: 'Guest not found' });
 
       const updated = await awardPoints(tenantId, guestId, points, description, bookingId);
@@ -171,6 +174,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
     schema: { tags: ['loyalty'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
+      const { db } = request;
       const { tenantId } = request.user as JwtPayload;
       const { guestId } = request.params as { guestId: string };
       const { points, description, bookingId } = z.object({
@@ -179,7 +183,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
         bookingId: z.string().optional(),
       }).parse(request.body);
 
-      const guest = await prisma.guest.findFirst({ where: { id: guestId, tenantId } });
+      const guest = await db.guest.findFirst({ where: { id: guestId } });
       if (!guest) return reply.status(404).send({ error: 'Guest not found' });
 
       try {
@@ -197,6 +201,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
     schema: { tags: ['loyalty'], security: [{ bearerAuth: [] }] },
     preHandler: [requireAuth, requireRole('OWNER', 'MANAGER', 'RECEPTIONIST')],
     handler: async (request, reply) => {
+      const { db } = request;
       const { tenantId } = request.user as JwtPayload;
       const { guestId } = request.params as { guestId: string };
       const { points, description } = z.object({
@@ -204,25 +209,24 @@ export async function loyaltyRoutes(app: FastifyInstance) {
         description: z.string().min(1),
       }).parse(request.body);
 
-      const account = await prisma.loyaltyAccount.findUnique({ where: { guestId } });
-      if (!account || account.tenantId !== tenantId) {
+      const account = await db.loyaltyAccount.findUnique({ where: { guestId } });
+      if (!account) {
         return reply.status(404).send({ error: 'Loyalty account not found' });
       }
 
       const newBalance = Math.max(0, account.points + points);
       const newLifetime = points > 0 ? account.lifetimePoints + points : account.lifetimePoints;
 
-      const prog = await prisma.loyaltyProgram.findUnique({ where: { tenantId } });
+      const prog = await db.loyaltyProgram.findUnique({ where: { tenantId } });
       const newTier = prog ? (calcTier(newLifetime, prog) as any) : account.tier;
 
-      await prisma.$transaction([
-        prisma.loyaltyAccount.update({
+      await db.$transaction([
+        db.loyaltyAccount.update({
           where: { id: account.id },
           data: { points: newBalance, lifetimePoints: newLifetime, tier: newTier },
         }),
-        prisma.loyaltyTransaction.create({
+        db.loyaltyTransaction.create({
           data: {
-            tenantId,
             accountId: account.id,
             type: 'ADJUST',
             points,
@@ -231,7 +235,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
         }),
       ]);
 
-      const updated = await prisma.loyaltyAccount.findUnique({
+      const updated = await db.loyaltyAccount.findUnique({
         where: { id: account.id },
         include: { guest: { select: { firstName: true, lastName: true, email: true } } },
       });
@@ -244,9 +248,9 @@ export async function loyaltyRoutes(app: FastifyInstance) {
     schema: { tags: ['loyalty'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
-      const accounts = await prisma.loyaltyAccount.findMany({
-        where: { tenantId },
+      const { db } = request;
+      const accounts = await db.loyaltyAccount.findMany({
+        where: {},
         include: {
           guest: { select: { firstName: true, lastName: true } },
         },

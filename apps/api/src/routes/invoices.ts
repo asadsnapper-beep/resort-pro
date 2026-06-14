@@ -205,11 +205,11 @@ export async function invoicesRoutes(app: FastifyInstance) {
   app.get('/', {
     schema: { tags: ['invoices'], summary: 'List invoices', security: [{ bearerAuth: [] }] },
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { page, limit, skip } = parsePageParams(request.query as Record<string, string>);
       const q = request.query as Record<string, string>;
 
-      const where: Record<string, unknown> = { tenantId };
+      const where: Record<string, unknown> = {};
       if (q.status)  where.status  = q.status;
       if (q.search)  where.OR = [
         { invoiceNumber: { contains: q.search, mode: 'insensitive' } },
@@ -217,12 +217,12 @@ export async function invoicesRoutes(app: FastifyInstance) {
       ];
 
       const [items, total] = await Promise.all([
-        prisma.invoice.findMany({
+        db.invoice.findMany({
           where, skip, take: limit,
           orderBy: { createdAt: 'desc' },
           include: { items: { select: { id: true } }, payments: { select: { amount: true } } },
         }),
-        prisma.invoice.count({ where }),
+        db.invoice.count({ where }),
       ]);
 
       return paginated(items, total, page, limit);
@@ -233,20 +233,20 @@ export async function invoicesRoutes(app: FastifyInstance) {
   app.get('/stats', {
     schema: { tags: ['invoices'], summary: 'Invoice stats', security: [{ bearerAuth: [] }] },
     handler: async (request) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const now        = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
       const [agg, paid, outstanding, thisMonth] = await Promise.all([
-        prisma.invoice.aggregate({ where: { tenantId }, _sum: { total: true }, _count: true }),
-        prisma.invoice.aggregate({ where: { tenantId, status: 'PAID' }, _sum: { total: true }, _count: true }),
-        prisma.invoice.aggregate({
-          where: { tenantId, status: { in: ['SENT', 'PARTIAL', 'OVERDUE'] } },
+        db.invoice.aggregate({ where: {}, _sum: { total: true }, _count: true }),
+        db.invoice.aggregate({ where: { status: 'PAID' }, _sum: { total: true }, _count: true }),
+        db.invoice.aggregate({
+          where: { status: { in: ['SENT', 'PARTIAL', 'OVERDUE'] } },
           _sum: { total: true, paidAmount: true },
         }),
-        prisma.invoice.aggregate({
-          where: { tenantId, createdAt: { gte: monthStart, lte: monthEnd } },
+        db.invoice.aggregate({
+          where: { createdAt: { gte: monthStart, lte: monthEnd } },
           _sum: { total: true },
           _count: true,
         }),
@@ -268,10 +268,10 @@ export async function invoicesRoutes(app: FastifyInstance) {
   app.get('/:id', {
     schema: { tags: ['invoices'], summary: 'Get invoice', security: [{ bearerAuth: [] }] },
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
-      const inv = await prisma.invoice.findFirst({
-        where: { id, tenantId },
+      const inv = await db.invoice.findFirst({
+        where: { id },
         include: { items: true, payments: true, booking: { select: { id: true, confirmationNo: true } } },
       });
       if (!inv) return reply.status(404).send({ success: false, error: 'Invoice not found' });
@@ -284,20 +284,21 @@ export async function invoicesRoutes(app: FastifyInstance) {
     schema: { tags: ['invoices'], summary: 'Generate invoice from booking', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
+      const { db } = request;
       const { tenantId } = request.user as JwtPayload;
       const { bookingId } = request.params as { bookingId: string };
 
       // Check no existing invoice
-      const existing = await prisma.invoice.findFirst({ where: { bookingId, tenantId } });
+      const existing = await db.invoice.findFirst({ where: { bookingId } });
       if (existing) return reply.status(409).send({ success: false, error: 'Invoice already exists for this booking', data: existing });
 
-      const booking = await prisma.booking.findFirst({
-        where: { id: bookingId, tenantId },
+      const booking = await db.booking.findFirst({
+        where: { id: bookingId },
         include: { guest: true, room: true, invoiceExtras: true, bookingPackages: { include: { package: true } } },
       });
       if (!booking) return reply.status(404).send({ success: false, error: 'Booking not found' });
 
-      const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
+      const tenant = await db.tenant.findUniqueOrThrow({ where: { id: tenantId } });
 
       // Build line items
       const nights = Math.max(1, Math.ceil(
@@ -343,10 +344,9 @@ export async function invoicesRoutes(app: FastifyInstance) {
       const { subtotal, taxAmount, total } = recalcTotals(lineItems, taxRate, 0);
       const invoiceNumber = await nextInvoiceNumber(tenantId);
 
-      const inv = await prisma.invoice.create({
+      const inv = await db.invoice.create({
         data: {
           invoiceNumber,
-          tenantId,
           bookingId,
           guestName:  `${booking.guest.firstName} ${booking.guest.lastName}`,
           guestEmail: booking.guest.email ?? undefined,
@@ -367,6 +367,7 @@ export async function invoicesRoutes(app: FastifyInstance) {
     schema: { tags: ['invoices'], summary: 'Create manual invoice', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request) => {
+      const { db } = request;
       const { tenantId } = request.user as JwtPayload;
       const body = z.object({
         guestName:    z.string().min(1),
@@ -384,9 +385,9 @@ export async function invoicesRoutes(app: FastifyInstance) {
       const discountAmt = body.discountAmt ?? 0;
       const invoiceNumber = await nextInvoiceNumber(tenantId);
 
-      const inv = await prisma.invoice.create({
+      const inv = await db.invoice.create({
         data: {
-          invoiceNumber, tenantId,
+          invoiceNumber,
           guestName:    body.guestName,
           guestEmail:   body.guestEmail,
           guestPhone:   body.guestPhone,
@@ -409,7 +410,7 @@ export async function invoicesRoutes(app: FastifyInstance) {
     schema: { tags: ['invoices'], summary: 'Update invoice', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
       const body = z.object({
         taxRate:      z.number().min(0).max(100).optional(),
@@ -420,10 +421,10 @@ export async function invoicesRoutes(app: FastifyInstance) {
         status:       z.enum(['DRAFT','SENT','PAID','PARTIAL','OVERDUE','CANCELLED']).optional(),
       }).parse(request.body);
 
-      const inv = await prisma.invoice.findFirst({ where: { id, tenantId } });
+      const inv = await db.invoice.findFirst({ where: { id } });
       if (!inv) return reply.status(404).send({ success: false, error: 'Invoice not found' });
 
-      await prisma.invoice.update({
+      await db.invoice.update({
         where: { id },
         data: {
           ...(body.taxRate      !== undefined && { taxRate:      body.taxRate }),
@@ -445,7 +446,7 @@ export async function invoicesRoutes(app: FastifyInstance) {
     schema: { tags: ['invoices'], summary: 'Add line item', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
       const body = z.object({
         description: z.string().min(1),
@@ -454,7 +455,7 @@ export async function invoicesRoutes(app: FastifyInstance) {
         unitPrice:   z.number(),
       }).parse(request.body);
 
-      const inv = await prisma.invoice.findFirst({ where: { id, tenantId } });
+      const inv = await db.invoice.findFirst({ where: { id } });
       if (!inv) return reply.status(404).send({ success: false, error: 'Invoice not found' });
       if (inv.status === 'PAID' || inv.status === 'CANCELLED')
         return reply.status(400).send({ success: false, error: 'Cannot edit a paid or cancelled invoice' });
@@ -462,7 +463,7 @@ export async function invoicesRoutes(app: FastifyInstance) {
       const qty   = body.quantity ?? 1;
       const total = qty * body.unitPrice;
 
-      await prisma.invoiceItem.create({
+      await db.invoiceItem.create({
         data: {
           invoiceId:   id,
           description: body.description,
@@ -483,7 +484,7 @@ export async function invoicesRoutes(app: FastifyInstance) {
     schema: { tags: ['invoices'], summary: 'Update line item', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id, itemId } = request.params as { id: string; itemId: string };
       const body = z.object({
         description: z.string().optional(),
@@ -492,16 +493,16 @@ export async function invoicesRoutes(app: FastifyInstance) {
         unitPrice:   z.number().optional(),
       }).parse(request.body);
 
-      const inv = await prisma.invoice.findFirst({ where: { id, tenantId } });
+      const inv = await db.invoice.findFirst({ where: { id } });
       if (!inv) return reply.status(404).send({ success: false, error: 'Invoice not found' });
 
-      const item = await prisma.invoiceItem.findFirst({ where: { id: itemId, invoiceId: id } });
+      const item = await db.invoiceItem.findFirst({ where: { id: itemId, invoiceId: id } });
       if (!item) return reply.status(404).send({ success: false, error: 'Item not found' });
 
       const qty       = body.quantity  ?? item.quantity;
       const unitPrice = body.unitPrice ?? item.unitPrice;
 
-      await prisma.invoiceItem.update({
+      await db.invoiceItem.update({
         where: { id: itemId },
         data: {
           description: body.description ?? item.description,
@@ -522,13 +523,13 @@ export async function invoicesRoutes(app: FastifyInstance) {
     schema: { tags: ['invoices'], summary: 'Remove line item', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id, itemId } = request.params as { id: string; itemId: string };
 
-      const inv = await prisma.invoice.findFirst({ where: { id, tenantId } });
+      const inv = await db.invoice.findFirst({ where: { id } });
       if (!inv) return reply.status(404).send({ success: false, error: 'Invoice not found' });
 
-      await prisma.invoiceItem.deleteMany({ where: { id: itemId, invoiceId: id } });
+      await db.invoiceItem.deleteMany({ where: { id: itemId, invoiceId: id } });
       const updated = await syncTotals(id);
       return ok(updated, 'Item removed');
     },
@@ -539,7 +540,7 @@ export async function invoicesRoutes(app: FastifyInstance) {
     schema: { tags: ['invoices'], summary: 'Record payment', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
       const body = z.object({
         amount:    z.number().positive(),
@@ -549,15 +550,14 @@ export async function invoicesRoutes(app: FastifyInstance) {
         paidAt:    z.string().optional(),
       }).parse(request.body);
 
-      const inv = await prisma.invoice.findFirst({ where: { id, tenantId } });
+      const inv = await db.invoice.findFirst({ where: { id } });
       if (!inv) return reply.status(404).send({ success: false, error: 'Invoice not found' });
       if (inv.status === 'CANCELLED')
         return reply.status(400).send({ success: false, error: 'Cannot record payment on a cancelled invoice' });
 
-      await prisma.invoicePayment.create({
+      await db.invoicePayment.create({
         data: {
           invoiceId: id,
-          tenantId,
           amount:    body.amount,
           method:    body.method ?? 'CASH',
           reference: body.reference,
@@ -576,11 +576,11 @@ export async function invoicesRoutes(app: FastifyInstance) {
     schema: { tags: ['invoices'], summary: 'Email invoice to guest', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
 
-      const inv = await prisma.invoice.findFirst({
-        where: { id, tenantId },
+      const inv = await db.invoice.findFirst({
+        where: { id },
         include: { items: true, payments: true, tenant: true },
       });
       if (!inv)           return reply.status(404).send({ success: false, error: 'Invoice not found' });
@@ -642,7 +642,7 @@ export async function invoicesRoutes(app: FastifyInstance) {
 
       // Mark as SENT if still DRAFT
       if (inv.status === 'DRAFT') {
-        await prisma.invoice.update({ where: { id }, data: { status: 'SENT' } });
+        await db.invoice.update({ where: { id }, data: { status: 'SENT' } });
       }
 
       return ok({ sent: true }, 'Invoice emailed to guest');
@@ -653,10 +653,10 @@ export async function invoicesRoutes(app: FastifyInstance) {
   app.get('/:id/pdf', {
     schema: { tags: ['invoices'], summary: 'Download invoice PDF', security: [{ bearerAuth: [] }] },
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
 
-      const inv = await prisma.invoice.findFirst({ where: { id, tenantId } });
+      const inv = await db.invoice.findFirst({ where: { id } });
       if (!inv) return reply.status(404).send({ success: false, error: 'Invoice not found' });
 
       const pdfBuffer = await buildInvoicePdf(id);
@@ -672,10 +672,10 @@ export async function invoicesRoutes(app: FastifyInstance) {
     schema: { tags: ['invoices'], summary: 'Cancel/delete invoice', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
 
-      const inv = await prisma.invoice.findFirst({ where: { id, tenantId } });
+      const inv = await db.invoice.findFirst({ where: { id } });
       if (!inv) return reply.status(404).send({ success: false, error: 'Invoice not found' });
 
       if (inv.status === 'PAID') {
@@ -684,11 +684,11 @@ export async function invoicesRoutes(app: FastifyInstance) {
 
       if (inv.paidAmount > 0) {
         // Has partial payments — soft cancel instead of delete
-        await prisma.invoice.update({ where: { id }, data: { status: 'CANCELLED' } });
+        await db.invoice.update({ where: { id }, data: { status: 'CANCELLED' } });
         return ok({ cancelled: true }, 'Invoice cancelled');
       }
 
-      await prisma.invoice.delete({ where: { id } });
+      await db.invoice.delete({ where: { id } });
       return ok({ deleted: true }, 'Invoice deleted');
     },
   });

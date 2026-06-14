@@ -7,8 +7,7 @@
  */
 
 import type { FastifyInstance } from 'fastify';
-import { prisma } from '@resort-pro/database';
-import { requireAuth, requireRole } from '../middleware/auth';
+import { requireRole } from '../middleware/auth';
 import { uploadToStorage, deleteFromStorage } from '../services/storage';
 import type { JwtPayload } from '@resort-pro/types';
 
@@ -26,11 +25,12 @@ export async function guestDocumentRoutes(app: FastifyInstance) {
     schema: { tags: ['guests'], summary: 'Upload guest document', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
+      const { db } = request;
       const { tenantId, id: uploadedBy } = request.user as JwtPayload;
       const { id: guestId } = request.params;
 
       // Verify guest belongs to tenant
-      const guest = await prisma.guest.findFirst({ where: { id: guestId, tenantId } });
+      const guest = await db.guest.findFirst({ where: { id: guestId } });
       if (!guest) {
         return reply.status(404).send({ success: false, error: 'Guest not found' });
       }
@@ -76,10 +76,9 @@ export async function guestDocumentRoutes(app: FastifyInstance) {
       const result = await uploadToStorage(fileBuffer, mimeType, 'guest-docs', tenantId);
 
       // Create DB record
-      const doc = await prisma.guestDocument.create({
+      const doc = await db.guestDocument.create({
         data: {
           guestId,
-          tenantId,
           docType,
           imageUrl: result.url,
           uploadedBy,
@@ -103,17 +102,17 @@ export async function guestDocumentRoutes(app: FastifyInstance) {
     schema: { tags: ['guests'], summary: 'List guest documents', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id: guestId } = request.params;
 
       // Verify guest belongs to tenant
-      const guest = await prisma.guest.findFirst({ where: { id: guestId, tenantId } });
+      const guest = await db.guest.findFirst({ where: { id: guestId } });
       if (!guest) {
         return reply.status(404).send({ success: false, error: 'Guest not found' });
       }
 
-      const docs = await prisma.guestDocument.findMany({
-        where: { guestId, tenantId },
+      const docs = await db.guestDocument.findMany({
+        where: { guestId },
         orderBy: { uploadedAt: 'desc' },
         select: {
           id:         true,
@@ -134,11 +133,11 @@ export async function guestDocumentRoutes(app: FastifyInstance) {
     schema: { tags: ['guests'], summary: 'Delete guest document', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id: guestId, docId } = request.params;
 
-      const doc = await prisma.guestDocument.findFirst({
-        where: { id: docId, guestId, tenantId },
+      const doc = await db.guestDocument.findFirst({
+        where: { id: docId, guestId },
       });
 
       if (!doc) {
@@ -155,7 +154,7 @@ export async function guestDocumentRoutes(app: FastifyInstance) {
         // Non-fatal — just remove the DB record
       }
 
-      await prisma.guestDocument.delete({ where: { id: docId } });
+      await db.guestDocument.delete({ where: { id: docId } });
 
       return reply.send({ success: true, data: { id: docId } });
     },

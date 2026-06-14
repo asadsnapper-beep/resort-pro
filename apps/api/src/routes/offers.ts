@@ -1,9 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '@resort-pro/database';
-import { requireAuth, requireRole } from '../middleware/auth';
+import { requireRole } from '../middleware/auth';
 import { ok, validate } from '../utils/response';
-import type { JwtPayload } from '@resort-pro/types';
 
 /* ── helpers ─────────────────────────────────────────────────────────────── */
 function isOfferActive(offer: {
@@ -59,13 +58,12 @@ export async function offersRoutes(app: FastifyInstance) {
     schema: { tags: ['offers'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { status } = request.query as { status?: string };
 
       const now = new Date();
-      const offers = await prisma.offer.findMany({
+      const offers = await db.offer.findMany({
         where: {
-          tenantId,
           ...(status === 'active'   && { isActive: true, validFrom: { lte: now }, validTo: { gte: now } }),
           ...(status === 'scheduled'&& { isActive: true, validFrom: { gt: now } }),
           ...(status === 'expired'  && { validTo: { lt: now } }),
@@ -87,7 +85,7 @@ export async function offersRoutes(app: FastifyInstance) {
     schema: { tags: ['offers'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const body = validate(offerSchema, request.body, reply);
       if (!body) return;
 
@@ -96,13 +94,12 @@ export async function offersRoutes(app: FastifyInstance) {
 
       // Uniqueness check within tenant
       if (promoCode) {
-        const clash = await prisma.offer.findFirst({ where: { tenantId, promoCode } });
+        const clash = await db.offer.findFirst({ where: { promoCode } });
         if (clash) return reply.status(409).send({ success: false, error: 'Promo code already exists' });
       }
 
-      const offer = await prisma.offer.create({
+      const offer = await db.offer.create({
         data: {
-          tenantId,
           ...body,
           promoCode,
           validFrom: new Date(body.validFrom),
@@ -119,11 +116,11 @@ export async function offersRoutes(app: FastifyInstance) {
     schema: { tags: ['offers'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
       const body = offerSchema.partial().parse(request.body);
 
-      const existing = await prisma.offer.findFirst({ where: { id, tenantId } });
+      const existing = await db.offer.findFirst({ where: { id } });
       if (!existing) return reply.status(404).send({ success: false, error: 'Offer not found' });
 
       // '' and null both mean "clear the promo code"; undefined means "don't change it"
@@ -132,7 +129,7 @@ export async function offersRoutes(app: FastifyInstance) {
         : body.promoCode === null || body.promoCode === '' ? null
         : body.promoCode.toUpperCase();
 
-      const offer = await prisma.offer.update({
+      const offer = await db.offer.update({
         where: { id },
         data: {
           ...body,
@@ -151,11 +148,11 @@ export async function offersRoutes(app: FastifyInstance) {
     schema: { tags: ['offers'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
-      const existing = await prisma.offer.findFirst({ where: { id, tenantId } });
+      const existing = await db.offer.findFirst({ where: { id } });
       if (!existing) return reply.status(404).send({ success: false, error: 'Offer not found' });
-      await prisma.offer.delete({ where: { id } });
+      await db.offer.delete({ where: { id } });
       return ok(null, 'Offer deleted');
     },
   });
@@ -165,12 +162,12 @@ export async function offersRoutes(app: FastifyInstance) {
     schema: { tags: ['offers'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
-      const offer = await prisma.offer.findFirst({ where: { id, tenantId } });
+      const offer = await db.offer.findFirst({ where: { id } });
       if (!offer) return reply.status(404).send({ success: false, error: 'Offer not found' });
 
-      const bookingOffers = await prisma.bookingOffer.findMany({
+      const bookingOffers = await db.bookingOffer.findMany({
         where: { offerId: id },
         select: { discount: true, booking: { select: { createdAt: true, totalAmount: true } } },
         orderBy: { booking: { createdAt: 'desc' } },

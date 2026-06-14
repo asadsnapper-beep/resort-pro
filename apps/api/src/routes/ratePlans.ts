@@ -87,9 +87,9 @@ export async function ratePlanRoutes(app: FastifyInstance) {
     schema: { tags: ['rate-plans'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
-      const plans = await prisma.ratePlan.findMany({
-        where: { tenantId },
+      const { db } = request;
+      const plans = await db.ratePlan.findMany({
+        where: {},
         include: { room: { select: { id: true, name: true, number: true } } },
         orderBy: [{ type: 'asc' }, { createdAt: 'desc' }],
       });
@@ -102,12 +102,11 @@ export async function ratePlanRoutes(app: FastifyInstance) {
     schema: { tags: ['rate-plans'], security: [{ bearerAuth: [] }] },
     preHandler: [requireAuth, requireRole('OWNER', 'MANAGER')],
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const body = createPlanSchema.parse(request.body);
 
-      const plan = await prisma.ratePlan.create({
+      const plan = await db.ratePlan.create({
         data: {
-          tenantId,
           roomId: body.roomId ?? null,
           name: body.name,
           type: body.type,
@@ -129,12 +128,12 @@ export async function ratePlanRoutes(app: FastifyInstance) {
     schema: { tags: ['rate-plans'], security: [{ bearerAuth: [] }] },
     preHandler: [requireAuth, requireRole('OWNER', 'MANAGER')],
     handler: async (request, reply) => {
+      const { db } = request;
       const { id } = request.params as { id: string };
-      const { tenantId } = request.user as JwtPayload;
       const body = createPlanSchema.partial().parse(request.body);
 
-      const plan = await prisma.ratePlan.updateMany({
-        where: { id, tenantId },
+      const plan = await db.ratePlan.updateMany({
+        where: { id },
         data: {
           ...(body.name !== undefined && { name: body.name }),
           ...(body.type !== undefined && { type: body.type }),
@@ -150,7 +149,7 @@ export async function ratePlanRoutes(app: FastifyInstance) {
 
       if (plan.count === 0) return reply.status(404).send({ error: 'Rate plan not found' });
 
-      const updated = await prisma.ratePlan.findUnique({
+      const updated = await db.ratePlan.findUnique({
         where: { id },
         include: { room: { select: { id: true, name: true, number: true } } },
       });
@@ -163,10 +162,10 @@ export async function ratePlanRoutes(app: FastifyInstance) {
     schema: { tags: ['rate-plans'], security: [{ bearerAuth: [] }] },
     preHandler: [requireAuth, requireRole('OWNER', 'MANAGER')],
     handler: async (request, reply) => {
+      const { db } = request;
       const { id } = request.params as { id: string };
-      const { tenantId } = request.user as JwtPayload;
 
-      await prisma.ratePlan.deleteMany({ where: { id, tenantId } });
+      await db.ratePlan.deleteMany({ where: { id } });
       return ok(reply, { deleted: true });
     },
   });
@@ -176,6 +175,7 @@ export async function ratePlanRoutes(app: FastifyInstance) {
     schema: { tags: ['rate-plans'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
+      const { db } = request;
       const { tenantId } = request.user as JwtPayload;
       const { roomId, checkIn, checkOut } = request.query as { roomId: string; checkIn: string; checkOut: string };
 
@@ -183,7 +183,7 @@ export async function ratePlanRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: 'roomId, checkIn, checkOut are required' });
       }
 
-      const room = await prisma.room.findFirst({ where: { id: roomId, tenantId } });
+      const room = await db.room.findFirst({ where: { id: roomId } });
       if (!room) return reply.status(404).send({ error: 'Room not found' });
 
       const resolved = await resolveRate(tenantId, roomId, new Date(checkIn), new Date(checkOut));

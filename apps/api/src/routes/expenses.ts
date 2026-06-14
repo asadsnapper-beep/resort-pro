@@ -13,7 +13,6 @@
 
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { prisma } from '@resort-pro/database'
 import { requireRole } from '../middleware/auth'
 import type { JwtPayload } from '@resort-pro/types'
 import dayjs from 'dayjs'
@@ -39,7 +38,7 @@ export async function expenseRoutes(app: FastifyInstance) {
   app.get('/', {
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload
+      const { db } = request;
       const { month, category, page = '1', limit = '50' } = request.query as {
         month?: string      // "2026-05"
         category?: string
@@ -50,7 +49,7 @@ export async function expenseRoutes(app: FastifyInstance) {
       const pageNum  = Math.max(1, parseInt(page))
       const pageSize = Math.min(100, Math.max(1, parseInt(limit)))
 
-      const where: any = { tenantId }
+      const where: any = {}
 
       if (month) {
         const start = dayjs(month, 'YYYY-MM').startOf('month').toDate()
@@ -62,13 +61,13 @@ export async function expenseRoutes(app: FastifyInstance) {
       }
 
       const [expenses, total] = await Promise.all([
-        prisma.expense.findMany({
+        db.expense.findMany({
           where,
           orderBy: { date: 'desc' },
           skip: (pageNum - 1) * pageSize,
           take: pageSize,
         }),
-        prisma.expense.count({ where }),
+        db.expense.count({ where }),
       ])
 
       return reply.send({
@@ -82,12 +81,12 @@ export async function expenseRoutes(app: FastifyInstance) {
   app.post('/', {
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId, sub } = request.user as JwtPayload
+      const { db } = request;
+      const { sub } = request.user as JwtPayload
       const body = expenseSchema.parse(request.body)
 
-      const expense = await prisma.expense.create({
+      const expense = await db.expense.create({
         data: {
-          tenantId,
           date:        new Date(body.date),
           category:    body.category,
           description: body.description,
@@ -107,14 +106,14 @@ export async function expenseRoutes(app: FastifyInstance) {
   app.patch('/:id', {
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload
+      const { db } = request;
       const { id } = request.params as { id: string }
 
-      const existing = await prisma.expense.findFirst({ where: { id, tenantId } })
+      const existing = await db.expense.findFirst({ where: { id } })
       if (!existing) return reply.code(404).send({ success: false, error: 'Expense not found' })
 
       const body = expenseSchema.partial().parse(request.body)
-      const expense = await prisma.expense.update({
+      const expense = await db.expense.update({
         where: { id },
         data: {
           ...(body.date        && { date: new Date(body.date) }),
@@ -135,13 +134,13 @@ export async function expenseRoutes(app: FastifyInstance) {
   app.delete('/:id', {
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload
+      const { db } = request;
       const { id } = request.params as { id: string }
 
-      const existing = await prisma.expense.findFirst({ where: { id, tenantId } })
+      const existing = await db.expense.findFirst({ where: { id } })
       if (!existing) return reply.code(404).send({ success: false, error: 'Expense not found' })
 
-      await prisma.expense.delete({ where: { id } })
+      await db.expense.delete({ where: { id } })
       return reply.send({ success: true })
     },
   })
@@ -150,7 +149,7 @@ export async function expenseRoutes(app: FastifyInstance) {
   app.get('/summary', {
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload
+      const { db } = request;
       const { month } = request.query as { month?: string }
 
       const targetMonth = month ?? dayjs().format('YYYY-MM')
@@ -163,25 +162,25 @@ export async function expenseRoutes(app: FastifyInstance) {
 
       const [byCategory, totalCurrent, totalPrev, revenue] = await Promise.all([
         // Expenses by category for the month
-        prisma.expense.groupBy({
+        db.expense.groupBy({
           by: ['category'],
-          where: { tenantId, date: { gte: start, lte: end } },
+          where: { date: { gte: start, lte: end } },
           _sum: { amount: true },
           orderBy: { _sum: { amount: 'desc' } },
         }),
         // Total expenses this month
-        prisma.expense.aggregate({
-          where: { tenantId, date: { gte: start, lte: end } },
+        db.expense.aggregate({
+          where: { date: { gte: start, lte: end } },
           _sum: { amount: true },
         }),
         // Total expenses prev month
-        prisma.expense.aggregate({
-          where: { tenantId, date: { gte: prevStart, lte: prevEnd } },
+        db.expense.aggregate({
+          where: { date: { gte: prevStart, lte: prevEnd } },
           _sum: { amount: true },
         }),
         // Revenue this month (for profit calculation)
-        prisma.payment.aggregate({
-          where: { tenantId, processedAt: { gte: start, lte: end }, status: 'PAID' },
+        db.payment.aggregate({
+          where: { processedAt: { gte: start, lte: end }, status: 'PAID' },
           _sum: { amount: true },
         }),
       ])
@@ -218,7 +217,7 @@ export async function expenseRoutes(app: FastifyInstance) {
   app.get('/trends', {
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload
+      const { db } = request;
 
       // Last 12 months
       const months: { label: string; start: Date; end: Date }[] = []
@@ -234,12 +233,12 @@ export async function expenseRoutes(app: FastifyInstance) {
       const trends = await Promise.all(
         months.map(async ({ label, start, end }) => {
           const [expenses, payments] = await Promise.all([
-            prisma.expense.aggregate({
-              where: { tenantId, date: { gte: start, lte: end } },
+            db.expense.aggregate({
+              where: { date: { gte: start, lte: end } },
               _sum: { amount: true },
             }),
-            prisma.payment.aggregate({
-              where: { tenantId, processedAt: { gte: start, lte: end }, status: 'PAID' },
+            db.payment.aggregate({
+              where: { processedAt: { gte: start, lte: end }, status: 'PAID' },
               _sum: { amount: true },
             }),
           ])

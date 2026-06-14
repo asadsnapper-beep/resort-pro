@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { prisma } from '@resort-pro/database';
 import { requireRole } from '../middleware/auth';
-import { ok, paginated, parsePageParams, validate } from '../utils/response';
+import { ok, paginated, parsePageParams } from '../utils/response';
 import { sendEmail } from '../services/email';
 import type { JwtPayload } from '@resort-pro/types';
 
@@ -28,12 +28,11 @@ export async function staffRoutes(app: FastifyInstance) {
     schema: { tags: ['staff'], summary: 'List all staff', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const query = request.query as { page?: number; limit?: number; department?: string; search?: string };
       const { page, limit, skip } = parsePageParams(query);
 
       const where: Record<string, unknown> = {
-        tenantId,
         ...(query.department && { department: query.department }),
         ...(query.search && {
           OR: [
@@ -46,14 +45,14 @@ export async function staffRoutes(app: FastifyInstance) {
       };
 
       const [staff, total] = await Promise.all([
-        prisma.staff.findMany({
+        db.staff.findMany({
           where,
           skip,
           take: limit,
           include: { user: { select: { email: true, firstName: true, lastName: true, role: true, isActive: true, lastLoginAt: true } } },
           orderBy: { user: { firstName: 'asc' } },
         }),
-        prisma.staff.count({ where }),
+        db.staff.count({ where }),
       ]);
 
       return paginated(staff, total, page, limit);
@@ -64,17 +63,18 @@ export async function staffRoutes(app: FastifyInstance) {
     schema: { tags: ['staff'], summary: 'Create staff member', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
+      const { db } = request;
       const { tenantId } = request.user as JwtPayload;
       const body = createStaffSchema.parse(request.body);
 
-      const existing = await prisma.user.findFirst({ where: { tenantId, email: body.email } });
+      // user.findFirst scoped by db — checks within this tenant
+      const existing = await db.user.findFirst({ where: { email: body.email } });
       if (existing) return reply.status(409).send({ success: false, error: 'Email already in use' });
 
       const passwordHash = await bcrypt.hash(body.password, 12);
 
-      const user = await prisma.user.create({
+      const user = await db.user.create({
         data: {
-          tenantId,
           email: body.email,
           passwordHash,
           firstName: body.firstName,
@@ -83,9 +83,8 @@ export async function staffRoutes(app: FastifyInstance) {
         },
       });
 
-      const staff = await prisma.staff.create({
+      const staff = await db.staff.create({
         data: {
-          tenantId,
           userId: user.id,
           department: body.department,
           position: body.position,
@@ -103,27 +102,27 @@ export async function staffRoutes(app: FastifyInstance) {
     schema: { tags: ['staff'], summary: 'Update staff member', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
 
-      const staff = await prisma.staff.findFirst({ where: { id, tenantId } });
+      const staff = await db.staff.findFirst({ where: { id } });
       if (!staff) return reply.status(404).send({ success: false, error: 'Staff member not found' });
 
       const body = createStaffSchema.partial().omit({ email: true, password: true }).parse(request.body);
       const { firstName, lastName, ...staffFields } = body;
 
       // Run both updates atomically; re-fetch after so includes reflect latest user data
-      await prisma.$transaction([
-        prisma.staff.update({ where: { id }, data: staffFields }),
+      await db.$transaction([
+        db.staff.update({ where: { id }, data: staffFields }),
         ...(firstName || lastName
-          ? [prisma.user.update({
+          ? [db.user.update({
               where: { id: staff.userId },
               data: { ...(firstName && { firstName }), ...(lastName && { lastName }) },
             })]
           : []),
       ]);
 
-      const updated = await prisma.staff.findFirst({
+      const updated = await db.staff.findFirst({
         where: { id },
         include: { user: { select: { email: true, firstName: true, lastName: true, role: true, isActive: true, lastLoginAt: true } } },
       });
@@ -135,15 +134,15 @@ export async function staffRoutes(app: FastifyInstance) {
     schema: { tags: ['staff'], summary: 'Deactivate staff member', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
 
-      const staff = await prisma.staff.findFirst({ where: { id, tenantId }, include: { user: true } });
+      const staff = await db.staff.findFirst({ where: { id }, include: { user: true } });
       if (!staff) return reply.status(404).send({ success: false, error: 'Staff member not found' });
 
       await Promise.all([
-        prisma.staff.update({ where: { id }, data: { isActive: false } }),
-        prisma.user.update({ where: { id: staff.userId }, data: { isActive: false } }),
+        db.staff.update({ where: { id }, data: { isActive: false } }),
+        db.user.update({ where: { id: staff.userId }, data: { isActive: false } }),
       ]);
 
       return ok(null, 'Staff member deactivated');
@@ -155,15 +154,15 @@ export async function staffRoutes(app: FastifyInstance) {
     schema: { tags: ['staff'], summary: 'Reactivate staff member', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
 
-      const staff = await prisma.staff.findFirst({ where: { id, tenantId }, include: { user: true } });
+      const staff = await db.staff.findFirst({ where: { id }, include: { user: true } });
       if (!staff) return reply.status(404).send({ success: false, error: 'Staff member not found' });
 
       await Promise.all([
-        prisma.staff.update({ where: { id }, data: { isActive: true } }),
-        prisma.user.update({ where: { id: staff.userId }, data: { isActive: true } }),
+        db.staff.update({ where: { id }, data: { isActive: true } }),
+        db.user.update({ where: { id: staff.userId }, data: { isActive: true } }),
       ]);
 
       return ok(null, 'Staff member reactivated');
@@ -175,6 +174,7 @@ export async function staffRoutes(app: FastifyInstance) {
     schema: { tags: ['staff'], summary: 'Invite staff member by email', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
+      const { db } = request;
       const { tenantId } = request.user as JwtPayload;
       const body = z.object({
         email: z.string().email(),
@@ -185,20 +185,20 @@ export async function staffRoutes(app: FastifyInstance) {
       if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
 
       // Check if user already exists
-      const existing = await prisma.user.findUnique({
+      const existing = await db.user.findUnique({
         where: { tenantId_email: { tenantId, email: body.email } },
       });
       if (existing) return reply.status(409).send({ success: false, error: 'A staff member with this email already exists.' });
 
       // Expire old unused invites for this email
-      await prisma.staffInvite.updateMany({
-        where: { tenantId, email: body.email, used: false },
+      await db.staffInvite.updateMany({
+        where: { email: body.email, used: false },
         data: { used: true },
       });
 
       const token = randomBytes(32).toString('hex');
-      await prisma.staffInvite.create({
-        data: { tenantId, email: body.email, role: body.role, token, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
+      await db.staffInvite.create({
+        data: { email: body.email, role: body.role, token, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
       });
 
       const webUrl = process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:3000';
@@ -229,9 +229,9 @@ export async function staffRoutes(app: FastifyInstance) {
     schema: { tags: ['staff'], summary: 'List pending staff invites', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request) => {
-      const { tenantId } = request.user as JwtPayload;
-      const invites = await prisma.staffInvite.findMany({
-        where: { tenantId, used: false, expiresAt: { gt: new Date() } },
+      const { db } = request;
+      const invites = await db.staffInvite.findMany({
+        where: { used: false, expiresAt: { gt: new Date() } },
         select: { id: true, email: true, role: true, createdAt: true, expiresAt: true },
         orderBy: { createdAt: 'desc' },
       });
@@ -244,9 +244,9 @@ export async function staffRoutes(app: FastifyInstance) {
     schema: { tags: ['staff'], summary: 'Cancel a pending invite', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
-      await prisma.staffInvite.updateMany({ where: { id, tenantId }, data: { used: true } });
+      await db.staffInvite.updateMany({ where: { id }, data: { used: true } });
       return ok(null, 'Invite cancelled');
     },
   });

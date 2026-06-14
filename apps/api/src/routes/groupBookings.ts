@@ -1,6 +1,5 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { prisma } from '@resort-pro/database';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { ok } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
@@ -31,12 +30,11 @@ export async function groupBookingRoutes(app: FastifyInstance) {
     schema: { tags: ['group-bookings'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { status, search } = request.query as { status?: string; search?: string };
 
-      const groups = await prisma.groupBooking.findMany({
+      const groups = await db.groupBooking.findMany({
         where: {
-          tenantId,
           ...(status ? { status: status as any } : {}),
           ...(search
             ? {
@@ -67,11 +65,11 @@ export async function groupBookingRoutes(app: FastifyInstance) {
     schema: { tags: ['group-bookings'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
 
-      const group = await prisma.groupBooking.findFirst({
-        where: { id, tenantId },
+      const group = await db.groupBooking.findFirst({
+        where: { id },
         include: {
           bookings: {
             include: {
@@ -93,6 +91,7 @@ export async function groupBookingRoutes(app: FastifyInstance) {
     schema: { tags: ['group-bookings'], security: [{ bearerAuth: [] }] },
     preHandler: [requireAuth, requireRole('OWNER', 'MANAGER', 'RECEPTIONIST')],
     handler: async (request, reply) => {
+      const { db } = request;
       const { tenantId } = request.user as JwtPayload;
 
       const bodySchema = groupSchema.extend({
@@ -117,9 +116,9 @@ export async function groupBookingRoutes(app: FastifyInstance) {
       const nights = Math.max(1, Math.ceil((checkOut.getTime() - checkIn.getTime()) / 86_400_000));
 
       // Create group + bookings in a transaction
-      const group = await prisma.$transaction(async (tx) => {
+      const group = await db.$transaction(async (tx) => {
         const newGroup = await tx.groupBooking.create({
-          data: { ...groupData, tenantId, checkIn, checkOut },
+          data: { ...groupData, checkIn, checkOut },
         });
 
         for (const bi of bookingInputs) {
@@ -130,7 +129,6 @@ export async function groupBookingRoutes(app: FastifyInstance) {
               where: { tenantId_email: { tenantId, email: bi.guestEmail } },
               update: {},
               create: {
-                tenantId,
                 firstName: bi.guestFirstName ?? 'Group',
                 lastName: bi.guestLastName ?? 'Guest',
                 email: bi.guestEmail,
@@ -157,7 +155,6 @@ export async function groupBookingRoutes(app: FastifyInstance) {
 
           await tx.booking.create({
             data: {
-              tenantId,
               roomId: bi.roomId,
               guestId,
               groupId: newGroup.id,
@@ -192,14 +189,14 @@ export async function groupBookingRoutes(app: FastifyInstance) {
     schema: { tags: ['group-bookings'], security: [{ bearerAuth: [] }] },
     preHandler: [requireAuth, requireRole('OWNER', 'MANAGER', 'RECEPTIONIST')],
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
       const data = groupSchema.partial().parse(request.body);
 
-      const group = await prisma.groupBooking.findFirst({ where: { id, tenantId } });
+      const group = await db.groupBooking.findFirst({ where: { id } });
       if (!group) return reply.status(404).send({ error: 'Group booking not found' });
 
-      const updated = await prisma.groupBooking.update({
+      const updated = await db.groupBooking.update({
         where: { id },
         data: {
           ...data,
@@ -218,16 +215,16 @@ export async function groupBookingRoutes(app: FastifyInstance) {
     schema: { tags: ['group-bookings'], security: [{ bearerAuth: [] }] },
     preHandler: [requireAuth, requireRole('OWNER', 'MANAGER', 'RECEPTIONIST')],
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
 
-      const group = await prisma.groupBooking.findFirst({ where: { id, tenantId } });
+      const group = await db.groupBooking.findFirst({ where: { id } });
       if (!group) return reply.status(404).send({ error: 'Group booking not found' });
 
       // Unlink bookings (set groupId = null) rather than delete them
-      await prisma.$transaction([
-        prisma.booking.updateMany({ where: { groupId: id }, data: { groupId: null } }),
-        prisma.groupBooking.delete({ where: { id } }),
+      await db.$transaction([
+        db.booking.updateMany({ where: { groupId: id }, data: { groupId: null } }),
+        db.groupBooking.delete({ where: { id } }),
       ]);
 
       return ok({ deleted: true });
@@ -240,19 +237,19 @@ export async function groupBookingRoutes(app: FastifyInstance) {
     schema: { tags: ['group-bookings'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
       const { bookingId } = z.object({ bookingId: z.string() }).parse(request.body);
 
       const [group, booking] = await Promise.all([
-        prisma.groupBooking.findFirst({ where: { id, tenantId } }),
-        prisma.booking.findFirst({ where: { id: bookingId, tenantId } }),
+        db.groupBooking.findFirst({ where: { id } }),
+        db.booking.findFirst({ where: { id: bookingId } }),
       ]);
 
       if (!group) return reply.status(404).send({ error: 'Group not found' });
       if (!booking) return reply.status(404).send({ error: 'Booking not found' });
 
-      await prisma.booking.update({ where: { id: bookingId }, data: { groupId: id } });
+      await db.booking.update({ where: { id: bookingId }, data: { groupId: id } });
       return ok({ linked: true });
     },
   });
@@ -262,13 +259,13 @@ export async function groupBookingRoutes(app: FastifyInstance) {
     schema: { tags: ['group-bookings'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id, bookingId } = request.params as { id: string; bookingId: string };
 
-      const booking = await prisma.booking.findFirst({ where: { id: bookingId, tenantId, groupId: id } });
+      const booking = await db.booking.findFirst({ where: { id: bookingId, groupId: id } });
       if (!booking) return reply.status(404).send({ error: 'Booking not in this group' });
 
-      await prisma.booking.update({ where: { id: bookingId }, data: { groupId: null } });
+      await db.booking.update({ where: { id: bookingId }, data: { groupId: null } });
       return ok({ unlinked: true });
     },
   });
@@ -278,11 +275,11 @@ export async function groupBookingRoutes(app: FastifyInstance) {
     schema: { tags: ['group-bookings'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
 
-      const group = await prisma.groupBooking.findFirst({
-        where: { id, tenantId },
+      const group = await db.groupBooking.findFirst({
+        where: { id },
         include: { bookings: { select: { id: true, roomId: true, status: true } } },
       });
       if (!group) return reply.status(404).send({ error: 'Group not found' });
@@ -290,17 +287,17 @@ export async function groupBookingRoutes(app: FastifyInstance) {
       const now = new Date();
       const toCheckIn = group.bookings.filter((b) => b.status === 'CONFIRMED');
 
-      await prisma.$transaction([
+      await db.$transaction([
         ...toCheckIn.map((b) =>
-          prisma.booking.update({
+          db.booking.update({
             where: { id: b.id },
             data: { status: 'CHECKED_IN', actualCheckIn: now },
           })
         ),
         ...toCheckIn.map((b) =>
-          prisma.room.update({ where: { id: b.roomId }, data: { status: 'OCCUPIED' } })
+          db.room.update({ where: { id: b.roomId }, data: { status: 'OCCUPIED' } })
         ),
-        prisma.groupBooking.update({ where: { id }, data: { status: 'CHECKED_IN' } }),
+        db.groupBooking.update({ where: { id }, data: { status: 'CHECKED_IN' } }),
       ]);
 
       return ok({ checkedIn: toCheckIn.length });
@@ -312,11 +309,11 @@ export async function groupBookingRoutes(app: FastifyInstance) {
     schema: { tags: ['group-bookings'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
 
-      const group = await prisma.groupBooking.findFirst({
-        where: { id, tenantId },
+      const group = await db.groupBooking.findFirst({
+        where: { id },
         include: { bookings: { select: { id: true, roomId: true, status: true } } },
       });
       if (!group) return reply.status(404).send({ error: 'Group not found' });
@@ -324,17 +321,17 @@ export async function groupBookingRoutes(app: FastifyInstance) {
       const now = new Date();
       const toCheckOut = group.bookings.filter((b) => b.status === 'CHECKED_IN');
 
-      await prisma.$transaction([
+      await db.$transaction([
         ...toCheckOut.map((b) =>
-          prisma.booking.update({
+          db.booking.update({
             where: { id: b.id },
             data: { status: 'CHECKED_OUT', actualCheckOut: now },
           })
         ),
         ...toCheckOut.map((b) =>
-          prisma.room.update({ where: { id: b.roomId }, data: { status: 'AVAILABLE' } })
+          db.room.update({ where: { id: b.roomId }, data: { status: 'AVAILABLE' } })
         ),
-        prisma.groupBooking.update({ where: { id }, data: { status: 'CHECKED_OUT' } }),
+        db.groupBooking.update({ where: { id }, data: { status: 'CHECKED_OUT' } }),
       ]);
 
       return ok({ checkedOut: toCheckOut.length });
@@ -346,11 +343,11 @@ export async function groupBookingRoutes(app: FastifyInstance) {
     schema: { tags: ['group-bookings'], security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
 
-      const group = await prisma.groupBooking.findFirst({
-        where: { id, tenantId },
+      const group = await db.groupBooking.findFirst({
+        where: { id },
         include: {
           bookings: {
             include: {

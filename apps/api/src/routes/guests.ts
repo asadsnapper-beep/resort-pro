@@ -1,9 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { prisma } from '@resort-pro/database';
-import { requireAuth, requireRole } from '../middleware/auth';
-import { ok, paginated, parsePageParams, validate } from '../utils/response';
-import type { JwtPayload } from '@resort-pro/types';
+import { requireRole } from '../middleware/auth';
+import { ok, paginated, parsePageParams } from '../utils/response';
 
 const guestSchema = z.object({
   firstName: z.string().min(1).max(50),
@@ -23,12 +21,11 @@ export async function guestRoutes(app: FastifyInstance) {
     schema: { tags: ['guests'], summary: 'List all guests', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const query = request.query as { page?: number; limit?: number; search?: string };
       const { page, limit, skip } = parsePageParams(query);
 
       const where = {
-        tenantId,
         ...(query.search && {
           OR: [
             { firstName: { contains: query.search, mode: 'insensitive' as never } },
@@ -39,8 +36,8 @@ export async function guestRoutes(app: FastifyInstance) {
       };
 
       const [guests, total] = await Promise.all([
-        prisma.guest.findMany({ where, skip, take: limit, orderBy: { createdAt: 'desc' } }),
-        prisma.guest.count({ where }),
+        db.guest.findMany({ where, skip, take: limit, orderBy: { createdAt: 'desc' } }),
+        db.guest.count({ where }),
       ]);
 
       return paginated(guests, total, page, limit);
@@ -51,10 +48,10 @@ export async function guestRoutes(app: FastifyInstance) {
     schema: { tags: ['guests'], summary: 'Get guest by ID', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
-      const guest = await prisma.guest.findFirst({
-        where: { id, tenantId },
+      const guest = await db.guest.findFirst({
+        where: { id },
         include: { bookings: { include: { room: { select: { name: true, number: true } } }, orderBy: { createdAt: 'desc' }, take: 10 } },
       });
       if (!guest) return reply.status(404).send({ success: false, error: 'Guest not found' });
@@ -66,15 +63,14 @@ export async function guestRoutes(app: FastifyInstance) {
     schema: { tags: ['guests'], summary: 'Create a guest', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const body = guestSchema.parse(request.body);
 
-      const existing = await prisma.guest.findFirst({ where: { tenantId, email: body.email } });
+      const existing = await db.guest.findFirst({ where: { email: body.email } });
       if (existing) return reply.status(409).send({ success: false, error: 'Guest with this email already exists' });
 
-      const guest = await prisma.guest.create({
+      const guest = await db.guest.create({
         data: {
-          tenantId,
           ...body,
           dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : null,
         },
@@ -87,20 +83,20 @@ export async function guestRoutes(app: FastifyInstance) {
     schema: { tags: ['guests'], summary: 'Update guest', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
       const body = guestSchema.partial().parse(request.body);
-      const guest = await prisma.guest.findFirst({ where: { id, tenantId } });
+      const guest = await db.guest.findFirst({ where: { id } });
       if (!guest) return reply.status(404).send({ success: false, error: 'Guest not found' });
 
       // If email is being changed, ensure it's not already taken by another guest
       if (body.email && body.email !== guest.email) {
-        const conflict = await prisma.guest.findFirst({ where: { tenantId, email: body.email } });
+        const conflict = await db.guest.findFirst({ where: { email: body.email } });
         if (conflict) return reply.status(409).send({ success: false, error: 'Another guest with this email already exists' });
       }
 
       const { dateOfBirth, ...rest } = body;
-      const updated = await prisma.guest.update({
+      const updated = await db.guest.update({
         where: { id },
         data: {
           ...rest,
@@ -117,13 +113,13 @@ export async function guestRoutes(app: FastifyInstance) {
     schema: { tags: ['guests'], summary: 'Delete guest', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const { id } = request.params as { id: string };
-      const guest = await prisma.guest.findFirst({ where: { id, tenantId } });
+      const guest = await db.guest.findFirst({ where: { id } });
       if (!guest) return reply.status(404).send({ success: false, error: 'Guest not found' });
 
       // Block delete if guest has active bookings
-      const activeBookings = await prisma.booking.count({
+      const activeBookings = await db.booking.count({
         where: { guestId: id, status: { in: ['CONFIRMED', 'CHECKED_IN', 'PENDING'] } },
       });
       if (activeBookings > 0) {
@@ -133,7 +129,7 @@ export async function guestRoutes(app: FastifyInstance) {
         });
       }
 
-      await prisma.guest.delete({ where: { id } });
+      await db.guest.delete({ where: { id } });
       return ok(null, 'Guest deleted');
     },
   });

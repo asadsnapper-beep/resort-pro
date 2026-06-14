@@ -43,10 +43,10 @@ export async function websiteRoutes(app: FastifyInstance) {
     schema: { tags: ['website'], summary: 'Get website content', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'MARKETER', 'DEVELOPER'),
     handler: async (request) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       // Return existing content or an empty shell — never 404, so the dashboard form always loads
-      const content = await prisma.websiteContent.findUnique({ where: { tenantId } });
-      return ok(content ?? { tenantId, heroTitle: '', galleryImages: [], testimonials: [], hiddenSections: [] });
+      const content = await db.websiteContent.findUnique({ where: {} as any });
+      return ok(content ?? { heroTitle: '', galleryImages: [], testimonials: [], hiddenSections: [] });
     },
   });
 
@@ -55,9 +55,10 @@ export async function websiteRoutes(app: FastifyInstance) {
     schema: { tags: ['website'], summary: 'Update website content', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'MARKETER', 'DEVELOPER'),
     handler: async (request) => {
+      const { db } = request;
       const { tenantId } = request.user as JwtPayload;
       const body = websiteSchema.parse(request.body);
-      const content = await prisma.websiteContent.upsert({
+      const content = await db.websiteContent.upsert({
         where: { tenantId },
         update: body,
         create: { tenantId, heroTitle: body.heroTitle, ...body },
@@ -71,14 +72,13 @@ export async function websiteRoutes(app: FastifyInstance) {
     schema: { tags: ['website'], summary: 'Website visitor stats', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'MARKETER', 'DEVELOPER'),
     handler: async (request) => {
-      const { tenantId } = request.user as JwtPayload;
+      const { db } = request;
       const now = new Date();
       const todayStr = now.toISOString().split('T')[0];
       const thirtyDaysAgo = new Date(now); thirtyDaysAgo.setDate(now.getDate() - 29);
 
-      const rows = await (prisma as any).websitePageView.findMany({
+      const rows = await (db as any).websitePageView.findMany({
         where: {
-          tenantId,
           date: { gte: thirtyDaysAgo },
         },
         orderBy: { date: 'asc' },
