@@ -5,7 +5,7 @@
 
 # ── Stage 1: base ─────────────────────────────────────────────────────────────
 FROM node:20-alpine AS base
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat python3 make g++
 # Install pnpm directly via npm — more reliable than corepack in CI/Docker
 RUN npm install -g pnpm@9
 

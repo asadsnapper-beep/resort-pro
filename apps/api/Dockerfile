@@ -5,7 +5,7 @@
 
 # ── Stage 1: base ─────────────────────────────────────────────────────────────
 FROM node:20-alpine AS base
-RUN apk add --no-cache libc6-compat openssl
+RUN apk add --no-cache libc6-compat openssl python3 make g++
 RUN npm install -g pnpm@9
 
 # ── Stage 2: install + build ──────────────────────────────────────────────────
