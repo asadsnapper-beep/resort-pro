@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "mapVisible" BOOLEAN NOT NULL DEFAULT false;
