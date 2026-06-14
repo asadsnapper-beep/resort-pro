@@ -1,18 +1,17 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { dashboardApi } from '@/lib/api';
+import { dashboardApi, websiteApi } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/badge';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
 import {
   BedDouble, CalendarCheck, CalendarX, TrendingUp, Users,
-  Ticket, DollarSign, Sparkles, ArrowUp, ArrowDown,
-  LogIn, LogOut, CheckCircle2, Clock, Wrench,
+  Ticket, DollarSign, Sparkles, ArrowUp, ArrowDown, UtensilsCrossed,
+  LogIn, LogOut, CheckCircle2, Clock, Wrench, Globe,
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import type { Metadata } from 'next';
 
 interface StatCardProps {
   title: string;
@@ -74,6 +73,12 @@ export default function DashboardPage() {
     refetchInterval: 60000,
   });
 
+  const { data: websiteStatsRes } = useQuery({
+    queryKey: ['website-stats'],
+    queryFn: () => websiteApi.getStats(),
+    refetchInterval: 300000, // refresh every 5 min
+  });
+
   const stats = statsRes?.data?.data?.stats;
   const recentBookings = statsRes?.data?.data?.recentBookings || [];
   const lowStock = statsRes?.data?.data?.lowStockAlerts || [];
@@ -82,6 +87,7 @@ export default function DashboardPage() {
   const todayData = todayRes?.data?.data;
   const arrivals: any[] = todayData?.arrivals || [];
   const departures: any[] = todayData?.departures || [];
+  const websiteStats = websiteStatsRes?.data?.data;
   const inHouseCount: number = todayData?.summary?.inHouseCount || 0;
 
   if (isLoading) {
@@ -102,21 +108,42 @@ export default function DashboardPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Good morning, {user?.firstName} 👋
+          {(() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; })()}, {user?.firstName} 👋
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Here's what's happening at your resort today
         </p>
       </div>
 
-      {/* Stat Cards */}
+      {/* Stat Cards & Charts — hidden for housekeeping staff */}
+      {user?.role === 'STAFF' && (
+        <div className="rounded-xl border border-yellow-200 bg-yellow-50 dark:bg-yellow-900/10 dark:border-yellow-800 px-5 py-6 flex items-center gap-4">
+          <Sparkles className="h-8 w-8 text-yellow-500 shrink-0" />
+          <div>
+            <p className="font-semibold text-yellow-800 dark:text-yellow-300">Your Tasks</p>
+            <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-0.5">Head to <a href="/dashboard/housekeeping" className="underline font-medium">Housekeeping</a> to view and update your assigned tasks for today.</p>
+          </div>
+        </div>
+      )}
+      {user?.role === 'CHEF' && (
+        <div className="rounded-xl border border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-800 px-5 py-6 flex items-center gap-4">
+          <UtensilsCrossed className="h-8 w-8 text-red-500 shrink-0" />
+          <div>
+            <p className="font-semibold text-red-800 dark:text-red-300">Kitchen Orders</p>
+            <p className="text-sm text-red-700 dark:text-red-400 mt-0.5">Head to <a href="/dashboard/orders" className="underline font-medium">F&B Orders</a> to view incoming orders and update their status.</p>
+          </div>
+        </div>
+      )}
+      {user?.role !== 'STAFF' && user?.role !== 'CHEF' && <>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Total Rooms" value={stats?.totalRooms || 0} icon={BedDouble} color="bg-resort-600" />
-        <StatCard title="Occupancy Rate" value={stats?.occupancyRate || 0} icon={TrendingUp} suffix="%" change={stats?.revenueGrowth} color="bg-blue-500" />
+        <StatCard title="Occupancy Rate" value={stats?.occupancyRate || 0} icon={TrendingUp} suffix="%" color="bg-blue-500" />
         <StatCard title="Today Check-ins" value={stats?.todayCheckIns || 0} icon={CalendarCheck} color="bg-green-500" />
         <StatCard title="Today Check-outs" value={stats?.todayCheckOuts || 0} icon={CalendarX} color="bg-orange-500" />
         <StatCard title="Active Bookings" value={stats?.activeBookings || 0} icon={Users} color="bg-purple-500" />
-        <StatCard title="Monthly Revenue" value={formatCurrency(stats?.monthlyRevenue || 0)} icon={DollarSign} change={stats?.revenueGrowth} color="bg-emerald-500" />
+        {['OWNER', 'MANAGER', 'SHAREHOLDER'].includes(user?.role ?? '') && (
+          <StatCard title="Monthly Revenue" value={formatCurrency(stats?.monthlyRevenue || 0)} icon={DollarSign} change={stats?.revenueGrowth} color="bg-emerald-500" />
+        )}
         <StatCard title="Open Tickets" value={stats?.openTickets || 0} icon={Ticket} color="bg-red-500" />
         <StatCard title="Pending Cleaning" value={stats?.pendingHousekeeping || 0} icon={Sparkles} color="bg-yellow-500" />
         <StatCard title="Maintenance" value={(stats as { openMaintenance?: number })?.openMaintenance || 0} icon={Wrench} color="bg-orange-600" />
@@ -262,6 +289,51 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      {/* Website Visitors Widget (optional — only shows if tracking data exists) */}
+      {websiteStats && (websiteStats.total30d > 0 || true) && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Globe className="h-4 w-4 text-indigo-500" />
+              Website Visitors
+            </CardTitle>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span className="font-semibold text-gray-700">{websiteStats.todayViews} today</span>
+              <span>·</span>
+              <span>{websiteStats.total30d} last 30 days</span>
+              <a href="/dashboard/website" className="text-indigo-600 hover:underline ml-1">Edit site →</a>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {websiteStats.total30d === 0 ? (
+              <div className="flex flex-col items-center py-4 gap-2 text-center">
+                <Globe className="h-8 w-8 text-gray-200" />
+                <p className="text-sm text-muted-foreground">No visitors yet. Share your booking website to start tracking.</p>
+                <a href="/dashboard/website" className="text-xs text-indigo-600 hover:underline">Set up your website →</a>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={80}>
+                <AreaChart data={websiteStats.chartData} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+                  <defs>
+                    <linearGradient id="visitorGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <Tooltip
+                    formatter={(v: number) => [v, 'Visitors']}
+                    contentStyle={{ background: '#1f2937', border: 'none', borderRadius: 8, fontSize: 11 }}
+                    labelStyle={{ color: '#9ca3af' }}
+                    itemStyle={{ color: '#e5e7eb' }}
+                  />
+                  <Area type="monotone" dataKey="views" stroke="#6366f1" fill="url(#visitorGrad)" strokeWidth={1.5} dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Recent Bookings + Low Stock */}
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
@@ -315,6 +387,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+      </>} {/* end non-STAFF block */}
     </div>
   );
 }

@@ -93,7 +93,7 @@ export async function ratePlanRoutes(app: FastifyInstance) {
         include: { room: { select: { id: true, name: true, number: true } } },
         orderBy: [{ type: 'asc' }, { createdAt: 'desc' }],
       });
-      return ok(reply, plans);
+      return ok(plans);
     },
   });
 
@@ -154,7 +154,7 @@ export async function ratePlanRoutes(app: FastifyInstance) {
         where: { id },
         include: { room: { select: { id: true, name: true, number: true } } },
       });
-      return ok(reply, updated);
+      return ok(updated);
     },
   });
 
@@ -187,7 +187,7 @@ export async function ratePlanRoutes(app: FastifyInstance) {
       if (!room) return reply.status(404).send({ error: 'Room not found' });
 
       const resolved = await resolveRate(tenantId, roomId, new Date(checkIn), new Date(checkOut));
-      return ok(reply, {
+      return ok({
         roomId,
         basePrice: Number(room.basePrice),
         resolved,

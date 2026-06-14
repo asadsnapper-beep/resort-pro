@@ -4,14 +4,15 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { roomsApi, guestsApi, ratePlansApi } from '@/lib/api';
 import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
-import { Search, BedDouble, Users, ChevronRight, ChevronLeft, Tags } from 'lucide-react';
+import { Search, BedDouble, ChevronRight, ChevronLeft, Tags, UserPlus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from '@/hooks/use-toast';
 
 const step1Schema = z.object({
   checkIn: z.string().min(1, 'Check-in date required'),
@@ -39,12 +40,17 @@ const ROOM_TYPE_COLORS: Record<string, string> = {
 };
 
 export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
+  const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
   const [step1Data, setStep1Data] = useState<Step1Data | null>(null);
   const [selectedRoom, setSelectedRoom] = useState<Record<string, unknown> | null>(null);
   const [selectedGuest, setSelectedGuest] = useState<Record<string, unknown> | null>(null);
   const [guestSearch, setGuestSearch] = useState('');
   const [specialRequests, setSpecialRequests] = useState('');
+  // New guest quick-create
+  const [showNewGuest, setShowNewGuest] = useState(false);
+  const [newGuestForm, setNewGuestForm] = useState({ firstName: '', lastName: '', email: '', phone: '' });
+  const [newGuestError, setNewGuestError] = useState<string | null>(null);
 
   const { register: reg1, handleSubmit: hs1, formState: { errors: e1 }, reset: reset1, watch } = useForm<Step1Data>({
     resolver: zodResolver(step1Schema),
@@ -89,10 +95,29 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
   const effectivePrice = resolvedRate?.effectivePrice ?? (selectedRoom ? Number(selectedRoom.basePrice) : 0);
   const totalAmount = effectivePrice * nights;
 
+  // Create new guest mutation
+  const createGuestMut = useMutation({
+    mutationFn: (data: typeof newGuestForm) => guestsApi.create(data),
+    onSuccess: (res) => {
+      const guest = res.data.data;
+      queryClient.invalidateQueries({ queryKey: ['guests-search'] });
+      setSelectedGuest(guest);
+      setShowNewGuest(false);
+      setNewGuestForm({ firstName: '', lastName: '', email: '', phone: '' });
+      toast({ title: 'Guest created', description: `${guest.firstName} ${guest.lastName} added` });
+      setStep(4);
+    },
+    onError: (err: { response?: { data?: { error?: string } } }) => {
+      setNewGuestError(err?.response?.data?.error ?? 'Could not create guest');
+    },
+  });
+
   useEffect(() => {
     if (!open) {
       setStep(1); setStep1Data(null); setSelectedRoom(null);
       setSelectedGuest(null); setGuestSearch(''); setSpecialRequests('');
+      setShowNewGuest(false); setNewGuestForm({ firstName: '', lastName: '', email: '', phone: '' });
+      setNewGuestError(null);
       reset1({ adults: 2, children: 0 });
     }
   }, [open, reset1]);
@@ -231,42 +256,118 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
             Room: <span className="font-semibold">{selectedRoom?.name as string}</span> · {formatCurrency(totalAmount)} total
           </div>
 
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={guestSearch}
-              onChange={(e) => setGuestSearch(e.target.value)}
-              placeholder="Search guest by name or email..."
-              className="pl-9"
-            />
-          </div>
-
-          <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-            {guests.length === 0 ? (
-              <div className="py-8 text-center text-sm text-muted-foreground">
-                {guestSearch ? 'No guests found' : 'Search or scroll to find a guest'}
+          {!showNewGuest ? (
+            <>
+              {/* Search existing guest */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={guestSearch}
+                  onChange={(e) => setGuestSearch(e.target.value)}
+                  placeholder="Search guest by name or email..."
+                  className="pl-9"
+                />
               </div>
-            ) : guests.map((guest) => (
-              <button
-                key={guest.id as string}
-                onClick={() => { setSelectedGuest(guest); setStep(4); }}
-                className={cn(
-                  'w-full rounded-xl border-2 p-3 text-left transition-all hover:border-resort-400 hover:bg-resort-50',
-                  selectedGuest?.id === guest.id ? 'border-resort-500 bg-resort-50' : 'border-gray-200 bg-white'
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-resort-100 text-sm font-bold text-resort-700">
-                    {(guest.firstName as string)[0]}{(guest.lastName as string)[0]}
+
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {guests.length === 0 ? (
+                  <div className="py-6 text-center text-sm text-muted-foreground">
+                    {guestSearch ? 'No guests found' : 'Search or scroll to find a guest'}
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-900">{guest.firstName as string} {guest.lastName as string}</p>
-                    <p className="text-xs text-muted-foreground">{guest.email as string}</p>
-                  </div>
+                ) : guests.map((guest) => (
+                  <button
+                    key={guest.id as string}
+                    onClick={() => { setSelectedGuest(guest); setStep(4); }}
+                    className={cn(
+                      'w-full rounded-xl border-2 p-3 text-left transition-all hover:border-resort-400 hover:bg-resort-50',
+                      selectedGuest?.id === guest.id ? 'border-resort-500 bg-resort-50' : 'border-gray-200 bg-white'
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-resort-100 text-sm font-bold text-resort-700">
+                        {(guest.firstName as string)[0]}{(guest.lastName as string)[0]}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{guest.firstName as string} {guest.lastName as string}</p>
+                        <p className="text-xs text-muted-foreground">{guest.email as string}</p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Divider + new guest button */}
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-gray-200" />
+                <button
+                  onClick={() => setShowNewGuest(true)}
+                  className="flex items-center gap-1.5 text-xs font-medium text-resort-600 hover:text-resort-700 whitespace-nowrap"
+                >
+                  <UserPlus className="h-3.5 w-3.5" /> New guest
+                </button>
+                <div className="h-px flex-1 bg-gray-200" />
+              </div>
+            </>
+          ) : (
+            /* Quick new-guest form */
+            <div className="rounded-xl border-2 border-resort-200 bg-resort-50/50 p-4 space-y-3">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm font-semibold text-resort-700 flex items-center gap-1.5">
+                  <UserPlus className="h-4 w-4" /> New Guest
+                </p>
+                <button onClick={() => { setShowNewGuest(false); setNewGuestError(null); }}
+                  className="rounded-lg p-1 text-gray-400 hover:bg-white transition-colors">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="mb-1 block text-xs text-gray-600">First name *</label>
+                  <Input
+                    value={newGuestForm.firstName}
+                    onChange={e => setNewGuestForm(p => ({ ...p, firstName: e.target.value }))}
+                    placeholder="John"
+                  />
                 </div>
-              </button>
-            ))}
-          </div>
+                <div>
+                  <label className="mb-1 block text-xs text-gray-600">Last name *</label>
+                  <Input
+                    value={newGuestForm.lastName}
+                    onChange={e => setNewGuestForm(p => ({ ...p, lastName: e.target.value }))}
+                    placeholder="Doe"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-gray-600">Email *</label>
+                <Input
+                  type="email"
+                  value={newGuestForm.email}
+                  onChange={e => setNewGuestForm(p => ({ ...p, email: e.target.value }))}
+                  placeholder="guest@email.com"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-gray-600">Phone</label>
+                <Input
+                  type="tel"
+                  value={newGuestForm.phone}
+                  onChange={e => setNewGuestForm(p => ({ ...p, phone: e.target.value }))}
+                  placeholder="+880..."
+                />
+              </div>
+              {newGuestError && <p className="text-xs text-red-500">{newGuestError}</p>}
+              <Button
+                className="w-full"
+                loading={createGuestMut.isPending}
+                disabled={!newGuestForm.firstName || !newGuestForm.lastName || !newGuestForm.email}
+                onClick={() => { setNewGuestError(null); createGuestMut.mutate(newGuestForm); }}
+              >
+                <UserPlus className="h-4 w-4 mr-1.5" /> Create & Select Guest
+              </Button>
+            </div>
+          )}
 
           <div className="flex justify-between pt-2">
             <Button variant="outline" onClick={() => setStep(2)} className="gap-2"><ChevronLeft className="h-4 w-4" /> Back</Button>

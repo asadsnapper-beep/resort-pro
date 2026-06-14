@@ -16,28 +16,73 @@ const itemSchema = z.object({
 });
 
 const movementSchema = z.object({
-  quantity: z.number().positive(),
+  quantity: z.number().min(0),
   type: z.enum(['IN', 'OUT', 'ADJUSTMENT']),
   reason: z.string().optional(),
 });
 
 export async function inventoryRoutes(app: FastifyInstance) {
+  // GET /stats — accurate counts across all items (not just current page)
+  app.get('/stats', {
+    schema: { tags: ['inventory'], summary: 'Get inventory stats', security: [{ bearerAuth: [] }] },
+    preHandler: requireAuth,
+    handler: async (request) => {
+      const { tenantId } = request.user as JwtPayload;
+      const [total, allItems] = await Promise.all([
+        prisma.inventoryItem.count({ where: { tenantId } }),
+        prisma.inventoryItem.findMany({
+          where: { tenantId },
+          select: { currentStock: true, minimumStock: true, unitCost: true },
+        }),
+      ]);
+      const lowStockCount = allItems.filter(
+        (i) => Number(i.currentStock) <= Number(i.minimumStock),
+      ).length;
+      const totalValue = allItems.reduce(
+        (s, i) => s + Number(i.currentStock) * Number(i.unitCost),
+        0,
+      );
+      return ok({ total, lowStockCount, totalValue });
+    },
+  });
+
   app.get('/', {
     schema: { tags: ['inventory'], summary: 'List inventory items', security: [{ bearerAuth: [] }] },
     preHandler: requireAuth,
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload;
-      const query = request.query as { page?: number; limit?: number; category?: string; lowStock?: string };
+      const query = request.query as { page?: number; limit?: number; category?: string; lowStock?: string; search?: string };
       const { page, limit, skip } = parsePageParams(query);
-      const items = await prisma.inventoryItem.findMany({
-        where: { tenantId, ...(query.category && { category: query.category as never }) },
-        skip, take: limit, orderBy: { name: 'asc' },
-      });
-      const total = await prisma.inventoryItem.count({ where: { tenantId } });
-      const result = query.lowStock === 'true'
-        ? items.filter((i) => Number(i.currentStock) <= Number(i.minimumStock))
-        : items;
-      return paginated(result, total, page, limit);
+
+      // Base where: tenantId + optional category + optional search
+      const baseWhere = {
+        tenantId,
+        ...(query.category && { category: query.category as never }),
+        ...(query.search && {
+          OR: [
+            { name: { contains: query.search, mode: 'insensitive' as const } },
+            { supplier: { contains: query.search, mode: 'insensitive' as const } },
+          ],
+        }),
+      };
+
+      // lowStock filter requires column-to-column comparison (currentStock <= minimumStock)
+      // Prisma doesn't support this natively, so fetch all matching items and paginate in JS
+      if (query.lowStock === 'true') {
+        const allItems = await prisma.inventoryItem.findMany({
+          where: baseWhere,
+          orderBy: { name: 'asc' },
+        });
+        const lowItems = allItems.filter((i) => Number(i.currentStock) <= Number(i.minimumStock));
+        const sliced = lowItems.slice(skip, skip + limit);
+        return paginated(sliced, lowItems.length, page, limit);
+      }
+
+      const [items, total] = await Promise.all([
+        prisma.inventoryItem.findMany({ where: baseWhere, skip, take: limit, orderBy: { name: 'asc' } }),
+        prisma.inventoryItem.count({ where: baseWhere }),
+      ]);
+      return paginated(items, total, page, limit);
     },
   });
 
@@ -63,6 +108,23 @@ export async function inventoryRoutes(app: FastifyInstance) {
       if (!item) return reply.status(404).send({ success: false, error: 'Item not found' });
       const updated = await prisma.inventoryItem.update({ where: { id }, data: body });
       return ok(updated, 'Item updated');
+    },
+  });
+
+  app.get('/:id/movements', {
+    schema: { tags: ['inventory'], summary: 'Get movement history for an item', security: [{ bearerAuth: [] }] },
+    preHandler: requireAuth,
+    handler: async (request, reply) => {
+      const { tenantId } = request.user as JwtPayload;
+      const { id } = request.params as { id: string };
+      const item = await prisma.inventoryItem.findFirst({ where: { id, tenantId } });
+      if (!item) return reply.status(404).send({ success: false, error: 'Item not found' });
+      const movements = await prisma.inventoryMovement.findMany({
+        where: { inventoryItemId: id, tenantId },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      });
+      return ok(movements);
     },
   });
 

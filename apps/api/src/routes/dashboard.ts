@@ -53,7 +53,6 @@ export async function dashboardRoutes(app: FastifyInstance) {
         }),
         prisma.inventoryItem.findMany({
           where: { tenantId },
-          take: 5,
         }),
         prisma.housekeepingTask.count({ where: { tenantId, status: { in: ['PENDING', 'IN_PROGRESS'] }, scheduledDate: { lte: tomorrow } } }),
         prisma.maintenanceTicket.count({ where: { tenantId, status: { not: 'RESOLVED' } } }),
@@ -67,9 +66,9 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
       const occupancyRate = totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0;
 
-      const lowStockItems = lowInventory.filter(
-        (item) => Number(item.currentStock) <= Number(item.minimumStock)
-      );
+      const lowStockItems = lowInventory
+        .filter((item) => Number(item.currentStock) <= Number(item.minimumStock))
+        .slice(0, 5);
 
       return ok({
         stats: {
@@ -190,9 +189,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
         confirmedBookings,
         totalRooms,
         occupiedRooms,
-        allPaidPayments90,
         guestCount,
-        returningGuests,
         bookingsBySource,
         allBookings90,
         revenueByMonth,            // last 12 months
@@ -213,20 +210,8 @@ export async function dashboardRoutes(app: FastifyInstance) {
         prisma.room.count({ where: { tenantId, isActive: true } }),
         // Currently occupied
         prisma.room.count({ where: { tenantId, status: 'OCCUPIED' } }),
-        // All paid payments last 90d (for ADR/RevPAR)
-        prisma.payment.findMany({
-          where: { tenantId, status: 'PAID', processedAt: { gte: prev90Start } },
-          select: { amount: true },
-        }),
         // Total unique guests
         prisma.guest.count({ where: { tenantId } }),
-        // Returning guests (more than 1 booking)
-        prisma.guest.count({
-          where: {
-            tenantId,
-            bookings: { some: {} },
-          },
-        }),
         // Bookings by source last 90d
         prisma.booking.groupBy({
           by: ['source'],

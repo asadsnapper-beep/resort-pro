@@ -20,13 +20,20 @@ const updateSchema = z.object({
   priority: z.enum(['URGENT', 'HIGH', 'NORMAL', 'LOW']).optional(),
 });
 
-/** When all open tickets for a room are resolved, restore its status to AVAILABLE */
+/** When all open tickets for a room are resolved, restore its status.
+ *  If a guest is currently checked in → OCCUPIED; otherwise → AVAILABLE.
+ */
 async function restoreRoomIfClear(tenantId: string, roomId: string) {
   const openCount = await prisma.maintenanceTicket.count({
     where: { tenantId, roomId, status: { not: 'RESOLVED' } },
   });
   if (openCount === 0) {
-    await prisma.room.update({ where: { id: roomId }, data: { status: 'AVAILABLE' } });
+    const activeBooking = await prisma.booking.findFirst({
+      where: { tenantId, roomId, status: 'CHECKED_IN' },
+      select: { id: true },
+    });
+    const newStatus = activeBooking ? 'OCCUPIED' : 'AVAILABLE';
+    await prisma.room.update({ where: { id: roomId }, data: { status: newStatus } });
   }
 }
 
@@ -51,14 +58,17 @@ export async function maintenanceRoutes(app: FastifyInstance) {
         include: {
           room: { select: { id: true, name: true, number: true, floor: true } },
         },
-        orderBy: [
-          // URGENT first, then by createdAt desc
-          { priority: 'asc' },
-          { createdAt: 'desc' },
-        ],
+        orderBy: { createdAt: 'desc' },
       });
 
-      return ok(reply, tickets);
+      // Sort by priority (URGENT→HIGH→NORMAL→LOW) then by newest first
+      const PRIORITY_RANK: Record<string, number> = { URGENT: 0, HIGH: 1, NORMAL: 2, LOW: 3 };
+      tickets.sort((a, b) =>
+        (PRIORITY_RANK[a.priority] ?? 99) - (PRIORITY_RANK[b.priority] ?? 99) ||
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+
+      return ok(tickets);
     },
   });
 
@@ -78,7 +88,7 @@ export async function maintenanceRoutes(app: FastifyInstance) {
         prisma.maintenanceTicket.count({ where: { tenantId, status: { not: 'RESOLVED' }, priority: 'URGENT' } }),
       ]);
 
-      return ok(reply, { open, inProgress, resolvedToday, urgent });
+      return ok({ open, inProgress, resolvedToday, urgent });
     },
   });
 
@@ -87,7 +97,7 @@ export async function maintenanceRoutes(app: FastifyInstance) {
     schema: { tags: ['maintenance'], security: [{ bearerAuth: [] }] },
     preHandler: requireAuth,
     handler: async (request, reply) => {
-      const { tenantId, userId } = request.user as JwtPayload;
+      const { tenantId, sub: userId } = request.user as JwtPayload;
       const body = createSchema.parse(request.body);
 
       const room = await prisma.room.findFirst({ where: { id: body.roomId, tenantId } });
@@ -128,7 +138,11 @@ export async function maintenanceRoutes(app: FastifyInstance) {
       const ticket = await prisma.maintenanceTicket.update({
         where: { id },
         data: {
-          ...(body.status !== undefined && { status: body.status }),
+          ...(body.status !== undefined && {
+            status: body.status,
+            // Ensure resolvedAt is set when status is moved to RESOLVED via this endpoint too
+            ...(body.status === 'RESOLVED' && !existing.resolvedAt && { resolvedAt: new Date() }),
+          }),
           ...(body.assignedTo !== undefined && { assignedTo: body.assignedTo }),
           ...(body.notes !== undefined && { notes: body.notes }),
           ...(body.priority !== undefined && { priority: body.priority }),
@@ -136,7 +150,12 @@ export async function maintenanceRoutes(app: FastifyInstance) {
         include: { room: { select: { id: true, name: true, number: true } } },
       });
 
-      return ok(reply, ticket);
+      // If status was set to RESOLVED via this endpoint, also restore room if clear
+      if (body.status === 'RESOLVED') {
+        await restoreRoomIfClear(tenantId, existing.roomId);
+      }
+
+      return ok(ticket);
     },
   });
 
@@ -162,7 +181,7 @@ export async function maintenanceRoutes(app: FastifyInstance) {
       // Restore room status if no other open tickets remain
       await restoreRoomIfClear(tenantId, existing.roomId);
 
-      return ok(reply, ticket);
+      return ok(ticket);
     },
   });
 
@@ -180,7 +199,7 @@ export async function maintenanceRoutes(app: FastifyInstance) {
       await prisma.maintenanceTicket.delete({ where: { id } });
       await restoreRoomIfClear(tenantId, existing.roomId);
 
-      return ok(reply, { deleted: true });
+      return ok({ deleted: true });
     },
   });
 }

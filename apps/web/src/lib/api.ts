@@ -79,12 +79,13 @@ export const dashboardApi = {
 
 // ── Rooms ─────────────────────────────────────────────────────────────────────
 export const roomsApi = {
-  list: (params?: Record<string, unknown>) => api.get('/rooms', { params }),
-  get: (id: string) => api.get(`/rooms/${id}`),
-  create: (data: unknown) => api.post('/rooms', data),
-  update: (id: string, data: unknown) => api.patch(`/rooms/${id}`, data),
+  list:         (params?: Record<string, unknown>) => api.get('/rooms', { params }),
+  get:          (id: string) => api.get(`/rooms/${id}`),
+  stats:        () => api.get('/rooms/stats'),
+  create:       (data: unknown) => api.post('/rooms', data),
+  update:       (id: string, data: unknown) => api.patch(`/rooms/${id}`, data),
   updateStatus: (id: string, status: string) => api.patch(`/rooms/${id}/status`, { status }),
-  delete: (id: string) => api.delete(`/rooms/${id}`),
+  delete:       (id: string) => api.delete(`/rooms/${id}`),
   availability: (checkIn: string, checkOut: string) =>
     api.get('/rooms/availability', { params: { checkIn, checkOut } }),
 };
@@ -133,18 +134,23 @@ export const guestsApi = {
 
 // ── Staff ─────────────────────────────────────────────────────────────────────
 export const staffApi = {
-  list: (params?: Record<string, unknown>) => api.get('/staff', { params }),
-  create: (data: unknown) => api.post('/staff', data),
-  update: (id: string, data: unknown) => api.patch(`/staff/${id}`, data),
-  delete: (id: string) => api.delete(`/staff/${id}`),
+  list:          (params?: Record<string, unknown>) => api.get('/staff', { params }),
+  create:        (data: unknown) => api.post('/staff', data),
+  update:        (id: string, data: unknown) => api.patch(`/staff/${id}`, data),
+  delete:        (id: string) => api.delete(`/staff/${id}`),
+  reactivate:    (id: string) => api.patch(`/staff/${id}/reactivate`),
+  invite:        (data: { email: string; role: string }) => api.post('/staff/invite', data),
+  listInvites:   () => api.get('/staff/invites'),
+  cancelInvite:  (id: string) => api.delete(`/staff/invites/${id}`),
 };
 
 // ── Housekeeping ──────────────────────────────────────────────────────────────
 export const housekeepingApi = {
-  list: (params?: Record<string, unknown>) => api.get('/housekeeping', { params }),
-  create: (data: unknown) => api.post('/housekeeping', data),
+  list:         (params?: Record<string, unknown>) => api.get('/housekeeping', { params }),
+  stats:        (params?: { date?: string }) => api.get('/housekeeping/stats', { params }),
+  create:       (data: unknown) => api.post('/housekeeping', data),
   updateStatus: (id: string, status: string) => api.patch(`/housekeeping/${id}/status`, { status }),
-  assign: (id: string, staffId: string) => api.patch(`/housekeeping/${id}/assign`, { staffId }),
+  assign:       (id: string, staffId: string) => api.patch(`/housekeeping/${id}/assign`, { staffId }),
 };
 
 // ── Menu ──────────────────────────────────────────────────────────────────────
@@ -157,17 +163,20 @@ export const menuApi = {
 
 // ── Food Orders ───────────────────────────────────────────────────────────────
 export const foodOrdersApi = {
-  list: (params?: Record<string, unknown>) => api.get('/food-orders', { params }),
-  create: (data: unknown) => api.post('/food-orders', data),
+  list:         (params?: Record<string, unknown>) => api.get('/food-orders', { params }),
+  stats:        () => api.get('/food-orders/stats'),
+  create:       (data: unknown) => api.post('/food-orders', data),
   updateStatus: (id: string, status: string) => api.patch(`/food-orders/${id}/status`, { status }),
 };
 
 // ── Inventory ─────────────────────────────────────────────────────────────────
 export const inventoryApi = {
   list: (params?: Record<string, unknown>) => api.get('/inventory', { params }),
+  stats: () => api.get('/inventory/stats'),
   create: (data: unknown) => api.post('/inventory', data),
   update: (id: string, data: unknown) => api.patch(`/inventory/${id}`, data),
   addMovement: (id: string, data: unknown) => api.post(`/inventory/${id}/movement`, data),
+  getMovements: (id: string) => api.get(`/inventory/${id}/movements`),
 };
 
 // ── Tickets ───────────────────────────────────────────────────────────────────
@@ -178,6 +187,14 @@ export const ticketsApi = {
   updateStatus: (id: string, status: string) => api.patch(`/tickets/${id}/status`, { status }),
   assign: (id: string, userId: string) => api.patch(`/tickets/${id}/assign`, { userId }),
   addMessage: (id: string, message: string) => api.post(`/tickets/${id}/messages`, { message }),
+};
+
+// ── Ticket Webhooks (Channel Settings) ───────────────────────────────────────
+export const ticketWebhooksApi = {
+  telegramInfo: () => api.get('/ticket-webhooks/telegram/info'),
+  telegramSetup: (data: { botToken: string; notifChatId?: string }) => api.post('/ticket-webhooks/telegram/setup', data),
+  telegramDisconnect: () => api.delete('/ticket-webhooks/telegram/setup'),
+  whatsappInfo: () => api.get('/ticket-webhooks/whatsapp/info'),
 };
 
 // ── Notifications ─────────────────────────────────────────────────────────────
@@ -191,6 +208,16 @@ export const notificationsApi = {
 export const websiteApi = {
   get: () => api.get('/website'),
   update: (data: unknown) => api.put('/website', data),
+  getStats: () => api.get('/website/stats'),
+};
+
+// Public (no-auth) — used from client components on the booking website
+const PUBLIC_API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+export const publicWebsiteApi = {
+  trackPageView: (slug: string) => {
+    // fire-and-forget — never await, never throw
+    fetch(`${PUBLIC_API}/site/${slug}/pageview`, { method: 'POST' }).catch(() => {});
+  },
 };
 
 // ── Tenant ────────────────────────────────────────────────────────────────────
@@ -214,6 +241,12 @@ export const tenantApi = {
   getModules: () => api.get('/tenant/flags/modules'),
   toggleModule: (flag: string, enabled: boolean) => api.patch('/tenant/flags/module', { flag, enabled }),
   getReferrals: () => api.get('/tenant/referrals'),
+  // Team management
+  getTeam: () => api.get('/tenant/team'),
+  inviteMember: (data: { email: string; role: string }) => api.post('/tenant/team/invite', data),
+  changeMemberRole: (userId: string, role: string) => api.patch(`/tenant/team/${userId}/role`, { role }),
+  removeMember: (userId: string) => api.delete(`/tenant/team/${userId}`),
+  cancelInvite: (inviteId: string) => api.delete(`/tenant/team/invite/${inviteId}`),
 };
 
 
@@ -284,6 +317,18 @@ export const reportsApi = {
   getDaily: (date?: string) => api.get('/reports/daily', { params: date ? { date } : {} }),
   emailDaily: (date?: string, toEmail?: string) =>
     api.post('/reports/daily/email', { toEmail }, { params: date ? { date } : {} }),
+  getDispatch: () => api.get('/reports/dispatch'),
+  saveDispatch: (data: {
+    enabled?: boolean;
+    dispatchTime?: string;
+    telegramEnabled?: boolean;
+    telegramBotToken?: string | null;
+    telegramChatId?: string | null;
+    whatsappEnabled?: boolean;
+    whatsappPhone?: string | null;
+  }) => api.put('/reports/dispatch', data),
+  testDispatch: (channel: 'telegram' | 'whatsapp') =>
+    api.post('/reports/dispatch/test', { channel }),
 };
 
 // ── Billing ───────────────────────────────────────────────────────────────────

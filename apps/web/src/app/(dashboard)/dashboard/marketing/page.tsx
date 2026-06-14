@@ -75,6 +75,9 @@ function formatDate(d: string | null) {
 export default function MarketingPage() {
   const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('all');
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['marketing-campaigns', statusFilter],
@@ -88,15 +91,17 @@ export default function MarketingPage() {
       toast({ title: '✓ Campaign deleted' });
     },
     onError: (e: any) => toast({ title: 'Error', description: e?.response?.data?.error ?? 'Could not delete', variant: 'destructive' }),
+    onSettled: () => setDeletingId(null),
   });
 
   const sendMut = useMutation({
     mutationFn: (id: string) => marketingApi.sendCampaign(id),
-    onSuccess: (_, id) => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['marketing-campaigns'] });
       toast({ title: '🚀 Campaign is sending!', description: 'Recipients will receive messages shortly.' });
     },
     onError: (e: any) => toast({ title: 'Cannot Send', description: e?.response?.data?.error ?? 'Error sending campaign', variant: 'destructive' }),
+    onSettled: () => setSendingId(null),
   });
 
   const cancelMut = useMutation({
@@ -105,7 +110,8 @@ export default function MarketingPage() {
       qc.invalidateQueries({ queryKey: ['marketing-campaigns'] });
       toast({ title: '✓ Campaign cancelled' });
     },
-    onError: (e: any) => toast({ title: 'Error', description: e?.response?.data?.error, variant: 'destructive' }),
+    onError: (e: any) => toast({ title: 'Error', description: e?.response?.data?.error ?? 'Could not cancel campaign', variant: 'destructive' }),
+    onSettled: () => setCancellingId(null),
   });
 
   const campaigns: Campaign[] = data?.data?.data ?? [];
@@ -211,13 +217,16 @@ export default function MarketingPage() {
                   {c.status === 'draft' && (
                     <>
                       <Button size="sm" variant="outline"
-                        onClick={() => { if (confirm('Send this campaign now?')) sendMut.mutate(c.id); }}
-                        loading={sendMut.isPending}
+                        onClick={() => { setSendingId(c.id); sendMut.mutate(c.id); }}
+                        loading={sendingId === c.id}
+                        disabled={sendingId !== null && sendingId !== c.id}
                         className="gap-1.5 text-resort-700 border-resort-200 hover:bg-resort-50">
                         <Send className="h-3.5 w-3.5" /> Send
                       </Button>
                       <Button size="sm" variant="ghost"
-                        onClick={() => { if (confirm('Delete this draft?')) deleteMut.mutate(c.id); }}
+                        onClick={() => { setDeletingId(c.id); deleteMut.mutate(c.id); }}
+                        loading={deletingId === c.id}
+                        disabled={deletingId !== null && deletingId !== c.id}
                         className="text-red-500 hover:text-red-700 hover:bg-red-50">
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -225,7 +234,9 @@ export default function MarketingPage() {
                   )}
                   {c.status === 'scheduled' && (
                     <Button size="sm" variant="outline"
-                      onClick={() => { if (confirm('Cancel this scheduled campaign?')) cancelMut.mutate(c.id); }}
+                      onClick={() => { setCancellingId(c.id); cancelMut.mutate(c.id); }}
+                      loading={cancellingId === c.id}
+                      disabled={cancellingId !== null && cancellingId !== c.id}
                       className="gap-1.5 text-red-600 border-red-200 hover:bg-red-50">
                       <XCircle className="h-3.5 w-3.5" /> Cancel
                     </Button>

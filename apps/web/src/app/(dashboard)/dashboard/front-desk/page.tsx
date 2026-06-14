@@ -24,7 +24,7 @@ interface Booking {
 }
 interface RoomMapRoom {
   id: string; number: string; name: string; type: string; status: string; floor?: number;
-  basePrice: number; capacity: number;
+  basePrice: number; maxOccupancy: number;
   booking: (Booking & { guest: Guest }) | null;
 }
 
@@ -164,10 +164,9 @@ function CheckOutModal({ booking, onClose, onSuccess }: {
 }) {
   const { tenant } = useAuthStore();
   const qc = useQueryClient();
-  const [extraPayment, setExtraPayment] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD' | 'BANK_TRANSFER'>('CASH');
-
   const balance = Math.max(0, Number(booking.totalAmount) - Number(booking.paidAmount));
+  const [extraPayment, setExtraPayment] = useState(balance > 0 ? String(balance) : '');
+  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD' | 'BANK_TRANSFER'>('CASH');
 
   const mutation = useMutation({
     mutationFn: () => bookingsApi.checkOut(booking.id, {
@@ -226,7 +225,7 @@ function CheckOutModal({ booking, onClose, onSuccess }: {
               <label className="block text-sm font-medium text-gray-700">Collect payment</label>
               <input
                 type="number" value={extraPayment} onChange={e => setExtraPayment(e.target.value)}
-                placeholder={String(balance)} defaultValue={balance}
+                placeholder={String(balance)}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-resort-500"
               />
               <div className="flex gap-2">
@@ -269,7 +268,7 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
   });
 
   const { data: roomData } = useQuery({
-    queryKey: ['rooms-available'],
+    queryKey: ['rooms-available', form.checkIn, form.checkOut],
     queryFn: () => roomsApi.availability(form.checkIn, form.checkOut).then(r => r.data.data),
   });
 
@@ -552,7 +551,7 @@ export default function FrontDeskPage() {
 
   const d = data as {
     date: string;
-    roomStats: { total: number; occupied: number; available: number; cleaning: number; outOfOrder: number };
+    roomStats: { total: number; occupied: number; available: number; cleaning: number; maintenance: number };
     totalGuests: number;
     arrivals:   { count: number; pending: number; bookings: Booking[] };
     departures: { count: number; pending: number; bookings: Booking[] };
@@ -566,7 +565,7 @@ export default function FrontDeskPage() {
     { label: 'Occupied',     value: stats?.occupied,  icon: Users,     color: 'text-blue-600',   bg: 'bg-blue-50' },
     { label: 'Available',    value: stats?.available, icon: Sparkles,  color: 'text-emerald-600',bg: 'bg-emerald-50' },
     { label: 'Cleaning',     value: stats?.cleaning,  icon: Sparkles,  color: 'text-amber-600',  bg: 'bg-amber-50' },
-    { label: 'Maintenance',  value: stats?.outOfOrder,icon: Wrench,    color: 'text-red-600',    bg: 'bg-red-50' },
+    { label: 'Maintenance',  value: stats?.maintenance,icon: Wrench,   color: 'text-red-600',    bg: 'bg-red-50' },
   ];
 
   const TABS = [

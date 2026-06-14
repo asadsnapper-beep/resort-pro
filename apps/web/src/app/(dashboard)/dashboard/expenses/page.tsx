@@ -340,7 +340,7 @@ export default function ExpensesPage() {
   const [currentMonth, setCurrentMonth] = useState(monthStr(new Date()));
   const [filterCategory, setFilterCategory] = useState('');
   const [page, setPage] = useState(1);
-  const [editingExpense, setEditingExpense] = useState<Expense | null | 'new'>('new' as any);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'list' | 'charts'>('list');
@@ -755,7 +755,7 @@ export default function ExpensesPage() {
       {/* ── Modal ── */}
       {showModal && (
         <ExpenseModal
-          expense={editingExpense === null ? null : (editingExpense as Expense)}
+          expense={editingExpense}
           currency={currency}
           onClose={() => { setShowModal(false); setEditingExpense(null); }}
         />

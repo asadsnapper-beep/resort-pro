@@ -76,7 +76,7 @@ function GroupModal({
     enabled: !isEdit,
   });
   const rooms: any[] = roomsRes?.data?.data ?? [];
-  const availableRooms = rooms.filter((r) => r.status === 'AVAILABLE' || r.status === 'RESERVED');
+  const availableRooms = rooms.filter((r) => r.status === 'AVAILABLE');
 
   const mutation = useMutation({
     mutationFn: (data: unknown) =>
@@ -613,7 +613,7 @@ function GroupCard({ group, onClick }: { group: any; onClick: () => void }) {
     Math.ceil((new Date(group.checkOut).getTime() - new Date(group.checkIn).getTime()) / 86_400_000));
   const totalAmount = group.bookings.reduce((s: number, b: any) => s + Number(b.totalAmount), 0);
   const paidAmount = group.bookings.reduce(
-    (s: number, b: any) => s + b.payments.filter((p: any) => p.status === 'COMPLETED').reduce((ps: number, p: any) => ps + Number(p.amount), 0),
+    (s: number, b: any) => s + b.payments.filter((p: any) => p.status === 'PAID').reduce((ps: number, p: any) => ps + Number(p.amount), 0),
     0,
   );
   const outstanding = totalAmount - paidAmount;

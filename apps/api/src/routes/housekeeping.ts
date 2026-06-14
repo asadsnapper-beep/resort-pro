@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '@resort-pro/database';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams, validate } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
 
@@ -13,19 +13,51 @@ const taskSchema = z.object({
   notes: z.string().optional(),
 });
 
+// Task types that involve cleaning between stays (room should be CLEANING while in progress, AVAILABLE when done)
+const BETWEEN_STAY_TYPES = ['CHECKOUT', 'DEEP_CLEAN', 'CHECKIN'] as const;
+
 export async function housekeepingRoutes(app: FastifyInstance) {
+  // GET /stats — total counts by status (for accurate dashboard cards)
+  app.get('/stats', {
+    schema: { tags: ['housekeeping'], summary: 'Get housekeeping stats', security: [{ bearerAuth: [] }] },
+    preHandler: requireAuth,
+    handler: async (request) => {
+      const { tenantId } = request.user as JwtPayload;
+      const query = request.query as { date?: string };
+      const dateWhere = query.date ? { scheduledDate: { equals: new Date(query.date) } } : {};
+
+      const [pending, inProgress, completed, skipped, total] = await Promise.all([
+        prisma.housekeepingTask.count({ where: { tenantId, status: 'PENDING', ...dateWhere } }),
+        prisma.housekeepingTask.count({ where: { tenantId, status: 'IN_PROGRESS', ...dateWhere } }),
+        prisma.housekeepingTask.count({ where: { tenantId, status: 'COMPLETED', ...dateWhere } }),
+        prisma.housekeepingTask.count({ where: { tenantId, status: 'SKIPPED', ...dateWhere } }),
+        prisma.housekeepingTask.count({ where: { tenantId, ...dateWhere } }),
+      ]);
+
+      return ok({ total, pending, inProgress, completed, skipped });
+    },
+  });
+
   app.get('/', {
     schema: { tags: ['housekeeping'], summary: 'List housekeeping tasks', security: [{ bearerAuth: [] }] },
     preHandler: requireAuth,
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload;
-      const query = request.query as { page?: number; limit?: number; status?: string; date?: string };
+      const query = request.query as { page?: number; limit?: number; status?: string; date?: string; search?: string };
       const { page, limit, skip } = parsePageParams(query);
 
       const where = {
         tenantId,
         ...(query.status && { status: query.status as never }),
         ...(query.date && { scheduledDate: { equals: new Date(query.date) } }),
+        ...(query.search && {
+          OR: [
+            { room: { number: { contains: query.search, mode: 'insensitive' as const } } },
+            { room: { name:   { contains: query.search, mode: 'insensitive' as const } } },
+            { assignedTo: { user: { firstName: { contains: query.search, mode: 'insensitive' as const } } } },
+            { assignedTo: { user: { lastName:  { contains: query.search, mode: 'insensitive' as const } } } },
+          ],
+        }),
       };
 
       const [tasks, total] = await Promise.all([
@@ -48,7 +80,7 @@ export async function housekeepingRoutes(app: FastifyInstance) {
 
   app.post('/', {
     schema: { tags: ['housekeeping'], summary: 'Create housekeeping task', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const body = taskSchema.parse(request.body);
@@ -87,8 +119,17 @@ export async function housekeepingRoutes(app: FastifyInstance) {
         },
       });
 
-      if (status === 'COMPLETED') {
-        await prisma.room.update({ where: { id: task.roomId }, data: { status: 'AVAILABLE' } });
+      // Only update room status for tasks that involve cleaning between stays.
+      // DAILY and TURNDOWN happen while the guest is still in the room — don't touch room status.
+      const isBetweenStay = (BETWEEN_STAY_TYPES as readonly string[]).includes(task.type);
+      if (isBetweenStay) {
+        if (status === 'IN_PROGRESS') {
+          // Mark room as being cleaned
+          await prisma.room.update({ where: { id: task.roomId }, data: { status: 'CLEANING' } });
+        } else if (status === 'COMPLETED') {
+          // Room ready for next guest
+          await prisma.room.update({ where: { id: task.roomId }, data: { status: 'AVAILABLE' } });
+        }
       }
 
       return ok(updated, 'Task updated');

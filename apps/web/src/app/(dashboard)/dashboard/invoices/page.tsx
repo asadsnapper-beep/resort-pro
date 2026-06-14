@@ -7,10 +7,9 @@ import { invoiceApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import {
   FileText, Search, Plus, TrendingUp, CheckCircle2,
-  Clock, AlertTriangle, ChevronRight, Receipt,
+  Clock, AlertTriangle, ChevronRight, Receipt, ChevronLeft,
 } from 'lucide-react';
 
 /* ── Types ─────────────────────────────────────────────────────────────────── */
@@ -34,6 +33,8 @@ interface Stats {
   collected: number;
   paidCount: number;
   outstanding: number;
+  thisMonth: number;
+  thisMonthCount: number;
 }
 
 /* ── Status config ─────────────────────────────────────────────────────────── */
@@ -56,8 +57,9 @@ export default function InvoicesPage() {
 
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<string>('All');
+  const [page, setPage]     = useState(1);
 
-  const params: Record<string, string> = {};
+  const params: Record<string, string> = { page: String(page) };
   if (status !== 'All') params.status = status;
   if (search)           params.search = search;
 
@@ -72,7 +74,8 @@ export default function InvoicesPage() {
   });
 
   const invoices: InvoiceSummary[] = listData?.data?.data?.items ?? [];
-  const stats: Stats = statsData?.data?.data ?? { totalInvoiced: 0, totalCount: 0, collected: 0, paidCount: 0, outstanding: 0 };
+  const pagination = listData?.data?.data ?? { total: 0, page: 1, limit: 20, totalPages: 1 };
+  const stats: Stats = statsData?.data?.data ?? { totalInvoiced: 0, totalCount: 0, collected: 0, paidCount: 0, outstanding: 0, thisMonth: 0, thisMonthCount: 0 };
 
   const fmt = (n: number) => `${currency} ${Number(n).toLocaleString()}`;
 
@@ -93,10 +96,10 @@ export default function InvoicesPage() {
       {/* Stats row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Invoiced', value: fmt(stats.totalInvoiced), sub: `${stats.totalCount} invoices`, color: 'text-gray-900', bg: 'bg-white' },
-          { label: 'Collected',      value: fmt(stats.collected),     sub: `${stats.paidCount} paid`,      color: 'text-green-700', bg: 'bg-green-50' },
-          { label: 'Outstanding',    value: fmt(stats.outstanding),   sub: 'unpaid balance',               color: 'text-red-600',   bg: 'bg-red-50' },
-          { label: 'This Month',     value: fmt(stats.totalInvoiced), sub: 'all time',                     color: 'text-blue-700',  bg: 'bg-blue-50' },
+          { label: 'Total Invoiced', value: fmt(stats.totalInvoiced), sub: `${stats.totalCount} invoices`,          color: 'text-gray-900', bg: 'bg-white' },
+          { label: 'Collected',      value: fmt(stats.collected),     sub: `${stats.paidCount} paid`,               color: 'text-green-700', bg: 'bg-green-50' },
+          { label: 'Outstanding',    value: fmt(stats.outstanding),   sub: 'unpaid balance',                        color: 'text-red-600',   bg: 'bg-red-50' },
+          { label: 'This Month',     value: fmt(stats.thisMonth),     sub: `${stats.thisMonthCount} invoice${stats.thisMonthCount !== 1 ? 's' : ''}`, color: 'text-blue-700', bg: 'bg-blue-50' },
         ].map(s => (
           <div key={s.label} className={`${s.bg} rounded-2xl border p-4`}>
             <p className="text-xs text-muted-foreground mb-1">{s.label}</p>
@@ -112,14 +115,14 @@ export default function InvoicesPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
           <Input
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
             placeholder="Search by name or invoice #…"
             className="pl-9"
           />
         </div>
         <div className="flex gap-1.5 flex-wrap">
           {FILTERS.map(f => (
-            <button key={f} onClick={() => setStatus(f)}
+            <button key={f} onClick={() => { setStatus(f); setPage(1); }}
               className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
                 status === f
                   ? 'bg-resort-600 text-white'
@@ -212,6 +215,43 @@ export default function InvoicesPage() {
           </table>
         )}
       </div>
+
+      {/* Pagination */}
+      {pagination.totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2">
+          <p className="text-sm text-muted-foreground">
+            Showing {((page - 1) * pagination.limit) + 1}–{Math.min(page * pagination.limit, pagination.total)} of {pagination.total} invoices
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="h-8 w-8 flex items-center justify-center rounded-lg border text-sm disabled:opacity-40 hover:bg-gray-50 transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+              const n = page <= 3 ? i + 1 : page + i - 2;
+              if (n < 1 || n > pagination.totalPages) return null;
+              return (
+                <button key={n} onClick={() => setPage(n)}
+                  className={`h-8 w-8 flex items-center justify-center rounded-lg border text-sm font-medium transition-colors ${
+                    n === page ? 'bg-resort-600 text-white border-resort-600' : 'hover:bg-gray-50'
+                  }`}>
+                  {n}
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+              disabled={page >= pagination.totalPages}
+              className="h-8 w-8 flex items-center justify-center rounded-lg border text-sm disabled:opacity-40 hover:bg-gray-50 transition-colors"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

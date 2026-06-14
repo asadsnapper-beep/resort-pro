@@ -74,8 +74,8 @@ export async function frontDeskRoutes(app: FastifyInstance) {
         total:     rooms.length,
         occupied:  rooms.filter(r => r.status === 'OCCUPIED').length,
         available: rooms.filter(r => r.status === 'AVAILABLE').length,
-        cleaning:  rooms.filter(r => r.status === 'CLEANING').length,
-        outOfOrder: rooms.filter(r => r.status === 'OUT_OF_ORDER').length,
+        cleaning:     rooms.filter(r => r.status === 'CLEANING').length,
+        maintenance:  rooms.filter(r => r.status === 'MAINTENANCE').length,
       };
 
       const totalGuests = inHouse.reduce((s, b) => s + b.adults + b.children, 0);
@@ -114,7 +114,7 @@ export async function frontDeskRoutes(app: FastifyInstance) {
       const [rooms, activeBookings] = await Promise.all([
         prisma.room.findMany({
           where: { tenantId, isActive: true },
-          select: { id: true, number: true, name: true, type: true, status: true, floor: true, basePrice: true, capacity: true },
+          select: { id: true, number: true, name: true, type: true, status: true, floor: true, basePrice: true, maxOccupancy: true },
           orderBy: [{ floor: 'asc' }, { number: 'asc' }],
         }),
         prisma.booking.findMany({

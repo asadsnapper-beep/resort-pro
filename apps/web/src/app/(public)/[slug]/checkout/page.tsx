@@ -6,7 +6,6 @@ import {
   CheckCircle2, Loader2, AlertCircle, CreditCard, Building2,
   Calendar, Moon, Users, ChevronRight, Shield, Info, ArrowLeft,
 } from 'lucide-react';
-import { paymentGatewayApi } from '@/lib/api';
 import axios from 'axios';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -123,6 +122,7 @@ function CheckoutInner({ slug }: { slug: string }) {
   const handlePay = async () => {
     if (!bookingId || !selected) return;
     setPaying(true);
+    setError(null); // clear any previous error before each attempt
     try {
       const origin    = window.location.origin;
       const returnUrl = `${origin}/pay/verify?gateway=${selected}&bookingId=${bookingId}&slug=${slug}`;

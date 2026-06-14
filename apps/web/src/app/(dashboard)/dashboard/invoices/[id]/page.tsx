@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { invoiceApi } from '@/lib/api';
@@ -82,7 +82,30 @@ export default function InvoiceDetailPage() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
   const qc     = useQueryClient();
-  const { tenant } = useAuthStore();
+  const { tenant, token } = useAuthStore();
+
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const handleDownloadPdf = useCallback(async () => {
+    if (!token) return;
+    setDownloadingPdf(true);
+    try {
+      const res = await fetch(invoiceApi.pdfUrl(id), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed');
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `invoice-${id}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: 'PDF download failed', variant: 'destructive' });
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }, [id, token]);
   const currency   = tenant?.currency ?? 'BDT';
   const fmt = (n: number) => `${currency} ${Number(n).toLocaleString()}`;
 
@@ -201,11 +224,10 @@ export default function InvoiceDetailPage() {
               <Mail className="h-4 w-4" /> Send Email
             </Button>
           )}
-          <a href={`${invoiceApi.pdfUrl(id)}`} target="_blank" rel="noopener noreferrer">
-            <Button variant="outline" className="gap-2">
-              <Download className="h-4 w-4" /> PDF
-            </Button>
-          </a>
+          <Button variant="outline" className="gap-2" onClick={handleDownloadPdf} disabled={downloadingPdf}>
+            {downloadingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            PDF
+          </Button>
           {outstanding > 0 && inv.status !== 'CANCELLED' && (
             <Button className="gap-2" onClick={() => { setPayForm(f => ({ ...f, amount: outstanding })); setShowPayment(true); }}>
               <CheckCircle2 className="h-4 w-4" /> Record Payment
@@ -283,43 +305,70 @@ export default function InvoiceDetailPage() {
 
               {/* Add item form */}
               {showAddItem && (
-                <div className="mt-4 border-t pt-4 space-y-3">
-                  <p className="text-sm font-semibold text-gray-700">Add New Item</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="col-span-2">
-                      <Input
-                        value={newItem.description}
-                        onChange={e => setNewItem(f => ({ ...f, description: e.target.value }))}
-                        placeholder="Description (e.g. Room Service, Laundry)"
-                      />
-                    </div>
-                    <select
-                      value={newItem.category}
-                      onChange={e => setNewItem(f => ({ ...f, category: e.target.value }))}
-                      className="h-10 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-                      {ITEM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
+                <div className="mt-4 rounded-xl border border-resort-200 bg-resort-50/40 p-4 space-y-4">
+                  <p className="text-sm font-semibold text-gray-800">New Line Item</p>
+
+                  {/* Description */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-gray-500">Description</label>
                     <Input
-                      type="number" min="1"
-                      value={newItem.quantity}
-                      onChange={e => setNewItem(f => ({ ...f, quantity: Number(e.target.value) }))}
-                      placeholder="Qty"
+                      value={newItem.description}
+                      onChange={e => setNewItem(f => ({ ...f, description: e.target.value }))}
+                      placeholder="e.g. Room Service, Laundry, Airport Transfer"
+                      autoFocus
                     />
-                    <div className="col-span-2">
+                  </div>
+
+                  {/* Category + Qty */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-gray-500">Category</label>
+                      <select
+                        value={newItem.category}
+                        onChange={e => setNewItem(f => ({ ...f, category: e.target.value }))}
+                        className="w-full h-10 rounded-md border border-input bg-white px-3 text-sm focus:outline-none focus:ring-1 focus:ring-resort-500">
+                        {ITEM_CATEGORIES.map(c => (
+                          <option key={c} value={c}>
+                            {c === 'ROOM' ? '🛏 Room' : c === 'FOOD' ? '🍽 Food & Beverage' : c === 'SERVICE' ? '🛎 Service' : c === 'LAUNDRY' ? '👕 Laundry' : c === 'MINIBAR' ? '🍹 Minibar' : '📦 Other'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-gray-500">Quantity</label>
                       <Input
-                        type="number" min="0"
-                        value={newItem.unitPrice}
-                        onChange={e => setNewItem(f => ({ ...f, unitPrice: Number(e.target.value) }))}
-                        placeholder={`Unit price (${currency})`}
+                        type="number" min="1"
+                        value={newItem.quantity}
+                        onChange={e => setNewItem(f => ({ ...f, quantity: Number(e.target.value) }))}
                       />
                     </div>
                   </div>
-                  <div className="flex gap-2">
+
+                  {/* Unit price + live total */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-gray-500">Unit Price ({currency})</label>
+                    <Input
+                      type="number" min="0" step="0.01"
+                      value={newItem.unitPrice || ''}
+                      onChange={e => setNewItem(f => ({ ...f, unitPrice: Number(e.target.value) }))}
+                      placeholder="0.00"
+                    />
+                    {newItem.unitPrice > 0 && newItem.quantity > 0 && (
+                      <p className="text-xs text-resort-700 font-medium pt-0.5">
+                        Total: {fmt(newItem.unitPrice * newItem.quantity)}
+                        {newItem.quantity > 1 && <span className="text-gray-400 font-normal"> ({newItem.quantity} × {fmt(newItem.unitPrice)})</span>}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-1">
                     <Button size="sm" onClick={() => addItemMut.mutate()} loading={addItemMut.isPending}
-                      disabled={!newItem.description || newItem.unitPrice <= 0}>
-                      <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                      disabled={!newItem.description.trim() || newItem.unitPrice <= 0}>
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Add Item
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setShowAddItem(false)}>Cancel</Button>
+                    <Button size="sm" variant="ghost" onClick={() => { setShowAddItem(false); setNewItem({ description: '', category: 'OTHER', quantity: 1, unitPrice: 0 }); }}>
+                      Cancel
+                    </Button>
                   </div>
                 </div>
               )}

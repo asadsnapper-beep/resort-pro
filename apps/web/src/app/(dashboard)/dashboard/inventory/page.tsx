@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { inventoryApi } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
@@ -11,7 +11,7 @@ import { formatCurrency } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import {
   Plus, Search, Package, AlertTriangle, TrendingDown, TrendingUp,
-  Pencil, ArrowUpDown, ChevronLeft, ChevronRight,
+  Pencil, ArrowUpDown, ChevronLeft, ChevronRight, History, Clock,
 } from 'lucide-react';
 
 interface InventoryItem {
@@ -43,15 +43,24 @@ function ItemModal({ open, onClose, loading, onSubmit, item }: {
   item?: InventoryItem | null;
 }) {
   const [form, setForm] = useState({
-    name: item?.name ?? '',
-    category: item?.category ?? '',
-    unit: item?.unit ?? '',
-    currentStock: item?.currentStock?.toString() ?? '0',
-    minimumStock: item?.minimumStock?.toString() ?? '0',
-    unitCost: item?.unitCost?.toString() ?? '0',
-    supplier: item?.supplier ?? '',
+    name: '', category: '', unit: '', currentStock: '0', minimumStock: '0', unitCost: '0', supplier: '',
   });
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  // Reset form every time the modal opens or the target item changes
+  useEffect(() => {
+    if (open) {
+      setForm({
+        name: item?.name ?? '',
+        category: item?.category ?? '',
+        unit: item?.unit ?? '',
+        currentStock: item?.currentStock?.toString() ?? '0',
+        minimumStock: item?.minimumStock?.toString() ?? '0',
+        unitCost: item?.unitCost?.toString() ?? '0',
+        supplier: item?.supplier ?? '',
+      });
+    }
+  }, [open, item]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,12 +138,20 @@ function MovementModal({ open, onClose, item, loading, onSubmit }: {
   const [quantity, setQuantity] = useState('');
   const [reason, setReason] = useState('');
 
+  // Reset fields every time the modal opens
+  useEffect(() => {
+    if (open) {
+      setType('IN');
+      setQuantity('');
+      setReason('');
+    }
+  }, [open]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const qty = parseFloat(quantity);
-    if (!qty || qty <= 0) { toast({ title: 'Invalid quantity', variant: 'destructive' }); return; }
+    if (isNaN(qty) || qty < 0) { toast({ title: 'Invalid quantity', variant: 'destructive' }); return; }
     onSubmit({ quantity: qty, type, reason: reason || undefined });
-    setQuantity(''); setReason('');
   };
 
   return (
@@ -173,6 +190,78 @@ function MovementModal({ open, onClose, item, loading, onSubmit }: {
   );
 }
 
+interface Movement {
+  id: string;
+  type: 'IN' | 'OUT' | 'ADJUSTMENT';
+  quantity: number;
+  reason?: string;
+  createdAt: string;
+}
+
+const MOVEMENT_CONFIG = {
+  IN:         { label: 'Stock In',    icon: TrendingUp,   cls: 'bg-green-100 text-green-700' },
+  OUT:        { label: 'Stock Out',   icon: TrendingDown, cls: 'bg-red-100 text-red-700' },
+  ADJUSTMENT: { label: 'Adjustment', icon: ArrowUpDown,  cls: 'bg-blue-100 text-blue-700' },
+};
+
+function HistoryModal({ open, onClose, item }: {
+  open: boolean; onClose: () => void; item: InventoryItem | null;
+}) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['inventory-movements', item?.id],
+    queryFn: () => inventoryApi.getMovements(item!.id),
+    enabled: open && !!item?.id,
+  });
+
+  const movements: Movement[] = data?.data?.data ?? [];
+
+  return (
+    <Modal open={open} onClose={onClose} title="Stock Movement History"
+      description={item ? `${item.name} — last 50 movements` : ''} className="max-w-lg">
+      {isLoading ? (
+        <div className="space-y-2 py-4">
+          {[...Array(4)].map((_, i) => <div key={i} className="h-14 rounded-lg bg-gray-100 animate-pulse" />)}
+        </div>
+      ) : movements.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <Clock className="h-10 w-10 text-gray-200 mb-3" />
+          <p className="font-medium text-gray-500">No movements yet</p>
+          <p className="text-sm text-muted-foreground mt-1">Record a stock movement to see history here</p>
+        </div>
+      ) : (
+        <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+          {movements.map(m => {
+            const cfg = MOVEMENT_CONFIG[m.type];
+            const Icon = cfg.icon;
+            return (
+              <div key={m.id} className="flex items-center gap-3 rounded-lg border p-3 hover:bg-gray-50">
+                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${cfg.cls}`}>
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cfg.cls}`}>{cfg.label}</span>
+                    <span className="text-sm font-bold text-gray-900">
+                      {m.type === 'OUT' ? '-' : m.type === 'IN' ? '+' : ''}{m.quantity} {item?.unit}
+                    </span>
+                  </div>
+                  {m.reason && <p className="text-xs text-muted-foreground mt-0.5 truncate">{m.reason}</p>}
+                </div>
+                <p className="text-xs text-muted-foreground shrink-0">
+                  {new Date(m.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div className="flex justify-end pt-3 border-t mt-3">
+        <Button variant="outline" onClick={onClose}>Close</Button>
+      </div>
+    </Modal>
+  );
+}
+
 export default function InventoryPage() {
   const queryClient = useQueryClient();
   const [catFilter, setCatFilter] = useState('');
@@ -182,43 +271,66 @@ export default function InventoryPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
   const [movementItem, setMovementItem] = useState<InventoryItem | null>(null);
+  const [historyItem, setHistoryItem] = useState<InventoryItem | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['inventory', catFilter, lowStockOnly, page],
-    queryFn: () => inventoryApi.list({ category: catFilter || undefined, lowStock: lowStockOnly ? 'true' : undefined, page, limit: 30 }),
+    queryKey: ['inventory', catFilter, search, lowStockOnly, page],
+    queryFn: () => inventoryApi.list({
+      category: catFilter || undefined,
+      search: search || undefined,
+      lowStock: lowStockOnly ? 'true' : undefined,
+      page,
+      limit: 30,
+    }),
+  });
+
+  // Accurate stats from server — not limited to current page
+  const { data: statsData } = useQuery({
+    queryKey: ['inventory-stats'],
+    queryFn: () => inventoryApi.stats(),
   });
 
   const createMutation = useMutation({
     mutationFn: (d: unknown) => inventoryApi.create(d),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['inventory'] }); toast({ title: 'Item added' }); setAddOpen(false); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
+      toast({ title: 'Item added' });
+      setAddOpen(false);
+    },
     onError: (err: { response?: { data?: { error?: string } } }) =>
       toast({ title: 'Error', description: err?.response?.data?.error ?? 'Failed to add item', variant: 'destructive' }),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: unknown }) => inventoryApi.update(id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['inventory'] }); toast({ title: 'Item updated' }); setEditItem(null); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
+      toast({ title: 'Item updated' });
+      setEditItem(null);
+    },
     onError: () => toast({ title: 'Error', description: 'Failed to update', variant: 'destructive' }),
   });
 
   const movementMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: unknown }) => inventoryApi.addMovement(id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['inventory'] }); toast({ title: 'Stock updated' }); setMovementItem(null); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
+      toast({ title: 'Stock updated' });
+      setMovementItem(null);
+    },
     onError: () => toast({ title: 'Error', description: 'Failed to record movement', variant: 'destructive' }),
   });
 
-  const allItems: InventoryItem[] = data?.data?.data ?? [];
+  const items: InventoryItem[] = data?.data?.data ?? [];
   const pagination = data?.data?.pagination;
-  const total = pagination?.total ?? 0;
 
-  const items = allItems.filter(i =>
-    search === '' ||
-    i.name.toLowerCase().includes(search.toLowerCase()) ||
-    i.supplier?.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const lowStockCount = allItems.filter(i => Number(i.currentStock) <= Number(i.minimumStock)).length;
-  const totalValue = allItems.reduce((s, i) => s + Number(i.currentStock) * Number(i.unitCost), 0);
+  const stats = statsData?.data?.data ?? { total: 0, lowStockCount: 0, totalValue: 0 };
+  const totalItems   = stats.total        ?? 0;
+  const lowStockCount = stats.lowStockCount ?? 0;
+  const totalValue   = stats.totalValue   ?? 0;
 
   return (
     <div className="space-y-6">
@@ -230,10 +342,10 @@ export default function InventoryPage() {
         <Button className="gap-2" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> Add Item</Button>
       </div>
 
-      {/* Stats */}
+      {/* Stats — from server, accurate across all items */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Total Items', value: total || 0, icon: Package, color: 'bg-resort-50 border-resort-200 text-resort-700' },
+          { label: 'Total Items', value: totalItems, icon: Package, color: 'bg-resort-50 border-resort-200 text-resort-700' },
           { label: 'Low Stock', value: lowStockCount, icon: AlertTriangle, color: lowStockCount > 0 ? 'bg-red-50 border-red-200 text-red-700' : 'bg-green-50 border-green-200 text-green-700' },
           { label: 'Stock Value', value: formatCurrency(totalValue), icon: TrendingUp, color: 'bg-blue-50 border-blue-200 text-blue-700' },
         ].map(({ label, value, icon: Icon, color }) => (
@@ -248,16 +360,21 @@ export default function InventoryPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search items or supplier..." className="pl-9" />
+          <Input
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            placeholder="Search items or supplier..."
+            className="pl-9"
+          />
         </div>
         <button
-          onClick={() => setLowStockOnly(v => !v)}
+          onClick={() => { setLowStockOnly(v => !v); setPage(1); }}
           className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium border transition-colors ${lowStockOnly ? 'bg-red-600 text-white border-red-600' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
           <AlertTriangle className="h-3.5 w-3.5" /> Low Stock Only
         </button>
         <div className="flex gap-2 flex-wrap">
           {CATEGORIES.map(c => (
-            <button key={c} onClick={() => setCatFilter(c)}
+            <button key={c} onClick={() => { setCatFilter(c); setPage(1); }}
               className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${catFilter === c ? 'bg-resort-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
               {c ? c.replace('_', ' ') : 'All'}
             </button>
@@ -329,6 +446,9 @@ export default function InventoryPage() {
                             <Button size="sm" variant="outline" className="text-xs gap-1" onClick={() => setMovementItem(item)}>
                               <ArrowUpDown className="h-3 w-3" /> Stock
                             </Button>
+                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-blue-600" title="View history" onClick={() => setHistoryItem(item)}>
+                              <History className="h-3.5 w-3.5" />
+                            </Button>
                             <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-resort-600" onClick={() => setEditItem(item)}>
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
@@ -347,7 +467,7 @@ export default function InventoryPage() {
       {/* Pagination */}
       {pagination && pagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">Showing {(page - 1) * 30 + 1}–{Math.min(page * 30, total)} of {total}</p>
+          <p className="text-sm text-muted-foreground">Showing {(page - 1) * 30 + 1}–{Math.min(page * 30, pagination.total)} of {pagination.total}</p>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)} className="gap-1"><ChevronLeft className="h-4 w-4" /> Previous</Button>
             <Button variant="outline" size="sm" disabled={page === pagination.totalPages} onClick={() => setPage(p => p + 1)} className="gap-1">Next <ChevronRight className="h-4 w-4" /></Button>
@@ -359,6 +479,7 @@ export default function InventoryPage() {
       <ItemModal open={!!editItem} onClose={() => setEditItem(null)} item={editItem} loading={updateMutation.isPending} onSubmit={d => editItem && updateMutation.mutate({ id: editItem.id, data: d })} />
       <MovementModal open={!!movementItem} onClose={() => setMovementItem(null)} item={movementItem} loading={movementMutation.isPending}
         onSubmit={d => movementItem && movementMutation.mutate({ id: movementItem.id, data: d })} />
+      <HistoryModal open={!!historyItem} onClose={() => setHistoryItem(null)} item={historyItem} />
     </div>
   );
 }

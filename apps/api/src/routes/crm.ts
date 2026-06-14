@@ -299,7 +299,18 @@ export async function crmRoutes(app: FastifyInstance) {
       take:  limit,
     });
 
-    const total = await prisma.guest.count({ where: { tenantId } });
+    const total = await prisma.guest.count({
+      where: {
+        tenantId,
+        ...(q.search ? { OR: [
+          { firstName: { contains: q.search, mode: 'insensitive' } },
+          { lastName:  { contains: q.search, mode: 'insensitive' } },
+          { email:     { contains: q.search, mode: 'insensitive' } },
+        ]} : {}),
+        ...(q.tier ? { score: { tier: q.tier as any } } : {}),
+        ...(q.tag  ? { tags: { some: { tag: { name: q.tag } } } } : {}),
+      },
+    });
     return ok({ guests, total, page, pages: Math.ceil(total / limit) });
   });
 
@@ -609,6 +620,195 @@ export async function crmRoutes(app: FastifyInstance) {
       update: { status: 'ACTIVE', currentStep: 0, completedAt: null },
     });
     return ok(enrollment, 'Guest enrolled in sequence');
+  });
+
+  /* ── AUTOMATION ──────────────────────────────────────────────────────────── */
+
+  /**
+   * POST /api/crm/automation/run-daily
+   *
+   * Sends birthday emails to guests celebrating today, and resort-anniversary
+   * emails to guests who stayed exactly ~1 year ago and haven't returned.
+   *
+   * Call this from a cron job (e.g. every day at 08:00 local time).
+   * Also callable manually from the CRM dashboard for testing.
+   */
+  app.post('/automation/run-daily', { preHandler: pre }, async (request) => {
+    const { tenantId } = request.user as JwtPayload;
+
+    const today     = new Date();
+    const todayMonth = today.getMonth() + 1; // 1-12
+    const todayDay   = today.getDate();
+
+    // Get tenant branding for email wrapper
+    const [tenant, wc] = await Promise.all([
+      prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true, slug: true } }),
+      prisma.websiteContent.findUnique({ where: { tenantId }, select: { primaryColor: true, accentColor: true } }),
+    ]);
+    const tenantName   = tenant?.name    ?? 'Resort';
+    const primaryColor = wc?.primaryColor ?? '#1a6b5e';
+    const accentColor  = wc?.accentColor  ?? '#d4a853';
+    const bookingUrl   = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/${tenant?.slug ?? ''}`;
+
+    // ── 1. Birthday emails ─────────────────────────────────────────────────
+    // Find active BIRTHDAY sequences for this tenant
+    const birthdaySequence = await prisma.sequence.findFirst({
+      where: { tenantId, trigger: 'BIRTHDAY', status: 'ACTIVE' },
+      include: { steps: { orderBy: { stepOrder: 'asc' }, take: 1 } },
+    });
+
+    // Find guests whose birthday is TODAY, subscribed, not already emailed this year
+    const birthdayGuests = await prisma.$queryRaw<
+      { id: string; firstName: string; email: string }[]
+    >`
+      SELECT g.id, g."firstName", g.email
+      FROM guests g
+      LEFT JOIN email_consents c ON c."guestId" = g.id
+      WHERE g."tenantId" = ${tenantId}
+        AND g."dateOfBirth" IS NOT NULL
+        AND EXTRACT(MONTH FROM g."dateOfBirth") = ${todayMonth}
+        AND EXTRACT(DAY   FROM g."dateOfBirth") = ${todayDay}
+        AND (c."subscribed" IS NULL OR c."subscribed" = true)
+        AND NOT EXISTS (
+          SELECT 1 FROM email_sends es
+          WHERE es."guestId" = g.id
+            AND es."tenantId" = ${tenantId}
+            AND es.subject ILIKE '%birthday%'
+            AND es."createdAt" > NOW() - INTERVAL '300 days'
+        )
+    `;
+
+    let birthdaySent = 0;
+    for (const guest of birthdayGuests) {
+      // Use first step of birthday sequence, or default birthday template
+      const stepHtml = birthdaySequence?.steps[0]?.html;
+      const stepSubject = birthdaySequence?.steps[0]?.subject;
+
+      const subject = stepSubject ?? `🎂 Happy Birthday ${guest.firstName}! A special gift from ${tenantName}`;
+      const bodyHtml = stepHtml ?? `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1f2937">
+          <div style="background:linear-gradient(135deg,#7c3aed,#ec4899);padding:40px 24px;text-align:center">
+            <h1 style="color:#ffffff;font-size:32px;margin:0">🎂 Happy Birthday!</h1>
+            <p style="color:#fce7f3;margin:12px 0 0">Wishing you a day as wonderful as you are</p>
+          </div>
+          <div style="padding:32px 24px;background:#ffffff;text-align:center">
+            <p>Dear <strong>${guest.firstName}</strong>,</p>
+            <p>The entire team at <strong>${tenantName}</strong> wishes you a very Happy Birthday! 🎉</p>
+            <p>As a special birthday gift, enjoy <strong>20% off</strong> your next stay — valid for 30 days.</p>
+            <div style="background:#fdf4ff;border:2px solid #7c3aed;border-radius:12px;padding:24px;margin:24px 0">
+              <p style="font-size:36px;font-weight:700;color:#ec4899;margin:0">20% OFF</p>
+              <p style="background:#7c3aed;color:#fff;display:inline-block;padding:8px 20px;border-radius:6px;font-weight:600;letter-spacing:2px;margin-top:8px">BDAY20</p>
+            </div>
+            <a href="${bookingUrl}" style="background:#7c3aed;color:#fff;padding:14px 32px;text-decoration:none;border-radius:8px;font-weight:600;display:inline-block">Claim Your Birthday Gift</a>
+            <p style="color:#6b7280;font-size:14px;margin-top:24px">With birthday wishes,<br><strong>${tenantName} Team</strong></p>
+            <p style="color:#9ca3af;font-size:11px;margin-top:16px">
+              <a href="${process.env.API_URL || 'http://localhost:4000'}/crm/unsubscribe/${guest.id}" style="color:#9ca3af">Unsubscribe</a>
+            </p>
+          </div>
+        </div>`;
+
+      const html = wrapEmail({ body: renderTemplate(bodyHtml, { guestName: guest.firstName }), tenantName, primaryColor, accentColor, unsubscribeUrl: `${process.env.API_URL || 'http://localhost:4000'}/crm/unsubscribe/${guest.id}` });
+      const { id: resendId, error } = await sendEmail({ to: guest.email, subject, html });
+
+      await prisma.emailSend.create({
+        data: {
+          tenantId,
+          guestId:    guest.id,
+          subject,
+          status:     error ? 'FAILED' : 'SENT',
+          resendId:   resendId ?? undefined,
+        },
+      });
+      if (!error) birthdaySent++;
+    }
+
+    // ── 2. Resort anniversary emails ───────────────────────────────────────
+    // Guests whose FIRST checkout was ~1 year ago (355–375 day window)
+    // AND haven't had any checkout in the last 60 days (haven't returned yet)
+    const anniversarySequence = await prisma.sequence.findFirst({
+      where: { tenantId, trigger: 'ANNIVERSARY', status: 'ACTIVE' },
+      include: { steps: { orderBy: { stepOrder: 'asc' }, take: 1 } },
+    });
+
+    const anniversaryGuests = await prisma.$queryRaw<
+      { id: string; firstName: string; email: string; firstStay: Date }[]
+    >`
+      SELECT DISTINCT ON (g.id)
+        g.id, g."firstName", g.email, MIN(b."checkOut") AS "firstStay"
+      FROM guests g
+      JOIN bookings b ON b."guestId" = g.id AND b.status = 'CHECKED_OUT'
+      LEFT JOIN email_consents c ON c."guestId" = g.id
+      WHERE g."tenantId" = ${tenantId}
+        AND (c."subscribed" IS NULL OR c."subscribed" = true)
+        AND NOT EXISTS (
+          SELECT 1 FROM email_sends es
+          WHERE es."guestId" = g.id
+            AND es."tenantId" = ${tenantId}
+            AND es.subject ILIKE '%anniversary%'
+            AND es."createdAt" > NOW() - INTERVAL '300 days'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM bookings b2
+          WHERE b2."guestId" = g.id
+            AND b2.status = 'CHECKED_OUT'
+            AND b2."checkOut" > NOW() - INTERVAL '60 days'
+        )
+      GROUP BY g.id, g."firstName", g.email
+      HAVING MIN(b."checkOut") BETWEEN NOW() - INTERVAL '375 days' AND NOW() - INTERVAL '355 days'
+    `;
+
+    let anniversarySent = 0;
+    for (const guest of anniversaryGuests) {
+      const stepHtml    = anniversarySequence?.steps[0]?.html;
+      const stepSubject = anniversarySequence?.steps[0]?.subject;
+
+      const subject = stepSubject ?? `🏖️ It's been 1 year, ${guest.firstName}! Come celebrate with us`;
+      const bodyHtml = stepHtml ?? `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1f2937">
+          <div style="background:linear-gradient(135deg,#1a6b5e,#2d9e8f);padding:40px 24px;text-align:center">
+            <h1 style="color:#d4a853;font-size:28px;margin:0">🏖️ Your Resort Anniversary!</h1>
+            <p style="color:#a7f3d0;margin:12px 0 0;font-size:16px">One year ago you made unforgettable memories here</p>
+          </div>
+          <div style="padding:32px 24px;background:#ffffff">
+            <p>Dear <strong>${guest.firstName}</strong>,</p>
+            <p>Can you believe it's already been a year since your last visit to <strong>${tenantName}</strong>? We miss having you here!</p>
+            <p>To celebrate your resort anniversary, we have a special gift for you:</p>
+            <div style="background:#f0faf8;border:2px solid #1a6b5e;border-radius:12px;padding:24px;text-align:center;margin:24px 0">
+              <p style="font-size:14px;color:#6b7280;margin:0">Your exclusive anniversary offer</p>
+              <p style="font-size:40px;font-weight:700;color:#1a6b5e;margin:8px 0">15% OFF</p>
+              <p style="font-size:14px;color:#374151;margin:0">on your return stay — valid for 30 days</p>
+              <p style="background:#1a6b5e;color:#fff;display:inline-block;padding:8px 20px;border-radius:6px;font-weight:600;margin-top:12px;letter-spacing:2px">ANNIV15</p>
+            </div>
+            <p style="color:#6b7280;font-size:13px;text-align:center">Offer valid for 30 days. Direct bookings only.</p>
+            <div style="text-align:center;margin:24px 0">
+              <a href="${bookingUrl}" style="background:#1a6b5e;color:#fff;padding:16px 36px;text-decoration:none;border-radius:8px;font-weight:600">Book My Return Stay →</a>
+            </div>
+            <p style="color:#6b7280;font-size:14px">Warm regards,<br><strong>${tenantName} Team</strong></p>
+            <p style="color:#9ca3af;font-size:11px;text-align:center;margin-top:24px">
+              <a href="${process.env.API_URL || 'http://localhost:4000'}/crm/unsubscribe/${guest.id}" style="color:#9ca3af">Unsubscribe</a>
+            </p>
+          </div>
+        </div>`;
+
+      const html = wrapEmail({ body: renderTemplate(bodyHtml, { guestName: guest.firstName }), tenantName, primaryColor, accentColor, unsubscribeUrl: `${process.env.API_URL || 'http://localhost:4000'}/crm/unsubscribe/${guest.id}` });
+      const { id: resendId, error } = await sendEmail({ to: guest.email, subject, html });
+
+      await prisma.emailSend.create({
+        data: {
+          tenantId,
+          guestId:    guest.id,
+          subject,
+          status:     error ? 'FAILED' : 'SENT',
+          resendId:   resendId ?? undefined,
+        },
+      });
+      if (!error) anniversarySent++;
+    }
+
+    return ok({
+      birthday:     { found: birthdayGuests.length,    sent: birthdaySent },
+      anniversary:  { found: anniversaryGuests.length, sent: anniversarySent },
+    }, `Automation complete — ${birthdaySent} birthday, ${anniversarySent} anniversary emails sent`);
   });
 
   /* ── ANALYTICS ────────────────────────────────────────────────────────────── */

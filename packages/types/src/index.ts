@@ -7,6 +7,7 @@ export type UserRole =
   | 'MARKETER'
   | 'DEVELOPER'
   | 'STAFF'
+  | 'CHEF'
   | 'GUEST';
 
 export interface AuthUser {
@@ -16,6 +17,8 @@ export interface AuthUser {
   tenantId: string;
   firstName: string;
   lastName: string;
+  phone?: string | null;
+  avatarUrl?: string | null;
 }
 
 export interface JwtPayload {
@@ -55,6 +58,8 @@ export interface Room {
   description: string | null;
   amenities: string[];
   images: string[];
+  videos: string[];
+  isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }

@@ -20,6 +20,7 @@ const schema = z.object({
   idNumber: z.string().optional(),
   address: z.string().optional(),
   notes: z.string().optional(),
+  dateOfBirth: z.string().optional(), // ISO date "yyyy-MM-dd"
 });
 
 type FormData = z.infer<typeof schema>;
@@ -35,6 +36,7 @@ interface Guest {
   idNumber?: string;
   address?: string;
   notes?: string;
+  dateOfBirth?: string | null;
 }
 
 interface Props {
@@ -62,9 +64,10 @@ export function GuestModal({ open, onClose, onSubmit, loading, guest }: Props) {
         idNumber: guest.idNumber ?? '',
         address: guest.address ?? '',
         notes: guest.notes ?? '',
+        dateOfBirth: guest.dateOfBirth ? guest.dateOfBirth.slice(0, 10) : '',
       });
     } else {
-      reset({ firstName: '', lastName: '', email: '', phone: '', nationality: '', idNumber: '', address: '', notes: '' });
+      reset({ firstName: '', lastName: '', email: '', phone: '', nationality: '', idNumber: '', address: '', notes: '', dateOfBirth: '' });
     }
   }, [guest, reset, open]);
 
@@ -129,9 +132,18 @@ export function GuestModal({ open, onClose, onSubmit, loading, guest }: Props) {
           <Input {...register('idNumber')} placeholder="AB1234567" />
         </div>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Address</label>
-          <Input {...register('address')} placeholder="123 Main St, New York, NY 10001" />
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Address</label>
+            <Input {...register('address')} placeholder="123 Main St, New York, NY 10001" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Date of Birth
+              <span className="ml-1 text-xs text-muted-foreground font-normal">(for birthday offers)</span>
+            </label>
+            <Input {...register('dateOfBirth')} type="date" />
+          </div>
         </div>
 
         <div>

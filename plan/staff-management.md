@@ -1,207 +1,189 @@
-# ResortPro — Staff Management Module
+# Staff Management — ResortPro
+
+> Team management এর complete technical reference — staff CRUD, invite system, roles, deactivate/reactivate।
+
+---
 
 ## Overview
 
-Resort staff-দের manage করা — roles/departments, shift scheduling, task assignment, attendance। Housekeeping, front desk, restaurant, maintenance — সব department-এর staff এক জায়গায়।
+ResortPro এর staff management system দুটো পথে নতুন staff যোগ করে:
 
-> Note: Tech details (user roles/permissions) আলাদা plan-এ আছে: `roles-permissions.md`
-> এই plan টা operational/HR side এর।
-
----
-
-## ১. Staff Directory `/dashboard/staff`
-
-```
-┌──────────────────────────────────────────────────────┐
-│  Staff                    [+ Add Staff]  [Export]   │
-│                                                      │
-│  Department: [All ▾]  Status: [Active ▾]            │
-│                                                      │
-│  Sarah Rahman        Housekeeping Supervisor         │
-│  📞 01712-xxxxx      Active since: Mar 2025         │
-│  Shifts: Mon–Fri     Today: 8am–4pm                │
-│  [View] [Edit] [Schedule]                           │
-│  ─────────────────────────────────────────────────  │
-│  Karim Hossain       Maintenance Technician          │
-│  📞 01812-xxxxx      Active since: Jan 2025         │
-│  [View] [Edit] [Schedule]                           │
-└──────────────────────────────────────────────────────┘
-```
+1. **Add Staff (form)** — email + password দিয়ে সরাসরি account create করে
+2. **Invite by Email** — token-based invite পাঠায়, staff নিজে signup করে (7 দিন valid)
 
 ---
 
-## ২. Staff Profile
+## Features
 
-```
-Name:          Sarah Rahman
-Role:          Housekeeping Supervisor
-Department:    Housekeeping
-Phone:         01712-345678
-Email:         sarah@resort.com (login email)
-Join Date:     March 1, 2025
-Status:        Active
+### ১. Staff List (`/dashboard/staff`)
+- **Stats bar** — Total Staff, Active, Departments
+- **Server-side search** — name, email, position দিয়ে (debounced 350ms)
+- **Department filter** — All / FRONT_DESK / HOUSEKEEPING / RESTAURANT / MAINTENANCE / SECURITY / MANAGEMENT
+- **Role column** — actual role badge (MANAGER, RECEPTIONIST, STAFF, etc.) color-coded
+- **Status dot** — avatar এ green/gray dot (active/inactive)
+- **Pagination** — 20 per page
 
-System Access:
-  Dashboard Role: HOUSEKEEPING  (limited access)
+### ২. Pending Invites Panel
+- Accept না করা invites হলুদ banner এ দেখায়
+- Email, role, sent date, expiry দেখায়
+- ✕ button দিয়ে individual invite cancel করা যায়
 
-Performance (auto-tracked):
-  Rooms cleaned this month: 124
-  Avg time per room: 28 min
-  Tasks completed: 95%
-  Open issues: 2
+### ৩. Add Staff Modal
+- Fields: First Name, Last Name, Email, Phone, Password (min 8), Department, Position, Hire Date
+- Create হলেই system access পায় (role: STAFF by default)
+- Email duplicate check আছে
 
-Attendance this week:
-  Mon ✅  Tue ✅  Wed ✅  Thu 🔴  Fri —
-```
+### ৪. Edit Staff Modal
+- Department, Position, Phone, Hire Date, First/Last Name পরিবর্তন করা যায়
+- Email পরিবর্তন করা যায় না
+- **নাম save হয়** — user table ও staff table দুটোই update হয়
 
----
+### ৫. Staff Detail Sheet (Right sidebar)
+- Avatar, name, position, department badge, status badge
+- **Tenure stats** — কতদিন হলো কাজ করছে (3d / 2mo / 1y 4mo)
+- **Last login** date
+- Contact: email, phone
+- Employment: position, department, hire date
+- **System Access** — actual role (color-coded badge, not hardcoded "STAFF")
+- **Actions:**
+  - Edit → opens edit modal
+  - Active staff → "Deactivate" (red) button
+  - Inactive staff → "Reactivate" (green) button
 
-## ৩. Shift Scheduling
-
-### Weekly Schedule View
-```
-          Mon    Tue    Wed    Thu    Fri    Sat    Sun
-Sarah     8–4    8–4    8–4    OFF    8–4    OFF    OFF
-Karim     9–5    9–5    9–5    9–5    9–5    OFF    OFF
-Rahim     OFF    2–10   2–10   2–10   2–10   2–10   2–10
-Front1    6–2    6–2    6–2    6–2    6–2    6–2    OFF
-```
-
-### Add/Edit Shift
-```
-Staff:     [Sarah Rahman ▾]
-Week:      [Jun 9–15, 2026]
-Mon:  [✓] From [08:00] To [16:00]
-Tue:  [✓] From [08:00] To [16:00]
-Wed:  [✓] From [08:00] To [16:00]
-Thu:  [ ] OFF
-Fri:  [✓] From [08:00] To [16:00]
-Sat:  [ ] OFF
-Sun:  [ ] OFF
-Notes: [Regular week]
-[Save Schedule]
-```
+### ৬. Invite by Email Modal
+- 6টি role option: Staff, Receptionist, Manager, Marketer, Developer, Shareholder
+- Role description auto-shows
+- 7 দিনের token generate হয়
+- `/auth/invite?token=...` লিংক email এ যায়
+- Pending invites panel এ দেখা যায়
 
 ---
 
-## ৪. Daily Task Assignment
+## Roles
+
+| Role | Access |
+|------|--------|
+| `OWNER` | সব কিছু |
+| `MANAGER` | Billing বাদে সব |
+| `RECEPTIONIST` | Bookings, Guests, Front Desk, Housekeeping |
+| `MARKETER` | Website, CRM, Email campaigns, Analytics |
+| `DEVELOPER` | Website builder, Embed settings, Channel Sync |
+| `SHAREHOLDER` | Read-only: Dashboard, Analytics, Reports |
+| `STAFF` | Housekeeping, Maintenance, Restaurant, F&B |
+
+---
+
+## API Endpoints
 
 ```
-Manager প্রতিদিন tasks assign করবে:
+GET    /api/staff                     List staff (filter: department, search, page, limit)
+POST   /api/staff                     Create staff member (email + password)
+PATCH  /api/staff/:id                 Update staff (name, department, position, phone, hireDate)
+DELETE /api/staff/:id                 Deactivate staff (sets isActive: false on staff + user)
+PATCH  /api/staff/:id/reactivate      Reactivate staff (sets isActive: true on staff + user)
 
-Housekeeping tasks: (auto-generated from checkouts)
-  Room 102 → Sarah (Priority: HIGH - checkout today, next guest 3pm)
-  Room 205 → Rahim
-  Room 301 → Sarah (stayover clean)
-
-Custom tasks:
-  [+ Add Task]
-  Task: "Deep clean pool area"
-  Assign to: [Facilities team ▾]
-  Due by: [2pm today]
-  Priority: [MEDIUM ▾]
+POST   /api/staff/invite              Send email invite (creates StaffInvite token, sends email)
+GET    /api/staff/invites             List pending invites (unused, not expired)
+DELETE /api/staff/invites/:id         Cancel/expire an invite
 ```
 
 ---
 
-## ৫. Department Structure
+## File Structure
 
 ```
-Departments:
-  HOUSEKEEPING     → housekeeping tasks
-  FRONT_DESK       → check-in/out, walk-ins
-  MAINTENANCE      → maintenance requests
-  RESTAURANT       → F&B orders (future)
-  MANAGEMENT       → owner/manager
-  SECURITY         → (optional)
-  ACTIVITIES       → activity guide/instructor
+apps/web/src/
+  app/(dashboard)/dashboard/staff/
+    page.tsx                  ← Staff list, invite modal, pending invites, pagination
+
+  components/staff/
+    StaffModal.tsx            ← Add/Edit staff form (react-hook-form + zod)
+    StaffDetailSheet.tsx      ← Right-slide detail panel
+
+  lib/api.ts                  ← staffApi: list, create, update, delete, reactivate, listInvites, cancelInvite
+
+apps/api/src/routes/
+  staff.ts                    ← All staff routes (~220 lines)
 ```
 
 ---
 
-## ৬. Database Schema
+## Data Flow
+
+```
+Add Staff:
+Manager → Add Staff modal → POST /api/staff
+  → bcrypt hash password → user create (role: STAFF) → staff create
+  → Account active immediately
+
+Invite Staff:
+Manager → Invite modal → POST /api/staff/invite
+  → StaffInvite create (token, expiresAt: +7d)
+  → Email sent with /auth/invite?token=...
+  → Staff clicks link → sets password, account created
+  → StaffInvite.used = true
+
+Deactivate:
+OWNER/Manager → Deactivate button → DELETE /api/staff/:id
+  → staff.isActive = false, user.isActive = false
+  → Login blocked
+
+Reactivate:
+OWNER/Manager → Reactivate button → PATCH /api/staff/:id/reactivate
+  → staff.isActive = true, user.isActive = true
+  → Login restored
+```
+
+---
+
+## Prisma Models
 
 ```prisma
-// Staff are Users with a Tenant association
-// Existing User model covers login, role
-// Add Staff-specific HR fields:
+model Staff {
+  id         String   @id @default(uuid())
+  tenantId   String
+  userId     String   @unique
+  department String   // FRONT_DESK | HOUSEKEEPING | RESTAURANT | MAINTENANCE | SECURITY | MANAGEMENT
+  position   String
+  phone      String?
+  hireDate   DateTime
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-model StaffProfile {
-  id           String   @id @default(cuid())
-  userId       String   @unique
-  user         User     @relation(fields: [userId], references: [id])
-  tenantId     String
-  tenant       Tenant   @relation(fields: [tenantId], references: [id])
-
-  department   String   // HOUSEKEEPING|FRONT_DESK|MAINTENANCE|etc.
-  jobTitle     String?
-  phone        String?
-  joinDate     DateTime?
-  status       String   @default("ACTIVE")  // ACTIVE|INACTIVE|ON_LEAVE
-  notes        String?
-
-  schedules    StaffSchedule[]
-  createdAt    DateTime @default(now())
+  tenant Tenant @relation(...)
+  user   User   @relation(...)
 }
 
-model StaffSchedule {
-  id           String   @id @default(cuid())
-  staffId      String
-  staff        StaffProfile @relation(fields: [staffId], references: [id])
-  tenantId     String
-
-  weekStart    DateTime  // Monday of the week
-  mon          Json?     // { from: "08:00", to: "16:00" } or null
-  tue          Json?
-  wed          Json?
-  thu          Json?
-  fri          Json?
-  sat          Json?
-  sun          Json?
-
-  notes        String?
-  createdAt    DateTime @default(now())
+model StaffInvite {
+  id        String   @id @default(uuid())
+  tenantId  String
+  email     String
+  role      UserRole
+  token     String   @unique
+  used      Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }
 ```
 
 ---
 
-## ৭. API Endpoints
+## উন্নতির সুযোগ (Future)
 
-```
-GET    /api/tenant/staff              → list staff
-POST   /api/tenant/staff              → invite/add staff (sends email invite)
-PATCH  /api/tenant/staff/:id          → update profile
-DELETE /api/tenant/staff/:id          → deactivate
-
-GET    /api/tenant/staff/:id/schedule → get weekly schedule
-PUT    /api/tenant/staff/:id/schedule → set weekly schedule
-GET    /api/tenant/schedule/week      → all staff schedule for a week
-  ?weekStart=2026-06-09
-
-GET    /api/tenant/staff/:id/tasks    → tasks assigned to this staff
-GET    /api/tenant/staff/:id/performance → performance metrics
-```
+- [ ] Staff schedule / shift management
+- [ ] Leave / absence tracking
+- [ ] Performance notes per staff member
+- [ ] Role change for existing staff (currently only at invite/create time)
+- [ ] Bulk invite from CSV
+- [ ] Staff photo upload
+- [ ] Password reset by admin
 
 ---
 
-## ৮. Implementation Steps
+## Status
 
-```
-Step 1 — Database (0.5 day)
-  ✦ StaffProfile + StaffSchedule models
-  ✦ Migrate
-
-Step 2 — API (1.5 days)
-  ✦ Staff CRUD (extend existing user invite flow)
-  ✦ Schedule management
-  ✦ Performance metrics query
-
-Step 3 — Dashboard UI (2 days)
-  ✦ /dashboard/staff page
-  ✦ Staff profile view/edit
-  ✦ Weekly schedule builder
-  ✦ Department filter
-
-Total: ~4 days
-```
+সব core feature ✅ live:
+- Staff CRUD, invite system, deactivate + reactivate
+- Server-side search, department filter, pagination
+- Actual role badge (not hardcoded), pending invites panel — June 2026

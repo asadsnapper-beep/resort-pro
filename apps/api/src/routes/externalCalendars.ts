@@ -71,15 +71,20 @@ export async function externalCalendarRoutes(app: FastifyInstance) {
         orderBy: [{ roomId: 'asc' }, { createdAt: 'asc' }],
       })
 
-      // Attach imported booking count per calendar
-      const withCounts = await Promise.all(
-        cals.map(async (cal) => {
-          const importedCount = await prisma.booking.count({
-            where: { tenantId, roomId: cal.roomId, externalSource: cal.name },
-          })
-          return { ...cal, importedCount }
-        })
+      // Attach imported booking count per calendar (single query via groupBy)
+      const countRows = await prisma.booking.groupBy({
+        by: ['externalSource'],
+        where: { tenantId, externalSource: { not: null } },
+        _count: { id: true },
+      })
+      const countBySource = Object.fromEntries(
+        countRows.map(r => [r.externalSource!, r._count.id])
       )
+
+      const withCounts = cals.map(cal => ({
+        ...cal,
+        importedCount: countBySource[cal.name] ?? 0,
+      }))
 
       return ok(withCounts)
     },
@@ -110,7 +115,7 @@ export async function externalCalendarRoutes(app: FastifyInstance) {
       // Immediately sync the new calendar (don't make staff wait 15 min)
       syncCalendarsForRoom(body.roomId, [cal]).catch(() => {})
 
-      return reply.code(201).send({ data: cal })
+      return reply.code(201).send(ok(cal))
     },
   })
 

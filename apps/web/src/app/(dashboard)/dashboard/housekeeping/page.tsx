@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { housekeepingApi, roomsApi, staffApi } from '@/lib/api';
+import { useAuthStore } from '@/store/auth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,22 +39,33 @@ const TYPE_COLORS: Record<string, string> = {
 
 function NewTaskModal({ open, onClose, loading, onSubmit }: {
   open: boolean; onClose: () => void; loading: boolean;
-  onSubmit: (data: Record<string, string>) => void;
+  onSubmit: (data: Record<string, string | undefined>) => void;
 }) {
-  const { data: roomsData } = useQuery({ queryKey: ['rooms-list'], queryFn: () => roomsApi.list({ limit: 100 }) });
+  const { data: roomsData } = useQuery({ queryKey: ['rooms-list'], queryFn: () => roomsApi.list({ limit: 200, isActive: true }) });
   const { data: staffData } = useQuery({ queryKey: ['staff-list'], queryFn: () => staffApi.list({ limit: 100, department: 'HOUSEKEEPING' }) });
   const rooms = roomsData?.data?.data ?? [];
   const staffList = staffData?.data?.data ?? [];
 
-  const [form, setForm] = useState({ roomId: '', assignedToId: '', type: '', scheduledDate: new Date().toISOString().split('T')[0], notes: '' });
+  const blankForm = { roomId: '', assignedToId: '', type: '', scheduledDate: new Date().toISOString().split('T')[0], notes: '' };
+  const [form, setForm] = useState(blankForm);
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  // Reset form each time modal opens
+  useEffect(() => { if (open) setForm(blankForm); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.roomId || !form.type || !form.scheduledDate) {
       toast({ title: 'Missing fields', description: 'Room, type and date are required', variant: 'destructive' }); return;
     }
-    onSubmit({ ...form, ...(form.assignedToId ? {} : { assignedToId: undefined as unknown as string }) });
+    const payload: Record<string, string | undefined> = {
+      roomId: form.roomId,
+      type: form.type,
+      scheduledDate: form.scheduledDate,
+      notes: form.notes || undefined,
+      assignedToId: form.assignedToId || undefined,
+    };
+    onSubmit(payload);
   };
 
   return (
@@ -116,38 +128,49 @@ export default function HousekeepingPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [dateFilter, setDateFilter] = useState('');
 
+  const { user } = useAuthStore();
+  const canManage = ['OWNER', 'MANAGER', 'RECEPTIONIST'].includes(user?.role ?? '');
+
   const { data, isLoading } = useQuery({
-    queryKey: ['housekeeping', statusFilter, dateFilter, page],
-    queryFn: () => housekeepingApi.list({ status: statusFilter || undefined, date: dateFilter || undefined, page, limit: 20 }),
+    queryKey: ['housekeeping', statusFilter, dateFilter, search, page],
+    queryFn: () => housekeepingApi.list({ status: statusFilter || undefined, date: dateFilter || undefined, search: search || undefined, page, limit: 20 }),
+  });
+
+  const { data: statsData } = useQuery({
+    queryKey: ['housekeeping-stats', dateFilter],
+    queryFn: () => housekeepingApi.stats({ date: dateFilter || undefined }),
   });
 
   const createMutation = useMutation({
     mutationFn: (d: unknown) => housekeepingApi.create(d),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['housekeeping'] }); toast({ title: 'Task created' }); setAddOpen(false); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['housekeeping'] });
+      queryClient.invalidateQueries({ queryKey: ['housekeeping-stats'] });
+      toast({ title: 'Task created' });
+      setAddOpen(false);
+    },
     onError: (err: { response?: { data?: { error?: string } } }) =>
       toast({ title: 'Error', description: err?.response?.data?.error ?? 'Failed to create task', variant: 'destructive' }),
   });
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => housekeepingApi.updateStatus(id, status),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['housekeeping'] }); toast({ title: 'Task updated' }); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['housekeeping'] });
+      queryClient.invalidateQueries({ queryKey: ['housekeeping-stats'] });
+      toast({ title: 'Task updated' });
+    },
     onError: () => toast({ title: 'Error', description: 'Failed to update task', variant: 'destructive' }),
   });
 
-  const allTasks: HKTask[] = data?.data?.data ?? [];
+  const tasks: HKTask[] = data?.data?.data ?? [];
   const pagination = data?.data?.pagination;
   const total = pagination?.total ?? 0;
 
-  const tasks = allTasks.filter(t =>
-    search === '' ||
-    t.room.name.toLowerCase().includes(search.toLowerCase()) ||
-    t.room.number.includes(search) ||
-    (t.assignedTo && `${t.assignedTo.user.firstName} ${t.assignedTo.user.lastName}`.toLowerCase().includes(search.toLowerCase()))
-  );
-
-  const pendingCount = allTasks.filter(t => t.status === 'PENDING').length;
-  const inProgressCount = allTasks.filter(t => t.status === 'IN_PROGRESS').length;
-  const completedCount = allTasks.filter(t => t.status === 'COMPLETED').length;
+  const stats = statsData?.data?.data ?? { total: 0, pending: 0, inProgress: 0, completed: 0 };
+  const pendingCount    = stats.pending    ?? 0;
+  const inProgressCount = stats.inProgress ?? 0;
+  const completedCount  = stats.completed  ?? 0;
 
   return (
     <div className="space-y-6">
@@ -156,9 +179,11 @@ export default function HousekeepingPage() {
           <h1 className="text-2xl font-bold text-gray-900">Housekeeping</h1>
           <p className="mt-1 text-sm text-muted-foreground">Schedule and track room cleaning tasks</p>
         </div>
-        <Button className="gap-2" onClick={() => setAddOpen(true)}>
-          <Plus className="h-4 w-4" /> New Task
-        </Button>
+        {canManage && (
+          <Button className="gap-2" onClick={() => setAddOpen(true)}>
+            <Plus className="h-4 w-4" /> New Task
+          </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -180,9 +205,9 @@ export default function HousekeepingPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative max-w-xs flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search room or staff..." className="pl-9" />
+          <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Search room or staff..." className="pl-9" />
         </div>
-        <Input type="date" value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="max-w-[160px]" />
+        <Input type="date" value={dateFilter} onChange={e => { setDateFilter(e.target.value); setPage(1); }} className="max-w-[160px]" />
         <div className="flex gap-2 flex-wrap">
           {STATUS_FILTERS.map(s => (
             <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
@@ -201,9 +226,9 @@ export default function HousekeepingPage() {
           ) : tasks.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20">
               <CheckSquare className="h-14 w-14 text-gray-200 mb-4" />
-              <p className="font-medium text-gray-500">{search || statusFilter ? 'No tasks found' : 'No tasks scheduled'}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{search || statusFilter ? 'Try adjusting filters' : 'Create your first housekeeping task'}</p>
-              {!search && !statusFilter && <Button className="mt-4 gap-2" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> New Task</Button>}
+              <p className="font-medium text-gray-500">{search || statusFilter || dateFilter ? 'No tasks found' : 'No tasks scheduled'}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{search || statusFilter || dateFilter ? 'Try adjusting filters' : 'Create your first housekeeping task'}</p>
+              {!search && !statusFilter && !dateFilter && canManage && <Button className="mt-4 gap-2" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> New Task</Button>}
             </div>
           ) : (
             <div className="overflow-x-auto">

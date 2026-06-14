@@ -64,7 +64,7 @@ async function buildDailyReport(tenantId: string, dateStr: string) {
       include: {
         guest: { select: { firstName: true, lastName: true } },
         room: { select: { number: true, name: true } },
-        payments: { where: { status: 'COMPLETED' } },
+        payments: { where: { status: 'PAID' } },
       },
       orderBy: { checkOut: 'asc' },
     }),
@@ -85,7 +85,7 @@ async function buildDailyReport(tenantId: string, dateStr: string) {
 
     // Room revenue: payments processed today
     prisma.payment.findMany({
-      where: { tenantId, processedAt: { gte: start, lte: end }, status: 'COMPLETED' },
+      where: { tenantId, processedAt: { gte: start, lte: end }, status: 'PAID' },
       include: { booking: { select: { id: true } } },
     }),
 
@@ -287,6 +287,19 @@ function buildReportEmail(report: Awaited<ReturnType<typeof buildDailyReport>>, 
 </body></html>`;
 }
 
+// ── Telegram helper (for test dispatch) ──────────────────────────────────────
+async function sendTelegramMsg(botToken: string, chatId: string, text: string): Promise<boolean> {
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
+    });
+    const data = await res.json() as any;
+    return data?.ok === true;
+  } catch { return false; }
+}
+
 export async function reportRoutes(app: FastifyInstance) {
   // GET /api/reports/daily?date=YYYY-MM-DD
   app.get('/daily', {
@@ -298,7 +311,7 @@ export async function reportRoutes(app: FastifyInstance) {
       const dateStr = date ?? new Date().toISOString().slice(0, 10);
 
       const report = await buildDailyReport(tenantId, dateStr);
-      return ok(reply, report);
+      return ok(report);
     },
   });
 
@@ -329,7 +342,137 @@ export async function reportRoutes(app: FastifyInstance) {
         html,
       });
 
-      return ok(reply, { sent: true, to: recipientEmail, date: dateStr });
+      return ok({ sent: true, to: recipientEmail, date: dateStr });
+    },
+  });
+
+  // ── GET /api/reports/dispatch — get dispatch settings ─────────────────────
+  app.get('/dispatch', {
+    preHandler: requireRole('OWNER', 'MANAGER'),
+    handler: async (request, reply) => {
+      const { tenantId } = request.user as JwtPayload;
+      const settings = await prisma.reportDispatchSettings.findUnique({ where: { tenantId } });
+      return ok(settings ?? {
+        enabled: false,
+        dispatchTime: '22:00',
+        telegramEnabled: false,
+        telegramBotToken: null,
+        telegramChatId: null,
+        whatsappEnabled: false,
+        whatsappPhone: null,
+        lastDispatchedAt: null,
+        lastDispatchDate: null,
+      });
+    },
+  });
+
+  // ── PUT /api/reports/dispatch — save dispatch settings ────────────────────
+  app.put('/dispatch', {
+    preHandler: requireRole('OWNER', 'MANAGER'),
+    handler: async (request, reply) => {
+      const { tenantId } = request.user as JwtPayload;
+      const body = request.body as {
+        enabled?: boolean;
+        dispatchTime?: string;
+        telegramEnabled?: boolean;
+        telegramBotToken?: string | null;
+        telegramChatId?: string | null;
+        whatsappEnabled?: boolean;
+        whatsappPhone?: string | null;
+      };
+
+      const settings = await prisma.reportDispatchSettings.upsert({
+        where: { tenantId },
+        create: {
+          tenantId,
+          enabled:          body.enabled          ?? false,
+          dispatchTime:     body.dispatchTime      ?? '22:00',
+          telegramEnabled:  body.telegramEnabled   ?? false,
+          telegramBotToken: body.telegramBotToken  ?? null,
+          telegramChatId:   body.telegramChatId    ?? null,
+          whatsappEnabled:  body.whatsappEnabled   ?? false,
+          whatsappPhone:    body.whatsappPhone      ?? null,
+        },
+        update: {
+          ...(body.enabled          !== undefined && { enabled: body.enabled }),
+          ...(body.dispatchTime     !== undefined && { dispatchTime: body.dispatchTime }),
+          ...(body.telegramEnabled  !== undefined && { telegramEnabled: body.telegramEnabled }),
+          ...(body.telegramBotToken !== undefined && { telegramBotToken: body.telegramBotToken }),
+          ...(body.telegramChatId   !== undefined && { telegramChatId: body.telegramChatId }),
+          ...(body.whatsappEnabled  !== undefined && { whatsappEnabled: body.whatsappEnabled }),
+          ...(body.whatsappPhone    !== undefined && { whatsappPhone: body.whatsappPhone }),
+        },
+      });
+
+      return ok(settings);
+    },
+  });
+
+  // ── POST /api/reports/dispatch/test — send test report now ───────────────
+  app.post('/dispatch/test', {
+    preHandler: requireRole('OWNER', 'MANAGER'),
+    handler: async (request, reply) => {
+      const { tenantId } = request.user as JwtPayload;
+      const body = request.body as { channel: 'telegram' | 'whatsapp' };
+
+      const settings = await prisma.reportDispatchSettings.findUnique({ where: { tenantId } });
+      if (!settings) return reply.code(400).send({ success: false, error: 'No dispatch settings found. Save settings first.' });
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const report  = await buildDailyReport(tenantId, dateStr);
+
+      let sent = false;
+      let error = '';
+
+      if (body.channel === 'telegram') {
+        if (!settings.telegramBotToken || !settings.telegramChatId) {
+          return reply.code(400).send({ success: false, error: 'Telegram bot token and chat ID are required.' });
+        }
+        const cur = report.tenant.currency;
+        const fmt = (n: number) => {
+          try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(n); }
+          catch { return `${cur} ${n.toFixed(0)}`; }
+        };
+        const text = `<b>📊 Test Report — ${report.tenant.name}</b>\n📅 ${dateStr}\n\n<b>🏨 Occupancy</b>\nRooms: ${report.occupancy.occupied}/${report.occupancy.totalRooms} (${report.occupancy.rate}%)\n\n<b>💰 Revenue</b>\n<b>Total: ${fmt(report.revenue.total)}</b>\n\n<i>✅ Test message from ResortPro</i>`;
+        sent = await sendTelegramMsg(settings.telegramBotToken, settings.telegramChatId, text);
+        if (!sent) error = 'Telegram delivery failed. Check your bot token and chat ID.';
+      } else if (body.channel === 'whatsapp') {
+        if (!settings.whatsappPhone) {
+          return reply.code(400).send({ success: false, error: 'WhatsApp phone number is required.' });
+        }
+        // Use tenant WA config
+        const tenant = await prisma.tenant.findUnique({
+          where: { id: tenantId },
+          select: { waMode: true, waApiToken: true, waPhoneNumberId: true },
+        });
+        const waToken = (tenant?.waMode === 'own' && tenant?.waApiToken) ? tenant.waApiToken : (process.env.META_WA_TOKEN ?? '');
+        const waPhoneId = (tenant?.waMode === 'own' && tenant?.waPhoneNumberId) ? tenant.waPhoneNumberId : (process.env.META_WA_PHONE_NUMBER_ID ?? '');
+        if (!waToken || !waPhoneId) {
+          return reply.code(400).send({ success: false, error: 'WhatsApp gateway not configured. Set up WhatsApp in Settings first.' });
+        }
+        try {
+          const res = await fetch(`https://graph.facebook.com/v19.0/${waPhoneId}/messages`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${waToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messaging_product: 'whatsapp',
+              to: settings.whatsappPhone.replace(/^\+/, ''),
+              type: 'text',
+              text: { body: `✅ Test report from ResortPro — ${report.tenant.name}\nDate: ${dateStr}\nOccupancy: ${report.occupancy.rate}%\nRevenue: ${report.revenue.total}` },
+            }),
+          });
+          const data = await res.json() as any;
+          sent = !!data?.messages?.[0]?.id;
+          if (!sent) error = 'WhatsApp delivery failed. Check gateway configuration.';
+        } catch (e) {
+          error = 'WhatsApp request failed.';
+        }
+      } else {
+        return reply.code(400).send({ success: false, error: 'channel must be "telegram" or "whatsapp"' });
+      }
+
+      if (!sent) return reply.code(502).send({ success: false, error });
+      return ok({ sent: true, channel: body.channel, date: dateStr });
     },
   });
 }

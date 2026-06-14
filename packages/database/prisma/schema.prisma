@@ -24,6 +24,7 @@ enum UserRole {
   MARKETER     // Analytics, Website, CRM & Email, Guests
   DEVELOPER    // Settings (Embed), Website, Channel Sync
   STAFF        // Housekeeping, Maintenance, Restaurant, Orders
+  CHEF         // Kitchen — Food Orders view & status update only
   GUEST        // (external, not dashboard user)
 }
 
@@ -190,6 +191,7 @@ enum TicketCategory {
 enum ChatSenderType {
   GUEST
   STAFF
+  BOT   // system-generated / webhook-forwarded messages
 }
 
 enum AdminRole {
@@ -365,6 +367,9 @@ model Tenant {
   waApiToken              String?
   waPhoneNumberId         String?
   waBusinessAccId         String?
+  // Telegram support channel
+  telegramBotToken        String?   // bot token from BotFather
+  telegramNotifChatId     String?   // staff group/channel chat_id for new ticket alerts
   // Notification triggers
   notifBookingConfirm     Boolean    @default(true)
   notifPaymentReceived    Boolean    @default(true)
@@ -434,7 +439,9 @@ model Tenant {
   supportTickets      SupportTicket[]
   amenities           Amenity[]
   websiteContent      WebsiteContent?
-  notifications       Notification[]
+  websitePageViews        WebsitePageView[]
+  reportDispatchSettings  ReportDispatchSettings?
+  notifications           Notification[]
   payments            Payment[]
   // CRM
   guestTags           GuestTag[]
@@ -609,6 +616,7 @@ model Guest {
   idNumber    String?
   address     String?
   notes       String?
+  dateOfBirth DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -1299,6 +1307,8 @@ model SupportTicket {
   category     TicketCategory @default(OTHER)
   priority     TicketPriority @default(MEDIUM)
   status       TicketStatus   @default(OPEN)
+  source       String         @default("WEB")  // "WEB" | "WHATSAPP" | "TELEGRAM"
+  externalChatId String?                        // telegram chat_id or WA phone number (for reply routing)
   resolvedAt   DateTime?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
@@ -1311,17 +1321,19 @@ model SupportTicket {
 
   @@index([tenantId])
   @@index([status])
+  @@index([source])
   @@map("support_tickets")
 }
 
 model ChatMessage {
-  id         String         @id @default(uuid())
-  ticketId   String
-  senderId   String
-  senderType ChatSenderType
-  message    String
-  isRead     Boolean        @default(false)
-  createdAt  DateTime       @default(now())
+  id            String         @id @default(uuid())
+  ticketId      String
+  senderId      String
+  senderType    ChatSenderType
+  message       String
+  isRead        Boolean        @default(false)
+  externalMsgId String?        // Telegram message_id or WA message_id (dedup)
+  createdAt     DateTime       @default(now())
 
   ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   sender User          @relation(fields: [senderId], references: [id])
@@ -1356,13 +1368,57 @@ model WebsiteContent {
   youtubeUrl     String?
   whatsappNumber String? // phone number only e.g. "+8801XXXXXXXXX"
   tripadvisorUrl String?
-  hiddenSections String[] @default([]) // sections owner has toggled off e.g. ["menu","gallery"]
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  hiddenSections    String[] @default([]) // sections owner has toggled off e.g. ["menu","gallery"]
+  googleAnalyticsId String?  // GA4 Measurement ID e.g. "G-XXXXXXXXXX"
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("website_content")
+}
+
+model WebsitePageView {
+  id       String   @id @default(cuid())
+  tenantId String
+  date     DateTime @db.Date
+  count    Int      @default(0)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, date])
+  @@index([tenantId])
+  @@map("website_page_views")
+}
+
+// ── Daily Report Auto-Dispatch settings (Telegram + WhatsApp) ─────────────────
+model ReportDispatchSettings {
+  id       String @id @default(cuid())
+  tenantId String @unique
+
+  // Master toggle
+  enabled      Boolean @default(false)
+  dispatchTime String  @default("22:00") // "HH:MM" in tenant's local time
+
+  // Telegram
+  telegramEnabled    Boolean @default(false)
+  telegramBotToken   String? // kept encrypted at rest in production
+  telegramChatId     String? // numeric chat/channel ID
+
+  // WhatsApp — phone number to send report to (owner's WA number)
+  whatsappEnabled Boolean @default(false)
+  whatsappPhone   String? // e.g. "+8801XXXXXXXXX"
+
+  // Last dispatch tracking
+  lastDispatchedAt DateTime?
+  lastDispatchDate String?   // "YYYY-MM-DD" of last report sent
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("report_dispatch_settings")
 }
 
 // ─── CRM ──────────────────────────────────────────────────────────────────────
@@ -1407,6 +1463,7 @@ enum SequenceTrigger {
   POST_STAY
   WIN_BACK
   BIRTHDAY
+  ANNIVERSARY
   MANUAL
 }
 

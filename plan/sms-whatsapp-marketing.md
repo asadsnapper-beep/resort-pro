@@ -365,3 +365,31 @@ Platform pool mode হলে:
 
 *See also: [sms-whatsapp-notifications.md](./sms-whatsapp-notifications.md) — transactional notifications*
 *See also: [sms-whatsapp-billing.md](./sms-whatsapp-billing.md) — quota & billing system*
+
+---
+
+## Bug Fixes (June 2026)
+
+### 1. ✅ `sendMut` page-level loading state — all Send buttons showed spinner simultaneously
+**Problem:** `useMutation` was declared once at the page level. `loading={sendMut.isPending}` was passed to every campaign's Send button, so when Campaign A was sending, Campaign B and C also showed loading spinners.  
+**Fix:** Added `sendingId: string | null` state. Buttons now use `loading={sendingId === c.id}` and set `setSendingId(c.id)` before calling `mutate()`. `onSettled` resets it to `null`. Same pattern applied to `deletingId` and `cancellingId`.
+
+### 2. ✅ WhatsApp quota not checked before send
+**Problem:** Before firing a campaign, the API only checked `smsQuotaMonthly` vs `smsUsedThisMonth + smsCredits`. A WhatsApp-only or `both`-channel campaign could be sent with zero WA quota remaining — no guard at all.  
+**Fix:** Added equivalent quota check for `needsWa`: compares `waQuotaMonthly - waUsedThisMonth + waCredits` against `recipients.length` and returns 400 with a clear billing error if insufficient.
+
+### 3. ✅ `processCampaignSend` always set `status: 'sent'` even on total failure
+**Problem:** After background send, campaign was always updated to `status: 'sent'` regardless of `delivered` count. A campaign where every single message failed would still show green "Sent" badge.  
+**Fix:** `finalStatus = delivered > 0 ? 'sent' : 'failed'`. The campaign accurately reflects whether at least one message was delivered.
+
+### 4. ✅ WA usage not tracked in platform pool
+**Problem:** After send, only `smsUsedThisMonth` was incremented (when `smsMode === 'platform'`). WhatsApp usage (`waUsedThisMonth`) was never updated, making the quota counter permanently stale.  
+**Fix:** Both `smsUsedThisMonth` and `waUsedThisMonth` are now incremented in a single `tenant.update()` call based on which channels were used and what mode is configured.
+
+### 5. ✅ `confirm()` native browser dialogs replaced
+**Problem:** Send, Delete (draft), and Cancel (scheduled) actions used `window.confirm()`, which is inconsistent with the rest of the app (all other destructive actions use toast feedback).  
+**Fix:** Removed all `confirm()` calls. Actions fire directly on click; success/error feedback is delivered via `toast()`. The detail page (`[id]/page.tsx`) had the same issue — also fixed.
+
+### 6. ✅ `cancelMut` `onError` showed `undefined` on network error
+**Problem:** `description: e?.response?.data?.error` — no fallback. If the request failed at network level (no `response`), toast showed `undefined`.  
+**Fix:** Added `?? 'Could not cancel campaign'` fallback in both `marketing/page.tsx` and `marketing/[id]/page.tsx`.

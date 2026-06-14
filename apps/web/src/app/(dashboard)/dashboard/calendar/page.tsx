@@ -8,7 +8,7 @@ import {
   ChevronLeft, ChevronRight, Loader2, BedDouble,
   CalendarDays, RefreshCw, Plus,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -52,6 +52,7 @@ const STATUS_CONFIG: Record<string, { bg: string; text: string; border: string; 
   CHECKED_IN:  { bg: 'bg-emerald-500',  text: 'text-white', border: 'border-emerald-600',  label: 'Checked In' },
   CHECKED_OUT: { bg: 'bg-gray-400',     text: 'text-white', border: 'border-gray-500',     label: 'Checked Out' },
   PENDING:     { bg: 'bg-amber-400',    text: 'text-white', border: 'border-amber-500',    label: 'Pending' },
+  CONFLICT:    { bg: 'bg-red-500',      text: 'text-white', border: 'border-red-600',      label: '⚠ Conflict' },
 };
 
 const ROOM_TYPE_SHORT: Record<string, string> = {
@@ -109,7 +110,7 @@ function BookingTooltip({ booking, onClose, onOpen }: {
         <p>📅 {booking.checkIn} → {booking.checkOut}</p>
         <p>🌙 {booking.nights} night{booking.nights !== 1 ? 's' : ''}</p>
         <p>👥 {booking.adults} adult{booking.adults !== 1 ? 's' : ''}{booking.children > 0 ? ` + ${booking.children} child` : ''}</p>
-        <p>💰 ${booking.totalAmount.toLocaleString()}</p>
+        <p>💰 {formatCurrency(booking.totalAmount)}</p>
       </div>
       <button
         onClick={onOpen}
@@ -136,7 +137,6 @@ function GanttRow({
   onCellClick: (roomId: string, date: string) => void;
   onBookingClick: (booking: GanttBooking) => void;
 }) {
-  const [tooltip, setTooltip] = useState<GanttBooking | null>(null);
   const router = useRouter();
   const totalDays = dates.length;
   const isMaintenance = room.status === 'MAINTENANCE';
@@ -217,14 +217,6 @@ function GanttRow({
                   <p className="text-[10px] opacity-70 ml-1 shrink-0">·{booking.nights}n</p>
                 )}
 
-                {/* Tooltip */}
-                {tooltip?.id === booking.id && (
-                  <BookingTooltip
-                    booking={booking}
-                    onClose={() => setTooltip(null)}
-                    onOpen={() => { setTooltip(null); router.push(`/dashboard/bookings/${booking.id}`); }}
-                  />
-                )}
               </div>
             </div>
           );
@@ -261,6 +253,10 @@ function Legend() {
       <div className="flex items-center gap-1.5">
         <span className="w-3 h-3 rounded-sm bg-orange-100" />
         Maintenance
+      </div>
+      <div className="flex items-center gap-1.5">
+        <span className="w-3 h-3 rounded-sm bg-red-500" />
+        Conflict
       </div>
     </div>
   );
@@ -308,7 +304,7 @@ export default function BookingCalendarPage() {
 
   const navigate = (dir: 'prev' | 'next' | 'today') => {
     if (dir === 'today') { setFromDate(getDefaultFrom()); return; }
-    setFromDate(prev => addDays(prev, dir === 'next' ? 14 : -14));
+    setFromDate(prev => addDays(prev, dir === 'next' ? 7 : -7));
   };
 
   const handleCellClick = (roomId: string, date: string) => {
@@ -536,7 +532,7 @@ export default function BookingCalendarPage() {
               </div>
               <div className="flex justify-between border-t border-gray-100 dark:border-gray-800 pt-2.5">
                 <span className="text-gray-500">Total</span>
-                <span className="font-bold text-gray-900 dark:text-white">${activeBooking.totalAmount.toLocaleString()}</span>
+                <span className="font-bold text-gray-900 dark:text-white">{formatCurrency(activeBooking.totalAmount)}</span>
               </div>
             </div>
 

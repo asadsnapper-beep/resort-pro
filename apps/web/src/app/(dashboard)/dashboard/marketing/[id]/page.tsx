@@ -77,13 +77,13 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
   const sendMut = useMutation({
     mutationFn: () => marketingApi.sendCampaign(id),
     onSuccess:  () => { qc.invalidateQueries({ queryKey: ['marketing-campaign', id] }); toast({ title: '🚀 Campaign is sending!' }); },
-    onError:    (e: any) => toast({ title: 'Error', description: e?.response?.data?.error, variant: 'destructive' }),
+    onError:    (e: any) => toast({ title: 'Cannot Send', description: e?.response?.data?.error ?? 'Error sending campaign', variant: 'destructive' }),
   });
 
   const cancelMut = useMutation({
     mutationFn: () => marketingApi.cancelCampaign(id),
     onSuccess:  () => { qc.invalidateQueries({ queryKey: ['marketing-campaign', id] }); toast({ title: '✓ Campaign cancelled' }); },
-    onError:    (e: any) => toast({ title: 'Error', description: e?.response?.data?.error, variant: 'destructive' }),
+    onError:    (e: any) => toast({ title: 'Error', description: e?.response?.data?.error ?? 'Could not cancel campaign', variant: 'destructive' }),
   });
 
   if (isLoading) return (
@@ -125,14 +125,14 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
 
         <div className="flex gap-2 shrink-0">
           {campaign.status === 'draft' && (
-            <Button onClick={() => { if (confirm('Send now?')) sendMut.mutate(); }}
+            <Button onClick={() => sendMut.mutate()}
               loading={sendMut.isPending}
               className="gap-2 bg-resort-600 hover:bg-resort-700">
               <Send className="h-4 w-4" /> Send Now
             </Button>
           )}
           {campaign.status === 'scheduled' && (
-            <Button variant="outline" onClick={() => { if (confirm('Cancel this campaign?')) cancelMut.mutate(); }}
+            <Button variant="outline" onClick={() => cancelMut.mutate()}
               loading={cancelMut.isPending}
               className="gap-2 text-red-600 border-red-200 hover:bg-red-50">
               <XCircle className="h-4 w-4" /> Cancel

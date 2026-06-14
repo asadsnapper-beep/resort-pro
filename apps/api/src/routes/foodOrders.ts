@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '@resort-pro/database';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams, validate } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
 
@@ -14,9 +14,27 @@ const orderSchema = z.object({
 });
 
 export async function foodOrderRoutes(app: FastifyInstance) {
+  // GET /api/food-orders/stats — accurate counts by status
+  app.get('/stats', {
+    schema: { tags: ['food-orders'], summary: 'Get order stats by status', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST', 'CHEF'),
+    handler: async (request) => {
+      const { tenantId } = request.user as JwtPayload;
+      const [pending, preparing, ready, delivered, cancelled, total] = await Promise.all([
+        prisma.foodOrder.count({ where: { tenantId, status: 'PENDING' } }),
+        prisma.foodOrder.count({ where: { tenantId, status: 'PREPARING' } }),
+        prisma.foodOrder.count({ where: { tenantId, status: 'READY' } }),
+        prisma.foodOrder.count({ where: { tenantId, status: 'DELIVERED' } }),
+        prisma.foodOrder.count({ where: { tenantId, status: 'CANCELLED' } }),
+        prisma.foodOrder.count({ where: { tenantId } }),
+      ]);
+      return ok({ total, pending, preparing, ready, delivered, cancelled });
+    },
+  });
+
   app.get('/', {
     schema: { tags: ['food-orders'], summary: 'List food orders', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST', 'CHEF'),
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload;
       const query = request.query as { page?: number; limit?: number; status?: string };
@@ -35,17 +53,28 @@ export async function foodOrderRoutes(app: FastifyInstance) {
 
   app.post('/', {
     schema: { tags: ['food-orders'], summary: 'Place a food order', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const body = orderSchema.parse(request.body);
 
+      // Deduplicate IDs before lookup (duplicate menuItemIds in request would give wrong count)
+      const uniqueIds = [...new Set(body.items.map((i) => i.menuItemId))];
       const menuItems = await prisma.menuItem.findMany({
-        where: { tenantId, id: { in: body.items.map((i) => i.menuItemId) } },
+        where: { tenantId, id: { in: uniqueIds } },
       });
 
-      if (menuItems.length !== body.items.length) {
+      if (menuItems.length !== uniqueIds.length) {
         return reply.status(400).send({ success: false, error: 'One or more menu items not found' });
+      }
+
+      // Block ordering unavailable items
+      const unavailable = menuItems.filter((m) => !m.isAvailable);
+      if (unavailable.length > 0) {
+        return reply.status(400).send({
+          success: false,
+          error: `Not available: ${unavailable.map((m) => m.name).join(', ')}`,
+        });
       }
 
       const totalAmount = body.items.reduce((sum, item) => {
@@ -77,11 +106,13 @@ export async function foodOrderRoutes(app: FastifyInstance) {
 
   app.patch('/:id/status', {
     schema: { tags: ['food-orders'], summary: 'Update order status', security: [{ bearerAuth: [] }] },
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST', 'CHEF'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
-      const { status } = request.body as { status: string };
+      const { status } = z.object({
+        status: z.enum(['PENDING', 'PREPARING', 'READY', 'DELIVERED', 'CANCELLED']),
+      }).parse(request.body);
       const order = await prisma.foodOrder.findFirst({ where: { id, tenantId } });
       if (!order) return reply.status(404).send({ success: false, error: 'Order not found' });
       const updated = await prisma.foodOrder.update({ where: { id }, data: { status: status as never } });

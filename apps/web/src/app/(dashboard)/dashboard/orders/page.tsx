@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { foodOrdersApi, menuApi, guestsApi } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
@@ -71,6 +71,16 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
   const [tableNumber, setTableNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [cart, setCart] = useState<{ menuItemId: string; name: string; price: number; quantity: number; notes: string }[]>([]);
+
+  // Reset all fields each time the modal opens
+  useEffect(() => {
+    if (open) {
+      setGuestId('');
+      setTableNumber('');
+      setNotes('');
+      setCart([]);
+    }
+  }, [open]);
 
   const addToCart = (item: MenuItem) => {
     setCart(c => {
@@ -181,6 +191,78 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
   );
 }
 
+// Per-order action card — has its own mutation so only THAT card shows loading
+function OrderCard({ order, expanded, onToggleExpand }: {
+  order: FoodOrder;
+  expanded: boolean;
+  onToggleExpand: () => void;
+}) {
+  const queryClient = useQueryClient();
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) => foodOrdersApi.updateStatus(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['food-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['food-orders-stats'] });
+      toast({ title: 'Order updated' });
+    },
+    onError: () => toast({ title: 'Error', description: 'Failed to update order', variant: 'destructive' }),
+  });
+
+  const nextStatus = STATUS_NEXT[order.status];
+
+  return (
+    <Card className="overflow-hidden hover:shadow-md transition-shadow">
+      <CardContent className="p-4">
+        <div className="flex items-center gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <StatusBadge status={order.status} />
+              {order.guest && <span className="text-sm font-medium">{order.guest.firstName} {order.guest.lastName}</span>}
+              {order.tableNumber && <span className="text-xs text-muted-foreground bg-gray-100 rounded px-2 py-0.5">📍 {order.tableNumber}</span>}
+              <span className="text-xs text-muted-foreground ml-auto">{formatDate(order.createdAt)}</span>
+            </div>
+            <button className="mt-1 text-left" onClick={onToggleExpand}>
+              <p className="text-xs text-resort-600 hover:underline">
+                {order.items.length} item{order.items.length !== 1 ? 's' : ''} · {formatCurrency(Number(order.totalAmount))}
+                {expanded ? ' ▲' : ' ▼'}
+              </p>
+            </button>
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
+            {nextStatus && (
+              <Button size="sm" variant="outline" className="text-xs"
+                onClick={() => statusMutation.mutate({ id: order.id, status: nextStatus })}
+                loading={statusMutation.isPending}>
+                {STATUS_LABEL[order.status]}
+              </Button>
+            )}
+            {(order.status === 'PENDING' || order.status === 'PREPARING') && (
+              <Button size="sm" variant="outline" className="text-xs text-red-600 border-red-200 hover:bg-red-50"
+                onClick={() => statusMutation.mutate({ id: order.id, status: 'CANCELLED' })}
+                disabled={statusMutation.isPending}>
+                <XCircle className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {expanded && (
+          <div className="mt-3 pt-3 border-t space-y-1.5">
+            {order.items.map(item => (
+              <div key={item.id} className="flex items-center justify-between text-sm">
+                <span className="text-gray-700">{item.quantity}× {item.menuItem.name}</span>
+                <span className="font-medium">{formatCurrency(Number(item.unitPrice) * item.quantity)}</span>
+              </div>
+            ))}
+            {order.notes && <p className="text-xs text-muted-foreground mt-2 italic">📝 {order.notes}</p>}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function OrdersPage() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('');
@@ -193,26 +275,32 @@ export default function OrdersPage() {
     queryFn: () => foodOrdersApi.list({ status: statusFilter || undefined, page, limit: 20 }),
   });
 
-  const createMutation = useMutation({
-    mutationFn: (d: unknown) => foodOrdersApi.create(d),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['food-orders'] }); toast({ title: 'Order placed!' }); setAddOpen(false); },
-    onError: (err: { response?: { data?: { error?: string } } }) =>
-      toast({ title: 'Error', description: err?.response?.data?.error ?? 'Failed to place order', variant: 'destructive' }),
+  const { data: statsData } = useQuery({
+    queryKey: ['food-orders-stats'],
+    queryFn: () => foodOrdersApi.stats(),
+    refetchInterval: 30000,
   });
 
-  const statusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) => foodOrdersApi.updateStatus(id, status),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['food-orders'] }); toast({ title: 'Order updated' }); },
-    onError: () => toast({ title: 'Error', description: 'Failed to update order', variant: 'destructive' }),
+  const createMutation = useMutation({
+    mutationFn: (d: unknown) => foodOrdersApi.create(d),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['food-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['food-orders-stats'] });
+      toast({ title: 'Order placed!' });
+      setAddOpen(false);
+    },
+    onError: (err: { response?: { data?: { error?: string } } }) =>
+      toast({ title: 'Error', description: err?.response?.data?.error ?? 'Failed to place order', variant: 'destructive' }),
   });
 
   const orders: FoodOrder[] = data?.data?.data ?? [];
   const pagination = data?.data?.pagination;
   const total = pagination?.total ?? 0;
 
-  const pendingCount = orders.filter(o => o.status === 'PENDING').length;
-  const preparingCount = orders.filter(o => o.status === 'PREPARING').length;
-  const readyCount = orders.filter(o => o.status === 'READY').length;
+  const stats = statsData?.data?.data ?? { total: 0, pending: 0, preparing: 0, ready: 0 };
+  const pendingCount   = stats.pending   ?? 0;
+  const preparingCount = stats.preparing ?? 0;
+  const readyCount     = stats.ready     ?? 0;
 
   return (
     <div className="space-y-6">
@@ -261,60 +349,14 @@ export default function OrdersPage() {
             {!statusFilter && <Button className="mt-4 gap-2" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> New Order</Button>}
           </div>
         ) : (
-          orders.map(order => {
-            const nextStatus = STATUS_NEXT[order.status];
-            const isExpanded = expanded === order.id;
-            return (
-              <Card key={order.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <StatusBadge status={order.status} />
-                        {order.guest && <span className="text-sm font-medium">{order.guest.firstName} {order.guest.lastName}</span>}
-                        {order.tableNumber && <span className="text-xs text-muted-foreground bg-gray-100 rounded px-2 py-0.5">📍 {order.tableNumber}</span>}
-                        <span className="text-xs text-muted-foreground ml-auto">{formatDate(order.createdAt)}</span>
-                      </div>
-                      <button className="mt-1 text-left" onClick={() => setExpanded(isExpanded ? null : order.id)}>
-                        <p className="text-xs text-resort-600 hover:underline">
-                          {order.items.length} item{order.items.length !== 1 ? 's' : ''} · {formatCurrency(Number(order.totalAmount))}
-                          {isExpanded ? ' ▲' : ' ▼'}
-                        </p>
-                      </button>
-                    </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                      {nextStatus && (
-                        <Button size="sm" variant="outline" className="text-xs"
-                          onClick={() => statusMutation.mutate({ id: order.id, status: nextStatus })}
-                          loading={statusMutation.isPending}>
-                          {STATUS_LABEL[order.status]}
-                        </Button>
-                      )}
-                      {(order.status === 'PENDING' || order.status === 'PREPARING') && (
-                        <Button size="sm" variant="outline" className="text-xs text-red-600 border-red-200 hover:bg-red-50"
-                          onClick={() => statusMutation.mutate({ id: order.id, status: 'CANCELLED' })}>
-                          <XCircle className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Expanded items */}
-                  {isExpanded && (
-                    <div className="mt-3 pt-3 border-t space-y-1.5">
-                      {order.items.map(item => (
-                        <div key={item.id} className="flex items-center justify-between text-sm">
-                          <span className="text-gray-700">{item.quantity}× {item.menuItem.name}</span>
-                          <span className="font-medium">{formatCurrency(Number(item.unitPrice) * item.quantity)}</span>
-                        </div>
-                      ))}
-                      {order.notes && <p className="text-xs text-muted-foreground mt-2 italic">📝 {order.notes}</p>}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })
+          orders.map(order => (
+            <OrderCard
+              key={order.id}
+              order={order}
+              expanded={expanded === order.id}
+              onToggleExpand={() => setExpanded(expanded === order.id ? null : order.id)}
+            />
+          ))
         )}
       </div>
 

@@ -6,10 +6,11 @@ import { format, isPast, isFuture } from 'date-fns';
 import {
   Plus, Pencil, Trash2, BarChart2, Tag, Percent, DollarSign,
   MoonStar, CalendarDays, Users, CheckCircle2, XCircle, Clock,
-  AlertTriangle, ChevronDown, X,
+  AlertTriangle, X,
 } from 'lucide-react';
 import { offersApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { toast } from '@/hooks/use-toast';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type OfferType = 'PERCENTAGE' | 'FIXED' | 'FREE_NIGHT';
@@ -38,9 +39,10 @@ interface Offer {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function offerStatus(o: Offer): 'active' | 'scheduled' | 'expired' | 'paused' {
-  if (!o.isActive) return 'paused';
   if (isFuture(new Date(o.validFrom))) return 'scheduled';
   if (isPast(new Date(o.validTo))) return 'expired';
+  // isCurrentlyActive = false means isActive toggled off OR maxUses exhausted
+  if (!o.isCurrentlyActive) return 'paused';
   return 'active';
 }
 
@@ -306,17 +308,41 @@ export default function OffersPage() {
   });
   const offers: Offer[] = data?.data?.data ?? [];
 
+  // Always fetch ALL offers for summary counts — independent of the current tab filter
+  const { data: allData } = useQuery({
+    queryKey: ['offers', 'all'],
+    queryFn: () => offersApi.list(undefined),
+  });
+  const allOffers: Offer[] = allData?.data?.data ?? [];
+
   const createMutation = useMutation({
     mutationFn: (d: unknown) => offersApi.create(d),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['offers'] }); setEditing(null); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['offers'] });
+      setEditing(null);
+      toast({ title: 'Offer created' });
+    },
+    onError: (err: { response?: { data?: { error?: string } } }) =>
+      toast({ title: 'Error', description: err?.response?.data?.error ?? 'Failed to create offer', variant: 'destructive' }),
   });
   const updateMutation = useMutation({
     mutationFn: ({ id, ...d }: { id: string } & Record<string, unknown>) => offersApi.update(id, d),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['offers'] }); setEditing(null); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['offers'] });
+      setEditing(null);
+      toast({ title: 'Offer updated' });
+    },
+    onError: (err: { response?: { data?: { error?: string } } }) =>
+      toast({ title: 'Error', description: err?.response?.data?.error ?? 'Failed to update offer', variant: 'destructive' }),
   });
   const deleteMutation = useMutation({
     mutationFn: (id: string) => offersApi.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['offers'] }); setConfirmDelete(null); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['offers'] });
+      setConfirmDelete(null);
+      toast({ title: 'Offer deleted' });
+    },
+    onError: () => toast({ title: 'Error', description: 'Failed to delete offer', variant: 'destructive' }),
   });
 
   const handleSave = (form: typeof EMPTY_FORM & { id?: string }) => {
@@ -332,8 +358,8 @@ export default function OffersPage() {
     }
   };
 
-  // Summary counts
-  const counts = offers.reduce<Record<string, number>>(
+  // Summary counts — always from allOffers (not filtered), so tabs don't break them
+  const counts = allOffers.reduce<Record<string, number>>(
     (acc, o) => { const s = offerStatus(o); acc[s] = (acc[s] ?? 0) + 1; return acc; }, {}
   );
 
@@ -364,7 +390,7 @@ export default function OffersPage() {
         ].map(({ label, key, color, bg }) => (
           <div key={key} className={cn('rounded-xl p-4', bg)}>
             <p className={cn('text-2xl font-bold', color)}>
-              {key === 'total' ? offers.length : (counts[key] ?? 0)}
+              {key === 'total' ? allOffers.length : (counts[key] ?? 0)}
             </p>
             <p className="text-xs text-gray-500 mt-0.5">{label} offers</p>
           </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/auth';
 import { authApi } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
@@ -47,10 +47,24 @@ export default function ProfilePage() {
   // ── Profile form state ────────────────────────────────────────────────────
   const [firstName, setFirstName] = useState(user?.firstName ?? '');
   const [lastName,  setLastName]  = useState(user?.lastName ?? '');
-  const [phone,     setPhone]     = useState((user as { phone?: string | null })?.phone ?? '');
-  const [avatarUrl, setAvatarUrl] = useState((user as { avatarUrl?: string | null })?.avatarUrl ?? '');
+  const [phone,     setPhone]     = useState(user?.phone ?? '');
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl ?? '');
   const [avatarColor, setAvatarColor] = useState('resort');
   const [savingProfile, setSavingProfile] = useState(false);
+
+  // ── Fetch fresh user data on mount (phone/avatarUrl not in JWT) ──────────
+  useEffect(() => {
+    authApi.me().then(res => {
+      const fresh = res?.data?.data;
+      if (!fresh) return;
+      updateUser(fresh);
+      setFirstName(fresh.firstName ?? '');
+      setLastName(fresh.lastName ?? '');
+      setPhone(fresh.phone ?? '');
+      setAvatarUrl(fresh.avatarUrl ?? '');
+    }).catch(() => { /* silently ignore — form already has store values */ });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Password form state ───────────────────────────────────────────────────
   const [currentPwd,  setCurrentPwd]  = useState('');

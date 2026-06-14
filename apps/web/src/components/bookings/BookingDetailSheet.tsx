@@ -4,7 +4,7 @@ import { useState } from 'react';
 import {
   X, CalendarDays, Users, CreditCard, BedDouble, MessageSquare,
   XCircle, LogIn, LogOut, Plus, Link2, CheckCircle2, Clock, AlertTriangle,
-  FileText, Gift, Trash2, ChevronDown, ChevronUp, Check,
+  FileText, Gift, Trash2, ChevronDown, ChevronUp, Check, ExternalLink,
 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { bookingsApi, bookingPaymentApi, packagesApi } from '@/lib/api';
@@ -32,7 +32,7 @@ interface Booking {
   createdAt: string;
   actualCheckIn?: string | null;
   actualCheckOut?: string | null;
-  guest: { firstName: string; lastName: string; email: string; phone?: string };
+  guest: { id?: string; firstName: string; lastName: string; email: string; phone?: string };
   room: { number: string; name: string; type: string };
   payments?: { amount: number; method: string; status: string; processedAt: string; reference?: string }[];
 }
@@ -63,6 +63,15 @@ function ConfirmModal({
     (new Date(booking.checkOut).getTime() - new Date(booking.checkIn).getTime()) / 86_400_000
   );
   const outstanding = Number(booking.totalAmount) - Number(booking.paidAmount);
+
+  // Check-in date mismatch detection
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const scheduledCheckIn = booking.checkIn.slice(0, 10);
+  const daysDiff = Math.round(
+    (new Date(scheduledCheckIn).getTime() - new Date(todayStr).getTime()) / 86_400_000
+  );
+  const isEarlyCheckIn = daysDiff > 0;
+  const isLateCheckIn  = daysDiff < 0;
 
   if (type === 'checkin') {
     return (
@@ -108,8 +117,27 @@ function ConfirmModal({
                 {booking.children > 0 ? ` + ${booking.children} child` : ''}
               </span>
             </div>
+
+            {/* Date mismatch warning */}
+            {isEarlyCheckIn && (
+              <div className="flex items-start gap-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 px-3 py-2">
+                <AlertTriangle className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-blue-700 dark:text-blue-400">
+                  <strong>Early check-in:</strong> Scheduled arrival is {daysDiff} day{daysDiff > 1 ? 's' : ''} from now ({formatDate(booking.checkIn)}).
+                </p>
+              </div>
+            )}
+            {isLateCheckIn && (
+              <div className="flex items-start gap-2 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 px-3 py-2">
+                <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-orange-700 dark:text-orange-400">
+                  <strong>Late check-in:</strong> Scheduled arrival was {Math.abs(daysDiff)} day{Math.abs(daysDiff) > 1 ? 's' : ''} ago ({formatDate(booking.checkIn)}).
+                </p>
+              </div>
+            )}
+
             {outstanding > 0 && (
-              <div className="flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2 mt-2">
+              <div className="flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2">
                 <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
                 <p className="text-xs text-amber-700 dark:text-amber-400">
                   Outstanding balance: <strong>{formatCurrency(outstanding)}</strong>
@@ -519,12 +547,23 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
 
             {/* Guest */}
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-resort-100 dark:bg-resort-900/30 text-base font-bold text-resort-700 dark:text-resort-400">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-resort-100 dark:bg-resort-900/30 text-base font-bold text-resort-700 dark:text-resort-400 shrink-0">
                 {booking.guest.firstName[0]}{booking.guest.lastName[0]}
               </div>
-              <div>
-                <p className="font-semibold text-gray-900 dark:text-white">{booking.guest.firstName} {booking.guest.lastName}</p>
-                <p className="text-sm text-gray-500">{booking.guest.email}</p>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-gray-900 dark:text-white">{booking.guest.firstName} {booking.guest.lastName}</p>
+                  {booking.guest.id && (
+                    <button
+                      onClick={() => { onClose(); router.push(`/dashboard/guests?id=${booking.guest.id}`); }}
+                      className="rounded p-0.5 text-gray-400 hover:text-resort-600 hover:bg-resort-50 dark:hover:bg-resort-900/20 transition-colors"
+                      title="View guest profile"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+                <p className="text-sm text-gray-500 truncate">{booking.guest.email}</p>
                 {booking.guest.phone && <p className="text-sm text-gray-500">{booking.guest.phone}</p>}
               </div>
             </div>

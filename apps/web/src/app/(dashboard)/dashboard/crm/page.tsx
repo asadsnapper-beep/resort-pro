@@ -60,6 +60,7 @@ const TRIGGER_LABELS: Record<string, string> = {
   POST_STAY:         '⭐ Post-Stay',
   WIN_BACK:          '💌 Win-Back (90 days)',
   BIRTHDAY:          '🎂 Birthday',
+  ANNIVERSARY:       '🏖️ Resort Anniversary (1 year)',
   MANUAL:            '🔧 Manual',
 };
 
@@ -773,14 +774,28 @@ function TemplatesTab({ token, primary }: { token: string; primary: string }) {
    ANALYTICS TAB
 ══════════════════════════════════════════════════════════════════════════════ */
 function AnalyticsTab({ token, primary, accent }: { token: string; primary: string; accent: string }) {
-  const [data, setData]     = useState<Analytics | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData]           = useState<Analytics | null>(null);
+  const [loading, setLoading]     = useState(true);
+  const [automating, setAutomating] = useState(false);
+  const [autoResult, setAutoResult] = useState<{ birthday: { found: number; sent: number }; anniversary: { found: number; sent: number } } | null>(null);
 
   useEffect(() => {
     api.get('/crm/analytics', { headers: { Authorization: `Bearer ${token}` } })
       .then(res => { setData(res.data.data); setLoading(false); })
       .catch(() => setLoading(false));
   }, [token]);
+
+  const runAutomation = async () => {
+    setAutomating(true);
+    setAutoResult(null);
+    try {
+      const res = await api.post('/crm/automation/run-daily', {}, { headers: { Authorization: `Bearer ${token}` } });
+      setAutoResult(res.data.data);
+    } catch {
+      alert('Failed to run automation. Check server logs.');
+    }
+    setAutomating(false);
+  };
 
   if (loading) return <div className="py-16 text-center text-gray-400">Loading analytics…</div>;
   if (!data)   return <div className="py-16 text-center text-gray-400">Failed to load analytics</div>;
@@ -791,6 +806,32 @@ function AnalyticsTab({ token, primary, accent }: { token: string; primary: stri
 
   return (
     <div className="space-y-6">
+      {/* Automation runner */}
+      <div className="rounded-2xl border border-dashed border-resort-300 bg-resort-50/50 p-5 flex items-start justify-between gap-4">
+        <div>
+          <p className="font-semibold text-gray-900 flex items-center gap-2">
+            <span>🤖</span> Daily Automation
+          </p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Sends birthday greetings (🎂) and resort anniversary emails (🏖️) to qualifying guests.
+            Run daily via cron, or manually here for testing.
+          </p>
+          {autoResult && (
+            <div className="mt-3 flex gap-4 text-sm">
+              <span className="text-purple-700 font-medium">🎂 Birthday: {autoResult.birthday.sent}/{autoResult.birthday.found} sent</span>
+              <span className="text-resort-700 font-medium">🏖️ Anniversary: {autoResult.anniversary.sent}/{autoResult.anniversary.found} sent</span>
+            </div>
+          )}
+        </div>
+        <button
+          onClick={runAutomation}
+          disabled={automating}
+          className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60"
+          style={{ backgroundColor: primary }}>
+          {automating ? 'Running…' : '▶ Run Now'}
+        </button>
+      </div>
+
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[

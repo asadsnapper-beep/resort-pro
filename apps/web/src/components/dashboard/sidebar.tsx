@@ -23,7 +23,7 @@ import type { Locale } from '@/i18n/config';
 // ─────────────────────────────────────────────────────────────────
 // Role type
 // ─────────────────────────────────────────────────────────────────
-type Role = 'OWNER' | 'MANAGER' | 'SHAREHOLDER' | 'RECEPTIONIST' | 'MARKETER' | 'DEVELOPER' | 'STAFF' | 'GUEST';
+type Role = 'OWNER' | 'MANAGER' | 'SHAREHOLDER' | 'RECEPTIONIST' | 'MARKETER' | 'DEVELOPER' | 'STAFF' | 'CHEF' | 'GUEST';
 
 // ─────────────────────────────────────────────────────────────────
 // Role badge config
@@ -36,6 +36,7 @@ const ROLE_LABELS: Record<Role, { label: string; color: string }> = {
   MARKETER:     { label: 'Marketer',     color: 'bg-purple-100 text-purple-700' },
   DEVELOPER:    { label: 'Developer',    color: 'bg-gray-100 text-gray-600' },
   STAFF:        { label: 'Staff',        color: 'bg-orange-100 text-orange-700' },
+  CHEF:         { label: 'Chef',         color: 'bg-red-100 text-red-700' },
   GUEST:        { label: 'Guest',        color: 'bg-gray-100 text-gray-500' },
 };
 
@@ -60,15 +61,15 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard/analytics',  labelKey: 'nav.analytics',    labelFallback: 'Analytics',       icon: BarChart2,       group: 'Overview',         groupKey: 'groups.overview',
     roles: ['OWNER', 'MANAGER', 'SHAREHOLDER', 'MARKETER'] },
   { href: '/dashboard/invoices',   labelKey: 'nav.invoices',     labelFallback: 'Invoices',        icon: FileText,        group: 'Overview',         groupKey: 'groups.overview',
-    roles: ['OWNER', 'MANAGER', 'SHAREHOLDER', 'RECEPTIONIST'] },
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
   { href: '/dashboard/expenses',   labelKey: 'nav.expenses',     labelFallback: 'Expenses',        icon: Receipt,         group: 'Overview',         groupKey: 'groups.overview',
-    roles: ['OWNER', 'MANAGER', 'SHAREHOLDER'] },
+    roles: ['OWNER', 'MANAGER'] },
   { href: '/dashboard/reports',    labelKey: 'nav.reports',      labelFallback: 'Daily Reports',   icon: FileBarChart2,   group: 'Overview',         groupKey: 'groups.overview',
-    roles: ['OWNER', 'MANAGER', 'SHAREHOLDER'] },
+    roles: ['OWNER', 'MANAGER'] },
 
   // ── Rooms & Bookings ──────────────────────────────────────
   { href: '/dashboard/rooms',          labelKey: 'nav.rooms',         labelFallback: 'Rooms & Villas',   icon: BedDouble,     group: 'Rooms & Bookings', groupKey: 'groups.rooms',
-    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'STAFF'] },
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
   { href: '/dashboard/rate-plans',     labelKey: 'nav.ratePlans',     labelFallback: 'Rate Plans',       icon: Tags,          group: 'Rooms & Bookings', groupKey: 'groups.rooms',
     roles: ['OWNER', 'MANAGER', 'MARKETER'] },
   { href: '/dashboard/packages',       labelKey: 'nav.packages',      labelFallback: 'Packages',         icon: Gift,          group: 'Rooms & Bookings', groupKey: 'groups.rooms',
@@ -76,7 +77,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard/front-desk',     labelKey: 'nav.frontDesk',     labelFallback: 'Front Desk',       icon: ClipboardList, group: 'Rooms & Bookings', groupKey: 'groups.rooms',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
   { href: '/dashboard/bookings',       labelKey: 'nav.bookings',      labelFallback: 'Bookings',         icon: CalendarDays,  group: 'Rooms & Bookings', groupKey: 'groups.rooms',
-    roles: ['OWNER', 'MANAGER', 'SHAREHOLDER', 'RECEPTIONIST'] },
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
   { href: '/dashboard/calendar',       labelKey: 'nav.calendar',      labelFallback: 'Booking Calendar', icon: LayoutGrid,    group: 'Rooms & Bookings', groupKey: 'groups.rooms',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
   { href: '/dashboard/group-bookings', labelKey: 'nav.groupBookings', labelFallback: 'Group Bookings',   icon: UsersRound,    group: 'Rooms & Bookings', groupKey: 'groups.rooms',
@@ -90,7 +91,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard/loyalty',  labelKey: 'nav.loyalty', labelFallback: 'Loyalty Program', icon: Star,   group: 'Guests', groupKey: 'groups.guests',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'MARKETER'] },
   { href: '/dashboard/support',  labelKey: 'nav.support', labelFallback: 'Support',         icon: Ticket, group: 'Guests', groupKey: 'groups.guests',
-    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'STAFF'] },
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
 
   // ── Operations ────────────────────────────────────────────
   { href: '/dashboard/staff',        labelKey: 'nav.staff',        labelFallback: 'Staff',        icon: UserCog, group: 'Operations', groupKey: 'groups.operations',
@@ -98,15 +99,15 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard/housekeeping', labelKey: 'nav.housekeeping', labelFallback: 'Housekeeping', icon: Sparkles, group: 'Operations', groupKey: 'groups.operations',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'STAFF'] },
   { href: '/dashboard/maintenance',  labelKey: 'nav.maintenance',  labelFallback: 'Maintenance',  icon: Wrench,   group: 'Operations', groupKey: 'groups.operations',
-    roles: ['OWNER', 'MANAGER', 'STAFF'] },
+    roles: ['OWNER', 'MANAGER'] },
 
   // ── Restaurant ────────────────────────────────────────────
   { href: '/dashboard/restaurant', labelKey: 'nav.restaurant', labelFallback: 'Restaurant', icon: UtensilsCrossed, group: 'Restaurant', groupKey: 'groups.restaurant',
-    roles: ['OWNER', 'MANAGER', 'STAFF'] },
+    roles: ['OWNER', 'MANAGER'] },
   { href: '/dashboard/orders',     labelKey: 'nav.orders',     labelFallback: 'F&B Orders', icon: ShoppingBag,     group: 'Restaurant', groupKey: 'groups.restaurant',
-    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'STAFF'] },
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'CHEF'] },
   { href: '/dashboard/inventory',  labelKey: 'nav.inventory',  labelFallback: 'Inventory',  icon: Package,         group: 'Restaurant', groupKey: 'groups.restaurant',
-    roles: ['OWNER', 'MANAGER', 'STAFF'] },
+    roles: ['OWNER', 'MANAGER'] },
 
   // ── Marketing ─────────────────────────────────────────────
   { href: '/dashboard/offers',    labelKey: 'nav.offers',    labelFallback: 'Offers',       icon: Ticket,   group: 'Marketing', groupKey: 'groups.marketing',
@@ -188,9 +189,10 @@ export function Sidebar() {
   const grouped = groupItems(visibleItems);
 
   const handleLogout = async () => {
+    const isDemo = !!tenant?.isDemo;
     if (refreshToken) await authApi.logout(refreshToken).catch(() => {});
     clearAuth();
-    router.push('/auth/login');
+    router.push(isDemo ? '/demo' : '/auth/login');
   };
 
   const toggleGroup = (group: string) => {
@@ -209,7 +211,7 @@ export function Sidebar() {
             {tenant?.name || 'ResortPro'}
           </p>
           <p className="text-xs text-gray-400 capitalize">
-            {tenant?.plan?.toLowerCase() || 'free'} plan
+            {role === 'OWNER' ? `${tenant?.plan?.toLowerCase() || 'free'} plan` : roleConfig.label}
           </p>
         </div>
       </div>
@@ -296,14 +298,20 @@ export function Sidebar() {
             <p className="truncate text-sm font-medium text-gray-900 group-hover:text-[#1a6b5e] dark:text-white">
               {user ? `${user.firstName} ${user.lastName}` : 'User'}
             </p>
-            <span
-              className={cn(
-                'inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
-                roleConfig.color,
-              )}
-            >
-              {roleConfig.label}
-            </span>
+            {role === 'OWNER' ? (
+              <span className="text-[11px] text-gray-400 truncate">
+                {tenant?.plan?.toLowerCase() || 'free'} plan
+              </span>
+            ) : (
+              <span
+                className={cn(
+                  'inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
+                  roleConfig.color,
+                )}
+              >
+                {roleConfig.label}
+              </span>
+            )}
           </Link>
           <button
             onClick={handleLogout}

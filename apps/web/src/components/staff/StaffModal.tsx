@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
 const DEPARTMENTS = ['FRONT_DESK', 'HOUSEKEEPING', 'RESTAURANT', 'MAINTENANCE', 'SECURITY', 'MANAGEMENT'] as const;
+const ROLES = ['STAFF', 'RECEPTIONIST', 'MANAGER', 'MARKETER', 'DEVELOPER', 'SHAREHOLDER'] as const;
 
 const createSchema = z.object({
   firstName: z.string().min(1, 'First name required').max(50),
@@ -19,6 +20,7 @@ const createSchema = z.object({
   position: z.string().min(1, 'Position required'),
   phone: z.string().optional(),
   hireDate: z.string().min(1, 'Hire date required'),
+  role: z.enum(ROLES).default('STAFF'),
 });
 
 const editSchema = z.object({
@@ -68,7 +70,7 @@ export function StaffModal({ open, onClose, onSubmit, loading, staff }: Props) {
         hireDate: staff.hireDate?.split('T')[0] ?? '',
       } as FormData);
     } else {
-      reset({ firstName: '', lastName: '', email: '', password: '', department: undefined, position: '', phone: '', hireDate: '' });
+      reset({ firstName: '', lastName: '', email: '', password: '', department: undefined, position: '', phone: '', hireDate: '', role: 'STAFF' });
     }
   }, [staff, reset, open]);
 
@@ -140,6 +142,21 @@ export function StaffModal({ open, onClose, onSubmit, loading, staff }: Props) {
             {errors.position && <p className="mt-1 text-xs text-red-500">{errors.position.message}</p>}
           </div>
         </div>
+
+        {/* Role (create only) */}
+        {!staff && (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">System Role</label>
+            <select
+              {...register('role')}
+              className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              {ROLES.map((r) => (
+                <option key={r} value={r}>{r.charAt(0) + r.slice(1).toLowerCase()}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Hire Date */}
         <div>

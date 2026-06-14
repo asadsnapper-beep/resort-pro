@@ -58,7 +58,7 @@ export async function groupBookingRoutes(app: FastifyInstance) {
         orderBy: { checkIn: 'asc' },
       });
 
-      return ok(reply, groups);
+      return ok(groups);
     },
   });
 
@@ -83,7 +83,7 @@ export async function groupBookingRoutes(app: FastifyInstance) {
       });
 
       if (!group) return reply.status(404).send({ error: 'Group booking not found' });
-      return ok(reply, group);
+      return ok(group);
     },
   });
 
@@ -183,7 +183,7 @@ export async function groupBookingRoutes(app: FastifyInstance) {
         });
       });
 
-      return ok(reply, group, 201);
+      return reply.status(201).send(ok(group));
     },
   });
 
@@ -209,7 +209,7 @@ export async function groupBookingRoutes(app: FastifyInstance) {
         include: { bookings: { include: bookingInclude }, _count: { select: { bookings: true } } },
       });
 
-      return ok(reply, updated);
+      return ok(updated);
     },
   });
 
@@ -230,7 +230,7 @@ export async function groupBookingRoutes(app: FastifyInstance) {
         prisma.groupBooking.delete({ where: { id } }),
       ]);
 
-      return ok(reply, { deleted: true });
+      return ok({ deleted: true });
     },
   });
 
@@ -253,7 +253,7 @@ export async function groupBookingRoutes(app: FastifyInstance) {
       if (!booking) return reply.status(404).send({ error: 'Booking not found' });
 
       await prisma.booking.update({ where: { id: bookingId }, data: { groupId: id } });
-      return ok(reply, { linked: true });
+      return ok({ linked: true });
     },
   });
 
@@ -269,7 +269,7 @@ export async function groupBookingRoutes(app: FastifyInstance) {
       if (!booking) return reply.status(404).send({ error: 'Booking not in this group' });
 
       await prisma.booking.update({ where: { id: bookingId }, data: { groupId: null } });
-      return ok(reply, { unlinked: true });
+      return ok({ unlinked: true });
     },
   });
 
@@ -303,7 +303,7 @@ export async function groupBookingRoutes(app: FastifyInstance) {
         prisma.groupBooking.update({ where: { id }, data: { status: 'CHECKED_IN' } }),
       ]);
 
-      return ok(reply, { checkedIn: toCheckIn.length });
+      return ok({ checkedIn: toCheckIn.length });
     },
   });
 
@@ -337,7 +337,7 @@ export async function groupBookingRoutes(app: FastifyInstance) {
         prisma.groupBooking.update({ where: { id }, data: { status: 'CHECKED_OUT' } }),
       ]);
 
-      return ok(reply, { checkedOut: toCheckOut.length });
+      return ok({ checkedOut: toCheckOut.length });
     },
   });
 
@@ -369,7 +369,7 @@ export async function groupBookingRoutes(app: FastifyInstance) {
 
       const totalAmount = group.bookings.reduce((s, b) => s + Number(b.totalAmount), 0);
       const paidAmount = group.bookings.reduce(
-        (s, b) => s + b.payments.filter((p) => p.status === 'COMPLETED').reduce((ps, p) => ps + Number(p.amount), 0),
+        (s, b) => s + b.payments.filter((p) => p.status === 'PAID').reduce((ps, p) => ps + Number(p.amount), 0),
         0,
       );
 
@@ -378,7 +378,7 @@ export async function groupBookingRoutes(app: FastifyInstance) {
       const checkedOut = group.bookings.filter((b) => b.status === 'CHECKED_OUT').length;
       const confirmed = group.bookings.filter((b) => b.status === 'CONFIRMED').length;
 
-      return ok(reply, {
+      return ok({
         group: {
           id: group.id,
           name: group.name,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { guestsApi } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
@@ -28,12 +28,12 @@ export default function GuestsPage() {
   const [editGuest, setEditGuest] = useState<Guest | null>(null);
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null);
   const [deleteGuest, setDeleteGuest] = useState<Guest | null>(null);
-  let debounceTimer: ReturnType<typeof setTimeout>;
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSearch = (val: string) => {
     setSearch(val);
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => { setDebouncedSearch(val); setPage(1); }, 350);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => { setDebouncedSearch(val); setPage(1); }, 350);
   };
 
   const { data, isLoading } = useQuery({
@@ -57,7 +57,8 @@ export default function GuestsPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => guestsApi.delete(id),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['guests'] }); toast({ title: 'Guest deleted' }); setDeleteGuest(null); setSelectedGuest(null); },
-    onError: () => toast({ title: 'Error', description: 'Failed to delete', variant: 'destructive' }),
+    onError: (err: { response?: { data?: { error?: string } } }) =>
+      toast({ title: 'Cannot delete guest', description: err?.response?.data?.error ?? 'Failed to delete guest', variant: 'destructive' }),
   });
 
   const guests: Guest[] = data?.data?.data ?? [];

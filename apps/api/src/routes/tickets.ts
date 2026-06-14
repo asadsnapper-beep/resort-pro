@@ -4,6 +4,7 @@ import { prisma } from '@resort-pro/database';
 import { requireAuth } from '../middleware/auth';
 import { ok, paginated, parsePageParams, validate } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
+import { forwardReplyToChannel } from '../services/ticketChannels';
 
 const ticketSchema = z.object({
   title: z.string().min(1).max(200),
@@ -109,13 +110,30 @@ export async function ticketRoutes(app: FastifyInstance) {
     handler: async (request, reply) => {
       const { tenantId, sub: userId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
-      const { message } = request.body as { message: string };
+      const { message } = z.object({ message: z.string().min(1, 'Message cannot be empty') }).parse(request.body);
+
       const ticket = await prisma.supportTicket.findFirst({ where: { id, tenantId } });
       if (!ticket) return reply.status(404).send({ success: false, error: 'Ticket not found' });
+
       const chatMessage = await prisma.chatMessage.create({
         data: { ticketId: id, senderId: userId, senderType: 'STAFF', message },
         include: { sender: { select: { firstName: true, lastName: true } } },
       });
+
+      // Forward reply to guest's platform (Telegram / WhatsApp) — fire and forget
+      if (ticket.source !== 'WEB' && ticket.externalChatId) {
+        const tenant = await prisma.tenant.findUnique({
+          where: { id: tenantId },
+          select: { telegramBotToken: true, waApiToken: true, waPhoneNumberId: true, waEnabled: true },
+        });
+        if (tenant) {
+          const staffName = [chatMessage.sender?.firstName, chatMessage.sender?.lastName].filter(Boolean).join(' ') || 'Staff';
+          forwardReplyToChannel(ticket, tenant, message, staffName).catch((err) =>
+            console.warn('[tickets] forwardReplyToChannel error:', err?.message),
+          );
+        }
+      }
+
       return reply.status(201).send(ok(chatMessage));
     },
   });

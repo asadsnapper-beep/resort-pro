@@ -9,11 +9,20 @@ import PDFDocument from 'pdfkit';
 
 /* ── helpers ─────────────────────────────────────────────────────────────── */
 
-/** Auto-generate invoice number: INV-YYYY-NNNN */
+/** Auto-generate invoice number: INV-YYYY-NNNN
+ *  Uses the highest existing number for the year rather than COUNT, which
+ *  avoids gaps from deletions and is more collision-resistant than COUNT.
+ *  The invoiceNumber unique constraint acts as the final safety net.
+ */
 async function nextInvoiceNumber(tenantId: string): Promise<string> {
-  const year  = new Date().getFullYear();
-  const count = await prisma.invoice.count({ where: { tenantId } });
-  return `INV-${year}-${String(count + 1).padStart(4, '0')}`;
+  const year   = new Date().getFullYear();
+  const prefix = `INV-${year}-`;
+  const last   = await prisma.invoice.findFirst({
+    where:   { tenantId, invoiceNumber: { startsWith: prefix } },
+    orderBy: { invoiceNumber: 'desc' },
+  });
+  const lastNum = last ? parseInt(last.invoiceNumber.slice(prefix.length), 10) : 0;
+  return `${prefix}${String(lastNum + 1).padStart(4, '0')}`;
 }
 
 /** Recalculate subtotal, taxAmount, total from items + rates */
@@ -225,12 +234,21 @@ export async function invoicesRoutes(app: FastifyInstance) {
     schema: { tags: ['invoices'], summary: 'Invoice stats', security: [{ bearerAuth: [] }] },
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload;
-      const [agg, paid, outstanding] = await Promise.all([
+      const now        = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+      const [agg, paid, outstanding, thisMonth] = await Promise.all([
         prisma.invoice.aggregate({ where: { tenantId }, _sum: { total: true }, _count: true }),
         prisma.invoice.aggregate({ where: { tenantId, status: 'PAID' }, _sum: { total: true }, _count: true }),
         prisma.invoice.aggregate({
           where: { tenantId, status: { in: ['SENT', 'PARTIAL', 'OVERDUE'] } },
           _sum: { total: true, paidAmount: true },
+        }),
+        prisma.invoice.aggregate({
+          where: { tenantId, createdAt: { gte: monthStart, lte: monthEnd } },
+          _sum: { total: true },
+          _count: true,
         }),
       ]);
       const outstandingAmt = (outstanding._sum.total ?? 0) - (outstanding._sum.paidAmount ?? 0);
@@ -240,6 +258,8 @@ export async function invoicesRoutes(app: FastifyInstance) {
         collected:      paid._sum.total         ?? 0,
         paidCount:      paid._count,
         outstanding:    outstandingAmt,
+        thisMonth:      thisMonth._sum.total    ?? 0,
+        thisMonthCount: thisMonth._count,
       });
     },
   });

@@ -21,7 +21,7 @@ interface AuthState {
   token: string | null;
   refreshToken: string | null;
   setAuth: (user: AuthUser, tenant: Tenant, token: string, refreshToken?: string) => void;
-  updateUser: (patch: Partial<AuthUser & { phone: string | null; avatarUrl: string | null }>) => void;
+  updateUser: (patch: Partial<AuthUser>) => void;
   clearAuth: () => void;
   isAuthenticated: () => boolean;
 }

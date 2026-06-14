@@ -59,10 +59,15 @@ async function autoCreateInvoice(bookingId: string, tenantId: string) {
     const taxAmt   = Math.round(subtotal * (taxRate / 100) * 100) / 100;
     const total    = subtotal + taxAmt;
 
-    // Generate invoice number
-    const year  = new Date().getFullYear();
-    const count = await prisma.invoice.count({ where: { tenantId } });
-    const invoiceNumber = `INV-${year}-${String(count + 1).padStart(4, '0')}`;
+    // Generate invoice number (safe: use highest existing number, not COUNT)
+    const year       = new Date().getFullYear();
+    const prefix     = `INV-${year}-`;
+    const lastInv    = await prisma.invoice.findFirst({
+      where:   { tenantId, invoiceNumber: { startsWith: prefix } },
+      orderBy: { invoiceNumber: 'desc' },
+    });
+    const lastNum       = lastInv ? parseInt(lastInv.invoiceNumber.slice(prefix.length), 10) : 0;
+    const invoiceNumber = `${prefix}${String(lastNum + 1).padStart(4, '0')}`;
 
     await prisma.invoice.create({
       data: {
@@ -111,12 +116,31 @@ export async function bookingRoutes(app: FastifyInstance) {
     preHandler: requireAuth,
     handler: async (request) => {
       const { tenantId } = request.user as JwtPayload;
-      const query = request.query as { page?: number; limit?: number; status?: string };
+      const query = request.query as {
+        page?: number; limit?: number; status?: string;
+        search?: string; dateFrom?: string; dateTo?: string;
+      };
       const { page, limit, skip } = parsePageParams(query);
 
-      const where = {
+      const where: Record<string, unknown> = {
         tenantId,
-        ...(query.status && { status: query.status as never }),
+        ...(query.status && { status: query.status }),
+        // Date range filter — matches bookings that overlap the selected window
+        ...(query.dateFrom || query.dateTo ? {
+          AND: [
+            ...(query.dateFrom ? [{ checkOut: { gte: new Date(query.dateFrom) } }] : []),
+            ...(query.dateTo   ? [{ checkIn:  { lte: new Date(query.dateTo + 'T23:59:59Z') } }] : []),
+          ],
+        } : {}),
+        // Search across guest name, email, confirmation number
+        ...(query.search ? {
+          OR: [
+            { confirmationNo: { contains: query.search, mode: 'insensitive' } },
+            { guest: { firstName: { contains: query.search, mode: 'insensitive' } } },
+            { guest: { lastName:  { contains: query.search, mode: 'insensitive' } } },
+            { guest: { email:     { contains: query.search, mode: 'insensitive' } } },
+          ],
+        } : {}),
       };
 
       const [bookings, total] = await Promise.all([
@@ -126,7 +150,7 @@ export async function bookingRoutes(app: FastifyInstance) {
           take: limit,
           orderBy: { createdAt: 'desc' },
           include: {
-            guest: { select: { firstName: true, lastName: true, email: true, phone: true } },
+            guest: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
             room: { select: { number: true, name: true, type: true } },
             payments: { select: { amount: true, method: true, status: true, processedAt: true } },
           },
@@ -186,9 +210,9 @@ export async function bookingRoutes(app: FastifyInstance) {
       const end = to ? new Date(to) : new Date(start.getTime() + 29 * 86_400_000);
       end.setHours(23, 59, 59, 999);
 
-      // All rooms for this tenant
+      // All active rooms for this tenant
       const rooms = await prisma.room.findMany({
-        where: { tenantId },
+        where: { tenantId, isActive: true },
         orderBy: [{ floor: 'asc' }, { number: 'asc' }],
         select: {
           id: true, number: true, name: true, type: true,
@@ -436,7 +460,7 @@ export async function bookingRoutes(app: FastifyInstance) {
             roomNotes:    body.roomNotes,
           },
           include: {
-            guest: { select: { firstName: true, lastName: true, email: true, phone: true } },
+            guest: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
             room:  { select: { number: true, name: true, type: true } },
             payments: { select: { amount: true, method: true, status: true, processedAt: true } },
           },
@@ -495,7 +519,7 @@ export async function bookingRoutes(app: FastifyInstance) {
           where: { id },
           data: { status: 'CHECKED_OUT', actualCheckOut: now, checkedOutBy: checkedOutByStaff },
           include: {
-            guest: { select: { firstName: true, lastName: true, email: true, phone: true } },
+            guest: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
             room:  { select: { number: true, name: true, type: true } },
             payments: { select: { amount: true, method: true, status: true, processedAt: true } },
           },
@@ -694,6 +718,7 @@ export async function bookingRoutes(app: FastifyInstance) {
           payments: { where: { status: 'PAID' } },
           foodOrders: { include: { items: { include: { menuItem: true } } } },
           invoiceExtras: { orderBy: { createdAt: 'asc' } },
+          invoice: { select: { id: true } },
           tenant: { select: { name: true, email: true, phone: true, address: true, currency: true, taxRate: true } },
         },
       });
@@ -724,6 +749,7 @@ export async function bookingRoutes(app: FastifyInstance) {
             children: booking.children,
             invoiceNumber: booking.invoiceNumber,
             invoiceSentAt: booking.invoiceSentAt,
+            invoiceId: booking.invoice?.id ?? null,
           },
           guest: booking.guest,
           room: { id: booking.room.id, name: booking.room.name, number: booking.room.number, basePrice: booking.room.basePrice },

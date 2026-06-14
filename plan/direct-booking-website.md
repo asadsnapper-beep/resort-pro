@@ -339,3 +339,27 @@ All pages use `generateMetadata()` for dynamic SEO tags from tenant settings.
 - Loyalty Program (T-38 ✅ — already done)
 - Custom domain + SSL (already in Tenant model)
 - Public website builder (already exists at `/dashboard/website`)
+
+---
+
+## Bug Fixes (June 2026)
+
+### 1. ✅ `POST /:slug/book` — `roomId` validated as UUID but rooms use cuid()
+**Problem:** `roomId: z.string().uuid()` in `publicBookSchema`. Prisma's `@default(cuid())` generates cuid IDs (e.g. `clxyz...`), not UUIDs. Every public booking submission was rejected with a 400 validation error — completely broken.  
+**Fix:** Changed to `z.string().min(1)`.
+
+### 2. ✅ `GET /api/website` returned 404 for new tenants
+**Problem:** `prisma.websiteContent.findUnique()` returns `null` for a tenant that hasn't set up their website yet. Route returned `404`, causing the dashboard website editor to never load (React Query `isError: true`, form stays at skeleton indefinitely).  
+**Fix:** Return `ok(content ?? { tenantId, heroTitle: '', galleryImages: [], testimonials: [], hiddenSections: [] })` — empty shell so the frontend form loads with defaults and the user can start editing right away.
+
+### 3. ✅ `GET /:slug/availability` — invalid dates caused Prisma crash
+**Problem:** No validation on `checkIn`/`checkOut` query params. `new Date('garbage')` returns `Invalid Date`, which Prisma passes to PostgreSQL causing a runtime error (500). Also, `checkOut <= checkIn` was not checked.  
+**Fix:** Added `isNaN(checkIn.getTime())` guards + `checkOut <= checkIn` check, returning proper 400 responses.
+
+### 4. ✅ Checkout page — error persisted across payment retry attempts
+**Problem:** If payment failed (e.g. network error), `setError(msg)` displayed the error. If the user then changed gateway and tried again, the error was still visible during the new attempt, confusing UX.  
+**Fix:** `setError(null)` at the top of `handlePay()` before each attempt.
+
+### 5. ✅ Checkout page — unused `paymentGatewayApi` import
+**Problem:** `import { paymentGatewayApi } from '@/lib/api'` was imported but never used — raw axios calls were used instead. Dead import, TypeScript warning.  
+**Fix:** Import removed.

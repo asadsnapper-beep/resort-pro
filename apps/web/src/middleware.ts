@@ -9,6 +9,7 @@ const PLATFORM_DOMAINS = new Set([
   'www.resortpro.site',
   'app.resortpro.site',   // dashboard app
   'api.resortpro.site',   // API
+  'stay.resortpro.site',  // public discovery (handled separately below)
   'resortpro.app',
   'www.resortpro.app',
 ]);
@@ -92,6 +93,19 @@ export async function middleware(request: NextRequest) {
   // 2. Skip exact platform / Vercel domains
   if (PLATFORM_DOMAINS.has(hostname)) return NextResponse.next();
   if (hostname.endsWith('.vercel.app')) return NextResponse.next();
+
+  // 2a. stay.resortpro.site  →  rewrite to /discover (or resort detail pages)
+  //     Local dev: localhost:3000/discover also works directly
+  if (hostname === 'stay.resortpro.site') {
+    // /  → /discover
+    if (pathname === '/') {
+      const url    = request.nextUrl.clone();
+      url.pathname = '/discover';
+      return NextResponse.rewrite(url);
+    }
+    // /resort/[slug] → /resort/[slug]  (already in (stay) group — no rewrite needed)
+    return NextResponse.next();
+  }
 
   // 3. *.resortpro.site  →  extract subdomain → rewrite to /<slug>
   if (hostname.endsWith(`.${SUBDOMAIN_BASE}`)) {

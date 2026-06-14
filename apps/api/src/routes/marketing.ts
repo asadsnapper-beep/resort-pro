@@ -211,12 +211,22 @@ export async function marketingRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: 'No recipients found for this audience filter' });
     }
 
-    // Quota check
+    // Quota check (SMS)
     if (needsSms) {
       const remaining = (tenant.smsQuotaMonthly - tenant.smsUsedThisMonth) + tenant.smsCredits;
       if (remaining < recipients.length) {
         return reply.status(400).send({
           error: `Not enough SMS quota. Need ${recipients.length}, have ${remaining}. Buy more credits in Billing.`,
+        });
+      }
+    }
+
+    // Quota check (WhatsApp)
+    if (needsWa) {
+      const remaining = (tenant.waQuotaMonthly - tenant.waUsedThisMonth) + tenant.waCredits;
+      if (remaining < recipients.length) {
+        return reply.status(400).send({
+          error: `Not enough WhatsApp quota. Need ${recipients.length}, have ${remaining}. Buy more credits in Billing.`,
         });
       }
     }
@@ -386,17 +396,24 @@ async function processCampaignSend(
     }
   }
 
+  const finalStatus = delivered > 0 ? 'sent' : 'failed';
   await prisma.marketingCampaign.update({
     where: { id: campaignId },
-    data: { status: 'sent', sentAt: new Date(), deliveredCount: delivered, failedCount: failed },
+    data: { status: finalStatus, sentAt: new Date(), deliveredCount: delivered, failedCount: failed },
   });
 
   // Track platform pool usage
-  if (tenant.smsMode === 'platform' && channels.includes('sms')) {
-    await prisma.tenant.update({
-      where: { id: tenantId },
-      data: { smsUsedThisMonth: { increment: delivered } },
-    });
+  const smsSent = channels.includes('sms') ? delivered : 0;
+  const waSent  = channels.includes('whatsapp') ? delivered : 0;
+  const usageUpdate: any = {};
+  if (tenant.smsMode === 'platform' && channels.includes('sms') && smsSent > 0) {
+    usageUpdate.smsUsedThisMonth = { increment: smsSent };
+  }
+  if (tenant.waMode === 'platform' && channels.includes('whatsapp') && waSent > 0) {
+    usageUpdate.waUsedThisMonth = { increment: waSent };
+  }
+  if (Object.keys(usageUpdate).length > 0) {
+    await prisma.tenant.update({ where: { id: tenantId }, data: usageUpdate });
   }
 }
 

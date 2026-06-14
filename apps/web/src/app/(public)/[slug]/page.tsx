@@ -4,10 +4,10 @@ import { getTheme } from '@/components/themes/registry';
 import { ConfigThemeRenderer } from '@/components/themes/config-renderer';
 import type { ResortData } from '@/components/themes/types';
 
-async function fetchResortData(slug: string): Promise<ResortData | null> {
+async function fetchResortData(slug: string, noCache = false): Promise<ResortData | null> {
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/site/${slug}`, {
-      next: { revalidate: 60 },
+      next: noCache ? { revalidate: 0 } : { revalidate: 60 },
     });
     if (!res.ok) return null;
     const json = await res.json();
@@ -31,6 +31,18 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
+/** Minimal fallback website data used when ?preview=... but no website is configured yet */
+function previewFallback(tenantName: string): ResortData['website'] {
+  return {
+    heroTitle:   `Welcome to ${tenantName}`,
+    heroSubtitle: 'Experience luxury and comfort like never before.',
+    aboutTitle:  'About Us',
+    aboutText:   'We offer world-class hospitality in a serene setting.',
+    galleryImages: [],
+    testimonials: [],
+  };
+}
+
 export default async function ResortWebsitePage({
   params,
   searchParams,
@@ -38,16 +50,27 @@ export default async function ResortWebsitePage({
   params: { slug: string };
   searchParams: { preview?: string };
 }) {
-  const data = await fetchResortData(params.slug);
+  const isPreview = !!searchParams?.preview;
+  // Preview mode: bypass 60s cache so changes show immediately
+  const data = await fetchResortData(params.slug, isPreview);
 
-  if (!data || !data.website) notFound();
+  // No tenant at all → hard 404
+  if (!data) notFound();
+
+  // No website configured yet → only allow preview mode; live site shows 404
+  if (!data.website && !isPreview) notFound();
+
+  // In preview mode with no website content, use a placeholder
+  const websiteData = data.website ?? previewFallback(data.tenant.name);
 
   // ?preview=themeKey → show that theme without saving
-  const themeKey = searchParams?.preview || data.website?.templateId;
+  const themeKey = searchParams?.preview || websiteData.templateId;
 
   // Config-driven theme (uploaded or AI-generated) takes priority over hardcoded
-  const configJson    = data.themeConfig;
+  // In preview mode, skip config-driven theme so we show the previewed theme directly
+  const configJson    = isPreview ? null : data.themeConfig;
   const ThemeComponent = getTheme(themeKey);
+  const resolvedData: ResortData = { ...data, website: websiteData };
 
   return (
     <>
@@ -59,8 +82,8 @@ export default async function ResortWebsitePage({
         </div>
       )}
       {configJson
-        ? <ConfigThemeRenderer data={data} config={configJson} />
-        : <ThemeComponent data={data} />
+        ? <ConfigThemeRenderer data={resolvedData} config={configJson} />
+        : <ThemeComponent data={resolvedData} />
       }
     </>
   );

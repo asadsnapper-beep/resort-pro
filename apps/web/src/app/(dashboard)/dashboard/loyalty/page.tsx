@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { loyaltyApi } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -400,7 +400,15 @@ export default function LoyaltyPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedGuest, setSelectedGuest] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [tierFilter, setTierFilter] = useState('');
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleSearch = (val: string) => {
+    setSearch(val);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => setDebouncedSearch(val), 350);
+  };
 
   const { data: progRes } = useQuery({
     queryKey: ['loyalty-program'],
@@ -408,8 +416,8 @@ export default function LoyaltyPage() {
   });
 
   const { data: accountsRes, isLoading } = useQuery({
-    queryKey: ['loyalty-accounts', search, tierFilter],
-    queryFn: () => loyaltyApi.getAccounts({ search: search || undefined, tier: tierFilter || undefined }),
+    queryKey: ['loyalty-accounts', debouncedSearch, tierFilter],
+    queryFn: () => loyaltyApi.getAccounts({ search: debouncedSearch || undefined, tier: tierFilter || undefined }),
   });
 
   const { data: leaderRes } = useQuery({
@@ -421,10 +429,8 @@ export default function LoyaltyPage() {
   const { accounts = [], total = 0, stats = [] } = accountsRes?.data?.data ?? {};
   const leaderboard: any[] = leaderRes?.data?.data ?? [];
 
-  // Tier distribution from stats
+  // Tier distribution from stats (counts all members, not just current page)
   const tierCounts = Object.fromEntries(stats.map((s: any) => [s.tier, s._count]));
-
-  const totalPoints = accounts.reduce((s: number, a: any) => s + a.points, 0);
 
   return (
     <div className="space-y-6">
@@ -483,10 +489,10 @@ export default function LoyaltyPage() {
         </Card>
         <Card>
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="rounded-xl p-3 bg-emerald-500"><Zap className="h-5 w-5 text-white" /></div>
+            <div className="rounded-xl p-3 bg-amber-500"><Medal className="h-5 w-5 text-white" /></div>
             <div>
-              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Points in Circulation</p>
-              <p className="text-2xl font-bold">{totalPoints.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Bronze Members</p>
+              <p className="text-2xl font-bold">{tierCounts['BRONZE'] ?? 0}</p>
             </div>
           </CardContent>
         </Card>
@@ -517,7 +523,7 @@ export default function LoyaltyPage() {
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative flex-1 min-w-48">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+              <input type="text" value={search} onChange={(e) => handleSearch(e.target.value)}
                 placeholder="Search members…"
                 className="w-full rounded-lg border border-gray-200 dark:border-gray-700 pl-9 pr-3 py-2 text-sm bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-resort-500" />
             </div>

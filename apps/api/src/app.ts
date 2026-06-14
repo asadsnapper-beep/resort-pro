@@ -22,6 +22,7 @@ import { menuRoutes } from './routes/menu';
 import { foodOrderRoutes } from './routes/foodOrders';
 import { inventoryRoutes } from './routes/inventory';
 import { ticketRoutes } from './routes/tickets';
+import { ticketWebhookRoutes } from './routes/ticketWebhooks';
 import { websiteRoutes, publicWebsiteRoutes } from './routes/website';
 import { dashboardRoutes } from './routes/dashboard';
 import { notificationRoutes } from './routes/notifications';
@@ -49,6 +50,7 @@ import { syncRoutes } from './routes/sync';
 import { guestDocumentRoutes } from './routes/guestDocuments';
 import { startPreArrivalCron } from './jobs/pre-arrival-reminder';
 import { startICalSyncCron } from './jobs/ical-sync';
+import { startReportDispatchJob } from './jobs/daily-report-dispatch';
 import { startAutomationEngine } from './services/automation';
 import { runTrialEmailCron } from './services/trial-emails';
 import { metrics, normalizePath } from './utils/metrics';
@@ -178,6 +180,7 @@ export async function buildApp() {
   await app.register(foodOrderRoutes, { prefix: '/api/food-orders' });
   await app.register(inventoryRoutes, { prefix: '/api/inventory' });
   await app.register(ticketRoutes, { prefix: '/api/tickets' });
+  await app.register(ticketWebhookRoutes, { prefix: '/api/ticket-webhooks' });
   await app.register(chatRoutes, { prefix: '/api/chat' });
   await app.register(websiteRoutes, { prefix: '/api/website' });
   await app.register(publicWebsiteRoutes, { prefix: '/site' });
@@ -211,6 +214,7 @@ export async function buildApp() {
     startAutomationEngine();
     startPreArrivalCron();
     startICalSyncCron();
+    startReportDispatchJob();
 
     // ── Trial lifecycle email cron (runs every 12 hours) ─────────────────
     runTrialEmailCron().catch((e) => app.log.error(e, 'trial-cron failed on startup'));

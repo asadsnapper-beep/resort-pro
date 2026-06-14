@@ -85,12 +85,12 @@ export function GuestDetailSheet({ guest, onClose, onEdit, onDelete }: Props) {
               <h3 className="mb-3 text-sm font-semibold text-gray-700">Contact Details</h3>
               <div className="space-y-2.5">
                 {[
-                  { icon: Mail, label: guest.email },
-                  { icon: Phone, label: guest.phone ?? '—' },
-                  { icon: MapPin, label: guest.address ?? '—' },
-                  { icon: Globe, label: guest.nationality ?? '—' },
-                ].map(({ icon: Icon, label }) => (
-                  <div key={label} className="flex items-center gap-3 text-sm">
+                  { key: 'email', icon: Mail, label: guest.email },
+                  { key: 'phone', icon: Phone, label: guest.phone ?? '—' },
+                  { key: 'address', icon: MapPin, label: guest.address ?? '—' },
+                  { key: 'nationality', icon: Globe, label: guest.nationality ?? '—' },
+                ].map(({ key, icon: Icon, label }) => (
+                  <div key={key} className="flex items-center gap-3 text-sm">
                     <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     <span className={label === '—' ? 'text-muted-foreground' : 'text-gray-900'}>{label}</span>
                   </div>

@@ -118,6 +118,7 @@ export default function AnalyticsPage() {
   const currency = (tenant as any)?.currency ?? 'BDT';
   const [data, setData] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [occupancy, setOccupancy] = useState<{ date: string; rate: number }[]>([]);
 
   useEffect(() => {
@@ -127,6 +128,8 @@ export default function AnalyticsPage() {
     ]).then(([a, o]) => {
       setData(a.data.data);
       setOccupancy(o.data.data);
+    }).catch(() => {
+      setError('Failed to load analytics. Please refresh the page.');
     }).finally(() => setLoading(false));
   }, []);
 
@@ -134,6 +137,14 @@ export default function AnalyticsPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-sm text-red-500">{error}</p>
       </div>
     );
   }
@@ -226,12 +237,12 @@ export default function AnalyticsPage() {
             icon={Receipt} color="bg-red-50 text-red-600"
             label="Expenses (MTD)" value={formatCurrency(kpis.mtdExpenses ?? 0, currency)}
             sub="Total costs this month"
-            change={kpis.expenseGrowth}
+            change={kpis.expenseGrowth !== undefined ? -(kpis.expenseGrowth) : undefined}
           />
           <KpiCard
             icon={kpis.profitMarginMTD >= 0 ? PiggyBank : TrendingDown}
             color={kpis.profitMarginMTD >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}
-            label="Net Profit (MTD)" value={formatCurrency(Math.max(0, (kpis.mtdRevenue ?? 0) - (kpis.mtdExpenses ?? 0)), currency)}
+            label="Net Profit (MTD)" value={formatCurrency((kpis.mtdRevenue ?? 0) - (kpis.mtdExpenses ?? 0), currency)}
             sub="Revenue minus expenses"
           />
           <KpiCard

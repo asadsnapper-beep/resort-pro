@@ -89,6 +89,9 @@ async function syncOneCalendar(cal: CalendarRow): Promise<void> {
       continue
     }
 
+    // TENTATIVE events — skip entirely (don't block rooms for unconfirmed holds)
+    if (event.status === 'TENTATIVE') continue
+
     if (existing) {
       // Update dates if changed
       const sameStart = existing.checkIn.getTime() === event.start.getTime()

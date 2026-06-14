@@ -7,13 +7,17 @@ import type { JwtPayload } from '@resort-pro/types';
 import * as dns from 'dns/promises';
 import { FLAG_REGISTRY } from '../utils/feature-flags';
 import { sendTestEmail } from '../utils/guest-emails';
+import crypto from 'crypto';
 
 const updateTenantSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   phone: z.string().optional(),
-  email: z.string().email().optional(),
-  website: z.string().url().optional(),
+  // Allow empty string to clear these fields — transform '' → undefined so Prisma skips the field
+  email: z.union([z.string().email(), z.literal('')]).optional().transform(v => v === '' ? undefined : v),
+  website: z.union([z.string().url(), z.literal('')]).optional().transform(v => v === '' ? undefined : v),
   address: z.string().optional(),
+  city: z.string().optional(),
+  country: z.string().optional(),
   currency: z.string().length(3).optional(),
   timezone: z.string().optional(),
   checkInTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
@@ -682,6 +686,117 @@ export async function tenantRoutes(app: FastifyInstance) {
         },
         referrals,
       }));
+    },
+  });
+
+  // ── Team management ──────────────────────────────────────────────────────────
+
+  // GET /api/tenants/team — list all team members + pending invites
+  app.get('/team', {
+    schema: { tags: ['tenants'], summary: 'List team members', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER', 'MANAGER'),
+    handler: async (request) => {
+      const { tenantId, sub } = request.user as JwtPayload;
+      const [members, pendingInvites] = await Promise.all([
+        prisma.user.findMany({
+          where: { tenantId },
+          select: { id: true, firstName: true, lastName: true, email: true, role: true, isActive: true, lastLoginAt: true, createdAt: true },
+          orderBy: { createdAt: 'asc' },
+        }),
+        prisma.staffInvite.findMany({
+          where: { tenantId, used: false, expiresAt: { gt: new Date() } },
+          select: { id: true, email: true, role: true, createdAt: true, expiresAt: true },
+          orderBy: { createdAt: 'desc' },
+        }),
+      ]);
+      return ok({ members: members.map(m => ({ ...m, isSelf: m.id === sub })), pendingInvites });
+    },
+  });
+
+  // POST /api/tenants/team/invite — send invite link
+  app.post('/team/invite', {
+    schema: { tags: ['tenants'], summary: 'Invite a team member', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER', 'MANAGER'),
+    handler: async (request, reply) => {
+      const { tenantId } = request.user as JwtPayload;
+      const { email, role } = z.object({
+        email: z.string().email(),
+        role: z.enum(['MANAGER', 'SHAREHOLDER', 'RECEPTIONIST', 'MARKETER', 'DEVELOPER', 'STAFF', 'CHEF']),
+      }).parse(request.body);
+
+      // Check if user already exists in this tenant
+      const existing = await prisma.user.findUnique({ where: { tenantId_email: { tenantId, email } } });
+      if (existing) return reply.status(409).send({ success: false, error: 'A user with this email already exists in your team.' });
+
+      // Cancel any previous pending invites for same email
+      await prisma.staffInvite.updateMany({
+        where: { tenantId, email, used: false },
+        data: { used: true },
+      });
+
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      await prisma.staffInvite.create({ data: { tenantId, email, role: role as never, token, expiresAt } });
+
+      const APP_URL = process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:3000';
+      const inviteLink = `${APP_URL}/auth/invite?token=${token}`;
+
+      return reply.status(201).send(ok({ inviteLink, email, role, expiresAt }, 'Invite created'));
+    },
+  });
+
+  // PATCH /api/tenants/team/:userId/role — change a member's role (OWNER only)
+  app.patch('/team/:userId/role', {
+    schema: { tags: ['tenants'], summary: 'Change team member role', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER'),
+    handler: async (request, reply) => {
+      const { tenantId, sub } = request.user as JwtPayload;
+      const { userId } = request.params as { userId: string };
+      const { role } = z.object({
+        role: z.enum(['MANAGER', 'SHAREHOLDER', 'RECEPTIONIST', 'MARKETER', 'DEVELOPER', 'STAFF', 'CHEF']),
+      }).parse(request.body);
+
+      if (userId === sub) return reply.status(400).send({ success: false, error: 'You cannot change your own role.' });
+
+      const member = await prisma.user.findFirst({ where: { id: userId, tenantId } });
+      if (!member) return reply.status(404).send({ success: false, error: 'Team member not found.' });
+      if (member.role === 'OWNER') return reply.status(403).send({ success: false, error: 'Cannot change the owner\'s role.' });
+
+      const updated = await prisma.user.update({ where: { id: userId }, data: { role: role as never } });
+      return ok({ id: updated.id, role: updated.role }, 'Role updated');
+    },
+  });
+
+  // DELETE /api/tenants/team/:userId — remove a team member (OWNER only)
+  app.delete('/team/:userId', {
+    schema: { tags: ['tenants'], summary: 'Remove a team member', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER'),
+    handler: async (request, reply) => {
+      const { tenantId, sub } = request.user as JwtPayload;
+      const { userId } = request.params as { userId: string };
+
+      if (userId === sub) return reply.status(400).send({ success: false, error: 'You cannot remove yourself.' });
+
+      const member = await prisma.user.findFirst({ where: { id: userId, tenantId } });
+      if (!member) return reply.status(404).send({ success: false, error: 'Team member not found.' });
+      if (member.role === 'OWNER') return reply.status(403).send({ success: false, error: 'Cannot remove the owner.' });
+
+      await prisma.user.delete({ where: { id: userId } });
+      return ok({ id: userId }, 'Team member removed');
+    },
+  });
+
+  // DELETE /api/tenants/team/invite/:inviteId — cancel a pending invite
+  app.delete('/team/invite/:inviteId', {
+    schema: { tags: ['tenants'], summary: 'Cancel a pending invite', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER', 'MANAGER'),
+    handler: async (request, reply) => {
+      const { tenantId } = request.user as JwtPayload;
+      const { inviteId } = request.params as { inviteId: string };
+      const invite = await prisma.staffInvite.findFirst({ where: { id: inviteId, tenantId } });
+      if (!invite) return reply.status(404).send({ success: false, error: 'Invite not found.' });
+      await prisma.staffInvite.update({ where: { id: inviteId }, data: { used: true } });
+      return ok({ id: inviteId }, 'Invite cancelled');
     },
   });
 }

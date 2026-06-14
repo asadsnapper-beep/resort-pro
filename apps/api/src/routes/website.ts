@@ -34,6 +34,7 @@ const websiteSchema = z.object({
   youtubeUrl: z.string().url().optional().or(z.literal('')),
   whatsappNumber: z.string().optional(),
   tripadvisorUrl: z.string().url().optional().or(z.literal('')),
+  googleAnalyticsId: z.string().regex(/^G-[A-Z0-9]+$/).optional().or(z.literal('')),
 });
 
 export async function websiteRoutes(app: FastifyInstance) {
@@ -41,11 +42,11 @@ export async function websiteRoutes(app: FastifyInstance) {
   app.get('/', {
     schema: { tags: ['website'], summary: 'Get website content', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'MARKETER', 'DEVELOPER'),
-    handler: async (request, reply) => {
+    handler: async (request) => {
       const { tenantId } = request.user as JwtPayload;
+      // Return existing content or an empty shell — never 404, so the dashboard form always loads
       const content = await prisma.websiteContent.findUnique({ where: { tenantId } });
-      if (!content) return reply.status(404).send({ success: false, error: 'Website content not found' });
-      return ok(content);
+      return ok(content ?? { tenantId, heroTitle: '', galleryImages: [], testimonials: [], hiddenSections: [] });
     },
   });
 
@@ -64,10 +65,70 @@ export async function websiteRoutes(app: FastifyInstance) {
       return ok(content, 'Website updated');
     },
   });
+
+  // GET /api/website/stats — visitor stats for dashboard widget
+  app.get('/stats', {
+    schema: { tags: ['website'], summary: 'Website visitor stats', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER', 'MANAGER', 'MARKETER', 'DEVELOPER'),
+    handler: async (request) => {
+      const { tenantId } = request.user as JwtPayload;
+      const now = new Date();
+      const todayStr = now.toISOString().split('T')[0];
+      const thirtyDaysAgo = new Date(now); thirtyDaysAgo.setDate(now.getDate() - 29);
+
+      const rows = await (prisma as any).websitePageView.findMany({
+        where: {
+          tenantId,
+          date: { gte: thirtyDaysAgo },
+        },
+        orderBy: { date: 'asc' },
+      });
+
+      const todayRow  = rows.find((r: any) => r.date.toISOString().split('T')[0] === todayStr);
+      const total30d  = rows.reduce((s: number, r: any) => s + r.count, 0);
+      const todayViews = todayRow?.count ?? 0;
+
+      // Build last-30-days chart data
+      const chartData: { date: string; views: number }[] = [];
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(now); d.setDate(now.getDate() - i);
+        const key = d.toISOString().split('T')[0];
+        const row = rows.find((r: any) => r.date.toISOString().split('T')[0] === key);
+        chartData.push({ date: d.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }), views: row?.count ?? 0 });
+      }
+
+      return ok({ todayViews, total30d, chartData });
+    },
+  });
 }
 
 // ── Public routes (no auth) ──────────────────────────────────────────────────
 export async function publicWebsiteRoutes(app: FastifyInstance) {
+  // POST /site/:slug/pageview — fire-and-forget visitor counter (no auth, lightweight)
+  app.post('/:slug/pageview', {
+    schema: { tags: ['website'], summary: 'Track a public website page view' },
+    handler: async (request, reply) => {
+      const { slug } = request.params as { slug: string };
+      // Run in background — respond immediately so it never blocks the visitor's page load
+      setImmediate(async () => {
+        try {
+          const tenant = await (prisma as any).tenant.findUnique({
+            where: { slug, isActive: true },
+            select: { id: true },
+          });
+          if (!tenant) return;
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          await (prisma as any).websitePageView.upsert({
+            where: { tenantId_date: { tenantId: tenant.id, date: today } },
+            update: { count: { increment: 1 } },
+            create: { tenantId: tenant.id, date: today, count: 1 },
+          });
+        } catch { /* silent — never break visitor experience */ }
+      });
+      return reply.status(204).send();
+    },
+  });
+
   // GET /site/domain/:hostname — resolve custom domain → slug (used by Next.js middleware)
   app.get('/domain/:hostname', {
     schema: { tags: ['website'], summary: 'Resolve custom domain to tenant slug' },
@@ -152,7 +213,7 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
     lastName: z.string().min(1),
     email: z.string().email(),
     phone: z.string().optional(),
-    roomId: z.string().uuid(),
+    roomId: z.string().min(1),
     checkIn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     checkOut: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     adults: z.number().int().min(1).default(1),
@@ -319,8 +380,15 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
         return reply.status(400).send({ success: false, error: 'checkIn and checkOut required' });
       }
 
-      const checkIn = new Date(query.checkIn);
+      const checkIn  = new Date(query.checkIn);
       const checkOut = new Date(query.checkOut);
+
+      if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
+        return reply.status(400).send({ success: false, error: 'Invalid date format for checkIn or checkOut' });
+      }
+      if (checkOut <= checkIn) {
+        return reply.status(400).send({ success: false, error: 'checkOut must be after checkIn' });
+      }
 
       const bookedRoomIds = await prisma.booking.findMany({
         where: {

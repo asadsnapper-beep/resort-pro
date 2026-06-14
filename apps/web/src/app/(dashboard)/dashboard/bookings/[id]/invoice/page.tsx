@@ -7,7 +7,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useState, useRef } from 'react';
 import {
   Printer, Send, ArrowLeft, Plus, Trash2, CheckCircle2,
-  Building2, User, CalendarDays, Hash, Loader2, Mail,
+  Building2, User, CalendarDays, Hash, Loader2, Mail, Download,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -24,6 +24,7 @@ interface InvoiceData {
     children: number;
     invoiceNumber: string | null;
     invoiceSentAt: string | null;
+    invoiceId: string | null;
   };
   guest: { firstName: string; lastName: string; email: string; phone?: string; address?: string; nationality?: string };
   room: { id: string; name: string; number: string; basePrice: number };
@@ -212,6 +213,17 @@ export default function InvoicePage() {
                 : <Mail className="h-4 w-4 mr-1" />}
               Email Invoice
             </Button>
+            {booking.invoiceId && (
+              <a
+                href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/invoices/${booking.invoiceId}/pdf`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button variant="outline" size="sm">
+                  <Download className="h-4 w-4 mr-1" /> PDF
+                </Button>
+              </a>
+            )}
             <Button size="sm" className="bg-resort-600 hover:bg-resort-700 text-white" onClick={handlePrint}>
               <Printer className="h-4 w-4 mr-1" /> Print
             </Button>

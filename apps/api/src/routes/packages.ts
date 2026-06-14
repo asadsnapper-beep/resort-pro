@@ -30,7 +30,7 @@ export async function packageRoutes(app: FastifyInstance) {
           _count: { select: { bookings: true } },
         },
       });
-      return ok(reply, packages);
+      return ok(packages);
     },
   });
 
@@ -44,7 +44,7 @@ export async function packageRoutes(app: FastifyInstance) {
       const pkg = await prisma.package.create({
         data: { ...data, tenantId },
       });
-      return ok(reply, pkg, 201);
+      return reply.status(201).send(ok(pkg));
     },
   });
 
@@ -61,7 +61,7 @@ export async function packageRoutes(app: FastifyInstance) {
       if (!pkg) return reply.status(404).send({ error: 'Package not found' });
 
       const updated = await prisma.package.update({ where: { id }, data });
-      return ok(reply, updated);
+      return ok(updated);
     },
   });
 
@@ -76,8 +76,16 @@ export async function packageRoutes(app: FastifyInstance) {
       const pkg = await prisma.package.findFirst({ where: { id, tenantId } });
       if (!pkg) return reply.status(404).send({ error: 'Package not found' });
 
+      // Block delete if package is used in any bookings
+      const usageCount = await prisma.bookingPackage.count({ where: { packageId: id } });
+      if (usageCount > 0) {
+        return reply.status(409).send({
+          error: `Cannot delete "${pkg.name}" — it has been applied to ${usageCount} booking(s). Deactivate it instead.`,
+        });
+      }
+
       await prisma.package.delete({ where: { id } });
-      return ok(reply, { deleted: true });
+      return ok({ deleted: true });
     },
   });
 
@@ -106,7 +114,7 @@ export async function packageRoutes(app: FastifyInstance) {
         orderBy: { createdAt: 'desc' },
       });
 
-      return ok(reply, bookings);
+      return ok(bookings);
     },
   });
 
@@ -160,7 +168,7 @@ export async function packageRoutes(app: FastifyInstance) {
         }),
       ]);
 
-      return ok(reply, bp, 201);
+      return reply.status(201).send(ok(bp));
     },
   });
 
@@ -196,7 +204,7 @@ export async function packageRoutes(app: FastifyInstance) {
         }),
       ]);
 
-      return ok(reply, { removed: true });
+      return ok({ removed: true });
     },
   });
 
@@ -222,7 +230,7 @@ export async function packageRoutes(app: FastifyInstance) {
         orderBy: { createdAt: 'asc' },
       });
 
-      return ok(reply, packages);
+      return ok(packages);
     },
   });
 }

@@ -126,9 +126,11 @@ export async function offersRoutes(app: FastifyInstance) {
       const existing = await prisma.offer.findFirst({ where: { id, tenantId } });
       if (!existing) return reply.status(404).send({ success: false, error: 'Offer not found' });
 
-      const promoCode = body.promoCode
-        ? body.promoCode.toUpperCase()
-        : body.promoCode === null ? null : undefined;
+      // '' and null both mean "clear the promo code"; undefined means "don't change it"
+      const promoCode =
+        body.promoCode === undefined ? undefined
+        : body.promoCode === null || body.promoCode === '' ? null
+        : body.promoCode.toUpperCase();
 
       const offer = await prisma.offer.update({
         where: { id },

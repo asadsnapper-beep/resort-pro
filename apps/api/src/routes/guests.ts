@@ -15,6 +15,7 @@ const guestSchema = z.object({
   idNumber: z.string().optional(),
   address: z.string().optional(),
   notes: z.string().optional(),
+  dateOfBirth: z.string().optional().nullable(), // ISO date string e.g. "1990-05-15"
 });
 
 export async function guestRoutes(app: FastifyInstance) {
@@ -71,7 +72,13 @@ export async function guestRoutes(app: FastifyInstance) {
       const existing = await prisma.guest.findFirst({ where: { tenantId, email: body.email } });
       if (existing) return reply.status(409).send({ success: false, error: 'Guest with this email already exists' });
 
-      const guest = await prisma.guest.create({ data: { tenantId, ...body } });
+      const guest = await prisma.guest.create({
+        data: {
+          tenantId,
+          ...body,
+          dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : null,
+        },
+      });
       return reply.status(201).send(ok(guest, 'Guest created'));
     },
   });
@@ -85,7 +92,23 @@ export async function guestRoutes(app: FastifyInstance) {
       const body = guestSchema.partial().parse(request.body);
       const guest = await prisma.guest.findFirst({ where: { id, tenantId } });
       if (!guest) return reply.status(404).send({ success: false, error: 'Guest not found' });
-      const updated = await prisma.guest.update({ where: { id }, data: body });
+
+      // If email is being changed, ensure it's not already taken by another guest
+      if (body.email && body.email !== guest.email) {
+        const conflict = await prisma.guest.findFirst({ where: { tenantId, email: body.email } });
+        if (conflict) return reply.status(409).send({ success: false, error: 'Another guest with this email already exists' });
+      }
+
+      const { dateOfBirth, ...rest } = body;
+      const updated = await prisma.guest.update({
+        where: { id },
+        data: {
+          ...rest,
+          ...(dateOfBirth !== undefined && {
+            dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+          }),
+        },
+      });
       return ok(updated, 'Guest updated');
     },
   });
@@ -98,6 +121,18 @@ export async function guestRoutes(app: FastifyInstance) {
       const { id } = request.params as { id: string };
       const guest = await prisma.guest.findFirst({ where: { id, tenantId } });
       if (!guest) return reply.status(404).send({ success: false, error: 'Guest not found' });
+
+      // Block delete if guest has active bookings
+      const activeBookings = await prisma.booking.count({
+        where: { guestId: id, status: { in: ['CONFIRMED', 'CHECKED_IN', 'PENDING'] } },
+      });
+      if (activeBookings > 0) {
+        return reply.status(409).send({
+          success: false,
+          error: `Cannot delete guest — they have ${activeBookings} active booking${activeBookings > 1 ? 's' : ''}. Check out or cancel their bookings first.`,
+        });
+      }
+
       await prisma.guest.delete({ where: { id } });
       return ok(null, 'Guest deleted');
     },

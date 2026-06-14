@@ -15,6 +15,7 @@ interface Staff {
     firstName: string;
     lastName: string;
     email: string;
+    role?: string;
     isActive: boolean;
     lastLoginAt?: string;
   };
@@ -25,6 +26,7 @@ interface Props {
   onClose: () => void;
   onEdit: (staff: Staff) => void;
   onDeactivate: (staff: Staff) => void;
+  onReactivate: (staff: Staff) => void;
 }
 
 const DEPT_COLORS: Record<string, string> = {
@@ -49,7 +51,17 @@ function getDaysEmployed(hireDate: string) {
   return m > 0 ? `${y}y ${m}mo` : `${y}y`;
 }
 
-export function StaffDetailSheet({ staff, onClose, onEdit, onDeactivate }: Props) {
+const ROLE_COLORS: Record<string, string> = {
+  OWNER:        'bg-yellow-100 text-yellow-800',
+  MANAGER:      'bg-purple-100 text-purple-700',
+  RECEPTIONIST: 'bg-blue-100 text-blue-700',
+  MARKETER:     'bg-pink-100 text-pink-700',
+  DEVELOPER:    'bg-indigo-100 text-indigo-700',
+  SHAREHOLDER:  'bg-amber-100 text-amber-700',
+  STAFF:        'bg-gray-100 text-gray-600',
+};
+
+export function StaffDetailSheet({ staff, onClose, onEdit, onDeactivate, onReactivate }: Props) {
   if (!staff) return null;
 
   const initials = getInitials(staff.user.firstName, staff.user.lastName);
@@ -113,10 +125,10 @@ export function StaffDetailSheet({ staff, onClose, onEdit, onDeactivate }: Props
               <h3 className="mb-3 text-sm font-semibold text-gray-700">Contact Details</h3>
               <div className="space-y-2.5">
                 {[
-                  { icon: Mail, label: staff.user.email },
-                  { icon: Phone, label: staff.phone ?? '—' },
-                ].map(({ icon: Icon, label }) => (
-                  <div key={label} className="flex items-center gap-3 text-sm">
+                  { key: 'email', icon: Mail, label: staff.user.email },
+                  { key: 'phone', icon: Phone, label: staff.phone ?? '—' },
+                ].map(({ key, icon: Icon, label }) => (
+                  <div key={key} className="flex items-center gap-3 text-sm">
                     <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     <span className={label === '—' ? 'text-muted-foreground' : 'text-gray-900'}>{label}</span>
                   </div>
@@ -154,7 +166,9 @@ export function StaffDetailSheet({ staff, onClose, onEdit, onDeactivate }: Props
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Role</span>
-                <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded font-medium">STAFF</span>
+                <span className={`text-xs px-2 py-0.5 rounded font-semibold ${ROLE_COLORS[staff.user.role ?? 'STAFF'] ?? ROLE_COLORS.STAFF}`}>
+                  {staff.user.role ?? 'STAFF'}
+                </span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Account Status</span>
@@ -171,9 +185,13 @@ export function StaffDetailSheet({ staff, onClose, onEdit, onDeactivate }: Props
           <Button variant="outline" className="flex-1 gap-2" onClick={() => onEdit(staff)}>
             <Pencil className="h-4 w-4" /> Edit
           </Button>
-          {staff.isActive && (
+          {staff.isActive ? (
             <Button variant="destructive" className="gap-2" onClick={() => onDeactivate(staff)}>
               <UserX className="h-4 w-4" /> Deactivate
+            </Button>
+          ) : (
+            <Button variant="outline" className="gap-2 border-green-300 text-green-700 hover:bg-green-50" onClick={() => onReactivate(staff)}>
+              <Shield className="h-4 w-4" /> Reactivate
             </Button>
           )}
         </div>

@@ -64,16 +64,18 @@ const SOURCE_COLORS: Record<string, string> = {
 
 interface AddModalProps {
   rooms: Room[];
+  preselectedRoom?: Room | null;
   onClose: () => void;
   onSaved: () => void;
 }
 
-function AddCalendarModal({ rooms, onClose, onSaved }: AddModalProps) {
+function AddCalendarModal({ rooms, preselectedRoom, onClose, onSaved }: AddModalProps) {
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  const [roomId, setRoomId] = useState('');
+  const [roomId, setRoomId] = useState(preselectedRoom?.id ?? '');
   const [name, setName] = useState('Booking.com');
+  const [customName, setCustomName] = useState('');
   const [url, setUrl] = useState('');
   const [testResult, setTestResult] = useState<{ ok: boolean; eventCount: number; error?: string } | null>(null);
   const [testing, setTesting] = useState(false);
@@ -95,8 +97,10 @@ function AddCalendarModal({ rooms, onClose, onSaved }: AddModalProps) {
     }
   }
 
+  const effectiveName = name === 'Other' ? customName : name;
+
   async function handleSave() {
-    if (!roomId || !name || !url) {
+    if (!roomId || !effectiveName || !url) {
       toast({ title: 'Fill all fields', variant: 'destructive' });
       return;
     }
@@ -106,7 +110,7 @@ function AddCalendarModal({ rooms, onClose, onSaved }: AddModalProps) {
     }
     setSaving(true);
     try {
-      await externalCalendarsApi.create({ roomId, name, icalUrl: url });
+      await externalCalendarsApi.create({ roomId, name: effectiveName, icalUrl: url });
       await qc.invalidateQueries({ queryKey: ['external-calendars'] });
       toast({ title: `${name} calendar added`, description: `Syncing room ${rooms.find(r => r.id === roomId)?.name}…` });
       onSaved();
@@ -172,9 +176,10 @@ function AddCalendarModal({ rooms, onClose, onSaved }: AddModalProps) {
             {name === 'Other' && (
               <input
                 type="text"
+                value={customName}
                 placeholder="Enter name…"
                 className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a6b5e]/30"
-                onChange={e => setName(e.target.value)}
+                onChange={e => setCustomName(e.target.value)}
               />
             )}
           </div>
@@ -257,12 +262,12 @@ function CalendarCard({ cal, onSynced }: CalendarCardProps) {
     setSyncing(true);
     try {
       await externalCalendarsApi.sync(cal.id);
-      await qc.invalidateQueries({ queryKey: ['external-calendars'] });
       toast({ title: 'Sync complete' });
       onSynced();
     } catch {
       toast({ title: 'Sync failed', variant: 'destructive' });
     } finally {
+      await qc.invalidateQueries({ queryKey: ['external-calendars'] });
       setSyncing(false);
     }
   }
@@ -460,7 +465,8 @@ export default function ChannelsPage() {
     queryKey: ['rooms-all'],
     queryFn: async () => {
       const res = await roomsApi.list({ limit: 200, isActive: true });
-      return (res.data.data ?? res.data) as Room[];
+      // paginated response: { success, data: rooms[], pagination: {...} }
+      return (res.data.data ?? []) as Room[];
     },
   });
 
@@ -581,6 +587,7 @@ export default function ChannelsPage() {
       {showModal && (
         <AddCalendarModal
           rooms={allRooms}
+          preselectedRoom={preselectedRoom}
           onClose={() => { setShowModal(false); setPreselectedRoom(null); }}
           onSaved={() => { setShowModal(false); setPreselectedRoom(null); }}
         />

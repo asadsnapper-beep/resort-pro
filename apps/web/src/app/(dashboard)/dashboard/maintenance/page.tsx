@@ -76,14 +76,14 @@ function CreateTicketModal({ onClose }: { onClose: () => void }) {
 
   const { data: roomsRes } = useQuery({
     queryKey: ['rooms-all'],
-    queryFn: () => roomsApi.list(),
-    select: r => (r.data.data?.rooms ?? r.data.data ?? []) as { id: string; name: string; number: string }[],
+    queryFn: () => roomsApi.list({ limit: 200, isActive: true }),
+    select: r => (r.data.data?.data ?? []) as { id: string; name: string; number: string }[],
   });
 
   const { data: staffRes } = useQuery({
     queryKey: ['staff-all'],
-    queryFn: () => staffApi.list(),
-    select: r => (r.data.data?.staff ?? r.data.data ?? []) as { id: string; userId: string; user?: { firstName: string; lastName: string } }[],
+    queryFn: () => staffApi.list({ limit: 200 }),
+    select: r => (r.data.data?.data ?? []) as { id: string; userId: string; user?: { firstName: string; lastName: string } }[],
   });
 
   const { mutate, isPending } = useMutation({
@@ -288,7 +288,10 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
 
   const { mutate: changeStatus, isPending: changingStatus } = useMutation({
     mutationFn: (status: Status) => maintenanceApi.update(ticket.id, { status }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['maintenance'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['maintenance'] });
+      qc.invalidateQueries({ queryKey: ['maintenance-summary'] });
+    },
     onError: () => toast({ title: 'Update failed', variant: 'destructive' }),
   });
 

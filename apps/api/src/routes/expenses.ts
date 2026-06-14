@@ -14,7 +14,7 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '@resort-pro/database'
-import { requireAuth } from '../middleware/auth'
+import { requireRole } from '../middleware/auth'
 import type { JwtPayload } from '@resort-pro/types'
 import dayjs from 'dayjs'
 
@@ -37,7 +37,7 @@ export async function expenseRoutes(app: FastifyInstance) {
 
   // ── GET / — list expenses ──────────────────────────────────────────────────
   app.get('/', {
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload
       const { month, category, page = '1', limit = '50' } = request.query as {
@@ -80,7 +80,7 @@ export async function expenseRoutes(app: FastifyInstance) {
 
   // ── POST / — create expense ────────────────────────────────────────────────
   app.post('/', {
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
       const { tenantId, sub } = request.user as JwtPayload
       const body = expenseSchema.parse(request.body)
@@ -105,7 +105,7 @@ export async function expenseRoutes(app: FastifyInstance) {
 
   // ── PATCH /:id — update expense ────────────────────────────────────────────
   app.patch('/:id', {
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload
       const { id } = request.params as { id: string }
@@ -133,7 +133,7 @@ export async function expenseRoutes(app: FastifyInstance) {
 
   // ── DELETE /:id — delete expense ───────────────────────────────────────────
   app.delete('/:id', {
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload
       const { id } = request.params as { id: string }
@@ -148,7 +148,7 @@ export async function expenseRoutes(app: FastifyInstance) {
 
   // ── GET /summary — monthly totals by category ──────────────────────────────
   app.get('/summary', {
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload
       const { month } = request.query as { month?: string }
@@ -216,7 +216,7 @@ export async function expenseRoutes(app: FastifyInstance) {
 
   // ── GET /trends — 12-month expense + revenue trend ─────────────────────────
   app.get('/trends', {
-    preHandler: requireAuth,
+    preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload
 

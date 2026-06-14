@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { reportsApi } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -9,6 +9,7 @@ import {
   FileBarChart2, Calendar, Mail, Printer, TrendingUp,
   LogIn, LogOut, AlertTriangle, Sparkles, Wrench,
   DollarSign, Banknote, CreditCard, Building2, ArrowRight,
+  Send, MessageCircle, Bell, BellOff, Clock, CheckCircle2,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
@@ -59,6 +60,221 @@ function SectionHeader({ icon: Icon, title, count }: {
         </span>
       )}
     </div>
+  );
+}
+
+// ── Dispatch Settings Panel ───────────────────────────────────────────────────
+function DispatchSettings() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  const { data: dispatchRes } = useQuery({
+    queryKey: ['report-dispatch'],
+    queryFn: () => reportsApi.getDispatch(),
+  });
+
+  const dispatch = dispatchRes?.data?.data;
+
+  const [form, setForm] = useState({
+    enabled: false,
+    dispatchTime: '22:00',
+    telegramEnabled: false,
+    telegramBotToken: '',
+    telegramChatId: '',
+    whatsappEnabled: false,
+    whatsappPhone: '',
+  });
+
+  useEffect(() => {
+    if (dispatch) {
+      setForm({
+        enabled:          dispatch.enabled          ?? false,
+        dispatchTime:     dispatch.dispatchTime      ?? '22:00',
+        telegramEnabled:  dispatch.telegramEnabled   ?? false,
+        telegramBotToken: dispatch.telegramBotToken  ?? '',
+        telegramChatId:   dispatch.telegramChatId    ?? '',
+        whatsappEnabled:  dispatch.whatsappEnabled   ?? false,
+        whatsappPhone:    dispatch.whatsappPhone      ?? '',
+      });
+    }
+  }, [dispatch]);
+
+  const saveMut = useMutation({
+    mutationFn: () => reportsApi.saveDispatch({
+      ...form,
+      telegramBotToken: form.telegramBotToken || null,
+      telegramChatId:   form.telegramChatId   || null,
+      whatsappPhone:    form.whatsappPhone     || null,
+    }),
+    onSuccess: () => {
+      toast({ title: 'Settings saved', description: 'Auto-dispatch settings updated.' });
+      qc.invalidateQueries({ queryKey: ['report-dispatch'] });
+    },
+    onError: () => toast({ title: 'Save failed', variant: 'destructive' }),
+  });
+
+  const [testingChannel, setTestingChannel] = useState<'telegram' | 'whatsapp' | null>(null);
+  const testMut = useMutation({
+    mutationFn: (channel: 'telegram' | 'whatsapp') => reportsApi.testDispatch(channel),
+    onMutate: (channel) => setTestingChannel(channel),
+    onSuccess: (_, channel) => {
+      toast({ title: `✅ Test ${channel === 'telegram' ? 'Telegram' : 'WhatsApp'} sent!`, description: 'Check your device for the test report.' });
+      setTestingChannel(null);
+    },
+    onError: (err: any, channel) => {
+      const msg = err?.response?.data?.error ?? 'Delivery failed.';
+      toast({ title: `${channel} test failed`, description: msg, variant: 'destructive' });
+      setTestingChannel(null);
+    },
+  });
+
+  const set = (key: string, value: any) => setForm(prev => ({ ...prev, [key]: value }));
+
+  return (
+    <Card className="no-print">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Bell className="h-4 w-4 text-resort-600" />
+            <CardTitle className="text-sm font-semibold uppercase tracking-wide">Auto-Dispatch Daily Report</CardTitle>
+          </div>
+          {/* Master enable toggle */}
+          <button
+            onClick={() => set('enabled', !form.enabled)}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${form.enabled ? 'bg-resort-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+          >
+            <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg transition-transform ${form.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          Send the daily report automatically to Telegram and/or WhatsApp every evening.
+        </p>
+      </CardHeader>
+
+      <CardContent className="space-y-5">
+        {/* Dispatch time */}
+        <div className="flex items-center gap-3">
+          <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div className="flex-1">
+            <label className="text-xs font-medium text-muted-foreground">Send Time (24h, server timezone)</label>
+            <input
+              type="time"
+              value={form.dispatchTime}
+              onChange={e => set('dispatchTime', e.target.value)}
+              className="mt-1 block w-full rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-sm bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-resort-500"
+            />
+          </div>
+        </div>
+
+        {/* ── Telegram ── */}
+        <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Send className="h-4 w-4 text-blue-500" />
+              <span className="text-sm font-medium">Telegram</span>
+            </div>
+            <button
+              onClick={() => set('telegramEnabled', !form.telegramEnabled)}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${form.telegramEnabled ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+            >
+              <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${form.telegramEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+            </button>
+          </div>
+
+          {form.telegramEnabled && (
+            <div className="space-y-2">
+              <div>
+                <label className="text-xs text-muted-foreground">Bot Token</label>
+                <input
+                  type="password"
+                  placeholder="123456789:ABCdefGhIJKlmNoPQRstuVWxyz"
+                  value={form.telegramBotToken}
+                  onChange={e => set('telegramBotToken', e.target.value)}
+                  className="mt-0.5 block w-full rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-sm bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-resort-500"
+                />
+                <p className="mt-0.5 text-xs text-muted-foreground">Create a bot via <a href="https://t.me/BotFather" target="_blank" rel="noreferrer" className="text-blue-500 hover:underline">@BotFather</a> to get a token.</p>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Chat ID</label>
+                <input
+                  type="text"
+                  placeholder="-1001234567890 or your personal chat ID"
+                  value={form.telegramChatId}
+                  onChange={e => set('telegramChatId', e.target.value)}
+                  className="mt-0.5 block w-full rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-sm bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-resort-500"
+                />
+                <p className="mt-0.5 text-xs text-muted-foreground">Send a message to the bot, then call <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">/getUpdates</code> to find your chat_id.</p>
+              </div>
+              <button
+                onClick={() => testMut.mutate('telegram')}
+                disabled={testingChannel === 'telegram' || !form.telegramBotToken || !form.telegramChatId}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 hover:bg-blue-100 transition-colors disabled:opacity-50"
+              >
+                {testingChannel === 'telegram' ? '⏳ Sending…' : <><Send className="h-3 w-3" /> Send Test Message</>}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* ── WhatsApp ── */}
+        <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MessageCircle className="h-4 w-4 text-green-500" />
+              <span className="text-sm font-medium">WhatsApp</span>
+            </div>
+            <button
+              onClick={() => set('whatsappEnabled', !form.whatsappEnabled)}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${form.whatsappEnabled ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+            >
+              <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${form.whatsappEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+            </button>
+          </div>
+
+          {form.whatsappEnabled && (
+            <div className="space-y-2">
+              <div>
+                <label className="text-xs text-muted-foreground">Recipient Phone Number</label>
+                <input
+                  type="tel"
+                  placeholder="+8801XXXXXXXXX"
+                  value={form.whatsappPhone}
+                  onChange={e => set('whatsappPhone', e.target.value)}
+                  className="mt-0.5 block w-full rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-sm bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-resort-500"
+                />
+                <p className="mt-0.5 text-xs text-muted-foreground">Uses the WhatsApp gateway from Settings → SMS & WhatsApp.</p>
+              </div>
+              <button
+                onClick={() => testMut.mutate('whatsapp')}
+                disabled={testingChannel === 'whatsapp' || !form.whatsappPhone}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-green-50 dark:bg-green-900/20 text-green-600 hover:bg-green-100 transition-colors disabled:opacity-50"
+              >
+                {testingChannel === 'whatsapp' ? '⏳ Sending…' : <><MessageCircle className="h-3 w-3" /> Send Test Message</>}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Last dispatched info */}
+        {dispatch?.lastDispatchedAt && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+            Last sent: {new Date(dispatch.lastDispatchedAt).toLocaleString()} (date: {dispatch.lastDispatchDate})
+          </div>
+        )}
+
+        {/* Save */}
+        <div className="flex justify-end pt-2 border-t border-gray-100 dark:border-gray-800">
+          <button
+            onClick={() => saveMut.mutate()}
+            disabled={saveMut.isPending}
+            className="px-4 py-2 text-sm rounded-lg bg-resort-600 text-white hover:bg-resort-700 transition-colors disabled:opacity-50"
+          >
+            {saveMut.isPending ? 'Saving…' : 'Save Settings'}
+          </button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -519,6 +735,9 @@ export default function ReportsPage() {
             </button>
           </div>
         )}
+
+        {/* ── Auto-Dispatch Settings ── */}
+        <DispatchSettings />
       </div>
     </>
   );

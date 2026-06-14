@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { menuApi } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
@@ -52,27 +52,30 @@ function MenuItemModal({ open, onClose, loading, onSubmit, item }: {
   onSubmit: (data: Record<string, unknown>) => void;
   item?: MenuItem | null;
 }) {
-  const [form, setForm] = useState({
-    name: item?.name ?? '',
-    description: item?.description ?? '',
-    category: item?.category ?? '',
-    price: item?.price?.toString() ?? '',
-    isAvailable: item?.isAvailable ?? true,
-    image: item?.image ?? '',
-  });
+  const blankForm = {
+    name: '',
+    description: '',
+    category: '',
+    price: '',
+    isAvailable: true,
+    image: '',
+  };
+  const [form, setForm] = useState(blankForm);
   const set = (k: string, v: unknown) => setForm(f => ({ ...f, [k]: v }));
 
-  // Reset when item changes
-  useState(() => {
-    setForm({
-      name: item?.name ?? '',
-      description: item?.description ?? '',
-      category: item?.category ?? '',
-      price: item?.price?.toString() ?? '',
-      isAvailable: item?.isAvailable ?? true,
-      image: item?.image ?? '',
-    });
-  });
+  // Sync form with the item being edited (or blank for create) each time modal opens
+  useEffect(() => {
+    if (open) {
+      setForm({
+        name: item?.name ?? '',
+        description: item?.description ?? '',
+        category: item?.category ?? '',
+        price: item?.price?.toString() ?? '',
+        isAvailable: item?.isAvailable ?? true,
+        image: item?.image ?? '',
+      });
+    }
+  }, [open, item]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,6 +178,7 @@ export default function RestaurantPage() {
   const toggleMutation = useMutation({
     mutationFn: ({ id, isAvailable }: { id: string; isAvailable: boolean }) => menuApi.update(id, { isAvailable }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['menu'] }),
+    onError: () => toast({ title: 'Error', description: 'Failed to update availability', variant: 'destructive' }),
   });
 
   const allItems: MenuItem[] = data?.data?.data ?? [];

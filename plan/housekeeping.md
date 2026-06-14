@@ -218,3 +218,38 @@ Step 3 — Dashboard UI (2.5 days)
 
 Total: ~5 days
 ```
+
+---
+
+## Bug Fixes Applied (June 2026)
+
+### 1. ✅ DAILY/TURNDOWN task complete করলে room AVAILABLE হয়ে যেত
+**Problem:** `PATCH /:id/status` always did `room.update({ status: 'AVAILABLE' })` on COMPLETED — even DAILY and TURNDOWN tasks, which happen while the guest is still in the room. Guest in room 201 doing TURNDOWN → room suddenly AVAILABLE → front desk could book it!  
+**Fix:** Only CHECKOUT, DEEP_CLEAN, CHECKIN tasks update room status:
+- `IN_PROGRESS` → room: `CLEANING`
+- `COMPLETED` → room: `AVAILABLE`
+- DAILY, TURNDOWN → no room status change
+
+### 2. ✅ Stats cards showed current page counts only
+**Problem:** `pendingCount` etc. came from `allTasks` (current page, max 20 items). Real totals were wrong.  
+**Fix:** Added `GET /api/housekeeping/stats` endpoint with `count()` per status. Frontend uses a separate query for accurate totals.
+
+### 3. ✅ Search was client-side (current page only)
+**Problem:** Searching room number only scanned the 20 items in the current page.  
+**Fix:** `search` param passed to API → Prisma `OR` filter on room.number, room.name, staff firstName/lastName.
+
+### 4. ✅ search/date filter didn't reset page
+**Problem:** Applying a new filter while on page 3 left page at 3, showing wrong/empty results.  
+**Fix:** Both `setSearch` and `setDateFilter` now call `setPage(1)`.
+
+### 5. ✅ NewTaskModal form didn't reset on close/reopen
+**Problem:** Half-filled form data persisted between modal opens.  
+**Fix:** `useEffect(() => { if (open) setForm(blankForm); }, [open])`.
+
+### 6. ✅ Room list included inactive rooms
+**Problem:** `roomsApi.list({ limit: 100 })` returned all rooms including deactivated ones.  
+**Fix:** `roomsApi.list({ limit: 200, isActive: true })`.
+
+### 7. ✅ `assignedToId: undefined as unknown as string` hacky cast
+**Problem:** Type-unsafe cast when no staff selected.  
+**Fix:** Explicit payload object with `assignedToId: form.assignedToId || undefined`.

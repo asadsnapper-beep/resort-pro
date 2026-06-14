@@ -19,7 +19,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
           data: { tenantId },
         });
       }
-      return ok(reply, prog);
+      return ok(prog);
     },
   });
 
@@ -45,7 +45,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
         update: data,
         create: { tenantId, ...data },
       });
-      return ok(reply, prog);
+      return ok(prog);
     },
   });
 
@@ -84,9 +84,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
         take: parseInt(limit),
       });
 
-      const total = await prisma.loyaltyAccount.count({
-        where: { tenantId, ...(tier ? { tier: tier as any } : {}) },
-      });
+      const total = await prisma.loyaltyAccount.count({ where });
 
       // Summary stats
       const stats = await prisma.loyaltyAccount.groupBy({
@@ -95,7 +93,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
         _count: true,
       });
 
-      return ok(reply, { accounts, total, stats });
+      return ok({ accounts, total, stats });
     },
   });
 
@@ -122,12 +120,12 @@ export async function loyaltyRoutes(app: FastifyInstance) {
         // Return empty account stub if not enrolled yet
         const guest = await prisma.guest.findFirst({ where: { id: guestId, tenantId } });
         if (!guest) return reply.status(404).send({ error: 'Guest not found' });
-        return ok(reply, { account: null, guest });
+        return ok({ account: null, guest });
       }
 
       const prog = await prisma.loyaltyProgram.findUnique({ where: { tenantId } });
 
-      return ok(reply, { account, prog });
+      return ok({ account, prog });
     },
   });
 
@@ -143,7 +141,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
       if (!guest) return reply.status(404).send({ error: 'Guest not found' });
 
       const account = await getOrCreateAccount(tenantId, guestId);
-      return ok(reply, account, 201);
+      return reply.status(201).send(ok(account));
     },
   });
 
@@ -164,7 +162,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
       if (!guest) return reply.status(404).send({ error: 'Guest not found' });
 
       const updated = await awardPoints(tenantId, guestId, points, description, bookingId);
-      return ok(reply, updated);
+      return ok(updated);
     },
   });
 
@@ -186,7 +184,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
 
       try {
         const result = await redeemPoints(tenantId, guestId, points, description, bookingId);
-        return ok(reply, result);
+        return ok(result);
       } catch (e: any) {
         return reply.status(400).send({ error: e.message });
       }
@@ -237,7 +235,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
         where: { id: account.id },
         include: { guest: { select: { firstName: true, lastName: true, email: true } } },
       });
-      return ok(reply, updated);
+      return ok(updated);
     },
   });
 
@@ -255,7 +253,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
         orderBy: { lifetimePoints: 'desc' },
         take: 10,
       });
-      return ok(reply, accounts);
+      return ok(accounts);
     },
   });
 }

@@ -35,6 +35,7 @@ interface WebsiteContent {
   whatsappNumber?: string;
   tripadvisorUrl?: string;
   hiddenSections?: string[];
+  googleAnalyticsId?: string;
 }
 
 const TOGGLEABLE_SECTIONS = [
@@ -86,6 +87,7 @@ export default function WebsitePage() {
     whatsappNumber: '',
     tripadvisorUrl: '',
     hiddenSections: [],
+    googleAnalyticsId: '',
   });
 
   const { data, isLoading } = useQuery({
@@ -118,6 +120,7 @@ export default function WebsitePage() {
         whatsappNumber: content.whatsappNumber ?? '',
         tripadvisorUrl: content.tripadvisorUrl ?? '',
         hiddenSections: content.hiddenSections ?? [],
+        googleAnalyticsId: content.googleAnalyticsId ?? '',
       });
     }
   }, [data]);
@@ -426,6 +429,18 @@ export default function WebsitePage() {
                   placeholder="Experience luxury like never before..."
                   className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none" />
                 <p className="mt-1 text-xs text-muted-foreground">{(form.seoDescription ?? '').length}/160 characters recommended</p>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Google Analytics ID</label>
+                <Input
+                  value={form.googleAnalyticsId ?? ''}
+                  onChange={e => set('googleAnalyticsId', e.target.value)}
+                  placeholder="G-XXXXXXXXXX"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Your GA4 Measurement ID — find it in <a href="https://analytics.google.com" target="_blank" rel="noopener noreferrer" className="text-resort-600 underline">Google Analytics</a> → Admin → Data Streams.
+                  Visitors to your booking website will be tracked automatically.
+                </p>
               </div>
             </CardContent>
           </Card>

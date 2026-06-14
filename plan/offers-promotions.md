@@ -192,3 +192,27 @@ Step 4 — Public Website (2 days)
 
 Total: ~7 days
 ```
+
+---
+
+## Bug Fixes Applied (June 2026)
+
+### 1. ✅ `offerStatus()` — `maxUses` exhausted offer still showed "Active"
+**Problem:** Frontend `offerStatus()` only checked `isActive`, `validFrom`, `validTo` — not `maxUses`. An offer with 50/50 slots used still showed green "Active" badge.  
+**Fix:** Removed manual `!isActive → paused` check. Now uses `o.isCurrentlyActive` returned by the API (which checks all conditions via `isOfferActive()`: isActive + valid dates + maxUses). If `isCurrentlyActive = false` after date checks pass, status = `paused`.
+
+### 2. ✅ Summary stat cards showed counts from filtered tab, not all offers
+**Problem:** `counts` computed from `offers` (the currently filtered API response). On "Active" tab: "Total" = active count, "Scheduled" = 0, "Expired" = 0 — all wrong.  
+**Fix:** Added a second `useQuery` with no filter (`queryKey: ['offers', 'all']`) solely for summary counts. `counts` and `allOffers.length` now always reflect the full offer list regardless of selected tab.
+
+### 3. ✅ `PATCH /:id` — `promoCode: ''` (empty string) didn't clear promo code
+**Problem:** Logic was `body.promoCode ? uppercase : body.promoCode === null ? null : undefined`. Empty string is falsy but not null, so it fell through to `undefined` → field unchanged.  
+**Fix:** Explicit three-way check: `=== undefined` → don't touch; `=== null || === ''` → set null (clear); otherwise → uppercase.
+
+### 4. ✅ No toast feedback on create / update / delete
+**Problem:** All three mutations had no `toast()` on success and no `onError` handler. Users had no visual confirmation; network errors failed silently.  
+**Fix:** Added `toast({ title: 'Offer created/updated/deleted' })` to all `onSuccess` and `toast({ ..., variant: 'destructive' })` to all `onError` handlers.
+
+### 5. ✅ `ChevronDown` imported but unused
+**Problem:** Dead import in the component file.  
+**Fix:** Removed from the import list.

@@ -292,7 +292,6 @@ export default function SettingsPage() {
   };
 
   const removeDomain = async () => {
-    if (!confirm('Remove custom domain?')) return;
     setDomainSaving(true);
     try {
       await api.put('/tenant/domain', { domain: null }, { headers: { Authorization: `Bearer ${token}` } });
@@ -2021,7 +2020,7 @@ function NotificationsTab() {
   });
 
   const triggerMut = useMutation({
-    mutationFn: () => tenantApi.updateSmsSettings(triggers),
+    mutationFn: (payload?: typeof triggers) => tenantApi.updateSmsSettings(payload ?? triggers),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['sms-settings'] }); toast({ title: '✓ Notification settings saved' }); },
     onError: () => toast({ title: 'Error', variant: 'destructive' }),
   });
@@ -2039,8 +2038,8 @@ function NotificationsTab() {
   });
 
   const d = data?.data?.data;
-  const smsPct = d ? Math.min(100, Math.round((d.smsUsedThisMonth / d.smsQuotaMonthly) * 100)) : 0;
-  const waPct  = d ? Math.min(100, Math.round((d.waUsedThisMonth / d.waQuotaMonthly) * 100)) : 0;
+  const smsPct = d && d.smsQuotaMonthly > 0 ? Math.min(100, Math.round((d.smsUsedThisMonth / d.smsQuotaMonthly) * 100)) : 0;
+  const waPct  = d && d.waQuotaMonthly  > 0 ? Math.min(100, Math.round((d.waUsedThisMonth  / d.waQuotaMonthly)  * 100)) : 0;
 
   if (isLoading) return (
     <div className="flex items-center justify-center py-16">
@@ -2077,7 +2076,11 @@ function NotificationsTab() {
               <p className="font-semibold text-gray-900">SMS Notifications</p>
               <p className="text-sm text-gray-500 mt-0.5">Booking confirmations, payment receipts, check-in reminders via SMS</p>
             </div>
-            <button onClick={() => { const v = !triggers.smsEnabled; setTriggers(p => ({ ...p, smsEnabled: v })); triggerMut.mutate(); }}
+            <button onClick={() => {
+                const newTriggers = { ...triggers, smsEnabled: !triggers.smsEnabled };
+                setTriggers(newTriggers);
+                triggerMut.mutate(newTriggers);
+              }}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${triggers.smsEnabled ? 'bg-resort-600' : 'bg-gray-300'}`}>
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${triggers.smsEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
@@ -2185,7 +2188,7 @@ function NotificationsTab() {
               <p className="font-semibold text-gray-900">WhatsApp Notifications</p>
               <p className="text-sm text-gray-500 mt-0.5">Booking confirmations, invoices, reminders via WhatsApp</p>
             </div>
-            <button onClick={() => { const v = !triggers.waEnabled; setTriggers(p => ({ ...p, waEnabled: v })); triggerMut.mutate(); }}
+            <button onClick={() => { const newTriggers = { ...triggers, waEnabled: !triggers.waEnabled }; setTriggers(newTriggers); triggerMut.mutate(newTriggers); }}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${triggers.waEnabled ? 'bg-green-500' : 'bg-gray-300'}`}>
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${triggers.waEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
@@ -2339,7 +2342,7 @@ function NotificationsTab() {
           </div>
 
           <div className="flex justify-end">
-            <Button onClick={() => triggerMut.mutate()} loading={triggerMut.isPending} className="gap-2">
+            <Button onClick={() => triggerMut.mutate(triggers)} loading={triggerMut.isPending} className="gap-2">
               <Save className="h-4 w-4" /> Save Trigger Settings
             </Button>
           </div>

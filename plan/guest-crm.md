@@ -243,3 +243,67 @@ Step 4 — Booking Form Integration (1 day)
 
 Total: ~6 days
 ```
+
+---
+
+## Bug Fixes & Feature Additions (June 2026)
+
+### 1. ✅ `GET /contacts` — `total` count ignored search/tier/tag filters
+**Problem:** `prisma.guest.count({ where: { tenantId } })` — no filters applied. Searching for "Rahman" showed "Total: 234" instead of filtered count. Pagination was completely broken for filtered results.  
+**Fix:** `total` now uses the same `where` clause as `findMany` (search + tier + tag filters all applied).
+
+### 2. ✅ BIRTHDAY and WIN_BACK triggers existed but were never fired
+**Problem:** `SequenceTrigger.BIRTHDAY` and `WIN_BACK` were in the DB schema and templates existed, but NO automation runner existed anywhere in the codebase. Completely dead code.  
+**Fix:** Added `POST /api/crm/automation/run-daily` endpoint + "Run Now" button in the CRM Analytics tab.
+
+### 3. ✅ No `dateOfBirth` field on Guest — birthday automation was impossible
+**Problem:** No way to know guest birthdays. Field didn't exist.  
+**Fix:** Migration `20260613000001` adds `dateOfBirth` (nullable DateTime) to `guests` table. GuestModal now shows the field with "(for birthday offers)" hint. `guests.ts` accepts it in create/update.
+
+### 4. ✅ ANNIVERSARY trigger missing
+**Problem:** No way to set up "resort anniversary" sequences — trigger didn't exist in schema.  
+**Fix:** Added `ANNIVERSARY` to `SequenceTrigger` enum. ANNIVERSARY trigger label added in CRM sequences dropdown.
+
+---
+
+## Birthday & Anniversary Automation
+
+### Birthday Logic (runs daily)
+```
+EXTRACT(MONTH FROM dateOfBirth) = today_month
+AND EXTRACT(DAY   FROM dateOfBirth) = today_day
+AND subscribed = true
+AND NOT sent birthday email in last 300 days
+
+→ Uses first step of active BIRTHDAY sequence (if exists)
+   OR default email with BDAY20 (20% off, 30-day validity)
+```
+
+### Resort Anniversary Logic (runs daily)
+```
+Guest's first checkout was 355–375 days ago (≈1 year window)
+AND no checkout in last 60 days (hasn't returned)
+AND subscribed = true
+AND NOT sent anniversary email in last 300 days
+
+→ Uses first step of active ANNIVERSARY sequence (if exists)
+   OR default email with ANNIV15 (15% off, 30-day validity)
+```
+
+### Cron Setup
+```bash
+# Run every morning at 08:00
+0 8 * * * curl -X POST https://api.yourresort.com/crm/automation/run-daily \
+  -H "Authorization: Bearer $STAFF_JWT_TOKEN"
+```
+
+---
+
+## Future Enhancements
+
+- [ ] Tie birthday/anniversary offers to live Offer records (dynamic promo codes with real expiry)
+- [ ] Dedicated cron token (not staff JWT) for automation endpoint
+- [ ] SMS/WhatsApp birthday greetings
+- [ ] Guest milestone emails: 5th stay, 10th stay, milestone spend
+- [ ] Visual email builder (drag-and-drop, no HTML required)
+- [ ] A/B subject line testing

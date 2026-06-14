@@ -82,14 +82,29 @@ function PlanModal({
     isActive: plan?.isActive ?? true,
   });
 
-  const set = (k: keyof PlanFormData, v: unknown) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k: keyof PlanFormData, v: unknown) => {
+    setForm(f => {
+      const next = { ...f, [k]: v };
+      // Auto-select Fri/Sat/Sun when switching to WEEKEND type with no days selected
+      if (k === 'type' && v === 'WEEKEND' && next.daysOfWeek.length === 0) {
+        next.daysOfWeek = [0, 5, 6]; // Sun, Fri, Sat
+      }
+      return next;
+    });
+  };
   const toggleDay = (d: number) => setForm(f => ({
     ...f,
     daysOfWeek: f.daysOfWeek.includes(d) ? f.daysOfWeek.filter(x => x !== d) : [...f.daysOfWeek, d],
   }));
 
+  const [formError, setFormError] = useState('');
+
   const { mutate, isPending } = useMutation({
     mutationFn: () => {
+      // Validate date range
+      if (form.startDate && form.endDate && form.endDate < form.startDate) {
+        throw new Error('End date must be after start date');
+      }
       const payload = {
         name: form.name,
         type: form.type,
@@ -108,7 +123,13 @@ function PlanModal({
       toast({ title: isEdit ? 'Rate plan updated' : 'Rate plan created' });
       onClose();
     },
-    onError: () => toast({ title: 'Save failed', variant: 'destructive' }),
+    onError: (e: Error) => {
+      if (e.message.includes('End date')) {
+        setFormError(e.message);
+      } else {
+        toast({ title: 'Save failed', variant: 'destructive' });
+      }
+    },
   });
 
   const showDateRange = ['SEASONAL', 'PROMO', 'EARLY_BIRD', 'LAST_MINUTE'].includes(form.type);
@@ -210,7 +231,7 @@ function PlanModal({
                   type="date"
                   className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm bg-transparent focus:outline-none focus:ring-2 focus:ring-resort-500"
                   value={form.startDate}
-                  onChange={e => set('startDate', e.target.value)}
+                  onChange={e => { setFormError(''); set('startDate', e.target.value); }}
                 />
               </div>
               <div>
@@ -219,7 +240,7 @@ function PlanModal({
                   type="date"
                   className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm bg-transparent focus:outline-none focus:ring-2 focus:ring-resort-500"
                   value={form.endDate}
-                  onChange={e => set('endDate', e.target.value)}
+                  onChange={e => { setFormError(''); set('endDate', e.target.value); }}
                 />
               </div>
             </div>
@@ -265,12 +286,17 @@ function PlanModal({
           </div>
         </div>
 
+        {formError && (
+          <p className="px-6 pb-2 text-xs text-red-500 flex items-center gap-1">
+            <span>⚠</span> {formError}
+          </p>
+        )}
         <div className="flex gap-2 px-6 pb-6">
           <Button variant="outline" className="flex-1" onClick={onClose} disabled={isPending}>Cancel</Button>
           <Button
             className="flex-1 bg-resort-600 hover:bg-resort-700 text-white"
             disabled={!form.name || !form.price || isPending}
-            onClick={() => mutate()}
+            onClick={() => { setFormError(''); mutate(); }}
           >
             {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             {isEdit ? 'Save Changes' : 'Create Plan'}
