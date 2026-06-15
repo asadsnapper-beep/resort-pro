@@ -425,9 +425,13 @@ export async function bookingRoutes(app: FastifyInstance) {
           return newBooking;
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
       } catch (err: unknown) {
-        const e = err as { statusCode?: number; message?: string };
+        const e = err as { statusCode?: number; message?: string; code?: string };
         if (e.statusCode === 409) {
           return reply.status(409).send({ success: false, error: e.message });
+        }
+        // Prisma serialization failure (P2034) — another transaction won the race
+        if (e.code === 'P2034') {
+          return reply.status(409).send({ success: false, error: 'Room is no longer available for these dates' });
         }
         throw err;
       }
@@ -1024,8 +1028,9 @@ export async function bookingRoutes(app: FastifyInstance) {
           return newBooking;
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
       } catch (err: unknown) {
-        const e = err as { statusCode?: number; message?: string };
+        const e = err as { statusCode?: number; message?: string; code?: string };
         if (e.statusCode === 409) return reply.status(409).send({ success: false, error: e.message });
+        if (e.code === 'P2034') return reply.status(409).send({ success: false, error: 'Room is no longer available for these dates' });
         throw err;
       }
 

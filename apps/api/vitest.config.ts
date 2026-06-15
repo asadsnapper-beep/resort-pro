@@ -9,6 +9,9 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // Sequential file execution — tests share a real DB with no per-file isolation
+    pool: 'forks',
+    poolOptions: { forks: { singleFork: true } },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
