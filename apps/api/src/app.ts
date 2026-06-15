@@ -49,11 +49,6 @@ import { offersRoutes, publicOffersRoutes } from './routes/offers';
 import { discoveryRoutes } from './routes/discovery';
 import { syncRoutes } from './routes/sync';
 import { guestDocumentRoutes } from './routes/guestDocuments';
-import { startPreArrivalCron } from './jobs/pre-arrival-reminder';
-import { startICalSyncCron } from './jobs/ical-sync';
-import { startReportDispatchJob } from './jobs/daily-report-dispatch';
-import { startAutomationEngine } from './services/automation';
-import { runTrialEmailCron } from './services/trial-emails';
 import { metrics, normalizePath } from './utils/metrics';
 
 export async function buildApp() {
@@ -211,21 +206,6 @@ export async function buildApp() {
   await app.register(publicOffersRoutes,  { prefix: '/site' });
   await app.register(discoveryRoutes,     { prefix: '/api' });
   await app.register(syncRoutes,          { prefix: '/api/sync' });
-
-  // ── Start automation engine ───────────────────────────────────────────────
-  if (process.env.NODE_ENV !== 'test') {
-    startAutomationEngine();
-    startPreArrivalCron();
-    startICalSyncCron();
-    startReportDispatchJob();
-
-    // ── Trial lifecycle email cron (runs every 12 hours) ─────────────────
-    runTrialEmailCron().catch((e) => app.log.error(e, 'trial-cron failed on startup'));
-    const TWELVE_HOURS = 12 * 60 * 60 * 1000;
-    setInterval(() => {
-      runTrialEmailCron().catch((e) => app.log.error(e, 'trial-cron failed'));
-    }, TWELVE_HOURS);
-  }
 
   // ── Error Handler ─────────────────────────────────────────────────────────
   app.setErrorHandler((error, _request, reply) => {
