@@ -51,6 +51,7 @@ import { syncRoutes } from './routes/sync';
 import { guestDocumentRoutes } from './routes/guestDocuments';
 import { restaurantTableRoutes } from './routes/restaurantTables';
 import { publicTableRoutes } from './routes/publicTable';
+import { aiRoutes } from './routes/ai';
 import { metrics, normalizePath } from './utils/metrics';
 
 export async function buildApp() {
@@ -210,6 +211,7 @@ export async function buildApp() {
   await app.register(syncRoutes,          { prefix: '/api/sync' });
   await app.register(restaurantTableRoutes, { prefix: '/api/restaurant/tables' });
   await app.register(publicTableRoutes,     { prefix: '/table' });
+  await app.register(aiRoutes,              { prefix: '/api/ai' });
 
   // ── Error Handler ─────────────────────────────────────────────────────────
   app.setErrorHandler((error, _request, reply) => {
