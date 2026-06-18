@@ -12,6 +12,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
 import { authApi, tenantApi } from '@/lib/api';
+import { useAiStatus } from '@/hooks/use-ai-status';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -52,6 +53,7 @@ type NavItem = {
   group: string;
   groupKey: string;         // translation key for group
   roles?: Role[];
+  aiFeature?: 'ai_content' | 'ai_chatbot' | 'ai_business_insights'; // hide unless this AI feature is live
 };
 
 const NAV_ITEMS: NavItem[] = [
@@ -119,6 +121,8 @@ const NAV_ITEMS: NavItem[] = [
     roles: ['OWNER', 'MANAGER', 'MARKETER'] },
   { href: '/dashboard/website',   labelKey: 'nav.website',   labelFallback: 'Website',      icon: Globe,    group: 'Marketing', groupKey: 'groups.marketing',
     roles: ['OWNER', 'MANAGER', 'MARKETER', 'DEVELOPER'] },
+  { href: '/dashboard/ai-content', labelKey: 'nav.aiContent', labelFallback: 'AI Content',   icon: Sparkles, group: 'Marketing', groupKey: 'groups.marketing',
+    roles: ['OWNER', 'MANAGER'], aiFeature: 'ai_content' },
 
   // ── Account ───────────────────────────────────────────────
   { href: '/dashboard/billing',   labelKey: 'nav.billing',   labelFallback: 'Billing',             icon: CreditCard,  group: 'Account', groupKey: 'groups.account',
@@ -179,10 +183,14 @@ export function Sidebar() {
     ? enabledModules['restaurant_module']
     : true;
 
+  const { status: aiStatus } = useAiStatus();
+
   const role = (user?.role ?? 'STAFF') as Role;
   const roleConfig = ROLE_LABELS[role] ?? ROLE_LABELS.STAFF;
   const visibleItems = getVisibleItems(role).filter((item) => {
     if (!restaurantEnabled && item.group === 'Restaurant') return false;
+    // AI nav items hide unless that AI feature is live (master switch + tenant flag)
+    if (item.aiFeature && !aiStatus[item.aiFeature]) return false;
     return true;
   });
   const grouped = groupItems(visibleItems);

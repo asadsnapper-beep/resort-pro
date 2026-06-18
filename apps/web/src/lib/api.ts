@@ -162,6 +162,12 @@ export const menuApi = {
   delete: (id: string) => api.delete(`/menu/${id}`),
 };
 
+// ── AI ──────────────────────────────────────────────────────────────────────
+export const aiApi = {
+  status:          ()              => api.get('/ai/status'),
+  generateContent: (data: unknown) => api.post('/ai/content/generate', data),
+};
+
 // ── Restaurant Tables ─────────────────────────────────────────────────────────
 export const restaurantTablesApi = {
   list:   ()                        => api.get('/restaurant/tables'),
