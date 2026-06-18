@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { websiteApi, tenantApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
@@ -8,9 +8,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
-import { Globe, Image, FileText, Palette, Star, Plus, Trash2, Save, Layout, LayoutGrid, ExternalLink, Share2, Link2, CheckCircle2, XCircle, Loader2, AlertTriangle } from 'lucide-react';
+import { Globe, Image, FileText, Palette, Star, Plus, Trash2, Save, Layout, LayoutGrid, ExternalLink, Share2, Link2, CheckCircle2, AlertTriangle, Loader2, PanelRight, PanelRightClose, RefreshCw, Monitor, Smartphone } from 'lucide-react';
 import { ThemePicker } from '@/components/dashboard/website/ThemePicker';
 import { ImageUpload } from '@/components/ui/ImageUpload';
+
+const PREVIEW_STORAGE_KEY = 'rp-website-preview';
 
 interface WebsiteContent {
   heroTitle: string;
@@ -65,6 +67,12 @@ export default function WebsitePage() {
   const queryClient = useQueryClient();
   const { tenant } = useAuthStore();
   const [tab, setTab] = useState<Tab>('template');
+
+  // Split-pane preview state
+  const [showPreview, setShowPreview]   = useState(true);
+  const [previewKey,  setPreviewKey]    = useState(0);   // increment to force iframe reload
+  const [mobileView,  setMobileView]    = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const [form, setForm] = useState<WebsiteContent>({
     heroTitle: '',
     heroSubtitle: '',
@@ -125,11 +133,28 @@ export default function WebsitePage() {
     }
   }, [data]);
 
+  // Debounced live preview: write to sessionStorage + postMessage iframe on form change
+  const sendPreviewUpdate = useCallback((payload: WebsiteContent) => {
+    try {
+      sessionStorage.setItem(PREVIEW_STORAGE_KEY, JSON.stringify(payload));
+    } catch {}
+    iframeRef.current?.contentWindow?.postMessage(
+      { type: 'rp-preview-update', payload },
+      window.location.origin,
+    );
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => sendPreviewUpdate(form), 600);
+    return () => clearTimeout(timer);
+  }, [form, sendPreviewUpdate]);
+
   const saveMutation = useMutation({
     mutationFn: () => websiteApi.update(form),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['website'] });
       toast({ title: 'Website updated!', description: 'Your changes are live.' });
+      setPreviewKey(k => k + 1);
     },
     onError: (err: { response?: { data?: { error?: string } } }) =>
       toast({ title: 'Error', description: err?.response?.data?.error ?? 'Failed to save', variant: 'destructive' }),
@@ -149,7 +174,8 @@ export default function WebsitePage() {
   const removeTestimonial = (i: number) =>
     set('testimonials', (form.testimonials ?? []).filter((_, idx) => idx !== i));
 
-  const publicUrl = tenant?.slug ? `/${tenant.slug}` : null;
+  const publicUrl  = tenant?.slug ? `/${tenant.slug}` : null;
+  const previewUrl = tenant?.slug ? `/${tenant.slug}?preview=${form.templateId ?? 'luxe'}` : null;
 
   /* ── Custom domain state ─────────────────────────────────────────────────── */
   const [domainInput, setDomainInput] = useState('');
@@ -215,53 +241,79 @@ export default function WebsitePage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Website</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Design and publish your public resort website</p>
-        </div>
-        <div className="flex gap-2">
+    <div className="flex flex-col h-[calc(100vh-4rem)] -mx-4 sm:-mx-6 lg:-mx-8 overflow-hidden">
+
+      {/* ── Top bar ──────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 py-3 border-b bg-white dark:bg-gray-950 flex-shrink-0 gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div>
+            <h1 className="text-lg font-bold text-gray-900 dark:text-white leading-none">Website Builder</h1>
+            <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">Design and publish your public resort website</p>
+          </div>
           {publicUrl && (
-            <Button variant="outline" className="gap-2" onClick={() => window.open(publicUrl, '_blank')}>
-              <ExternalLink className="h-4 w-4" /> View Live Site
+            <span className="hidden sm:flex items-center gap-1 text-xs font-semibold text-green-600 bg-green-50 dark:bg-green-900/20 px-2.5 py-1 rounded-full border border-green-200 dark:border-green-800">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" /> Live
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {/* Preview toggle */}
+          <button
+            onClick={() => setShowPreview(v => !v)}
+            title={showPreview ? 'Hide preview' : 'Show preview'}
+            className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              showPreview
+                ? 'bg-resort-50 text-resort-700 border border-resort-200 dark:bg-resort-900/20 dark:text-resort-300'
+                : 'bg-gray-100 text-gray-600 border border-gray-200 dark:bg-gray-800 dark:text-gray-400'
+            }`}>
+            {showPreview ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRight className="h-3.5 w-3.5" />}
+            {showPreview ? 'Hide Preview' : 'Show Preview'}
+          </button>
+
+          {publicUrl && (
+            <Button variant="outline" size="sm" className="gap-1.5 text-xs hidden sm:flex" onClick={() => window.open(publicUrl, '_blank')}>
+              <ExternalLink className="h-3.5 w-3.5" /> Live Site
             </Button>
           )}
-          <Button className="gap-2" loading={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
-            <Save className="h-4 w-4" /> Save & Publish
+          <Button size="sm" className="gap-1.5 text-xs" loading={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
+            <Save className="h-3.5 w-3.5" /> Save & Publish
           </Button>
         </div>
       </div>
 
-      {/* Live URL banner */}
-      {publicUrl && (
-        <div className="flex items-center gap-3 rounded-xl border border-resort-200 bg-resort-50 px-5 py-3">
-          <Globe className="h-4 w-4 text-resort-600 flex-shrink-0" />
-          <p className="text-sm text-resort-700">
-            Your website is live at{' '}
-            <a href={publicUrl} target="_blank" rel="noopener noreferrer"
-              className="font-semibold underline hover:text-resort-900">
-              {typeof window !== 'undefined' ? window.location.origin : ''}{publicUrl}
-            </a>
-          </p>
-          <span className="ml-auto flex items-center gap-1 text-xs font-semibold text-green-600">
-            <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" /> Live
-          </span>
-        </div>
-      )}
+      {/* ── Body: editor + preview ────────────────────────────────────────── */}
+      <div className={`flex flex-1 min-h-0 ${showPreview ? 'lg:grid lg:grid-cols-[440px_1fr]' : ''}`}>
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b overflow-x-auto">
-        {TABS.map(({ id, label, icon: Icon }) => (
-          <button key={id} onClick={() => setTab(id)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-              tab === id ? 'border-resort-600 text-resort-700' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}>
-            <Icon className="h-4 w-4" /> {label}
-          </button>
-        ))}
-      </div>
+        {/* ── LEFT: Editor panel ──────────────────────────────────────────── */}
+        <div className="flex flex-col min-h-0 border-r dark:border-gray-800">
+          {/* Tabs */}
+          <div className="flex gap-0.5 border-b dark:border-gray-800 px-3 overflow-x-auto flex-shrink-0 bg-gray-50 dark:bg-gray-900">
+            {TABS.map(({ id, label, icon: Icon }) => (
+              <button key={id} onClick={() => setTab(id)}
+                className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  tab === id
+                    ? 'border-resort-600 text-resort-700 dark:text-resort-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:hover:text-gray-300'
+                }`}>
+                <Icon className="h-3.5 w-3.5" /> {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab content (scrollable) */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-5">
+
+            {/* Live URL banner */}
+            {publicUrl && (
+              <div className="flex items-center gap-2 rounded-lg border border-resort-200 bg-resort-50 dark:bg-resort-900/20 dark:border-resort-800/40 px-3 py-2">
+                <Globe className="h-3.5 w-3.5 text-resort-600 flex-shrink-0" />
+                <a href={publicUrl} target="_blank" rel="noopener noreferrer"
+                  className="text-xs font-semibold text-resort-700 dark:text-resort-300 underline truncate hover:text-resort-900">
+                  {typeof window !== 'undefined' ? window.location.host : ''}{publicUrl}
+                </a>
+              </div>
+            )}
 
       {/* ── Theme Picker ────────────────────────────────────────────────── */}
       {tab === 'template' && tenant?.slug && (
@@ -782,14 +834,83 @@ export default function WebsitePage() {
         </div>
       )}
 
-      {/* Save (bottom) — hide on domain tab, it has its own save */}
-      {tab !== 'domain' && (
-        <div className="flex justify-end pt-2">
-          <Button className="gap-2 px-8" loading={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
-            <Save className="h-4 w-4" /> Save & Publish
-          </Button>
-        </div>
-      )}
+            {/* Save button inside editor panel (except domain tab) */}
+            {tab !== 'domain' && (
+              <div className="flex justify-end pt-2 pb-4">
+                <Button className="gap-2" loading={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
+                  <Save className="h-4 w-4" /> Save & Publish
+                </Button>
+              </div>
+            )}
+
+          </div>{/* end scrollable content */}
+        </div>{/* end LEFT editor panel */}
+
+        {/* ── RIGHT: Live Preview panel ─────────────────────────────────── */}
+        {showPreview && previewUrl && (
+          <div className="hidden lg:flex flex-col min-h-0 bg-gray-100 dark:bg-gray-900">
+
+            {/* Preview toolbar */}
+            <div className="flex items-center gap-2 px-4 py-2 border-b dark:border-gray-800 bg-white dark:bg-gray-950 flex-shrink-0">
+              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+                Live Preview
+              </span>
+              <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded font-mono">
+                {form.templateId ?? 'luxe'}
+              </span>
+              <span className="ml-auto flex items-center gap-1">
+                {/* Mobile / Desktop toggle */}
+                <button
+                  onClick={() => setMobileView(false)}
+                  title="Desktop view"
+                  className={`p-1.5 rounded transition-colors ${!mobileView ? 'bg-resort-100 text-resort-700' : 'text-gray-400 hover:text-gray-700'}`}>
+                  <Monitor className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => setMobileView(true)}
+                  title="Mobile view"
+                  className={`p-1.5 rounded transition-colors ${mobileView ? 'bg-resort-100 text-resort-700' : 'text-gray-400 hover:text-gray-700'}`}>
+                  <Smartphone className="h-3.5 w-3.5" />
+                </button>
+                {/* Refresh */}
+                <button
+                  onClick={() => setPreviewKey(k => k + 1)}
+                  title="Reload preview"
+                  className="p-1.5 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ml-1">
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </button>
+                {/* Open in new tab */}
+                <a href={previewUrl} target="_blank" rel="noopener noreferrer"
+                  title="Open in new tab"
+                  className="p-1.5 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </span>
+            </div>
+
+            {/* iframe wrapper */}
+            <div className="flex-1 flex items-start justify-center overflow-auto p-4">
+              <div className={`relative bg-white shadow-2xl rounded-xl overflow-hidden transition-all duration-300 ${
+                mobileView ? 'w-[390px] h-[844px]' : 'w-full h-full'
+              }`}>
+                {mobileView && (
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-1 bg-gray-300 rounded-full mt-2 z-10" />
+                )}
+                <iframe
+                  key={`${previewKey}-${form.templateId}`}
+                  ref={iframeRef}
+                  src={previewUrl}
+                  className="w-full h-full border-0"
+                  title="Website preview"
+                />
+              </div>
+            </div>
+
+          </div>
+        )}
+
+      </div>
     </div>
   );
 }

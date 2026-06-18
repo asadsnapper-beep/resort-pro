@@ -118,6 +118,27 @@ Phase 3 — ৬+ মাস পরে:
 
 ---
 
+## 🤖 AI Features
+
+AI implementation-এর সব plan আলাদা folder-এ আছে।
+
+| File | Feature | Priority | Est. Effort |
+|------|---------|----------|-------------|
+| [ai/ai-dynamic-pricing.md](./ai/ai-dynamic-pricing.md) | AI-powered room rate optimization | High | ~3 weeks |
+| [ai/ai-guest-chatbot.md](./ai/ai-guest-chatbot.md) | 24/7 AI guest concierge (Claude) | High | ~3 weeks |
+| [ai/ai-demand-forecasting.md](./ai/ai-demand-forecasting.md) | 30/60/90 day occupancy forecast | High | ~3 weeks |
+| [ai/ai-review-sentiment.md](./ai/ai-review-sentiment.md) | Review analysis + monthly AI reports | Medium | ~2.5 weeks |
+| [ai/ai-housekeeping-optimizer.md](./ai/ai-housekeeping-optimizer.md) | AI-optimized cleaning schedules | Medium | ~2.5 weeks |
+| [ai/ai-revenue-intelligence.md](./ai/ai-revenue-intelligence.md) | Revenue dashboard + "Ask your data" | Medium | ~3 weeks |
+| [ai/ai-guest-personalization.md](./ai/ai-guest-personalization.md) | Guest preferences + pre-arrival briefing | Medium | ~2 weeks |
+| [ai/ai-staff-scheduling.md](./ai/ai-staff-scheduling.md) | AI staff roster optimization | Low | ~2 weeks |
+| [ai/ai-maintenance-predictor.md](./ai/ai-maintenance-predictor.md) | Predictive maintenance alerts | Low | ~2 weeks |
+| [ai/ai-content-generator.md](./ai/ai-content-generator.md) | Marketing copy generation (Claude) | Low | ~1 week |
+
+→ **Full AI overview**: [ai/README.md](./ai/README.md)
+
+---
+
 ## 📊 Total Effort Estimate (approximate)
 
 | Phase | Features | Est. Time |

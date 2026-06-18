@@ -49,6 +49,8 @@ import { offersRoutes, publicOffersRoutes } from './routes/offers';
 import { discoveryRoutes } from './routes/discovery';
 import { syncRoutes } from './routes/sync';
 import { guestDocumentRoutes } from './routes/guestDocuments';
+import { restaurantTableRoutes } from './routes/restaurantTables';
+import { publicTableRoutes } from './routes/publicTable';
 import { metrics, normalizePath } from './utils/metrics';
 
 export async function buildApp() {
@@ -147,7 +149,7 @@ export async function buildApp() {
   app.addHook('onResponse', (request, reply, done) => {
     // Skip health check, static, and swagger to keep metrics clean
     const url = request.url ?? '';
-    if (!url.startsWith('/api/') && !url.startsWith('/site/') && !url.startsWith('/embed/')) { done(); return; }
+    if (!url.startsWith('/api/') && !url.startsWith('/site/') && !url.startsWith('/embed/') && !url.startsWith('/table/')) { done(); return; }
     metrics.record({
       method: request.method,
       path: normalizePath(url),
@@ -206,6 +208,8 @@ export async function buildApp() {
   await app.register(publicOffersRoutes,  { prefix: '/site' });
   await app.register(discoveryRoutes,     { prefix: '/api' });
   await app.register(syncRoutes,          { prefix: '/api/sync' });
+  await app.register(restaurantTableRoutes, { prefix: '/api/restaurant/tables' });
+  await app.register(publicTableRoutes,     { prefix: '/table' });
 
   // ── Error Handler ─────────────────────────────────────────────────────────
   app.setErrorHandler((error, _request, reply) => {

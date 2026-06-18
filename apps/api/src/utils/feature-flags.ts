@@ -37,17 +37,26 @@ export const FLAG_REGISTRY: FlagDefinition[] = [
   },
 
   // ── AI ────────────────────────────────────────────────────────────────────
+  // Default OFF — built behind flags, enabled per-tenant from super-admin once
+  // the platform AI master switch is on. See plan/ai/ROLLOUT-STRATEGY.md
   {
-    flag: 'ai_suggestions',
-    label: 'AI Room Description Generator',
-    description: 'Adds a "Generate with AI" button on room edit pages to auto-write descriptions.',
+    flag: 'ai_content',
+    label: 'AI Content Generator & Onboarding',
+    description: 'AI writes room/website/menu content and powers the "describe your resort" onboarding setup. Owner reviews drafts before anything is applied.',
     category: 'AI',
     defaultOn: false,
   },
   {
-    flag: 'ai_pricing',
-    label: 'AI Dynamic Pricing',
-    description: 'Suggests optimal room prices based on occupancy, season, and local events.',
+    flag: 'ai_chatbot',
+    label: 'AI Guest Chatbot & Booking',
+    description: 'Website chatbot that answers guest questions, checks availability, and guides them to booking (deep-link or lead capture).',
+    category: 'AI',
+    defaultOn: false,
+  },
+  {
+    flag: 'ai_business_insights',
+    label: 'AI Business Suggestions',
+    description: 'Revenue intelligence dashboard with weekly briefings, anomaly detection, and actionable business suggestions.',
     category: 'AI',
     defaultOn: false,
   },

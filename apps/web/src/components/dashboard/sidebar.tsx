@@ -105,6 +105,8 @@ const NAV_ITEMS: NavItem[] = [
     roles: ['OWNER', 'MANAGER'] },
   { href: '/dashboard/orders',     labelKey: 'nav.orders',     labelFallback: 'F&B Orders', icon: ShoppingBag,     group: 'Restaurant', groupKey: 'groups.restaurant',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'CHEF'] },
+  { href: '/dashboard/restaurant/tables', labelKey: 'nav.tables', labelFallback: 'Tables',    icon: LayoutGrid,      group: 'Restaurant', groupKey: 'groups.restaurant',
+    roles: ['OWNER', 'MANAGER'] },
   { href: '/dashboard/inventory',  labelKey: 'nav.inventory',  labelFallback: 'Inventory',  icon: Package,         group: 'Restaurant', groupKey: 'groups.restaurant',
     roles: ['OWNER', 'MANAGER'] },
 

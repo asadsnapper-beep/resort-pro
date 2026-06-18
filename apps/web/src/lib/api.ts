@@ -162,6 +162,14 @@ export const menuApi = {
   delete: (id: string) => api.delete(`/menu/${id}`),
 };
 
+// ── Restaurant Tables ─────────────────────────────────────────────────────────
+export const restaurantTablesApi = {
+  list:   ()                        => api.get('/restaurant/tables'),
+  create: (data: unknown)           => api.post('/restaurant/tables', data),
+  update: (id: string, data: unknown) => api.patch(`/restaurant/tables/${id}`, data),
+  delete: (id: string)              => api.delete(`/restaurant/tables/${id}`),
+};
+
 // ── Food Orders ───────────────────────────────────────────────────────────────
 export const foodOrdersApi = {
   list:         (params?: Record<string, unknown>) => api.get('/food-orders', { params }),

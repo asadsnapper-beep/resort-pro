@@ -87,13 +87,14 @@ export async function foodOrderRoutes(app: FastifyInstance) {
           tableNumber: body.tableNumber,
           notes: body.notes,
           totalAmount,
+          paymentStatus: 'PAID',
           items: {
             create: body.items.map((item) => {
               const menuItem = menuItems.find((m) => m.id === item.menuItemId)!;
               return { menuItemId: item.menuItemId, quantity: item.quantity, unitPrice: menuItem.price, notes: item.notes };
             }),
           },
-        },
+        } as any,
         include: { items: { include: { menuItem: true } } },
       });
 

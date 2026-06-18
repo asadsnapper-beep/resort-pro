@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import {
   Plus, ShoppingBag, Clock, ChefHat, CheckCircle2, XCircle,
   Trash2, ChevronLeft, ChevronRight, UtensilsCrossed, Bell,
+  Maximize2, Minimize2,
 } from 'lucide-react';
 
 interface OrderItem {
@@ -313,7 +314,9 @@ function KitchenCard({ order }: { order: FoodOrder }) {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {order.tableNumber && (
-              <span className="text-2xl font-black text-gray-900">📍 {order.tableNumber}</span>
+              <span className="bg-gray-900 text-white text-xl font-black px-3 py-1 rounded-xl">
+                Table {order.tableNumber}
+              </span>
             )}
             {order.guest && (
               <span className="text-lg font-semibold text-gray-700">{order.guest.firstName} {order.guest.lastName}</span>
@@ -322,6 +325,11 @@ function KitchenCard({ order }: { order: FoodOrder }) {
               <span className="text-2xl font-black text-gray-900">Walk-in</span>
             )}
           </div>
+          {(order as any).paymentStatus && (order as any).paymentStatus !== 'PAID' && (
+            <span className="mt-1 inline-block text-xs font-bold bg-red-100 text-red-600 px-2 py-0.5 rounded-full">
+              Unpaid
+            </span>
+          )}
         </div>
         <span className="text-xs text-gray-400 shrink-0">{minutesAgo(order.createdAt)}</span>
       </div>
@@ -371,6 +379,24 @@ function KitchenDisplay() {
   const prevCountRef = useRef(0);
   const [newOrderAlert, setNewOrderAlert] = useState(false);
   const [clock, setClock] = useState(new Date());
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    function onFsChange() {
+      setIsFullscreen(!!document.fullscreenElement);
+    }
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  }
 
   // Live clock
   useEffect(() => {
@@ -420,7 +446,7 @@ function KitchenDisplay() {
   const readyCount     = stats.ready     ?? 0;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-4 space-y-4">
+    <div ref={containerRef} className="min-h-screen bg-gray-950 text-white p-4 space-y-4">
       {/* Header bar */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -431,6 +457,16 @@ function KitchenDisplay() {
             <h1 className="text-xl font-black tracking-tight">Kitchen Display</h1>
             <p className="text-xs text-gray-400">Live order queue — auto refreshes every 15s</p>
           </div>
+          <button
+            onClick={toggleFullscreen}
+            title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            className="ml-2 flex h-8 w-8 items-center justify-center rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors text-gray-400 hover:text-white"
+          >
+            {isFullscreen
+              ? <Minimize2 className="h-4 w-4" />
+              : <Maximize2 className="h-4 w-4" />
+            }
+          </button>
         </div>
         <div className="text-right">
           <p className="text-2xl font-black tabular-nums">

@@ -2,11 +2,24 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "api", "dev"],
+      "port": 4000,
+      "autoPort": false
+    },
+    {
       "name": "web",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "web", "dev"],
       "port": 3000,
       "autoPort": false
+    },
+    {
+      "name": "plan-viewer",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["plan/serve.js"],
+      "port": 4242
     }
   ]
 }
