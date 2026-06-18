@@ -6,7 +6,7 @@ import { toast } from '@/hooks/use-toast';
 import {
   Settings, Save, Plus, Trash2, Loader2,
   DollarSign, Clock, Tag, CheckCircle2, AlertCircle,
-  ChevronDown, ChevronUp, RefreshCw,
+  ChevronDown, ChevronUp, RefreshCw, Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +24,7 @@ type PlatformSettings = {
   id: string;
   trialDays: number;
   plans: Plan[];
+  aiEnabledGlobal: boolean;
   updatedAt: string;
 };
 
@@ -207,6 +208,7 @@ export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
   const [trialDays, setTrialDays] = useState(14);
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [aiEnabledGlobal, setAiEnabledGlobal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -219,6 +221,7 @@ export default function AdminSettingsPage() {
         setSettings(s);
         setTrialDays(s.trialDays);
         setPlans(s.plans);
+        setAiEnabledGlobal(s.aiEnabledGlobal ?? false);
         setSavedAt(s.updatedAt);
       })
       .catch(() => toast({ title: 'Failed to load settings', variant: 'destructive' }))
@@ -264,7 +267,7 @@ export default function AdminSettingsPage() {
         }
       }
 
-      const res = await adminEndpoints.updateSettings({ trialDays, plans });
+      const res = await adminEndpoints.updateSettings({ trialDays, plans, aiEnabledGlobal });
       const updated = res.data.data as PlatformSettings;
       setSettings(updated);
       setSavedAt(updated.updatedAt);
@@ -281,6 +284,7 @@ export default function AdminSettingsPage() {
     if (!settings) return;
     setTrialDays(settings.trialDays);
     setPlans(settings.plans);
+    setAiEnabledGlobal(settings.aiEnabledGlobal ?? false);
     setHasChanges(false);
   };
 
@@ -346,6 +350,50 @@ export default function AdminSettingsPage() {
           You have unsaved changes. Click "Save Changes" to apply.
         </div>
       )}
+
+      {/* AI Master Switch */}
+      <section className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-purple-400" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-white font-semibold">AI Features — Master Switch</h2>
+            <p className="text-gray-500 text-sm">
+              Global kill-switch for all AI features. When OFF, no AI runs for any tenant
+              (no Claude calls, zero cost) — even if a tenant has an AI flag enabled.
+            </p>
+          </div>
+          {/* Toggle */}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={aiEnabledGlobal}
+            onClick={() => { setAiEnabledGlobal((v) => !v); markChanged(); }}
+            className={cn(
+              'relative w-14 h-8 rounded-full transition-colors shrink-0',
+              aiEnabledGlobal ? 'bg-purple-600' : 'bg-gray-700',
+            )}
+          >
+            <span
+              className={cn(
+                'absolute top-1 left-1 w-6 h-6 rounded-full bg-white transition-transform',
+                aiEnabledGlobal && 'translate-x-6',
+              )}
+            />
+          </button>
+        </div>
+        <div className={cn(
+          'mt-4 px-4 py-3 rounded-xl text-xs',
+          aiEnabledGlobal
+            ? 'bg-purple-500/10 border border-purple-500/20 text-purple-300'
+            : 'bg-gray-800/60 text-gray-500',
+        )}>
+          {aiEnabledGlobal
+            ? '✨ AI is globally ON. Each tenant still needs its per-feature flag enabled (Tenants → Feature Flags → AI).'
+            : '🔒 AI is globally OFF. AI code ships dark until you flip this. Turn on only when you are ready to pay for tokens.'}
+        </div>
+      </section>
 
       {/* Trial Duration Section */}
       <section className="bg-gray-900 border border-gray-800 rounded-2xl p-6">

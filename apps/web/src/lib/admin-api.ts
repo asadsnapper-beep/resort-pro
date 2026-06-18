@@ -51,7 +51,7 @@ export const adminEndpoints = {
   billing: () => adminApi.get('/billing'),
   // Platform settings
   getSettings: () => adminApi.get('/settings'),
-  updateSettings: (data: { trialDays?: number; plans?: unknown[] }) => adminApi.put('/settings', data),
+  updateSettings: (data: { trialDays?: number; plans?: unknown[]; aiEnabledGlobal?: boolean }) => adminApi.put('/settings', data),
   // CSV Exports
   exportTenantsCsv: () => adminApi.get('/export/tenants-csv', { responseType: 'blob' }),
   exportRevenueCsv: () => adminApi.get('/export/revenue-csv', { responseType: 'blob' }),

@@ -1380,9 +1380,10 @@ Rules:
         roomLimit: number;
         features: string[];
       }>;
+      aiEnabledGlobal?: boolean;
     };
   }>('/settings', { preHandler: requireSuperAdmin }, async (request, reply) => {
-    const { trialDays, plans } = request.body || {};
+    const { trialDays, plans, aiEnabledGlobal } = request.body || {};
 
     const data: Record<string, unknown> = {};
     if (trialDays !== undefined) {
@@ -1396,6 +1397,9 @@ Rules:
         return reply.status(400).send({ success: false, error: 'plans must be a non-empty array' });
       }
       data.plans = plans;
+    }
+    if (aiEnabledGlobal !== undefined) {
+      data.aiEnabledGlobal = !!aiEnabledGlobal;
     }
 
     const updated = await prisma.platformSettings.upsert({
