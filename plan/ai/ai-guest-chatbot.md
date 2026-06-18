@@ -62,6 +62,73 @@ Availability check-ও read-only, tenant-scoped public endpoint — AI raw DB qu
 
 ---
 
+## Guest Identify / Lead Capture (v3)
+
+Website-এর chatbot-এ guest নিজেকে চেনাবে — **নাম + email + phone**। এটা "login" নয় (password/account নেই), বরং একটা lightweight **identify + lead capture** step। প্রতিটা identify একটা `BookingLead` row বানায় → সরাসরি CRM lead।
+
+> **মূল business value:** chatbot শুধু প্রশ্নের উত্তর দেয় না — প্রতিটা আগ্রহী guest-কে একটা trackable lead-এ পরিণত করে, যা owner পরে follow-up/marketing-এ ব্যবহার করতে পারে।
+
+### দুটো mode (owner per-resort toggle করবে)
+
+| Mode | কখন identify চায় | Trade-off |
+|------|------------------|-----------|
+| **(খ) Soft — DEFAULT** ⭐ | guest free চ্যাট করে; booking/availability-তে আগ্রহ দেখালে তখন নাম+phone চায় | কম friction, ভালো UX, **গরম lead** (quality > quantity) |
+| **(ক) Gate** | চ্যাট শুরুর আগেই নাম+email+phone বাধ্যতামূলক | প্রতিটা চ্যাট = lead, কিন্তু সহজ প্রশ্নেও form → অনেকে পালায় |
+
+**Default: Soft।** Owner চাইলে dashboard থেকে Gate চালু করতে পারবে (`chatRequireIdentity` flag)।
+
+### Flow (Soft mode)
+
+```
+Guest চ্যাট করছে (anonymous, sessionId দিয়ে)
+        ↓ intent = booking/availability ধরা পড়লে
+Bot: "নাম আর phone দিন, আমরা confirm করে call করবো" + consent checkbox
+        ↓ guest দিলে
+POST /ai/guest/lead/:slug  → BookingLead upsert (sessionId-এর সাথে যুক্ত)
+        ↓
+পরের turn থেকে bot নাম ধরে ডাকে; lead owner-এর CRM/leads page-এ
+```
+
+### Data
+
+আগের `BookingLead` model-এ **`email` field যোগ** + session-এর সাথে link:
+
+```prisma
+model BookingLead {
+  // ... existing fields ...
+  email     String?   // নতুন — identify step
+  sessionId String?   // GuestChatSession-এর সাথে link (একই guest-এর ডুপ্লিকেট lead এড়াতে)
+  consent   Boolean   @default(false) // contact করার অনুমতি
+}
+```
+
+`@@unique([tenantId, sessionId])` — এক session = এক lead (বারবার নয়)।
+
+### 🔒 নিরাপত্তা ও Privacy (বাধ্যতামূলক)
+
+| নিয়ম | কীভাবে |
+|------|--------|
+| **Consent লাগবেই** | email/phone নেওয়ার আগে checkbox: "আমরা আপনাকে contact করতে পারি"। consent=false হলে store করবে না। |
+| **Validate** | email/phone format zod দিয়ে check; নাম length cap |
+| **Rate-limit** | per-IP-hash + per-session — bot/spam lead flood ঠেকাতে |
+| **PII minimal** | শুধু নাম, email, phone — আর কিছু না (passport/payment কখনো না) |
+| **Tenant-scoped** | lead সবসময় calling tenant-এর; cross-tenant না |
+| **AI লেখে না** | lead row server validate করে বানায়, AI না |
+
+> Privacy note: এটা আগের "privacy-first, no PII" সিদ্ধান্ত শিথিল করে — তাই **consent + privacy policy বাধ্যতামূলক** (GDPR/data-protection)।
+
+### UI
+
+- Embed widget-এ একটা ছোট inline form (নাম / email / phone / consent checkbox) — চ্যাটের মধ্যেই, আলাদা পেজ না
+- Gate mode-এ widget খুললেই form আগে; Soft mode-এ bot prompt করলে form
+- Owner dashboard: **Leads page** (`GET /api/leads`) — chatbot lead list, status (new/contacted/converted/lost)
+
+### Phase placement
+
+এটা `ai_chatbot` feature-এরই অংশ — **Phase 3 (Booking Conversion)**-এর সাথে একসাথে বানানো হবে। `chatRequireIdentity` toggle Phase 3-এ যোগ হবে।
+
+---
+
 ## Architecture
 
 ```
