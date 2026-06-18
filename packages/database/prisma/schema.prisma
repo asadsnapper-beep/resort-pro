@@ -477,6 +477,15 @@ model Tenant {
   discoveryClicks     DiscoveryClick[]
   guestDocuments      GuestDocument[]
   restaurantTables    RestaurantTable[]
+  // AI (built behind flags — see plan/ai/ROLLOUT-STRATEGY.md)
+  aiKeys              AiKeys?
+  aiUsages            AiUsage[]
+  generatedContent    GeneratedContent[]
+  bookingLeads        BookingLead[]
+  guestChatSessions   GuestChatSession[]
+  aiAbuseLogs         AiAbuse[]
+  revenueSnapshots    RevenueSnapshot[]
+  aiInsights          AIInsight[]
 
   @@map("tenants")
 }
@@ -1279,6 +1288,155 @@ model FoodOrderItem {
   menuItem MenuItem  @relation(fields: [menuItemId], references: [id])
 
   @@map("food_order_items")
+}
+
+// ─── AI (shipped behind flags, default OFF — plan/ai/ROLLOUT-STRATEGY.md) ────────
+
+// Per-tenant AI API keys. mode = platform-managed (default) or BYOK.
+model AiKeys {
+  id           String   @id @default(uuid())
+  tenantId     String   @unique
+  mode         String   @default("platform") // "platform" | "byok"
+  dashboardKey String?  // encrypted (AES-256-GCM) — BYOK dashboard/owner key
+  guestKey     String?  // encrypted — BYOK guest chatbot key (optional)
+  updatedAt    DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("ai_keys")
+}
+
+// AI usage tracking. month = "YYYY-MM" (dashboard) or "YYYY-MM-guest" (chatbot).
+model AiUsage {
+  id         String   @id @default(uuid())
+  tenantId   String
+  month      String
+  queryCount Int      @default(0)
+  tokenCount Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, month])
+  @@index([tenantId])
+  @@map("ai_usage")
+}
+
+// AI-generated content (draft-first; never auto-published).
+model GeneratedContent {
+  id          String   @id @default(uuid())
+  tenantId    String
+  contentType String   // room_desc | promo_email | social_post | offer_copy | review_response | onboarding
+  prompt      String
+  content     String
+  language    String   @default("en")
+  status      String   @default("draft") // draft | applied | discarded
+  appliedTo   String?  // room:<id> | website | offer:<id>
+  tokensUsed  Int?
+  createdById String
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("generated_content")
+}
+
+// Leads captured by the guest chatbot (name + phone, no booking created).
+model BookingLead {
+  id        String    @id @default(uuid())
+  tenantId  String
+  name      String
+  phone     String
+  checkIn   DateTime?
+  checkOut  DateTime?
+  guests    Int?
+  roomType  String?
+  source    String    @default("chatbot")
+  status    String    @default("new") // new | contacted | converted | lost
+  createdAt DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("booking_leads")
+}
+
+// Guest chatbot session — abuse/cost control (memory-only conversation).
+model GuestChatSession {
+  id        String   @id @default(uuid())
+  tenantId  String
+  sessionId String   @unique // client-generated UUID
+  turnCount Int      @default(0)
+  ipHash    String   // SHA-256 of IP — never plain IP
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("guest_chat_sessions")
+}
+
+// Flagged prompt-injection / abuse attempts (audit trail).
+model AiAbuse {
+  id         String   @id @default(uuid())
+  tenantId   String
+  sessionId  String
+  ipHash     String
+  flaggedMsg String   // trimmed to 500 chars
+  reason     String
+  createdAt  DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("ai_abuse")
+}
+
+// Daily/weekly revenue snapshot powering business suggestions.
+model RevenueSnapshot {
+  id            String   @id @default(uuid())
+  tenantId      String
+  snapshotDate  DateTime
+  period        String   // daily | weekly | monthly
+  totalRooms    Int
+  availableRooms Int
+  roomsSold     Int
+  occupancyRate Float
+  adr           Float
+  revpar        Float
+  roomRevenue   Float
+  fbRevenue     Float?
+  totalRevenue  Float
+  cancellations Int      @default(0)
+  bySource      Json?
+  byRoomType    Json?
+  createdAt     DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, snapshotDate, period])
+  @@index([tenantId])
+  @@map("revenue_snapshots")
+}
+
+// AI-generated business insight / suggestion (proposal — owner acts).
+model AIInsight {
+  id        String   @id @default(uuid())
+  tenantId  String
+  kind      String   // briefing | anomaly | suggestion
+  title     String
+  body      String
+  severity  String   @default("info") // info | warning | critical
+  status    String   @default("new")  // new | seen | dismissed | actioned
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("ai_insights")
 }
 
 // ─── Inventory ────────────────────────────────────────────────────────────────
