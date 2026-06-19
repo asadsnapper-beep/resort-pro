@@ -1,0 +1,162 @@
+/**
+ * Guest ID / Passport OCR
+ *
+ * POST /api/guests/scan-id
+ *   multipart: file (image), docType? (PASSPORT|NATIONAL_ID|DRIVERS_LICENSE|OTHER)
+ *   → runs Tesseract OCR → attempts MRZ parse → returns extracted fields
+ */
+
+import type { FastifyInstance } from 'fastify';
+import Tesseract from 'tesseract.js';
+import { parse as parseMRZ } from 'mrz';
+import { requireRole } from '../middleware/auth';
+
+// ── MRZ parser ────────────────────────────────────────────────────────────────
+
+function tryParseMRZ(text: string): Record<string, string> | null {
+  // Extract lines that look like MRZ (only A-Z, 0-9, <, length 30 or 44)
+  const lines = text
+    .split('\n')
+    .map(l => l.replace(/\s+/g, '').toUpperCase())
+    .filter(l => /^[A-Z0-9<]{30,44}$/.test(l));
+
+  if (lines.length < 2) return null;
+
+  try {
+    // Try TD3 (passport, 2 lines × 44) first
+    if (lines.some(l => l.length === 44)) {
+      const td3Lines = lines.filter(l => l.length === 44).slice(0, 2);
+      if (td3Lines.length === 2) {
+        const result = parseMRZ(td3Lines);
+        return flattenMRZ(result);
+      }
+    }
+    // Try TD1 (ID card, 3 lines × 30)
+    if (lines.some(l => l.length === 30)) {
+      const td1Lines = lines.filter(l => l.length === 30).slice(0, 3);
+      if (td1Lines.length >= 2) {
+        const result = parseMRZ(td1Lines);
+        return flattenMRZ(result);
+      }
+    }
+  } catch {
+    // MRZ parse failed — not a standard document
+  }
+  return null;
+}
+
+function flattenMRZ(result: any): Record<string, string> {
+  const fields: Record<string, string> = {};
+  const fieldMap: Record<string, string> = {
+    firstName:       'firstName',
+    lastName:        'lastName',
+    nationality:     'nationality',
+    birthDate:       'dateOfBirth',
+    expirationDate:  'expiryDate',
+    documentNumber:  'documentNumber',
+    sex:             'gender',
+  };
+  for (const [mrzKey, ourKey] of Object.entries(fieldMap)) {
+    const val = result.fields?.[mrzKey];
+    if (val?.value) fields[ourKey] = String(val.value);
+  }
+  return fields;
+}
+
+// ── Heuristic text parser (non-MRZ fallback) ──────────────────────────────────
+
+function parseRawText(text: string): Record<string, string> {
+  const fields: Record<string, string> = {};
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+
+  // Bangladesh NID patterns
+  const nidMatch = text.match(/\b(\d{10,17})\b/);
+  if (nidMatch) fields.documentNumber = nidMatch[1];
+
+  // Name patterns: "Name:", "নাম:", "Holder:", bold-looking ALL CAPS line
+  for (const line of lines) {
+    const nameMatch = line.match(/(?:name|holder|নাম)[:\s]+([A-Za-z\s]{3,40})/i);
+    if (nameMatch) {
+      const parts = nameMatch[1].trim().split(/\s+/);
+      if (parts.length >= 2) {
+        fields.firstName = parts[0];
+        fields.lastName  = parts.slice(1).join(' ');
+      }
+      break;
+    }
+  }
+
+  // Date of birth: DD/MM/YYYY or YYYY-MM-DD
+  const dobMatch = text.match(/(?:dob|birth|born|জন্ম)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i)
+    || text.match(/\b(\d{1,2}[/-]\d{1,2}[/-]\d{4})\b/);
+  if (dobMatch) fields.dateOfBirth = dobMatch[1];
+
+  return fields;
+}
+
+// ── Route ─────────────────────────────────────────────────────────────────────
+
+export async function idScanRoutes(app: FastifyInstance) {
+  app.post('/scan-id', {
+    schema: { tags: ['guests'], summary: 'OCR a guest ID / passport image' },
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
+    handler: async (request, reply) => {
+      const parts = request.parts();
+      let fileBuffer: Buffer | null = null;
+      let mimeType = 'image/jpeg';
+      let docType  = 'OTHER';
+
+      for await (const part of parts) {
+        if (part.type === 'file' && part.fieldname === 'file') {
+          mimeType = part.mimetype;
+          if (!mimeType.startsWith('image/')) {
+            return reply.status(400).send({ success: false, error: 'Only image files allowed' });
+          }
+          const chunks: Buffer[] = [];
+          for await (const chunk of part.file) chunks.push(chunk as Buffer);
+          fileBuffer = Buffer.concat(chunks);
+        } else if (part.type === 'field' && part.fieldname === 'docType') {
+          docType = String(part.value).toUpperCase();
+        }
+      }
+
+      if (!fileBuffer || fileBuffer.byteLength === 0) {
+        return reply.status(400).send({ success: false, error: 'No image uploaded' });
+      }
+      if (fileBuffer.byteLength > 10 * 1024 * 1024) {
+        return reply.status(400).send({ success: false, error: 'Image too large (max 10 MB)' });
+      }
+
+      // ── Run OCR ──────────────────────────────────────────────────────────
+      let rawText  = '';
+      let confidence = 0;
+      try {
+        const result = await Tesseract.recognize(fileBuffer, 'eng+ben', {
+          // @ts-ignore — logger not in types but valid
+          logger: () => {},
+        });
+        rawText    = result.data.text;
+        confidence = result.data.confidence;
+      } catch (err) {
+        app.log.error(`[id-scan] Tesseract error: ${err}`);
+        return reply.status(500).send({ success: false, error: 'OCR failed. Try a clearer image.' });
+      }
+
+      // ── Parse fields ─────────────────────────────────────────────────────
+      const mrzFields = tryParseMRZ(rawText);
+      const fields = mrzFields ?? parseRawText(rawText);
+
+      return reply.send({
+        success: true,
+        data: {
+          fields,
+          docType,
+          confidence: Math.round(confidence),
+          method: mrzFields ? 'mrz' : 'ocr',
+          // rawText only in dev (don't leak full doc text in prod)
+          ...(process.env.NODE_ENV !== 'production' ? { rawText } : {}),
+        },
+      });
+    },
+  });
+}

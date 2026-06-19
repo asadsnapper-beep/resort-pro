@@ -1,13 +1,15 @@
 'use client';
 
+'use client';
+
 import { useState } from 'react';
 import {
   X, CalendarDays, Users, CreditCard, BedDouble, MessageSquare,
   XCircle, LogIn, LogOut, Plus, Link2, CheckCircle2, Clock, AlertTriangle,
-  FileText, Gift, Trash2, ChevronDown, ChevronUp, Check, ExternalLink,
+  FileText, Gift, Trash2, ChevronDown, ChevronUp, Check, ExternalLink, ScanLine,
 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { bookingsApi, bookingPaymentApi, packagesApi } from '@/lib/api';
+import { bookingsApi, bookingPaymentApi, packagesApi, guestsApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/ui/badge';
@@ -15,6 +17,7 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { IdScanModal, type ScannedFields } from '@/components/guests/IdScanModal';
 
 interface Booking {
   id: string;
@@ -414,6 +417,7 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
   const [payAmount, setPayAmount] = useState('');
   const [payMethod, setPayMethod] = useState('CASH');
   const [confirmModal, setConfirmModal] = useState<'checkin' | 'checkout' | null>(null);
+  const [showIdScan,   setShowIdScan]   = useState(false);
 
   const checkInMutation = useMutation({
     mutationFn: () => bookingsApi.checkIn(booking!.id),
@@ -566,7 +570,41 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
                 <p className="text-sm text-gray-500 truncate">{booking.guest.email}</p>
                 {booking.guest.phone && <p className="text-sm text-gray-500">{booking.guest.phone}</p>}
               </div>
+              {booking.guest.id && (
+                <button
+                  onClick={() => setShowIdScan(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#1a6b5e]/30 text-[#1a6b5e] hover:bg-[#f0faf8] text-xs font-medium transition-colors shrink-0"
+                  title="Scan guest ID / passport"
+                >
+                  <ScanLine className="w-3.5 h-3.5" /> Scan ID
+                </button>
+              )}
             </div>
+
+            {/* ID Scan Modal */}
+            {showIdScan && booking.guest.id && (
+              <IdScanModal
+                guestId={booking.guest.id}
+                guestName={`${booking.guest.firstName} ${booking.guest.lastName}`}
+                onClose={() => setShowIdScan(false)}
+                onConfirm={async (fields: ScannedFields) => {
+                  try {
+                    await guestsApi.update(booking.guest.id!, {
+                      ...(fields.firstName     ? { firstName:   fields.firstName }     : {}),
+                      ...(fields.lastName      ? { lastName:    fields.lastName }      : {}),
+                      ...(fields.nationality   ? { nationality: fields.nationality }   : {}),
+                      ...(fields.dateOfBirth   ? { dateOfBirth: fields.dateOfBirth }   : {}),
+                      ...(fields.documentNumber ? { passportNumber: fields.documentNumber } : {}),
+                    });
+                    queryClient.invalidateQueries({ queryKey: ['booking', booking.id] });
+                    toast({ title: '✅ Guest profile updated', description: 'ID scan applied successfully.' });
+                  } catch {
+                    toast({ title: 'Update failed', description: 'Could not update guest profile.', variant: 'destructive' });
+                  }
+                  setShowIdScan(false);
+                }}
+              />
+            )}
 
             {/* Stay Details */}
             <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 divide-y divide-gray-100 dark:divide-gray-700 overflow-hidden">
