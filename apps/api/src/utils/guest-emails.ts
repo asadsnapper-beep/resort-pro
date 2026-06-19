@@ -354,6 +354,98 @@ export async function sendCancellationEmail(bookingId: string) {
   });
 }
 
+export async function sendWebBookingEmails(bookingId: string) {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: {
+      guest: true,
+      room: true,
+      tenant: { select: { name: true, email: true, phone: true, currency: true, logoUrl: true, brandPrimaryColor: true, checkInTime: true, checkOutTime: true } },
+    },
+  });
+  if (!booking) return;
+
+  const settings = await getEmailSettings(booking.tenantId);
+  const primary = booking.tenant.brandPrimaryColor ?? '#1a6b5e';
+  const nights = calculateNights(booking.checkIn, booking.checkOut);
+
+  // ── 1. Guest confirmation email ───────────────────────────────────────────
+  if (settings.sendConfirmation) {
+    const guestBody = `
+      <h2 style="color:#1a1a1a;margin:0 0 4px">Booking Request Received! ✅</h2>
+      <p style="color:#555;margin:0 0 20px">Hi ${booking.guest.firstName}, we've received your booking request at <strong>${booking.tenant.name}</strong>. The resort team will review and confirm your reservation shortly.</p>
+      ${bookingTable({
+        room: `${booking.room.name} (#${booking.room.number})`,
+        checkIn: booking.checkIn,
+        checkOut: booking.checkOut,
+        nights,
+        adults: booking.adults,
+        children: booking.children,
+        totalAmount: Number(booking.totalAmount),
+        currency: booking.tenant.currency,
+        confirmationNo: booking.confirmationNo,
+        primaryColor: primary,
+      })}
+      <div style="background:#fffbeb;border-left:4px solid #f59e0b;border-radius:4px;padding:16px;margin:20px 0">
+        <p style="margin:0;color:#92400e;font-size:14px"><strong>⏳ Status: Pending Confirmation</strong></p>
+        <p style="margin:6px 0 0;color:#78350f;font-size:13px">You will receive another email once the resort confirms your reservation.</p>
+      </div>
+      <p style="color:#555;font-size:14px">If you have any questions, contact us${booking.tenant.email ? ` at <a href="mailto:${booking.tenant.email}" style="color:${primary}">${booking.tenant.email}</a>` : ''}${booking.tenant.phone ? ` or call ${booking.tenant.phone}` : ''}.</p>
+    `;
+    await sendEmail({
+      to: booking.guest.email,
+      subject: `Booking Request Received — ${booking.tenant.name} (${booking.confirmationNo})`,
+      html: wrapGuest({
+        tenantName: booking.tenant.name,
+        logoUrl: booking.tenant.logoUrl,
+        primaryColor: primary,
+        replyToEmail: settings.replyToEmail ?? booking.tenant.email,
+        footerText: settings.footerText,
+        body: guestBody,
+      }),
+    });
+  }
+
+  // ── 2. Owner notification email ───────────────────────────────────────────
+  if (booking.tenant.email) {
+    const ownerBody = `
+      <h2 style="color:#1a1a1a;margin:0 0 4px">New Booking Request 🔔</h2>
+      <p style="color:#555;margin:0 0 20px">A new booking inquiry has been submitted via your resort website.</p>
+      ${bookingTable({
+        room: `${booking.room.name} (#${booking.room.number})`,
+        checkIn: booking.checkIn,
+        checkOut: booking.checkOut,
+        nights,
+        adults: booking.adults,
+        children: booking.children,
+        totalAmount: Number(booking.totalAmount),
+        currency: booking.tenant.currency,
+        confirmationNo: booking.confirmationNo,
+        primaryColor: primary,
+      })}
+      <div style="background:#f0faf8;border-left:4px solid ${primary};border-radius:4px;padding:16px;margin:20px 0">
+        <p style="margin:0;color:#1a1a1a;font-size:14px;font-weight:600">Guest Details</p>
+        <p style="margin:6px 0 0;color:#555;font-size:13px">Name: ${booking.guest.firstName} ${booking.guest.lastName}</p>
+        <p style="margin:4px 0 0;color:#555;font-size:13px">Email: <a href="mailto:${booking.guest.email}" style="color:${primary}">${booking.guest.email}</a></p>
+        ${booking.guest.phone ? `<p style="margin:4px 0 0;color:#555;font-size:13px">Phone: ${booking.guest.phone}</p>` : ''}
+        ${booking.specialRequests ? `<p style="margin:4px 0 0;color:#555;font-size:13px">Special Requests: ${booking.specialRequests}</p>` : ''}
+      </div>
+      <p style="color:#555;font-size:14px">Log in to your dashboard to confirm or manage this booking.</p>
+    `;
+    await sendEmail({
+      to: booking.tenant.email,
+      subject: `New Booking Request — ${booking.guest.firstName} ${booking.guest.lastName} (${booking.confirmationNo})`,
+      html: wrapGuest({
+        tenantName: booking.tenant.name,
+        logoUrl: booking.tenant.logoUrl,
+        primaryColor: primary,
+        replyToEmail: booking.guest.email,
+        body: ownerBody,
+      }),
+    });
+  }
+}
+
 export async function sendTestEmail(tenantId: string, toEmail: string) {
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },

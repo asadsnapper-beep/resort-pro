@@ -5,6 +5,7 @@ import { requireRole } from '../middleware/auth';
 import { ok, validate } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
 import { resolveRate } from './ratePlans';
+import { sendWebBookingEmails } from '../utils/guest-emails';
 
 const websiteSchema = z.object({
   heroTitle: z.string().min(1),
@@ -318,6 +319,9 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
           data: { usedCount: { increment: 1 } },
         });
       }
+
+      // Fire-and-forget emails — don't block the 201 response
+      sendWebBookingEmails(booking.id).catch(() => {});
 
       return reply.status(201).send(ok({
         id: booking.id,
