@@ -239,12 +239,23 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
       const room = await prisma.room.findFirst({ where: { id: body.roomId, tenantId: tenant.id, isActive: true } });
       if (!room) return reply.status(404).send({ success: false, error: 'Room not found' });
 
-      // Check availability
+      // Check availability — PENDING bookings within last 30 min also block (stale ones are ignored)
+      const pendingCutoff = new Date(Date.now() - 30 * 60 * 1000);
       const conflict = await prisma.booking.findFirst({
         where: {
           tenantId: tenant.id, roomId: room.id,
-          status: { in: ['CONFIRMED', 'CHECKED_IN'] },
-          AND: [{ checkIn: { lt: checkOut } }, { checkOut: { gt: checkIn } }],
+          status: { in: ['CONFIRMED', 'CHECKED_IN', 'PENDING'] },
+          AND: [
+            { checkIn: { lt: checkOut } },
+            { checkOut: { gt: checkIn } },
+            // Ignore stale PENDING bookings older than 30 minutes
+            {
+              OR: [
+                { status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
+                { status: 'PENDING', createdAt: { gte: pendingCutoff } },
+              ],
+            },
+          ],
         },
       });
       if (conflict) return reply.status(409).send({ success: false, error: 'Room not available for selected dates' });
