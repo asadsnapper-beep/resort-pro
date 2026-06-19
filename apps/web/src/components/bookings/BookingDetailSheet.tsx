@@ -18,6 +18,7 @@ import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { IdScanModal, type ScannedFields } from '@/components/guests/IdScanModal';
+import { PrintReceiptButton } from '@/components/bookings/PrintReceiptButton';
 
 interface Booking {
   id: string;
@@ -784,13 +785,16 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
             </div>
           )}
           {(isCheckedIn || isCheckedOut) && (
-            <Button
-              variant="outline"
-              className="w-full gap-2 text-resort-600 border-resort-200 hover:bg-resort-50 dark:border-resort-900 dark:hover:bg-resort-900/20"
-              onClick={() => { onClose(); router.push(`/dashboard/bookings/${booking.id}/invoice`); }}
-            >
-              <FileText className="h-4 w-4" /> View Invoice
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1 gap-2 text-resort-600 border-resort-200 hover:bg-resort-50 dark:border-resort-900 dark:hover:bg-resort-900/20"
+                onClick={() => { onClose(); router.push(`/dashboard/bookings/${booking.id}/invoice`); }}
+              >
+                <FileText className="h-4 w-4" /> View Invoice
+              </Button>
+              <PrintReceiptButton bookingId={booking.id} />
+            </div>
           )}
         </div>
       </div>
