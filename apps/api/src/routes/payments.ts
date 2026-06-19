@@ -28,6 +28,7 @@ import {
 }                               from '@resort-pro/payment-registry';
 import { requireAuth }          from '../middleware/auth';
 import type { JwtPayload }      from '@resort-pro/types';
+import { sendBookingConfirmation } from '../utils/guest-emails';
 
 const WEB_BASE = process.env.WEB_BASE_URL || 'http://localhost:3000';
 const API_BASE = process.env.API_BASE_URL || 'http://localhost:4000';
@@ -363,6 +364,8 @@ export async function paymentRoutes(app: FastifyInstance) {
         result.gatewayPaymentId ?? paymentId,
         Number(payment.amount) * 100,
       );
+      // Fire-and-forget confirmation email after payment verified
+      sendBookingConfirmation(payment.bookingId).catch(() => {});
     }
 
     return reply.send({
@@ -449,6 +452,7 @@ export async function paymentRoutes(app: FastifyInstance) {
           result.gatewayPaymentId ?? orderId,
           Number(payment.amount) * 100,
         );
+        sendBookingConfirmation(payment.bookingId).catch(() => {});
       }
 
       return reply.status(200).send({ received: true });

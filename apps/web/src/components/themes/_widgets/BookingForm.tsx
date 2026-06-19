@@ -272,19 +272,8 @@ export function BookingForm({
       setBookingId(id);
       setConfirmation({ confirmationNo, totalAmount, nights });
 
-      // 2. Fetch active gateways
-      const gwRes = await fetch(`${API_BASE}/api/payments/settings/active/${slug}`);
-      const gwJson = await gwRes.json();
-      if (gwRes.ok) {
-        setActiveGateways(gwJson.data);
-        // Default to bKash if available
-        if (gwJson.data?.bkash) setSelectedPayment('BKASH');
-        else if (gwJson.data?.ssl) setSelectedPayment('SSL');
-        else if (gwJson.data?.stripe) setSelectedPayment('STRIPE');
-        else setSelectedPayment('MANUAL');
-      }
-
-      setStep('payment');
+      // Redirect to the checkout page which handles all gateways uniformly
+      window.location.href = `/${slug}/checkout?bookingId=${id}`;
     } catch { setError('Something went wrong. Please try again.'); }
     setSubmitting(false);
   };
