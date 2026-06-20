@@ -304,45 +304,67 @@ export default function DashboardPage() {
 
       {/* Charts Row */}
       <div className="grid gap-3 lg:grid-cols-2 animate-fade-up [animation-delay:210ms]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Revenue (Last 12 months)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={revenueData}>
-                <defs>
-                  <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#309485" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#309485" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} tickLine={false} />
-                <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v) => [formatCurrency(Number(v)), 'Revenue']} />
-                <Area type="monotone" dataKey="revenue" stroke="#309485" fill="url(#revenueGrad)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {/* Revenue Chart */}
+        <div className="rounded-[14px] border px-[22px] py-[18px]"
+          style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-[13px] font-semibold text-[#18231f]">Revenue</p>
+              <p className="text-[11px] text-[#8aa29a]">Last 12 months</p>
+            </div>
+            <div className="flex h-[28px] w-[28px] items-center justify-center rounded-[8px] bg-[#e3f2ef]">
+              <TrendingUp className="h-[12px] w-[12px] text-[#23766a]" strokeWidth={2.5} />
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={revenueData} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#23766a" stopOpacity={0.12} />
+                  <stop offset="95%" stopColor="#23766a" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.04)" />
+              <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#8aa29a' }} tickLine={false} axisLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: '#8aa29a' }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+              <Tooltip
+                formatter={(v) => [formatCurrency(Number(v)), 'Revenue']}
+                contentStyle={{ background: '#1b342f', border: 'none', borderRadius: 10, fontSize: 12 }}
+                labelStyle={{ color: '#9bbdb7' }}
+                itemStyle={{ color: '#ece7df' }}
+              />
+              <Area type="monotone" dataKey="revenue" stroke="#23766a" fill="url(#revenueGrad)" strokeWidth={2} dot={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Occupancy Rate (Last 30 days)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={occupancyData.slice(-14)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} />
-                <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} unit="%" domain={[0, 100]} />
-                <Tooltip formatter={(v) => [`${v}%`, 'Occupancy']} />
-                <Bar dataKey="rate" fill="#309485" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {/* Occupancy Chart */}
+        <div className="rounded-[14px] border px-[22px] py-[18px]"
+          style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-[13px] font-semibold text-[#18231f]">Occupancy Rate</p>
+              <p className="text-[11px] text-[#8aa29a]">Last 14 days</p>
+            </div>
+            <div className="flex h-[28px] w-[28px] items-center justify-center rounded-[8px] bg-[#f4ecda]">
+              <BedDouble className="h-[12px] w-[12px] text-[#b89040]" strokeWidth={2.5} />
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={occupancyData.slice(-14)} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.04)" />
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#8aa29a' }} tickLine={false} axisLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: '#8aa29a' }} tickLine={false} axisLine={false} unit="%" domain={[0, 100]} />
+              <Tooltip
+                formatter={(v) => [`${v}%`, 'Occupancy']}
+                contentStyle={{ background: '#1b342f', border: 'none', borderRadius: 10, fontSize: 12 }}
+                labelStyle={{ color: '#9bbdb7' }}
+                itemStyle={{ color: '#ece7df' }}
+              />
+              <Bar dataKey="rate" fill="#23766a" radius={[5, 5, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       {/* Website Visitors Widget (optional — only shows if tracking data exists) */}
