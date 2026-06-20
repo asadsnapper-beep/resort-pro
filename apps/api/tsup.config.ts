@@ -18,6 +18,8 @@ export default defineConfig({
     'fsevents',
     'bufferutil',
     'utf-8-validate',
+    'tesseract.js',
+    'mrz',
   ],
   sourcemap: true,
   clean: true,
