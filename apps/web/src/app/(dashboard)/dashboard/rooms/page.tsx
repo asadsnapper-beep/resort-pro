@@ -4,57 +4,59 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { roomsApi } from '@/lib/api';
 import { useDebounce } from '@/hooks/use-debounce';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { StatusBadge } from '@/components/ui/badge';
 import { ConfirmModal } from '@/components/ui/modal';
 import { RoomModal } from '@/components/rooms/RoomModal';
 import { RoomDetailSheet } from '@/components/rooms/RoomDetailSheet';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
-import {
-  Plus, BedDouble, Users, DollarSign, Search,
-  CheckCircle2, Wrench, ChevronLeft, ChevronRight,
-} from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { Plus, BedDouble, Users, DollarSign, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Room } from '@resort-pro/types';
 
-/* ── Types ─────────────────────────────────────────────────────────────────── */
 interface RoomWithBooking extends Room {
   currentBooking?: {
-    id: string;
-    confirmationNo: string;
-    status: string;
-    checkIn: string;
-    checkOut: string;
-    adults: number;
-    children: number;
+    id: string; confirmationNo: string; status: string;
+    checkIn: string; checkOut: string; adults: number; children: number;
     guest: { id: string; firstName: string; lastName: string; email: string; phone?: string };
   } | null;
 }
 
-/* ── Constants ──────────────────────────────────────────────────────────────── */
 const ROOM_TYPE_LABELS: Record<string, string> = {
   STANDARD: 'Standard', DELUXE: 'Deluxe', SUITE: 'Suite',
   VILLA: 'Villa', COTTAGE: 'Cottage', BUNGALOW: 'Bungalow',
 };
 
-const ROOM_TYPE_COLORS: Record<string, string> = {
-  STANDARD: 'bg-gray-100 text-gray-700',
-  DELUXE:   'bg-blue-100 text-blue-700',
-  SUITE:    'bg-purple-100 text-purple-700',
-  VILLA:    'bg-resort-100 text-resort-700',
-  COTTAGE:  'bg-green-100 text-green-700',
-  BUNGALOW: 'bg-orange-100 text-orange-700',
+const ROOM_STATUS_PILL: Record<string, { bg: string; border: string; text: string; label: string }> = {
+  AVAILABLE:   { bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Available'   },
+  OCCUPIED:    { bg: '#f4ecda', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'Occupied'    },
+  CLEANING:    { bg: '#fceee4', border: 'rgba(184,114,74,0.2)',  text: '#b8724a', label: 'Cleaning'    },
+  MAINTENANCE: { bg: '#fef2f2', border: 'rgba(200,60,60,0.15)', text: '#c43c3c', label: 'Maintenance' },
+  RESERVED:    { bg: '#f5f0fe', border: 'rgba(120,70,200,0.15)',text: '#7846c8', label: 'Reserved'    },
+};
+
+const ROOM_TYPE_STYLE: Record<string, { bg: string; text: string }> = {
+  STANDARD: { bg: '#f5f4f1', text: '#6b7280' },
+  DELUXE:   { bg: '#e3f2ef', text: '#23766a' },
+  SUITE:    { bg: '#f5f0fe', text: '#7846c8' },
+  VILLA:    { bg: '#e3f2ef', text: '#23766a' },
+  COTTAGE:  { bg: '#e3f2ef', text: '#23766a' },
+  BUNGALOW: { bg: '#f4ecda', text: '#b89040' },
 };
 
 const STATUS_FILTERS = ['', 'AVAILABLE', 'OCCUPIED', 'CLEANING', 'MAINTENANCE', 'RESERVED'] as const;
 const TYPE_FILTERS   = ['', 'STANDARD', 'DELUXE', 'SUITE', 'VILLA', 'COTTAGE', 'BUNGALOW'] as const;
 
-/* ════════════════════════════════════════════════════════════════════════════ */
+const STAT_FILTERS: { label: string; key: keyof typeof stats_default; filter: string; bg: string; border: string; text: string }[] = [
+  { label: 'Total',       key: 'total',       filter: '',            bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)',       text: '#18231f' },
+  { label: 'Available',   key: 'available',   filter: 'AVAILABLE',   bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)',   text: '#23766a' },
+  { label: 'Occupied',    key: 'occupied',    filter: 'OCCUPIED',    bg: '#f4ecda', border: 'rgba(184,144,64,0.2)',   text: '#b89040' },
+  { label: 'Cleaning',    key: 'cleaning',    filter: 'CLEANING',    bg: '#fceee4', border: 'rgba(184,114,74,0.2)',   text: '#b8724a' },
+  { label: 'Maintenance', key: 'maintenance', filter: 'MAINTENANCE', bg: '#fef2f2', border: 'rgba(200,60,60,0.15)',  text: '#c43c3c' },
+  { label: 'Reserved',    key: 'reserved',    filter: 'RESERVED',    bg: '#f5f0fe', border: 'rgba(120,70,200,0.15)', text: '#7846c8' },
+];
+const stats_default = { total: 0, available: 0, occupied: 0, cleaning: 0, maintenance: 0, reserved: 0 };
+
 export default function RoomsPage() {
   const queryClient = useQueryClient();
-
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter,   setTypeFilter]   = useState('');
   const [searchInput,  setSearchInput]  = useState('');
@@ -66,7 +68,6 @@ export default function RoomsPage() {
   const [deleteRoom,   setDeleteRoom]   = useState<RoomWithBooking | null>(null);
   const [addOpen,      setAddOpen]      = useState(false);
 
-  /* ── Queries ── */
   const listParams: Record<string, unknown> = { page, limit: 20 };
   if (statusFilter) listParams.status = statusFilter;
   if (typeFilter)   listParams.type   = typeFilter;
@@ -84,9 +85,8 @@ export default function RoomsPage() {
 
   const rooms: RoomWithBooking[] = data?.data?.data ?? [];
   const pagination = data?.data?.pagination ?? { total: 0, totalPages: 1, page: 1, limit: 20 };
-  const stats = statsData?.data?.data ?? { total: 0, available: 0, occupied: 0, cleaning: 0, maintenance: 0, reserved: 0 };
+  const stats = statsData?.data?.data ?? stats_default;
 
-  /* ── Mutations ── */
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['rooms'] });
     queryClient.invalidateQueries({ queryKey: ['rooms-stats'] });
@@ -101,124 +101,103 @@ export default function RoomsPage() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: unknown }) => roomsApi.update(id, data),
-    onSuccess: () => {
-      invalidate();
-      toast({ title: 'Room updated' });
-      setEditRoom(null);
-      setSelectedRoom(null);
-    },
+    onSuccess: () => { invalidate(); toast({ title: 'Room updated' }); setEditRoom(null); setSelectedRoom(null); },
     onError: (err: { response?: { data?: { error?: string } } }) =>
       toast({ title: 'Error', description: err?.response?.data?.error ?? 'Failed to update room', variant: 'destructive' }),
   });
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => roomsApi.updateStatus(id, status),
-    onSuccess: (_, vars) => {
-      invalidate();
-      toast({ title: 'Status updated' });
-      if (selectedRoom) setSelectedRoom(r => r ? { ...r, status: vars.status as Room['status'] } : null);
-    },
+    onSuccess: (_, vars) => { invalidate(); toast({ title: 'Status updated' }); if (selectedRoom) setSelectedRoom(r => r ? { ...r, status: vars.status as Room['status'] } : null); },
     onError: () => toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => roomsApi.delete(id),
-    onSuccess: () => {
-      invalidate();
-      toast({ title: 'Room deleted' });
-      setDeleteRoom(null);
-      setSelectedRoom(null);
-    },
+    onSuccess: () => { invalidate(); toast({ title: 'Room deleted' }); setDeleteRoom(null); setSelectedRoom(null); },
     onError: (err: { response?: { data?: { error?: string } } }) =>
       toast({ title: 'Error', description: err?.response?.data?.error ?? 'Failed to delete room', variant: 'destructive' }),
   });
 
-  /* ── Open detail: fetch fresh room with currentBooking ── */
   const openDetail = async (room: RoomWithBooking) => {
-    setSelectedRoom(room); // show immediately with cached data
-    try {
-      const res = await roomsApi.get(room.id);
-      setSelectedRoom(res.data?.data ?? room);
-    } catch { /* keep cached */ }
+    setSelectedRoom(room);
+    try { const res = await roomsApi.get(room.id); setSelectedRoom(res.data?.data ?? room); } catch { /* keep cached */ }
   };
 
   const resetFilters = () => { setSearchInput(''); setStatusFilter(''); setTypeFilter(''); setPage(1); };
 
   return (
-    <div className="space-y-6">
-
+    <div className="space-y-4 animate-fade-up">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Rooms & Villas</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Manage your resort accommodations</p>
+          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Rooms & Villas</h1>
+          <p className="mt-[4px] text-[13px] text-[#7a9890]">Manage your resort accommodations</p>
         </div>
-        <Button className="gap-2" onClick={() => setAddOpen(true)}>
-          <Plus className="h-4 w-4" /> Add Room
-        </Button>
+        <button
+          onClick={() => setAddOpen(true)}
+          className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
+          style={{ background: '#1b342f' }}
+        >
+          <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} /> Add Room
+        </button>
       </div>
 
-      {/* Stats — always from full dataset via /stats endpoint */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
-        {[
-          { label: 'Total',       value: stats.total,       color: 'bg-gray-50 border-gray-200',   text: 'text-gray-900',   filter: '' },
-          { label: 'Available',   value: stats.available,   color: 'bg-green-50 border-green-200', text: 'text-green-700',  filter: 'AVAILABLE' },
-          { label: 'Occupied',    value: stats.occupied,    color: 'bg-blue-50 border-blue-200',   text: 'text-blue-700',   filter: 'OCCUPIED' },
-          { label: 'Cleaning',    value: stats.cleaning,    color: 'bg-amber-50 border-amber-200', text: 'text-amber-700',  filter: 'CLEANING' },
-          { label: 'Maintenance', value: stats.maintenance, color: 'bg-yellow-50 border-yellow-200', text: 'text-yellow-700', filter: 'MAINTENANCE' },
-          { label: 'Reserved',    value: stats.reserved,    color: 'bg-purple-50 border-purple-200', text: 'text-purple-700', filter: 'RESERVED' },
-        ].map(({ label, value, color, text, filter }) => (
-          <button
-            key={label}
-            onClick={() => { setStatusFilter(statusFilter === filter ? '' : filter); setPage(1); }}
-            className={`rounded-xl border p-4 text-left transition-all hover:shadow-sm ${color} ${statusFilter === filter ? 'ring-2 ring-resort-500' : ''}`}
-          >
-            <p className="text-xs font-medium text-muted-foreground">{label}</p>
-            <p className={`mt-1 text-3xl font-bold ${text}`}>{value}</p>
-          </button>
-        ))}
+      {/* Stats bar — clickable filters */}
+      <div className="grid grid-cols-3 gap-2 md:grid-cols-6">
+        {STAT_FILTERS.map(({ label, key, filter, bg, border, text }) => {
+          const active = statusFilter === filter;
+          return (
+            <button
+              key={label}
+              onClick={() => { setStatusFilter(statusFilter === filter ? '' : filter); setPage(1); }}
+              className="rounded-[12px] border p-[14px] text-left transition-all hover:shadow-sm"
+              style={{
+                background: active ? bg : '#fff',
+                borderColor: active ? border : 'rgba(0,0,0,0.045)',
+                boxShadow: active ? `0 0 0 2px ${border}` : '0 1px 6px rgba(0,0,0,0.04)',
+              }}
+            >
+              <p className="text-[10px] font-semibold uppercase tracking-[0.07em]" style={{ color: active ? text : '#8aa29a' }}>{label}</p>
+              <p className="mt-[4px] text-[26px] font-semibold leading-none tracking-[-0.02em]" style={{ color: active ? text : '#18231f' }}>
+                {(stats as typeof stats_default)[key]}
+              </p>
+            </button>
+          );
+        })}
       </div>
 
       {/* Filters */}
-      <div className="space-y-3">
-        {/* Search */}
+      <div className="space-y-2">
         <div className="relative max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8aa29a]" />
+          <input
             value={searchInput}
             onChange={e => { setSearchInput(e.target.value); setPage(1); }}
             placeholder="Search by name or room #…"
-            className="pl-9"
+            className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-[8px] pl-9 pr-4 text-[13px] text-[#18231f] placeholder:text-[#8aa29a] focus:outline-none focus:ring-1 focus:ring-resort-600/20"
           />
         </div>
-
-        {/* Status filter */}
-        <div className="flex gap-2 flex-wrap items-center">
-          <span className="text-xs font-medium text-muted-foreground">Status:</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.07em] text-[#8aa29a]">Status:</span>
           {STATUS_FILTERS.map(s => (
-            <button key={s}
-              onClick={() => { setStatusFilter(s); setPage(1); }}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                statusFilter === s
-                  ? 'bg-resort-600 text-white'
-                  : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-              }`}>
-              {s || 'All'}
+            <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
+              className="rounded-[8px] border px-[11px] py-[5px] text-[12px] font-medium transition-colors"
+              style={statusFilter === s
+                ? { background: '#1b342f', color: '#dfd9d0', borderColor: '#1b342f' }
+                : { background: '#fff', color: '#6b8880', borderColor: 'rgba(0,0,0,0.09)' }}>
+              {s.replace(/_/g, ' ') || 'All'}
             </button>
           ))}
         </div>
-
-        {/* Type filter */}
-        <div className="flex gap-2 flex-wrap items-center">
-          <span className="text-xs font-medium text-muted-foreground">Type:</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.07em] text-[#8aa29a]">Type:</span>
           {TYPE_FILTERS.map(t => (
-            <button key={t}
-              onClick={() => { setTypeFilter(t); setPage(1); }}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                typeFilter === t
-                  ? 'bg-gray-800 text-white'
-                  : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-              }`}>
+            <button key={t} onClick={() => { setTypeFilter(t); setPage(1); }}
+              className="rounded-[8px] border px-[11px] py-[5px] text-[12px] font-medium transition-colors"
+              style={typeFilter === t
+                ? { background: '#1b342f', color: '#dfd9d0', borderColor: '#1b342f' }
+                : { background: '#fff', color: '#6b8880', borderColor: 'rgba(0,0,0,0.09)' }}>
               {t ? ROOM_TYPE_LABELS[t] : 'All'}
             </button>
           ))}
@@ -227,161 +206,154 @@ export default function RoomsPage() {
 
       {/* Room Grid */}
       {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[...Array(6)].map((_, i) => <div key={i} className="h-52 rounded-xl bg-gray-100 animate-pulse" />)}
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="h-52 animate-pulse rounded-[14px]" style={{ background: '#e8e5de' }} />
+          ))}
         </div>
       ) : rooms.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-20">
-            <BedDouble className="h-14 w-14 text-gray-200 mb-4" />
-            <p className="font-medium text-gray-500">No rooms found</p>
-            <p className="mt-1 text-sm text-muted-foreground">
+        <div className="flex flex-col items-center justify-center gap-3 rounded-[14px] border py-20"
+          style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#f5f4f1]">
+            <BedDouble className="h-7 w-7 text-[#c5bdb4]" />
+          </div>
+          <div className="text-center">
+            <p className="text-[14px] font-medium text-[#18231f]">No rooms found</p>
+            <p className="mt-1 text-[13px] text-[#8aa29a]">
               {searchInput || statusFilter || typeFilter ? 'Try changing your filters' : 'Add your first room to get started'}
             </p>
-            {searchInput || statusFilter || typeFilter ? (
-              <Button variant="outline" className="mt-4" onClick={resetFilters}>Clear filters</Button>
-            ) : (
-              <Button className="mt-4 gap-2" onClick={() => setAddOpen(true)}>
-                <Plus className="h-4 w-4" /> Add Room
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+          </div>
+          {searchInput || statusFilter || typeFilter ? (
+            <button onClick={resetFilters}
+              className="rounded-[8px] border px-4 py-[7px] text-[12.5px] font-medium"
+              style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.09)', color: '#18231f' }}>
+              Clear filters
+            </button>
+          ) : (
+            <button onClick={() => setAddOpen(true)}
+              className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0]"
+              style={{ background: '#1b342f' }}>
+              <Plus className="h-[13px] w-[13px]" /> Add Room
+            </button>
+          )}
+        </div>
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {rooms.map(room => (
-              <Card key={room.id}
-                className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer group"
-                onClick={() => openDetail(room)}>
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {rooms.map(room => {
+              const statusStyle = ROOM_STATUS_PILL[room.status] ?? ROOM_STATUS_PILL.AVAILABLE;
+              const typeStyle   = ROOM_TYPE_STYLE[room.type]   ?? ROOM_TYPE_STYLE.STANDARD;
+              return (
+                <div key={room.id}
+                  className="group cursor-pointer overflow-hidden rounded-[14px] border transition-shadow hover:shadow-md"
+                  style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}
+                  onClick={() => openDetail(room)}>
 
-                {/* Image */}
-                {room.images?.[0] ? (
-                  <div className="aspect-video w-full overflow-hidden bg-gray-100">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={room.images[0]} alt={room.name}
-                      className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }} />
-                  </div>
-                ) : (
-                  <div className="aspect-video w-full bg-gradient-to-br from-resort-50 to-resort-100 flex items-center justify-center">
-                    <BedDouble className="h-10 w-10 text-resort-300" />
-                  </div>
-                )}
+                  {/* Image / placeholder */}
+                  {room.images?.[0] ? (
+                    <div className="aspect-video w-full overflow-hidden" style={{ background: '#f5f4f1' }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={room.images[0]} alt={room.name}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }} />
+                    </div>
+                  ) : (
+                    <div className="flex aspect-video w-full items-center justify-center" style={{ background: '#e8f4f2' }}>
+                      <BedDouble className="h-10 w-10 text-[#9bbdb7]" strokeWidth={1.5} />
+                    </div>
+                  )}
 
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-mono text-xs font-bold text-muted-foreground">#{room.number}</span>
-                        <span className={`rounded-md px-1.5 py-0.5 text-xs font-medium ${ROOM_TYPE_COLORS[room.type]}`}>
-                          {ROOM_TYPE_LABELS[room.type]}
-                        </span>
+                  <div className="p-4">
+                    <div className="flex items-start justify-between mb-[10px]">
+                      <div>
+                        <div className="mb-[5px] flex items-center gap-2">
+                          <span className="font-mono text-[11px] font-bold text-[#8aa29a]">#{room.number}</span>
+                          <span className="rounded-[6px] px-[8px] py-[3px] text-[11px] font-semibold"
+                            style={{ background: typeStyle.bg, color: typeStyle.text }}>
+                            {ROOM_TYPE_LABELS[room.type]}
+                          </span>
+                        </div>
+                        <p className="text-[14px] font-semibold text-[#18231f]">{room.name}</p>
                       </div>
-                      <p className="font-semibold text-gray-900">{room.name}</p>
+                      <span className="shrink-0 rounded-[7px] border px-[9px] py-[4px] text-[11px] font-semibold"
+                        style={{ background: statusStyle.bg, borderColor: statusStyle.border, color: statusStyle.text }}>
+                        {statusStyle.label}
+                      </span>
                     </div>
-                    <StatusBadge status={room.status} />
+
+                    <div className="flex items-center gap-4 text-[12.5px] text-[#8aa29a]">
+                      <span className="flex items-center gap-1">
+                        <Users className="h-3.5 w-3.5" /> {room.maxOccupancy}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <DollarSign className="h-3.5 w-3.5" /> {formatCurrency(Number(room.basePrice))}/night
+                      </span>
+                    </div>
+
+                    {room.amenities && room.amenities.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-1">
+                        {room.amenities.slice(0, 3).map(a => (
+                          <span key={a} className="rounded-[6px] px-[8px] py-[3px] text-[11px] font-medium"
+                            style={{ background: '#f5f4f1', color: '#6b8880' }}>{a}</span>
+                        ))}
+                        {room.amenities.length > 3 && (
+                          <span className="rounded-[6px] px-[8px] py-[3px] text-[11px] font-medium"
+                            style={{ background: '#f5f4f1', color: '#8aa29a' }}>+{room.amenities.length - 3}</span>
+                        )}
+                      </div>
+                    )}
+
+                    {room.videos && room.videos.length > 0 && (
+                      <p className="mt-2 text-[11.5px] text-[#8aa29a]">
+                        <span className="text-[#23766a]">▶</span> {room.videos.length} video{room.videos.length !== 1 ? 's' : ''}
+                      </p>
+                    )}
                   </div>
-
-                  <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Users className="h-3.5 w-3.5" /> {room.maxOccupancy}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <DollarSign className="h-3.5 w-3.5" /> {formatCurrency(Number(room.basePrice))}/night
-                    </span>
-                  </div>
-
-                  {room.amenities && room.amenities.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-1">
-                      {room.amenities.slice(0, 3).map(a => (
-                        <span key={a} className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">{a}</span>
-                      ))}
-                      {room.amenities.length > 3 && (
-                        <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">+{room.amenities.length - 3}</span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Video indicator */}
-                  {room.videos && room.videos.length > 0 && (
-                    <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-                      <span className="text-resort-500">▶</span>
-                      {room.videos.length} video{room.videos.length !== 1 ? 's' : ''}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+                </div>
+              );
+            })}
           </div>
 
           {/* Pagination */}
           {pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between pt-2">
-              <p className="text-sm text-muted-foreground">
+            <div className="flex items-center justify-between pt-1">
+              <p className="text-[12.5px] text-[#8aa29a]">
                 Showing {(page - 1) * pagination.limit + 1}–{Math.min(page * pagination.limit, pagination.total)} of {pagination.total} rooms
               </p>
-              <div className="flex items-center gap-1">
-                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="gap-1">
-                  <ChevronLeft className="h-4 w-4" /> Prev
-                </Button>
+              <div className="flex items-center gap-1.5">
+                <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
+                  className="flex items-center gap-1 rounded-[8px] border px-3 py-[6px] text-[12.5px] font-medium disabled:opacity-40"
+                  style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.09)', color: '#18231f' }}>
+                  <ChevronLeft className="h-3.5 w-3.5" /> Prev
+                </button>
                 {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
                   const n = page <= 3 ? i + 1 : page + i - 2;
                   if (n < 1 || n > pagination.totalPages) return null;
                   return (
                     <button key={n} onClick={() => setPage(n)}
-                      className={`h-8 w-8 rounded-lg text-sm font-medium transition-colors ${
-                        n === page ? 'bg-resort-600 text-white' : 'border hover:bg-gray-50 text-gray-700'
-                      }`}>
+                      className="h-8 w-8 rounded-[8px] text-[12.5px] font-medium transition-colors"
+                      style={n === page
+                        ? { background: '#1b342f', color: '#dfd9d0', border: '1px solid #1b342f' }
+                        : { background: '#fff', color: '#18231f', border: '1px solid rgba(0,0,0,0.09)' }}>
                       {n}
                     </button>
                   );
                 })}
-                <Button variant="outline" size="sm" disabled={page >= pagination.totalPages} onClick={() => setPage(p => p + 1)} className="gap-1">
-                  Next <ChevronRight className="h-4 w-4" />
-                </Button>
+                <button disabled={page >= pagination.totalPages} onClick={() => setPage(p => p + 1)}
+                  className="flex items-center gap-1 rounded-[8px] border px-3 py-[6px] text-[12.5px] font-medium disabled:opacity-40"
+                  style={{ background: '#1b342f', borderColor: '#1b342f', color: '#dfd9d0' }}>
+                  Next <ChevronRight className="h-3.5 w-3.5" />
+                </button>
               </div>
             </div>
           )}
         </>
       )}
 
-      {/* Add Modal */}
-      <RoomModal
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        loading={createMutation.isPending}
-        onSubmit={data => createMutation.mutate(data)}
-      />
-
-      {/* Edit Modal */}
-      <RoomModal
-        open={!!editRoom}
-        onClose={() => setEditRoom(null)}
-        room={editRoom}
-        loading={updateMutation.isPending}
-        onSubmit={data => editRoom && updateMutation.mutate({ id: editRoom.id, data })}
-      />
-
-      {/* Detail Sheet */}
-      <RoomDetailSheet
-        room={selectedRoom}
-        onClose={() => setSelectedRoom(null)}
-        onEdit={r => { setEditRoom(r); setSelectedRoom(null); }}
-        onDelete={r => setDeleteRoom(r)}
-        onStatusChange={(id, status) => statusMutation.mutate({ id, status })}
-        statusLoading={statusMutation.isPending}
-      />
-
-      {/* Delete Confirm */}
-      <ConfirmModal
-        open={!!deleteRoom}
-        onClose={() => setDeleteRoom(null)}
-        onConfirm={() => deleteRoom && deleteMutation.mutate(deleteRoom.id)}
-        loading={deleteMutation.isPending}
-        title="Delete Room"
-        description={`Are you sure you want to delete "${deleteRoom?.name}"? This action cannot be undone.`}
-      />
+      <RoomModal open={addOpen} onClose={() => setAddOpen(false)} loading={createMutation.isPending} onSubmit={data => createMutation.mutate(data)} />
+      <RoomModal open={!!editRoom} onClose={() => setEditRoom(null)} room={editRoom} loading={updateMutation.isPending} onSubmit={data => editRoom && updateMutation.mutate({ id: editRoom.id, data })} />
+      <RoomDetailSheet room={selectedRoom} onClose={() => setSelectedRoom(null)} onEdit={r => { setEditRoom(r); setSelectedRoom(null); }} onDelete={r => setDeleteRoom(r)} onStatusChange={(id, status) => statusMutation.mutate({ id, status })} statusLoading={statusMutation.isPending} />
+      <ConfirmModal open={!!deleteRoom} onClose={() => setDeleteRoom(null)} onConfirm={() => deleteRoom && deleteMutation.mutate(deleteRoom.id)} loading={deleteMutation.isPending} title="Delete Room" description={`Are you sure you want to delete "${deleteRoom?.name}"? This action cannot be undone.`} />
     </div>
   );
 }
