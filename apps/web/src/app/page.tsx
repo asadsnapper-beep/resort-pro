@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 
 // ─────────────────────────────────────────────
@@ -9,319 +9,353 @@ import Link from 'next/link';
 
 const NAV_LINKS = [
   { label: 'Features', href: '#features' },
-  { label: 'How it works', href: '#how-it-works' },
-  { label: 'Embed SDK', href: '#embed' },
+  { label: 'How it works', href: '#how' },
   { label: 'Pricing', href: '#pricing' },
   { label: 'FAQ', href: '#faq' },
 ];
 
 const FEATURES = [
   {
-    color: 'bg-resort-100 text-resort-700',
+    title: 'Bookings & Calendar',
+    desc: 'Drag-and-drop calendar, walk-ins, online and group bookings in one view.',
     svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-        <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#23766a" strokeWidth={1.6} strokeLinecap="round">
+        <rect x="3" y="4.5" width="18" height="16" rx="2.5" /><path d="M3 9h18M8 2.5v4M16 2.5v4" />
       </svg>
     ),
-    title: 'Room & Booking Management',
-    desc: 'Drag-and-drop calendar, walk-in, online booking, and group bookings all in one intuitive view.',
   },
   {
-    color: 'bg-emerald-100 text-emerald-700',
+    title: 'Payments Built In',
+    desc: 'bKash, SSLCommerz, Stripe and cash — no plugins, no chasing screenshots.',
     svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-        <rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#23766a" strokeWidth={1.6} strokeLinecap="round">
+        <rect x="2.5" y="5" width="19" height="14" rx="2.5" /><path d="M2.5 9.5h19M6 15h4" />
       </svg>
     ),
-    title: 'Online Payments',
-    desc: 'bKash, SSL Commerce, Stripe, and manual payments built in — no third-party plugins needed.',
   },
   {
-    color: 'bg-blue-100 text-blue-700',
-    svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-        <path d="M18 20V10M12 20V4M6 20v-6"/>
-      </svg>
-    ),
     title: 'Analytics & Reports',
-    desc: 'Revenue trends, occupancy rates, expense tracking, and profit margin reports in real time.',
-  },
-  {
-    color: 'bg-orange-100 text-orange-700',
+    desc: 'Occupancy, revenue and profit, updated in real time.',
     svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-        <path d="M3 11l19-9-9 19-2-8-8-2z"/>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#23766a" strokeWidth={1.6} strokeLinecap="round">
+        <path d="M4 20V4M4 20h16M8 16v-5M13 16V8M18 16v-3" />
       </svg>
     ),
+  },
+  {
     title: 'Restaurant & Room Service',
-    desc: 'Menu management, table orders, and room-service requests with live kitchen status.',
-  },
-  {
-    color: 'bg-purple-100 text-purple-700',
+    desc: 'Menus, table orders and live kitchen status.',
     svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#23766a" strokeWidth={1.6} strokeLinecap="round">
+        <path d="M7 2.5v8a2.5 2.5 0 0 1-5 0v-8M4.5 11v10.5M16 2.5c-1.7 0-2.5 2-2.5 5s.8 4 2.5 4 2.5-1 2.5-4-.8-5-2.5-5zM16 15.5v6" />
       </svg>
     ),
-    title: 'Guest CRM',
-    desc: 'Guest profiles, loyalty points, stay history, and communication logs — all in one place.',
   },
   {
-    color: 'bg-gold-400/20 text-gold-600',
+    title: 'Guest CRM & Loyalty',
+    desc: 'Profiles, stay history and loyalty points in one place.',
     svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-        <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#23766a" strokeWidth={1.6} strokeLinecap="round">
+        <circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5" />
       </svg>
     ),
-    title: 'Embed on Any Website',
-    desc: 'Drop booking forms, room listings, menus, and calendars on your site with one line of code.',
+  },
+  {
+    title: 'Embed Anywhere',
+    desc: 'Add booking forms to your existing site with one line of code.',
+    svg: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#23766a" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M8.5 8.5 5 12l3.5 3.5M15.5 8.5 19 12l-3.5 3.5M13 5l-2 14" />
+      </svg>
+    ),
   },
 ];
 
 const STEPS = [
-  {
-    num: '01',
-    title: 'Create your account',
-    desc: 'Sign up, add your property details, upload your rooms and set your rates. Takes about 5 minutes.',
-  },
-  {
-    num: '02',
-    title: 'Set up payments',
-    desc: 'Connect bKash, Stripe, or SSL Commerce with one click. Start accepting online bookings immediately.',
-  },
-  {
-    num: '03',
-    title: 'Go live',
-    desc: 'Share your booking link or embed our widgets on your existing website. Watch bookings roll in.',
-  },
+  { num: '01', title: 'Create your account', desc: 'Sign up free and add your rooms, rates and photos in minutes. No card needed.' },
+  { num: '02', title: 'Connect payments', desc: 'Link bKash, SSLCommerz or Stripe in a few taps and start taking deposits.' },
+  { num: '03', title: 'Go live', desc: "Share your booking link or embed it on your site. You're taking bookings tonight." },
 ];
+
+const EMBED_WIDGETS = ['Booking form', 'Room list', 'Availability calendar', 'Restaurant menu'];
 
 const PLANS = [
   {
-    name: 'STARTER',
-    price: '$49',
-    rooms: 'Up to 20 rooms',
-    staff: '3 users',
-    features: ['Room & booking management', 'bKash & Stripe payments', 'Guest CRM', 'Embed widgets', '24/7 email support'],
-    cta: 'Start free trial',
-    ctaHref: '/auth/register?plan=STARTER',
-    highlight: false,
+    key: 'starter',
+    name: 'Starter',
+    monthly: 1500,
+    annualMonthly: 1250,
+    annualYearly: 15000,
+    tagline: 'For small guesthouses getting online.',
+    featuresPrefix: null as string | null,
+    features: [
+      'Up to <strong>10 rooms</strong> & 3 staff seats',
+      'Core PMS — bookings, rooms, guests, housekeeping',
+      'Booking site on a ResortPro subdomain',
+      'bKash & cash · basic invoicing & reports',
+      'Email support',
+    ],
+    ai: 'AI content generator · ~30 / mo',
+    highlighted: false,
+    badge: null as string | null,
   },
   {
-    name: 'PROFESSIONAL',
-    price: '$99',
-    rooms: 'Up to 100 rooms',
-    staff: '10 users',
-    features: ['Everything in Starter', 'Advanced analytics & reports', 'Rate plans & channel sync', 'Restaurant & room service', 'Priority support'],
-    cta: 'Start free trial',
-    ctaHref: '/auth/register?plan=PROFESSIONAL',
-    highlight: true,
+    key: 'professional',
+    name: 'Professional',
+    monthly: 3900,
+    annualMonthly: 3250,
+    annualYearly: 39000,
+    tagline: 'For growing resorts running every department.',
+    featuresPrefix: 'Everything in Starter, plus',
+    features: [
+      'Up to <strong>40 rooms</strong> & 10 staff seats',
+      'Custom domain — no ResortPro badge',
+      'F&B + table ordering',
+      'CRM, email/SMS marketing & loyalty',
+      'OTA sync — Airbnb, Booking.com · advanced reports',
+      'Priority email support',
+    ],
+    ai: 'AI content + chatbot · ~300 / mo',
+    highlighted: true,
+    badge: 'Most popular',
   },
   {
-    name: 'ENTERPRISE',
-    price: '$199',
-    rooms: 'Unlimited rooms',
-    staff: 'Unlimited users',
-    features: ['Everything in Professional', 'White-label branding', 'SSO & SAML', 'Dedicated account manager', 'SLA guarantee'],
-    cta: 'Contact sales',
-    ctaHref: '/contact',
-    highlight: false,
+    key: 'premium',
+    name: 'Premium',
+    monthly: 7900,
+    annualMonthly: 6583,
+    annualYearly: 79000,
+    tagline: 'For established & multi-property resorts.',
+    featuresPrefix: 'Everything in Professional, plus',
+    features: [
+      '<strong>Unlimited</strong> rooms & staff seats',
+      'Multi-property dashboard',
+      'Revenue intelligence reports',
+      'Priority support',
+    ],
+    ai: 'Full AI suite + insights · ~1,500 / mo',
+    highlighted: false,
+    badge: null,
   },
+];
+
+const STATS = [
+  { stat: '500+', label: 'rooms managed' },
+  { stat: '৳2.4Cr+', label: 'processed' },
+  { stat: '99.9%', label: 'uptime' },
 ];
 
 const TESTIMONIALS = [
   {
-    quote: 'ResortPro completely replaced our 4 different Excel sheets and WhatsApp booking group. Now everything is in one place and I can check the status from my phone at midnight.',
-    name: 'Karim Hossain',
-    role: 'Manager, Palm Paradise Resort',
-    location: "Cox's Bazar",
+    quote: 'We closed our three booking spreadsheets the first week. Double-bookings just stopped, and our reception team finally breathes during peak season.',
+    initials: 'TR', name: 'Tanvir Rahman', role: "GM, Bay Breeze · Cox's Bazar",
   },
   {
-    quote: 'The bKash integration alone saved us hours every week. Guests pay online, we see it instantly on the dashboard — no more chasing payment screenshots on WhatsApp.',
-    name: 'Sumaiya Islam',
-    role: 'Owner, Sea View Boutique Hotel',
-    location: 'Sylhet',
+    quote: 'bKash and Stripe in one place changed everything. No more chasing payment screenshots on WhatsApp — guests pay the deposit before they even arrive.',
+    initials: 'FK', name: 'Farhana Karim', role: 'Owner, Tea Valley · Sreemangal',
   },
   {
-    quote: 'We embedded the booking form on our WordPress site in 5 minutes. Online bookings doubled in the first month. The embed SDK is a game changer.',
-    name: 'Rahim Chowdhury',
-    role: 'CEO, Blue Lagoon Spa Resort',
-    location: "Cox's Bazar",
+    quote: 'I run two properties from my phone now. Occupancy and revenue update live, so I can drop rates on a slow weekend before it costs me.',
+    initials: 'SA', name: 'Shahriar Ahmed', role: 'Director, Hilltop Retreat · Sylhet',
   },
 ];
 
 const FAQS = [
-  {
-    q: 'Do I need technical skills to use ResortPro?',
-    a: 'Not at all. ResortPro is designed for resort owners and managers, not developers. Setup takes about 10 minutes with no coding required. Our onboarding wizard walks you through each step.',
-  },
-  {
-    q: 'Can I use bKash for guest payments?',
-    a: 'Yes. bKash, SSL Commerce, Stripe, and manual payment (cash/bank transfer) are all built directly into ResortPro. You can enable any combination of payment methods for your property.',
-  },
-  {
-    q: 'Can I embed the booking form on my existing website?',
-    a: 'Absolutely. Drop one line of code anywhere on your website — WordPress, Wix, Squarespace, or any custom site. The booking form, room listing, calendar, and food menu are all embeddable.',
-  },
-  {
-    q: 'What happens after my free trial ends?',
-    a: "You choose a plan that fits your property. Your data is always yours — if you decide ResortPro isn't for you, you can export everything. No lock-in.",
-  },
-  {
-    q: 'Is my data safe and backed up?',
-    a: 'Yes. All data is encrypted in transit and at rest. Automated backups run daily. Our infrastructure is hosted on AWS with 99.9% uptime SLA.',
-  },
-  {
-    q: 'Can I cancel anytime?',
-    a: 'Yes. No contracts, no cancellation fees. Cancel anytime directly from your dashboard. Your subscription stays active until the end of the billing period.',
-  },
+  { q: 'Do I need technical skills to set this up?', a: 'No. Most owners are live within an afternoon — add your rooms and rates, connect a payment method, and share your link. If you get stuck, our team helps you onboard in Bangla or English.' },
+  { q: 'Which payment methods are supported?', a: 'bKash, SSLCommerz, Stripe and plain cash, all in one place. Guests can pay a deposit or the full amount online, and every transaction is reconciled automatically.' },
+  { q: 'Can I use ResortPro with my existing website?', a: 'Yes. Drop a single line of code onto WordPress, Wix, Squarespace or any site and a live booking form, room list, calendar or menu appears instantly.' },
+  { q: 'What happens after the 14-day free trial?', a: 'Nothing breaks. You pick a plan when you are ready — no card is required to start, and you can change or cancel your plan at any time.' },
+  { q: 'Can I manage more than one property?', a: 'Absolutely. The Premium plan gives you a single dashboard across all your properties, with separate calendars, staff and reporting for each — and Enterprise adds white-label and custom limits for larger chains.' },
+  { q: 'Is my data safe?', a: 'Your data is encrypted in transit and at rest, backed up daily, and never sold. You can export everything at any time.' },
 ];
 
 const TRUST_BRANDS = [
-  'Palm Paradise Resort',
-  'Sea View Boutique',
-  'The Green Valley Inn',
-  'Coral Bay Hotels',
-  'Monsoon Retreat',
-  'Blue Lagoon Spa',
+  { text: 'Bay Breeze', cls: 'font-display text-[19px] font-semibold' },
+  { text: 'TEA VALLEY', cls: 'text-[18px] font-semibold tracking-[0.08em]' },
+  { text: 'Coral Coast', cls: 'font-display italic text-[19px]' },
+  { text: 'SUNDARBAN STAY', cls: 'text-[17px] font-semibold tracking-[0.12em]' },
+  { text: 'Hilltop Retreat', cls: 'font-display text-[19px] font-semibold' },
 ];
 
-const EMBED_WIDGETS = [
-  { icon: '📅', label: 'Booking Form' },
-  { icon: '🛏️', label: 'Room Listing' },
-  { icon: '📆', label: 'Calendar' },
-  { icon: '🍽️', label: 'Food Menu' },
-  { icon: '📞', label: 'Floating CTA' },
-];
+const EMBED_CODE = `<script src="https://cdn.resortpro.io/embed.js"
+        data-property="bay-breeze"
+        data-widget="booking"></script>`;
+
+const taka = (n: number) => '৳' + n.toLocaleString('en-IN');
 
 // ─────────────────────────────────────────────
-// Sub-components
+// Helpers
 // ─────────────────────────────────────────────
 
-function Logo() {
+function Reveal({
+  children,
+  className,
+  delay = 0,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  delay?: number;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    // Already in view on mount (e.g. above-the-fold hero) → reveal next frame
+    // so the fade still plays but we never wait on the IntersectionObserver.
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight && rect.bottom > 0) {
+      const raf = requestAnimationFrame(() => setShown(true));
+      return () => cancelAnimationFrame(raf);
+    }
+
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShown(true);
+          io.disconnect();
+        }
+      },
+      { threshold: 0.12 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   return (
-    <div className="flex items-center gap-3">
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gold-500 font-display text-lg font-bold text-resort-900">
-        R
-      </div>
-      <span className="font-display text-xl font-semibold tracking-tight text-resort-900">
-        ResortPro
-      </span>
+    <div
+      ref={ref}
+      className={className}
+      style={{
+        opacity: shown ? 1 : 0,
+        transform: shown ? 'none' : 'translateY(26px)',
+        transition: `opacity .9s cubic-bezier(.2,.7,.2,1) ${delay}ms, transform .9s cubic-bezier(.2,.7,.2,1) ${delay}ms`,
+      }}
+    >
+      {children}
     </div>
   );
 }
 
-function LogoLight() {
+function Eyebrow({ label, centered = false, dark = false }: { label: string; centered?: boolean; dark?: boolean }) {
   return (
-    <div className="flex items-center gap-3">
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gold-500 font-display text-lg font-bold text-resort-900">
-        R
-      </div>
-      <span className="font-display text-xl font-semibold tracking-tight text-white">
-        ResortPro
+    <div className={`inline-flex items-center gap-[11px] ${centered ? 'justify-center' : ''}`}>
+      <span className="h-px w-[26px] bg-gold-500" />
+      <span className={`text-xs font-semibold uppercase tracking-[0.2em] ${dark ? 'text-[#e8c682]' : 'text-resort-600'}`}>
+        {label}
       </span>
+      {centered && <span className="h-px w-[26px] bg-gold-500" />}
     </div>
   );
 }
 
-function CheckIcon() {
+function GoldCheck() {
   return (
-    <svg className="h-4 w-4 shrink-0 text-resort-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#d4a853" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 flex-none">
+      <path d="M20 6 9 17l-5-5" />
     </svg>
   );
 }
 
-function CheckIconGold() {
+function LogoMark({ size = 30, dotBg = '#19403b' }: { size?: number; dotBg?: string }) {
   return (
-    <svg className="h-4 w-4 shrink-0 text-gold-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-    </svg>
+    <span
+      className="flex items-center justify-center rounded-full"
+      style={{ width: size, height: size, background: dotBg }}
+    >
+      <span className="rounded-full border-[1.5px] border-gold-500" style={{ width: size * 0.37, height: size * 0.37 }} />
+    </span>
   );
 }
 
-// Fake dashboard mockup — pure HTML/CSS/Tailwind
+// ─────────────────────────────────────────────
+// Dashboard mockup (cream — matches prototype)
+// ─────────────────────────────────────────────
+
 function DashboardMockup() {
+  const navItems = ['Dashboard', 'Bookings', 'Calendar', 'Restaurant', 'Payments', 'Guests'];
+  const calRows: { label: string; bars: { span: number; color: string }[] }[] = [
+    { label: 'Deluxe', bars: [{ span: 1, color: '#e7eeec' }, { span: 2, color: '#23766a' }, { span: 1, color: '#e7eeec' }, { span: 2, color: '#d4a853' }, { span: 1, color: '#e7eeec' }] },
+    { label: 'Suite', bars: [{ span: 3, color: '#23766a' }, { span: 1, color: '#e7eeec' }, { span: 2, color: '#23766a' }, { span: 1, color: '#e7eeec' }] },
+    { label: 'Villa', bars: [{ span: 1, color: '#e7eeec' }, { span: 1, color: '#e7eeec' }, { span: 3, color: '#19403b' }, { span: 2, color: '#e7eeec' }] },
+    { label: 'Cabana', bars: [{ span: 2, color: '#d4a853' }, { span: 1, color: '#e7eeec' }, { span: 2, color: '#23766a' }, { span: 2, color: '#e7eeec' }] },
+  ];
+
   return (
-    <div className="mx-auto w-full max-w-3xl overflow-hidden rounded-2xl shadow-2xl shadow-black/50 ring-1 ring-white/10">
-      {/* Browser chrome */}
-      <div className="flex items-center gap-1.5 bg-resort-800 px-4 py-3">
-        <span className="h-3 w-3 rounded-full bg-red-400/80" />
-        <span className="h-3 w-3 rounded-full bg-yellow-400/80" />
-        <span className="h-3 w-3 rounded-full bg-green-400/80" />
-        <div className="ml-3 flex-1 rounded-md bg-resort-700 px-3 py-1 text-xs text-resort-400">
-          app.resortpro.io/dashboard
-        </div>
+    <div
+      className="overflow-hidden rounded-[6px] border-t-[3px] border-gold-500 bg-white text-left"
+      style={{ boxShadow: '0 40px 90px -30px rgba(25,64,59,.32), 0 8px 24px rgba(25,64,59,.08)' }}
+    >
+      {/* Browser bar */}
+      <div className="flex items-center gap-2 border-b border-[rgba(25,64,59,0.07)] px-[18px] py-[14px]">
+        <span className="h-[11px] w-[11px] rounded-full bg-[#e8ddd0]" />
+        <span className="h-[11px] w-[11px] rounded-full bg-[#e8ddd0]" />
+        <span className="h-[11px] w-[11px] rounded-full bg-[#e8ddd0]" />
+        <span className="ml-[14px] text-xs text-[#9aa19d]">app.resortpro.io / dashboard</span>
       </div>
-      {/* App body */}
-      <div className="flex bg-gray-50" style={{ minHeight: 320 }}>
+
+      <div className="flex min-h-[420px]">
         {/* Sidebar */}
-        <div className="flex w-48 flex-col gap-2 bg-resort-800 p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <div className="h-6 w-6 rounded bg-gold-500" />
-            <div className="h-3 w-20 rounded bg-resort-600" />
+        <div className="hidden w-[200px] flex-none flex-col gap-1.5 bg-resort-900 p-[22px_16px] sm:flex" style={{ padding: '22px 16px' }}>
+          <div className="mb-[18px] flex items-center gap-[9px] px-1.5">
+            <LogoMark size={22} dotBg="#23766a" />
+            <span className="font-display text-[15px] font-semibold text-[#f2efe9]">ResortPro</span>
           </div>
-          {[70, 55, 80, 60, 45, 65].map((w, i) => (
-            <div key={i} className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ${i === 0 ? 'bg-resort-600' : ''}`}>
-              <div className="h-3 w-3 rounded bg-resort-500" />
-              <div className={`h-2 rounded bg-resort-600`} style={{ width: `${w}%` }} />
+          {navItems.map((item, i) => (
+            <div
+              key={item}
+              className="flex items-center gap-2.5 rounded-lg px-3 py-2.5"
+              style={i === 0 ? { background: 'rgba(212,168,83,.16)' } : undefined}
+            >
+              <span className="h-[7px] w-[7px] rounded-full" style={{ background: i === 0 ? '#d4a853' : 'rgba(255,255,255,.3)' }} />
+              <span className={`text-[13px] ${i === 0 ? 'font-medium text-white' : 'text-[#b9c6c2]'}`}>{item}</span>
             </div>
           ))}
         </div>
-        {/* Main content */}
-        <div className="flex-1 p-5">
-          {/* Stats row */}
-          <div className="mb-4 grid grid-cols-4 gap-3">
+
+        {/* Main */}
+        <div className="flex-1 bg-[#faf9f6] p-[26px_28px]" style={{ padding: '26px 28px' }}>
+          <div className="mb-[22px] flex items-center justify-between">
+            <div>
+              <div className="font-display text-xl font-semibold text-resort-900">Good morning, Bay Breeze</div>
+              <div className="mt-0.5 text-[12.5px] text-[#8a918d]">Saturday, 20 June · 24 rooms</div>
+            </div>
+            <span className="rounded-full bg-resort-600 px-[15px] py-2 text-xs font-semibold text-white">+ New booking</span>
+          </div>
+
+          {/* Stat cards */}
+          <div className="mb-[22px] grid grid-cols-3 gap-3.5">
             {[
-              { label: 'Occupancy', val: '87%', color: 'bg-resort-100 text-resort-700' },
-              { label: 'Revenue', val: '৳ 84k', color: 'bg-gold-400/20 text-gold-600' },
-              { label: 'Check-ins', val: '12', color: 'bg-blue-50 text-blue-600' },
-              { label: 'Pending', val: '4', color: 'bg-orange-50 text-orange-600' },
+              { label: 'OCCUPANCY', val: '87%', note: '▲ 6% this week', noteColor: '#23766a' },
+              { label: "TODAY'S REVENUE", val: '৳3.2L', note: '▲ 12% vs avg', noteColor: '#23766a' },
+              { label: 'ARRIVALS', val: '14', note: '3 checked in', noteColor: '#8a918d' },
             ].map((s) => (
-              <div key={s.label} className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-100">
-                <p className="text-[10px] font-medium text-gray-400">{s.label}</p>
-                <p className={`mt-1 text-sm font-bold ${s.color.split(' ')[1]}`}>{s.val}</p>
-                <div className={`mt-1 h-1 w-full rounded ${s.color.split(' ')[0]}`} />
+              <div key={s.label} className="rounded-xl border border-[rgba(25,64,59,0.07)] bg-white p-4">
+                <div className="text-[11.5px] tracking-[0.04em] text-[#8a918d]">{s.label}</div>
+                <div className="mt-[5px] font-display text-[27px] font-semibold text-resort-900">{s.val}</div>
+                <div className="mt-0.5 text-[11.5px]" style={{ color: s.noteColor }}>{s.note}</div>
               </div>
             ))}
           </div>
-          {/* Fake chart */}
-          <div className="mb-4 rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-100">
-            <div className="mb-2 flex items-center justify-between">
-              <div className="h-2.5 w-24 rounded bg-gray-200" />
-              <div className="h-2 w-16 rounded bg-gray-100" />
+
+          {/* Calendar */}
+          <div className="rounded-xl border border-[rgba(25,64,59,0.07)] bg-white p-[18px]">
+            <div className="mb-3.5 flex items-center justify-between">
+              <span className="text-[13.5px] font-semibold text-resort-900">Booking calendar</span>
+              <span className="text-xs text-[#8a918d]">June 18 – 24</span>
             </div>
-            <div className="flex items-end gap-1.5 pt-2" style={{ height: 50 }}>
-              {[35, 55, 42, 70, 60, 80, 65, 90, 75, 85, 70, 95].map((h, i) => (
-                <div
-                  key={i}
-                  className="flex-1 rounded-t"
-                  style={{
-                    height: `${h}%`,
-                    backgroundColor: i === 11 ? '#23766a' : '#e0f0ee',
-                  }}
-                />
+            <div className="flex flex-col gap-[9px]">
+              {calRows.map((row) => (
+                <div key={row.label} className="grid items-center gap-1.5" style={{ gridTemplateColumns: '64px repeat(7, 1fr)' }}>
+                  <span className="text-[11px] text-[#8a918d]">{row.label}</span>
+                  {row.bars.map((b, i) => (
+                    <span key={i} className="h-[18px] rounded-[5px]" style={{ background: b.color, gridColumn: `span ${b.span}` }} />
+                  ))}
+                </div>
               ))}
             </div>
-          </div>
-          {/* Bookings table */}
-          <div className="rounded-xl bg-white shadow-sm ring-1 ring-gray-100">
-            <div className="border-b border-gray-100 px-3 py-2">
-              <div className="h-2.5 w-28 rounded bg-gray-200" />
-            </div>
-            {[
-              { status: 'bg-green-400', w1: 80, w2: 40 },
-              { status: 'bg-blue-400', w1: 65, w2: 55 },
-              { status: 'bg-gold-400', w1: 72, w2: 35 },
-              { status: 'bg-green-400', w1: 58, w2: 48 },
-              { status: 'bg-orange-400', w1: 75, w2: 30 },
-            ].map((row, i) => (
-              <div key={i} className="flex items-center gap-3 border-b border-gray-50 px-3 py-2 last:border-0">
-                <div className={`h-2 w-2 rounded-full ${row.status}`} />
-                <div className="h-2 rounded bg-gray-200" style={{ width: `${row.w1}%` }} />
-                <div className="h-2 rounded bg-gray-100" style={{ width: `${row.w2}%`, minWidth: 32 }} />
-              </div>
-            ))}
           </div>
         </div>
       </div>
@@ -335,103 +369,88 @@ function DashboardMockup() {
 
 export default function HomePage() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [scrolled, setScrolled] = useState(false);
+  const [navSolid, setNavSolid] = useState(false);
+  const [annual, setAnnual] = useState(false);
+  const [openFaq, setOpenFaq] = useState<number>(0);
+  const [copied, setCopied] = useState(false);
+  const copyTimer = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
+    const onScroll = () => setNavSolid((window.scrollY || 0) > 28);
     window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
+
+  const copyCode = () => {
+    try { navigator.clipboard?.writeText(EMBED_CODE); } catch { /* noop */ }
+    setCopied(true);
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+    copyTimer.current = setTimeout(() => setCopied(false), 1800);
+  };
+
   return (
-    <div className="scroll-smooth antialiased">
+    <div className="min-h-screen overflow-x-hidden bg-[#faf8f4] font-sans text-resort-900 antialiased scroll-smooth">
 
-      {/* ── NAVBAR ── */}
+      {/* ── NAV ── */}
       <header
-        className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
-          scrolled
-            ? 'bg-white/95 shadow-sm backdrop-blur-md border-b border-gray-100'
-            : 'bg-transparent'
-        }`}
+        className="fixed inset-x-0 top-0 z-50 transition-all duration-300"
+        style={{
+          background: navSolid ? 'rgba(250,248,244,0.82)' : 'rgba(250,248,244,0)',
+          backdropFilter: navSolid ? 'saturate(180%) blur(14px)' : 'none',
+          WebkitBackdropFilter: navSolid ? 'saturate(180%) blur(14px)' : 'none',
+          borderBottom: `1px solid ${navSolid ? 'rgba(25,64,59,0.1)' : 'rgba(25,64,59,0)'}`,
+        }}
       >
-        <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          {scrolled ? <Logo /> : <LogoLight />}
+        <nav className="mx-auto flex h-[74px] max-w-[1180px] items-center justify-between px-7">
+          <a href="#top" className="flex items-center gap-[11px]">
+            <LogoMark />
+            <span className="font-display text-[21px] font-semibold tracking-tight">ResortPro</span>
+          </a>
 
-          {/* Desktop nav */}
-          <div className="hidden items-center gap-7 md:flex">
+          {/* Desktop links */}
+          <div className="hidden items-center gap-[34px] md:flex">
             {NAV_LINKS.map((l) => (
-              <a
-                key={l.label}
-                href={l.href}
-                className={`text-sm font-medium transition-colors ${
-                  scrolled
-                    ? 'text-gray-600 hover:text-resort-700'
-                    : 'text-white/80 hover:text-white'
-                }`}
-              >
+              <a key={l.label} href={l.href} className="text-[14.5px] font-medium text-[#3f4a47] transition-colors hover:text-resort-600">
                 {l.label}
               </a>
             ))}
           </div>
 
-          <div className="hidden items-center gap-3 md:flex">
-            {/* Language switcher */}
-            <Link
-              href="/bn"
-              className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors ${
-                scrolled
-                  ? 'border-gray-200 text-gray-500 hover:text-resort-700 hover:border-resort-300'
-                  : 'border-white/20 text-white/60 hover:text-white hover:border-white/40'
-              }`}
-            >
-              বাংলা
-            </Link>
-            <Link
-              href="/auth/login"
-              className={`text-sm font-medium transition-colors ${
-                scrolled ? 'text-gray-600 hover:text-resort-700' : 'text-white/80 hover:text-white'
-              }`}
-            >
-              Sign in
+          {/* Desktop CTAs */}
+          <div className="hidden items-center gap-[18px] md:flex">
+            <Link href="/auth/login" className="text-[14.5px] font-medium text-resort-900 transition-colors hover:text-resort-600">
+              Log in
             </Link>
             <Link
               href="/plans"
-              className="rounded-lg bg-gold-500 px-5 py-2.5 text-sm font-semibold text-resort-900 transition-all hover:bg-gold-400 shadow-sm"
+              className="rounded-full border-[1.5px] border-gold-500 px-[19px] py-[9px] text-sm font-semibold text-resort-600 transition-all hover:-translate-y-px hover:bg-gold-500 hover:text-resort-900"
             >
               Start free trial
             </Link>
           </div>
 
           {/* Mobile hamburger */}
-          <button
-            className="flex flex-col gap-1.5 p-2 md:hidden"
-            onClick={() => setMenuOpen(!menuOpen)}
-            aria-label="Toggle menu"
-          >
-            <span className={`block h-0.5 w-6 transition-all duration-300 ${scrolled ? 'bg-resort-900' : 'bg-white'} ${menuOpen ? 'translate-y-2 rotate-45' : ''}`} />
-            <span className={`block h-0.5 w-6 transition-all duration-300 ${scrolled ? 'bg-resort-900' : 'bg-white'} ${menuOpen ? 'opacity-0' : ''}`} />
-            <span className={`block h-0.5 w-6 transition-all duration-300 ${scrolled ? 'bg-resort-900' : 'bg-white'} ${menuOpen ? '-translate-y-2 -rotate-45' : ''}`} />
+          <button className="flex flex-col gap-1.5 p-2 md:hidden" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu">
+            <span className={`block h-0.5 w-6 bg-resort-900 transition-all duration-300 ${menuOpen ? 'translate-y-2 rotate-45' : ''}`} />
+            <span className={`block h-0.5 w-6 bg-resort-900 transition-all duration-300 ${menuOpen ? 'opacity-0' : ''}`} />
+            <span className={`block h-0.5 w-6 bg-resort-900 transition-all duration-300 ${menuOpen ? '-translate-y-2 -rotate-45' : ''}`} />
           </button>
         </nav>
 
-        {/* Mobile menu */}
         {menuOpen && (
-          <div className="border-t border-gray-100 bg-white px-6 py-4 md:hidden">
+          <div className="border-t border-[rgba(25,64,59,0.1)] bg-[#faf8f4] px-7 py-5 md:hidden">
             <div className="flex flex-col gap-4">
               {NAV_LINKS.map((l) => (
-                <a
-                  key={l.label}
-                  href={l.href}
-                  className="text-sm font-medium text-gray-700 hover:text-resort-700"
-                  onClick={() => setMenuOpen(false)}
-                >
+                <a key={l.label} href={l.href} className="text-[15px] font-medium text-resort-900" onClick={() => setMenuOpen(false)}>
                   {l.label}
                 </a>
               ))}
-              <div className="mt-2 flex flex-col gap-3 border-t border-gray-100 pt-4">
-                <Link href="/auth/login" className="text-center text-sm font-medium text-gray-700">Sign in</Link>
-                <Link href="/plans" className="rounded-lg bg-gold-500 py-2.5 text-center text-sm font-semibold text-resort-900">
+              <div className="mt-2 flex flex-col gap-3 border-t border-[rgba(25,64,59,0.1)] pt-4">
+                <Link href="/auth/login" className="text-center text-sm font-medium text-resort-900">Log in</Link>
+                <Link href="/plans" className="rounded-full bg-resort-600 py-3 text-center text-sm font-semibold text-white">
                   Start free trial
                 </Link>
               </div>
@@ -441,409 +460,358 @@ export default function HomePage() {
       </header>
 
       {/* ── HERO ── */}
-      <section
-        id="hero"
-        className="relative overflow-hidden bg-resort-900 pt-28 pb-20"
-        style={{
-          backgroundImage:
-            'linear-gradient(135deg, #19403b 0%, #1e5048 50%, #23766a 100%)',
-        }}
-      >
-        {/* Dot grid overlay */}
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.07]"
-          style={{
-            backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)',
-            backgroundSize: '28px 28px',
-          }}
-        />
+      <section id="top" className="px-7 pb-[90px] pt-[150px] text-center">
+        <div className="mx-auto max-w-[840px]">
+          <Reveal className="inline-block"><Eyebrow label="Hotel & resort management, reimagined" centered /></Reveal>
 
-        <div className="relative mx-auto max-w-7xl px-6 text-center">
-          {/* Badge */}
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white/90 backdrop-blur-sm">
-            <span className="text-gold-400">✦</span>
-            Trusted by 200+ resorts across Asia
-          </div>
+          <Reveal delay={80}>
+            <h1 className="mt-[26px] font-display text-[clamp(2.6rem,6.2vw,5rem)] font-medium leading-[1.04] tracking-[-0.02em] text-resort-900">
+              The <em className="not-italic text-resort-600 italic">calm</em> way to<br className="hidden sm:block" /> run a busy resort.
+            </h1>
+          </Reveal>
 
-          {/* Headline */}
-          <h1 className="mx-auto max-w-4xl font-display text-4xl font-bold leading-[1.15] tracking-tight text-white sm:text-5xl md:text-6xl lg:text-7xl">
-            The all-in-one platform built for{' '}
-            <span className="text-gold-400">resorts &amp; boutique hotels</span>
-          </h1>
+          <Reveal delay={160}>
+            <p className="mx-auto mt-7 max-w-[620px] text-[clamp(1.05rem,1.5vw,1.28rem)] leading-[1.6] text-[#5b6360]">
+              Bookings, payments, restaurant, and guests — one elegant system that replaces your spreadsheets,
+              WhatsApp groups, and payment screenshots. Built for the way resorts in Bangladesh actually work.
+            </p>
+          </Reveal>
 
-          {/* Sub */}
-          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-white/65">
-            Bookings, payments, staff, restaurant, analytics — one beautiful dashboard.
-            Stop juggling spreadsheets and WhatsApp groups.
-          </p>
-
-          {/* CTAs */}
-          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link
-              href="/plans"
-              className="w-full rounded-xl bg-gold-500 px-8 py-4 text-base font-semibold text-resort-900 shadow-lg shadow-gold-500/25 transition-all hover:bg-gold-400 hover:shadow-gold-400/30 sm:w-auto"
-            >
-              Start free trial →
-            </Link>
-            <a
-              href="/try"
-              className="w-full rounded-xl border border-white/25 bg-white/10 px-8 py-4 text-base font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20 sm:w-auto"
-            >
-              Watch demo →
-            </a>
-          </div>
-
-          {/* Trust pills */}
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-5 text-sm text-white/50">
-            <span className="flex items-center gap-1.5">
-              <span className="text-green-400">✓</span> 14-day free trial
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="text-green-400">✓</span> No credit card required
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="text-green-400">✓</span> Setup in 10 minutes
-            </span>
-          </div>
-
-          {/* Dashboard mockup */}
-          <div className="relative mt-16">
-            {/* Glow */}
-            <div className="pointer-events-none absolute -inset-x-10 top-10 h-60 rounded-full bg-resort-600/20 blur-3xl" />
-            <DashboardMockup />
-          </div>
-        </div>
-      </section>
-
-      {/* ── LOGOS BAR ── */}
-      <section className="bg-white py-10">
-        <div className="mx-auto max-w-7xl px-6 text-center">
-          <p className="mb-8 text-xs font-semibold uppercase tracking-widest text-gray-400">
-            Trusted by resorts using
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
-            {TRUST_BRANDS.map((brand) => (
-              <span
-                key={brand}
-                className="text-sm font-semibold uppercase tracking-widest text-gray-300"
+          <Reveal delay={240}>
+            <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
+              <Link
+                href="/plans"
+                className="rounded-full bg-resort-600 px-[30px] py-[15px] text-[15.5px] font-semibold text-white transition-all hover:-translate-y-0.5"
+                style={{ boxShadow: '0 10px 30px rgba(35,118,106,.25)' }}
               >
-                {brand}
-              </span>
-            ))}
-          </div>
+                Start your free trial
+              </Link>
+              <a
+                href="https://demo.resortpro.io"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-[7px] rounded-full border-[1.5px] border-resort-600/35 px-[26px] py-3.5 text-[15.5px] font-semibold text-[#1f5950] transition-all hover:-translate-y-px hover:border-resort-600 hover:bg-resort-600/[0.06]"
+              >
+                Explore the live demo <span className="text-[13px]">↗</span>
+              </a>
+            </div>
+          </Reveal>
+
+          <Reveal delay={280}>
+            <a href="#how" className="mt-[18px] inline-block border-b-[1.5px] border-transparent pb-0.5 text-sm font-medium text-[#8a918d] transition-all hover:border-[#1f5950] hover:text-[#1f5950]">
+              or see how it works →
+            </a>
+          </Reveal>
+
+          <Reveal delay={320}>
+            <p className="mt-[22px] text-[13.5px] text-[#8a918d]">
+              No credit card required · Set up in 10 minutes · bKash & Stripe built in
+            </p>
+          </Reveal>
         </div>
+
+        <Reveal delay={400} className="mx-auto mt-[72px] max-w-[1040px]">
+          <DashboardMockup />
+        </Reveal>
       </section>
 
-      {/* ── STATS ROW ── */}
-      <section className="border-b border-gray-100 bg-white py-12">
-        <div className="mx-auto max-w-5xl px-6">
-          <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
-            {[
-              { num: '200+', label: 'Resorts onboarded' },
-              { num: '50,000+', label: 'Bookings managed' },
-              { num: '৳ 12 Cr+', label: 'Revenue processed' },
-              { num: '4.9 ★', label: 'Customer rating' },
-            ].map((s) => (
-              <div key={s.label} className="text-center">
-                <p className="font-display text-3xl font-bold text-resort-700 md:text-4xl">{s.num}</p>
-                <p className="mt-1 text-sm text-gray-500">{s.label}</p>
-              </div>
+      {/* ── TRUST STRIP ── */}
+      <section className="px-7 py-2">
+        <div className="mx-auto max-w-[1040px] border-y border-[rgba(25,64,59,0.1)] py-[30px]">
+          <p className="mb-[22px] text-center text-[13px] tracking-[0.04em] text-[#8a918d]">
+            Trusted by resorts across Cox&apos;s Bazar, Sylhet &amp; Sreemangal
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-x-[clamp(28px,5vw,64px)] gap-y-5 opacity-50">
+            {TRUST_BRANDS.map((b) => (
+              <span key={b.text} className={`text-resort-900 ${b.cls}`}>{b.text}</span>
             ))}
           </div>
         </div>
       </section>
 
       {/* ── FEATURES ── */}
-      <section id="features" className="bg-white py-24">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="mx-auto max-w-2xl text-center">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-resort-600">
-              Platform
-            </p>
-            <h2 className="font-display text-3xl font-bold text-gray-900 sm:text-4xl">
-              Everything your resort needs, in one place
+      <section id="features" className="px-7 py-[120px]">
+        <div className="mx-auto max-w-[1180px]">
+          <Reveal className="max-w-[720px]">
+            <Eyebrow label="Everything in one place" />
+            <h2 className="my-[18px] font-display text-[clamp(2rem,4vw,3.1rem)] font-medium leading-[1.1] tracking-[-0.02em] text-resort-900">
+              Run every part of your property from a single screen.
             </h2>
-            <p className="mt-4 text-lg text-gray-500">
-              Stop paying for 6 different tools. ResortPro brings everything under one roof.
+            <p className="text-[1.15rem] leading-[1.6] text-[#5b6360]">
+              From the first enquiry to checkout and the final invoice — ResortPro handles the whole guest journey.
             </p>
-          </div>
+          </Reveal>
 
-          <div className="mt-16 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map((f) => (
-              <div
-                key={f.title}
-                className="group rounded-2xl border border-gray-100 bg-gray-50 p-7 transition-all duration-300 hover:-translate-y-1 hover:border-resort-200 hover:bg-white hover:shadow-lg hover:shadow-resort-100/50"
-              >
-                <div className={`mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl ${f.color}`}>
-                  {f.svg}
+          <div className="mt-[54px] grid grid-cols-1 gap-[22px] sm:grid-cols-2 lg:grid-cols-3">
+            {FEATURES.map((f, i) => (
+              <Reveal key={f.title} delay={(i % 3) * 80}>
+                <div className="group h-full rounded-[18px] border border-[rgba(25,64,59,0.09)] bg-white p-[30px] transition-all duration-300 hover:-translate-y-1.5 hover:border-resort-600/30 hover:shadow-[0_22px_44px_-22px_rgba(25,64,59,0.28)]">
+                  <span className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#e8f1ef]">{f.svg}</span>
+                  <h3 className="mb-[9px] font-display text-[21px] font-semibold text-resort-900">{f.title}</h3>
+                  <p className="text-[15px] leading-[1.62] text-[#5b6360]">{f.desc}</p>
                 </div>
-                <h3 className="font-semibold text-gray-900">{f.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-gray-500">{f.desc}</p>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
       </section>
 
       {/* ── HOW IT WORKS ── */}
-      <section id="how-it-works" className="bg-resort-50 py-24">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="mx-auto max-w-2xl text-center">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-resort-600">
-              Getting started
-            </p>
-            <h2 className="font-display text-3xl font-bold text-gray-900 sm:text-4xl">
-              Up and running in 10 minutes
+      <section id="how" className="px-7 pb-[120px] pt-10">
+        <div className="mx-auto max-w-[1180px]">
+          <Reveal className="max-w-[720px]">
+            <Eyebrow label="Live in three steps" />
+            <h2 className="mt-[18px] font-display text-[clamp(2rem,4vw,3.1rem)] font-medium leading-[1.1] tracking-[-0.02em] text-resort-900">
+              From sign-up to your first online booking — today.
             </h2>
-          </div>
+          </Reveal>
 
-          <div className="relative mt-16">
-            {/* Connector line */}
-            <div className="absolute left-0 right-0 top-10 hidden h-0.5 bg-resort-200 md:block mx-[calc(16.66%+1.5rem)]" />
-
-            <div className="grid grid-cols-1 gap-10 md:grid-cols-3">
-              {STEPS.map((step, i) => (
-                <div key={step.num} className="relative flex flex-col items-center text-center">
-                  <div className="relative z-10 mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-resort-700 shadow-lg shadow-resort-700/30 ring-4 ring-resort-50">
-                    <span className="font-display text-xl font-bold text-white">{step.num}</span>
-                  </div>
-                  <h3 className="font-semibold text-gray-900">{step.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-gray-500">{step.desc}</p>
+          <div className="mt-[58px] grid grid-cols-1 gap-7 md:grid-cols-3">
+            {STEPS.map((s, i) => (
+              <Reveal key={s.num} delay={i * 80}>
+                <div className="md:pr-[18px]">
+                  <div className="font-display text-[62px] font-medium leading-none text-resort-600">{s.num}</div>
+                  <div className="my-[18px] h-px w-10" style={{ background: 'repeating-linear-gradient(90deg,#d4a853 0 8px,transparent 8px 14px)' }} />
+                  <h3 className="mb-[9px] font-display text-[22px] font-semibold text-resort-900">{s.title}</h3>
+                  <p className="text-[15px] leading-[1.62] text-[#5b6360]">{s.desc}</p>
                 </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── EMBED ── */}
+      <section className="px-7 pb-[120px]">
+        <Reveal className="mx-auto grid max-w-[1180px] grid-cols-1 items-center gap-14 lg:grid-cols-2">
+          <div>
+            <Eyebrow label="Works with your website" />
+            <h2 className="my-[18px] font-display text-[clamp(1.9rem,3.6vw,2.8rem)] font-medium leading-[1.12] tracking-[-0.02em] text-resort-900">
+              Keep your website. Add the booking power.
+            </h2>
+            <p className="mb-[26px] text-[1.1rem] leading-[1.62] text-[#5b6360]">
+              One snippet drops a live booking form, room list, calendar or menu onto WordPress, Wix, Squarespace — any site.
+            </p>
+            <div className="flex flex-wrap gap-2.5">
+              {EMBED_WIDGETS.map((w) => (
+                <span key={w} className="rounded-full border border-[rgba(25,64,59,0.12)] bg-white px-4 py-2 text-[13.5px] font-medium text-[#1f5950]">
+                  {w}
+                </span>
               ))}
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* ── EMBED SDK ── */}
-      <section id="embed" className="bg-white py-24">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="flex flex-col items-center gap-12 lg:flex-row lg:gap-20">
-            {/* Left text */}
-            <div className="flex-1">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-resort-600">
-                Embed SDK
-              </p>
-              <h2 className="font-display text-3xl font-bold text-gray-900 sm:text-4xl">
-                Your website.{' '}
-                <span className="text-resort-700">Your bookings.</span>
-              </h2>
-              <p className="mt-5 text-lg leading-relaxed text-gray-500">
-                Already have a website? Keep it. Just drop one line of code to embed ResortPro's
-                booking engine, room listings, food menu, or live availability calendar. Works
-                with WordPress, Wix, Squarespace, or any custom site.
-              </p>
-              <div className="mt-6 space-y-3">
-                {[
-                  'No developer required — copy & paste one snippet',
-                  'Fully branded to match your existing site',
-                  'Real-time sync with your ResortPro dashboard',
-                ].map((point) => (
-                  <div key={point} className="flex items-start gap-2.5">
-                    <CheckIcon />
-                    <span className="text-sm text-gray-600">{point}</span>
-                  </div>
-                ))}
+          <div className="rounded-2xl bg-resort-900 p-6" style={{ boxShadow: '0 30px 70px -30px rgba(25,64,59,.5)' }}>
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex gap-[7px]">
+                <span className="h-2.5 w-2.5 rounded-full bg-white/[0.18]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-white/[0.18]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-white/[0.18]" />
               </div>
-              {/* Widget badges */}
-              <div className="mt-8 flex flex-wrap gap-2">
-                {EMBED_WIDGETS.map((w) => (
-                  <span
-                    key={w.label}
-                    className="flex items-center gap-1.5 rounded-full border border-resort-200 bg-resort-50 px-3 py-1.5 text-xs font-medium text-resort-700"
-                  >
-                    {w.icon} {w.label}
-                  </span>
-                ))}
-              </div>
+              <button
+                onClick={copyCode}
+                className="rounded-[7px] border border-gold-500/35 bg-gold-500/[0.16] px-[13px] py-1.5 text-[12.5px] font-semibold text-[#e8c682] transition-all hover:bg-gold-500/[0.28]"
+              >
+                {copied ? 'Copied ✓' : 'Copy'}
+              </button>
             </div>
-
-            {/* Right: code snippet */}
-            <div className="flex-1 w-full">
-              <div className="overflow-hidden rounded-2xl bg-gray-900 shadow-2xl ring-1 ring-white/10">
-                {/* Editor chrome */}
-                <div className="flex items-center gap-1.5 border-b border-gray-700 px-4 py-3">
-                  <span className="h-3 w-3 rounded-full bg-red-400/80" />
-                  <span className="h-3 w-3 rounded-full bg-yellow-400/80" />
-                  <span className="h-3 w-3 rounded-full bg-green-400/80" />
-                  <span className="ml-3 text-xs text-gray-500">booking-widget.html</span>
-                </div>
-                <div className="p-6 font-mono text-sm leading-relaxed">
-                  <p className="text-gray-500">{'<!-- Your existing website HTML -->'}</p>
-                  <p className="mt-3 text-gray-400">{'<div'}</p>
-                  <p className="ml-4 text-blue-400">{'  data-resortpro="booking"'}</p>
-                  <p className="ml-4 text-green-400">{'  data-slug="your-resort"'}</p>
-                  <p className="ml-4 text-purple-400">{'  data-theme="light"'}</p>
-                  <p className="text-gray-400">{'></div>'}</p>
-                  <p className="mt-4 text-gray-400">{'<script'}</p>
-                  <p className="ml-4 text-yellow-300">{'  src="https://cdn.resortpro.io/embed.js"'}</p>
-                  <p className="text-gray-400">{'></script>'}</p>
-                  <p className="mt-4 text-gray-600">{'// That\'s it. Booking form is live.'}</p>
-                </div>
-              </div>
-            </div>
+            <pre className="m-0 whitespace-pre-wrap break-words font-mono text-[13.5px] leading-[1.7] text-[#cfe0db]">{EMBED_CODE}</pre>
           </div>
-        </div>
+        </Reveal>
       </section>
 
       {/* ── PRICING ── */}
-      <section id="pricing" className="bg-gray-50 py-24">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="mx-auto max-w-2xl text-center">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-resort-600">
-              Pricing
-            </p>
-            <h2 className="font-display text-3xl font-bold text-gray-900 sm:text-4xl">
-              Simple, transparent pricing
+      <section id="pricing" className="border-y border-[rgba(25,64,59,0.08)] bg-white px-7 py-[110px]">
+        <div className="mx-auto max-w-[1180px]">
+          <Reveal className="mx-auto max-w-[640px] text-center">
+            <Eyebrow label="Simple, honest pricing" centered />
+            <h2 className="mb-3.5 mt-[18px] font-display text-[clamp(2rem,4vw,3.1rem)] font-medium leading-[1.1] tracking-[-0.02em] text-resort-900">
+              Pick a plan. Change it anytime.
             </h2>
-            <p className="mt-4 text-lg text-gray-500">
-              Start free. Upgrade when you're ready.
+            <p className="text-[1.12rem] leading-[1.6] text-[#5b6360]">
+              AI in every plan, a 14-day free trial, and bKash built in. No setup fees, no contracts.
             </p>
+          </Reveal>
+
+          {/* Billing toggle */}
+          <div className="my-[34px] mb-[50px] flex items-center justify-center gap-3.5">
+            <span className="text-[14.5px] font-medium" style={{ color: annual ? '#8a918d' : '#19403b' }}>Monthly</span>
+            <button
+              onClick={() => setAnnual(!annual)}
+              aria-label="Toggle annual billing"
+              className="flex h-7 w-[52px] items-center rounded-full p-[3px] transition-colors duration-200"
+              style={{ background: annual ? '#23766a' : '#d8d2c6', justifyContent: annual ? 'flex-end' : 'flex-start' }}
+            >
+              <span className="block h-[22px] w-[22px] rounded-full bg-white" style={{ boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+            </button>
+            <span className="text-[14.5px] font-medium" style={{ color: annual ? '#19403b' : '#8a918d' }}>Annual</span>
+            <span className="rounded-full bg-[#f3e6c9] px-[11px] py-[5px] text-xs font-semibold text-[#9c7b2e]">2 months free</span>
           </div>
 
-          <div className="mt-16 grid grid-cols-1 gap-6 md:grid-cols-3">
-            {PLANS.map((plan) => (
-              <div
-                key={plan.name}
-                className={`relative flex flex-col rounded-2xl p-8 ${
-                  plan.highlight
-                    ? 'bg-resort-800 text-white shadow-2xl shadow-resort-900/40 ring-2 ring-gold-400'
-                    : 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-100'
-                }`}
-              >
-                {plan.highlight && (
-                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                    <span className="rounded-full bg-gold-500 px-4 py-1 text-xs font-bold text-resort-900">
-                      Most Popular
-                    </span>
-                  </div>
-                )}
-                <p className={`text-xs font-bold uppercase tracking-widest ${plan.highlight ? 'text-gold-400' : 'text-resort-600'}`}>
-                  {plan.name}
-                </p>
-                <div className="mt-3 flex items-end gap-1">
-                  <span className={`font-display text-4xl font-bold ${plan.highlight ? 'text-white' : 'text-gray-900'}`}>
-                    {plan.price}
-                  </span>
-                  <span className={`mb-1 text-sm ${plan.highlight ? 'text-white/60' : 'text-gray-400'}`}>/month</span>
-                </div>
-                <p className={`mt-1 text-sm ${plan.highlight ? 'text-white/70' : 'text-gray-500'}`}>
-                  {plan.rooms} · {plan.staff}
-                </p>
-
-                <ul className="mt-7 space-y-3">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2.5">
-                      {plan.highlight ? <CheckIconGold /> : <CheckIcon />}
-                      <span className={`text-sm ${plan.highlight ? 'text-white/80' : 'text-gray-600'}`}>{f}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="mt-auto pt-8">
-                  <Link
-                    href={plan.ctaHref}
-                    className={`block w-full rounded-xl py-3 text-center text-sm font-semibold transition-all ${
-                      plan.highlight
-                        ? 'bg-gold-500 text-resort-900 hover:bg-gold-400'
-                        : 'border border-resort-200 bg-resort-50 text-resort-700 hover:bg-resort-100'
+          {/* Plan cards */}
+          <div className="mx-auto grid max-w-[1080px] grid-cols-1 items-stretch gap-6 md:grid-cols-3">
+            {PLANS.map((plan) => {
+              const hl = plan.highlighted;
+              const price = taka(annual ? plan.annualMonthly : plan.monthly);
+              const note = annual ? `billed ${taka(plan.annualYearly)} / yr` : 'per month, billed monthly';
+              return (
+                <Reveal key={plan.key} className="h-full">
+                  <div
+                    className={`relative flex h-full flex-col rounded-[20px] ${
+                      hl ? 'border-[1.5px] border-gold-500 bg-resort-900 md:-translate-y-2.5' : 'border border-[rgba(25,64,59,0.1)] bg-[#faf8f4]'
                     }`}
+                    style={{ padding: hl ? '38px 30px' : '34px 30px', boxShadow: hl ? '0 30px 70px -30px rgba(25,64,59,.55)' : undefined }}
                   >
-                    {plan.cta}
-                  </Link>
-                </div>
-              </div>
-            ))}
+                    {plan.badge && (
+                      <span className="absolute -top-[13px] left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-gold-500 px-4 py-1.5 text-[11.5px] font-bold uppercase tracking-[0.08em] text-resort-900">
+                        {plan.badge}
+                      </span>
+                    )}
+                    <div className={`text-xs font-semibold uppercase tracking-[0.16em] ${hl ? 'text-[#e8c682]' : 'text-resort-600'}`}>{plan.name}</div>
+                    <div className="mb-1 mt-3.5 flex items-baseline gap-1.5">
+                      <span className={`font-display text-[46px] font-semibold ${hl ? 'text-white' : 'text-resort-900'}`}>{price}</span>
+                      <span className={`text-sm ${hl ? 'text-[#a9bcb6]' : 'text-[#8a918d]'}`}>/mo</span>
+                    </div>
+                    <div className={`min-h-[18px] text-[13px] ${hl ? 'text-[#a9bcb6]' : 'text-[#8a918d]'}`}>{note}</div>
+                    <p className={`mt-3 text-sm leading-[1.55] ${hl ? 'text-[#cdd9d5]' : 'text-[#5b6360]'}`}>{plan.tagline}</p>
+
+                    <div className="my-[22px] h-px" style={{ background: hl ? 'rgba(255,255,255,.14)' : 'rgba(25,64,59,.1)' }} />
+
+                    {plan.featuresPrefix && (
+                      <div className={`mb-3.5 text-[12.5px] font-semibold tracking-[0.02em] ${hl ? 'text-[#9fb4ae]' : 'text-[#8a918d]'}`}>
+                        {plan.featuresPrefix}
+                      </div>
+                    )}
+
+                    <div className="flex flex-1 flex-col gap-[13px]">
+                      {plan.features.map((feat) => (
+                        <div key={feat} className="flex items-start gap-[11px]">
+                          <GoldCheck />
+                          <span className={`text-[14.5px] ${hl ? 'text-[#eef3f1]' : 'text-[#3f4a47]'}`} dangerouslySetInnerHTML={{ __html: feat }} />
+                        </div>
+                      ))}
+                    </div>
+
+                    <div
+                      className="mt-5 flex items-center gap-[9px] rounded-[10px] px-[13px] py-[11px]"
+                      style={{ background: hl ? 'rgba(212,168,83,.16)' : 'rgba(212,168,83,.14)' }}
+                    >
+                      <span className="text-sm leading-none" style={{ color: hl ? '#e8c682' : '#b88a2e' }}>✦</span>
+                      <span className="text-[13px] font-medium" style={{ color: hl ? '#e8c682' : '#9c7b2e' }}>{plan.ai}</span>
+                    </div>
+
+                    <Link
+                      href="/plans"
+                      className={`mt-[18px] rounded-full py-3.5 text-center text-[15px] font-semibold transition-all ${
+                        hl
+                          ? 'bg-gold-500 font-bold text-resort-900 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(212,168,83,0.35)]'
+                          : 'border-[1.5px] border-resort-600 text-resort-600 hover:bg-resort-600 hover:text-white'
+                      }`}
+                    >
+                      Start free trial
+                    </Link>
+                  </div>
+                </Reveal>
+              );
+            })}
           </div>
 
-          <p className="mt-10 text-center text-sm text-gray-400">
-            All plans include: 14-day free trial &bull; bKash &amp; Stripe payments &bull; Embed
-            widgets &bull; 24/7 email support
-          </p>
+          {/* Enterprise strip */}
+          <Reveal className="mx-auto mt-6 flex max-w-[1080px] flex-wrap items-center justify-between gap-[18px] rounded-[18px] border border-[rgba(25,64,59,0.1)] bg-[#faf8f4] px-[34px] py-[26px]">
+            <div className="flex flex-wrap items-center gap-[18px]">
+              <div className="font-display text-[21px] font-semibold text-resort-900">Enterprise</div>
+              <div className="max-w-[560px] text-[14.5px] leading-[1.5] text-[#5b6360]">
+                For hotel groups &amp; chains — white-label, custom AI caps, dedicated infrastructure and negotiated pricing.
+              </div>
+            </div>
+            <Link
+              href="/contact"
+              className="whitespace-nowrap rounded-full bg-resort-900 px-[26px] py-3 text-[14.5px] font-semibold text-white transition-all hover:-translate-y-px hover:bg-resort-600"
+            >
+              Contact sales
+            </Link>
+          </Reveal>
         </div>
       </section>
 
       {/* ── TESTIMONIALS ── */}
-      <section id="testimonials" className="bg-resort-900 py-24">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="font-display text-3xl font-bold text-gold-400 sm:text-4xl">
-              What resort owners are saying
+      <section className="bg-resort-900 px-7 py-[110px]">
+        <div className="mx-auto max-w-[1180px]">
+          <Reveal className="mx-auto max-w-[680px] text-center">
+            <Eyebrow label="Loved by resort owners" centered dark />
+            <h2 className="mt-[18px] font-display text-[clamp(2rem,4vw,3.1rem)] font-medium leading-[1.1] tracking-[-0.02em] text-white">
+              Why teams switch to ResortPro — and stay.
             </h2>
-            <p className="mt-4 text-white/60">
-              Real feedback from property managers across Asia.
-            </p>
-          </div>
+          </Reveal>
 
-          <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-3">
-            {TESTIMONIALS.map((t) => (
-              <div
-                key={t.name}
-                className="flex flex-col rounded-2xl bg-white/10 p-7 ring-1 ring-white/10 backdrop-blur-sm"
-              >
-                <div className="mb-4 flex gap-1">
-                  {[...Array(5)].map((_, i) => (
-                    <span key={i} className="text-gold-400">★</span>
-                  ))}
-                </div>
-                <p className="flex-1 text-sm leading-relaxed text-white/80">
-                  &ldquo;{t.quote}&rdquo;
-                </p>
-                <div className="mt-6 flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-resort-700 text-sm font-bold text-gold-400">
-                    {t.name[0]}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-white">{t.name}</p>
-                    <p className="text-xs text-white/50">{t.role}</p>
-                    <p className="text-xs text-white/40">{t.location}</p>
-                  </div>
+          {/* Stat band */}
+          <Reveal className="my-[54px] mb-[60px] flex flex-wrap items-center justify-center gap-x-[clamp(28px,6vw,80px)] gap-y-8">
+            {STATS.map((s, i) => (
+              <div key={s.label} className="flex items-center gap-x-[clamp(28px,6vw,80px)]">
+                {i > 0 && <span className="hidden h-12 w-px bg-white/[0.14] sm:block" />}
+                <div className="text-center">
+                  <div className="font-display text-[clamp(2.4rem,4vw,3.2rem)] font-semibold leading-none text-gold-500">{s.stat}</div>
+                  <div className="mt-2 text-[13.5px] tracking-[0.02em] text-[#a9bcb6]">{s.label}</div>
                 </div>
               </div>
+            ))}
+          </Reveal>
+
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+            {TESTIMONIALS.map((t, i) => (
+              <Reveal key={t.name} delay={i * 80}>
+                <div className="h-full rounded-[18px] border border-white/10 bg-white/[0.04] p-8">
+                  <div className="h-[34px] font-display text-[56px] leading-[0.6] text-gold-500">&ldquo;</div>
+                  <p className="mb-6 text-[16px] leading-[1.65] text-[#eef3f1]">{t.quote}</p>
+                  <div className="flex items-center gap-[13px]">
+                    <span className="flex h-[42px] w-[42px] items-center justify-center rounded-full bg-gold-500 text-[15px] font-bold text-resort-900">
+                      {t.initials}
+                    </span>
+                    <div>
+                      <div className="text-[14.5px] font-semibold text-white">{t.name}</div>
+                      <div className="text-[13px] text-[#a9bcb6]">{t.role}</div>
+                    </div>
+                  </div>
+                </div>
+              </Reveal>
             ))}
           </div>
         </div>
       </section>
 
       {/* ── FAQ ── */}
-      <section id="faq" className="bg-white py-24">
-        <div className="mx-auto max-w-3xl px-6">
-          <div className="mb-12 text-center">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-resort-600">
-              FAQ
-            </p>
-            <h2 className="font-display text-3xl font-bold text-gray-900 sm:text-4xl">
-              Frequently asked questions
+      <section id="faq" className="px-7 py-[110px]">
+        <div className="mx-auto max-w-[760px]">
+          <Reveal className="text-center">
+            <Eyebrow label="Good to know" centered />
+            <h2 className="mt-[18px] font-display text-[clamp(2rem,4vw,3.1rem)] font-medium leading-[1.1] tracking-[-0.02em] text-resort-900">
+              Questions, answered.
             </h2>
-          </div>
+          </Reveal>
 
-          <div className="space-y-3">
+          <div className="mt-[46px] border-t border-[rgba(25,64,59,0.12)]">
             {FAQS.map((faq, i) => {
-              const isOpen = openFaq === i;
+              const open = openFaq === i;
               return (
-                <div
-                  key={i}
-                  className="overflow-hidden rounded-xl border border-gray-100 bg-gray-50 transition-all"
-                >
+                <div key={i} className="border-b border-[rgba(25,64,59,0.12)]">
                   <button
-                    className="flex w-full items-center justify-between px-6 py-5 text-left"
-                    onClick={() => setOpenFaq(isOpen ? null : i)}
+                    onClick={() => setOpenFaq(open ? -1 : i)}
+                    className="flex w-full items-center justify-between gap-5 px-1 py-6 text-left"
                   >
-                    <span className="pr-4 text-sm font-semibold text-gray-900">{faq.q}</span>
+                    <span className="text-[17.5px] font-semibold text-resort-900">{faq.q}</span>
                     <span
-                      className={`shrink-0 text-resort-600 transition-transform duration-300 ${isOpen ? 'rotate-45' : ''}`}
+                      className="flex-none text-2xl font-light leading-none text-resort-600 transition-transform duration-300"
+                      style={{ transform: open ? 'rotate(45deg)' : 'rotate(0deg)' }}
                     >
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                      </svg>
+                      +
                     </span>
                   </button>
-                  {isOpen && (
-                    <div className="border-t border-gray-100 px-6 pb-5 pt-4">
-                      <p className="text-sm leading-relaxed text-gray-500">{faq.a}</p>
-                    </div>
-                  )}
+                  <div
+                    className="overflow-hidden transition-all duration-[400ms] ease-out"
+                    style={{ maxHeight: open ? 240 : 0, opacity: open ? 1 : 0 }}
+                  >
+                    <p className="m-0 max-w-[640px] px-1 pb-6 text-[15.5px] leading-[1.65] text-[#5b6360]">{faq.a}</p>
+                  </div>
                 </div>
               );
             })}
@@ -852,140 +820,72 @@ export default function HomePage() {
       </section>
 
       {/* ── FINAL CTA ── */}
-      <section
-        className="py-28 text-center"
-        style={{
-          backgroundImage: 'linear-gradient(135deg, #1e5048 0%, #19403b 100%)',
-        }}
-      >
-        <div className="mx-auto max-w-3xl px-6">
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm text-white/80">
-            <span className="text-gold-400">✦</span>
-            Join 200+ resorts already using ResortPro
-          </div>
-          <h2 className="font-display text-4xl font-bold text-white sm:text-5xl">
-            Ready to transform how you run your resort?
+      <section className="bg-resort-900 px-7 py-[100px] text-center">
+        <Reveal className="mx-auto max-w-[720px]">
+          <h2 className="mb-[18px] font-display text-[clamp(2.2rem,4.6vw,3.6rem)] font-medium leading-[1.08] tracking-[-0.02em] text-white">
+            Your front desk, finally at peace.
           </h2>
-          <p className="mx-auto mt-5 max-w-xl text-lg text-white/60">
-            No contracts. No setup fees. Start free and upgrade only when you need to.
+          <p className="mb-[34px] text-[1.15rem] leading-[1.6] text-[#cdd9d5]">
+            Start free today. Be taking online bookings by tonight.
           </p>
-          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+          <div className="flex flex-wrap items-center justify-center gap-4">
             <Link
               href="/plans"
-              className="w-full rounded-xl bg-gold-500 px-8 py-4 text-base font-semibold text-resort-900 shadow-lg shadow-gold-500/25 transition-all hover:bg-gold-400 sm:w-auto"
+              className="rounded-full bg-gold-500 px-8 py-[15px] text-[15.5px] font-bold text-resort-900 transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_32px_rgba(212,168,83,0.35)]"
             >
-              Start free trial — it's free for 14 days
+              Start free trial
             </Link>
             <Link
               href="/contact"
-              className="w-full rounded-xl border border-white/25 bg-white/10 px-8 py-4 text-base font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20 sm:w-auto"
+              className="rounded-full border-[1.5px] border-white/30 px-[30px] py-3.5 text-[15.5px] font-semibold text-[#eef3f1] transition-all hover:border-white hover:bg-white/[0.06]"
             >
-              Talk to us
+              Book a demo
             </Link>
           </div>
-        </div>
+        </Reveal>
       </section>
 
       {/* ── FOOTER ── */}
-      <footer className="bg-resort-900">
-        <div className="mx-auto max-w-7xl px-6 py-16">
-          <div className="grid grid-cols-2 gap-10 md:grid-cols-5">
-            {/* Brand col */}
-            <div className="col-span-2 md:col-span-1">
-              <LogoLight />
-              <p className="mt-4 text-sm leading-relaxed text-white/50">
-                Built for the hospitality industry. The all-in-one resort management platform.
+      <footer className="bg-[#142f2b] px-7 pb-10 pt-16">
+        <div className="mx-auto max-w-[1180px]">
+          <div className="grid grid-cols-2 gap-10 sm:grid-cols-3 lg:grid-cols-5">
+            <div className="col-span-2 min-w-[220px] sm:col-span-3 lg:col-span-1">
+              <a href="#top" className="mb-4 flex items-center gap-[11px]">
+                <LogoMark size={28} dotBg="#23766a" />
+                <span className="font-display text-[19px] font-semibold text-[#f2efe9]">ResortPro</span>
+              </a>
+              <p className="max-w-[260px] text-sm leading-[1.6] text-[#90a39e]">
+                The calm operating system for resorts in Bangladesh and beyond.
               </p>
-              {/* Social icons */}
-              <div className="mt-6 flex gap-4">
-                {[
-                  {
-                    label: 'Twitter/X',
-                    icon: (
-                      <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
-                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                      </svg>
-                    ),
-                  },
-                  {
-                    label: 'LinkedIn',
-                    icon: (
-                      <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
-                        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-                      </svg>
-                    ),
-                  },
-                  {
-                    label: 'Facebook',
-                    icon: (
-                      <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
-                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                      </svg>
-                    ),
-                  },
-                ].map((s) => (
-                  <a
-                    key={s.label}
-                    href="#"
-                    aria-label={s.label}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-white/60 transition-colors hover:bg-white/20 hover:text-white"
-                  >
-                    {s.icon}
-                  </a>
-                ))}
-              </div>
             </div>
 
-            {/* Link columns */}
             {[
-              {
-                title: 'Product',
-                links: ['Features', 'Pricing', 'Embed SDK', 'WordPress Plugin'],
-              },
-              {
-                title: 'Company',
-                links: ['About', 'Blog', 'Contact'],
-              },
-              {
-                title: 'Legal',
-                links: ['Privacy Policy', 'Terms of Service', 'GDPR'],
-              },
-              {
-                title: 'Support',
-                links: ['Documentation', 'Help Center', 'Status'],
-              },
+              { title: 'Product', links: [['Features', '#features'], ['Pricing', '#pricing'], ['Embed SDK', '#'], ['Changelog', '#']] },
+              { title: 'Company', links: [['About', '#'], ['Careers', '#'], ['Blog', '#']] },
+              { title: 'Resources', links: [['Docs', '#'], ['Help center', '#faq'], ['Status', '#']] },
+              { title: 'Legal', links: [['Privacy', '#'], ['Terms', '#']] },
             ].map((col) => (
               <div key={col.title}>
-                <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-white/40">
-                  {col.title}
-                </p>
-                <ul className="space-y-3">
-                  {col.links.map((link) => (
-                    <li key={link}>
-                      <a
-                        href="#"
-                        className="text-sm text-white/60 transition-colors hover:text-white"
-                      >
-                        {link}
-                      </a>
-                    </li>
+                <div className="mb-4 text-xs font-semibold uppercase tracking-[0.12em] text-[#7f938e]">{col.title}</div>
+                <div className="flex flex-col gap-[11px]">
+                  {col.links.map(([label, href]) => (
+                    <a key={label} href={href} className="text-sm text-[#c2d0cb] transition-colors hover:text-white">{label}</a>
                   ))}
-                </ul>
+                </div>
               </div>
             ))}
           </div>
 
-          <div className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 sm:flex-row">
-            <p className="text-sm text-white/40">
-              &copy; {new Date().getFullYear()} ResortPro. Built for the hospitality industry.
-            </p>
-            <div className="flex items-center gap-4">
-              <span className="text-xs text-white/40 border border-white/30 rounded px-2 py-1 text-white/60">
-                🌐 English
-              </span>
-              <Link href="/bn" className="text-xs text-white/40 hover:text-white/70 transition-colors border border-white/20 rounded px-2 py-1">
-                🇧🇩 বাংলা
-              </Link>
+          <div className="my-6 mt-11 h-px bg-white/10" />
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <span className="text-[13px] text-[#7f938e]">© 2026 ResortPro. Made in Bangladesh.</span>
+            <div className="flex items-center gap-[22px]">
+              <span className="text-[13px] text-[#90a39e]">English (BD)</span>
+              <div className="flex gap-3.5">
+                {['Twitter', 'LinkedIn', 'Facebook'].map((s) => (
+                  <a key={s} href="#" className="text-[13px] text-[#90a39e] transition-colors hover:text-white">{s}</a>
+                ))}
+              </div>
             </div>
           </div>
         </div>
