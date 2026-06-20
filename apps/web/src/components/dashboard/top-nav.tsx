@@ -71,14 +71,17 @@ export function TopNav() {
   return (
     <header className="border-b border-resort-900/10 bg-white dark:border-white/8 dark:bg-resort-900/60">
       <TrialBanner />
-      <div className="flex h-13 items-center justify-between px-5">
+      <div className="flex h-[52px] items-center justify-between px-5">
         <div className="flex items-center gap-3 flex-1 max-w-sm">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8fa8a1]" />
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8aa29a]" />
             <input
               placeholder="Search rooms, bookings, guests..."
-              className="w-full rounded-full border border-resort-900/10 bg-[#f5f4f1] py-1.5 pl-8 pr-4 text-[13px] text-resort-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-resort-600/30 dark:border-white/10 dark:bg-white/5 dark:text-white"
+              className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-1.5 pl-8 pr-16 text-[13px] text-[#18231f] placeholder:text-[#8aa29a] focus:outline-none focus:ring-1 focus:ring-resort-600/20 dark:border-white/10 dark:bg-white/5 dark:text-white"
             />
+            <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-0.5 rounded bg-white border border-black/8 px-1.5 py-0.5 text-[10px] text-[#8aa29a] font-medium">
+              ⌘K
+            </kbd>
           </div>
         </div>
 

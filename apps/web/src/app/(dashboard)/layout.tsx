@@ -107,7 +107,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!isAuthenticated()) return null;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#f5f4f1] dark:bg-gray-950">
+    <div className="flex h-screen overflow-hidden bg-[#efece6] dark:bg-gray-950">
       {/* Sidebar — hidden on mobile */}
       <div className="hidden md:flex">
         <Sidebar />

@@ -9,42 +9,73 @@ import { useAuthStore } from '@/store/auth';
 import {
   BedDouble, CalendarCheck, CalendarX, TrendingUp, Users,
   Ticket, DollarSign, Sparkles, ArrowUp, ArrowDown, UtensilsCrossed,
-  LogIn, LogOut, CheckCircle2, Clock, Wrench, Globe,
+  LogIn, LogOut, CheckCircle2, Clock, Wrench, Globe, Tag, AlertCircle, Banknote,
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
-interface StatCardProps {
-  title: string;
-  value: string | number;
-  icon: React.ElementType;
-  change?: number;
-  suffix?: string;
-  color: string;
+type IconFamily = 'teal' | 'gold' | 'coral';
+
+const ICON_STYLES: Record<IconFamily, { bg: string; color: string }> = {
+  teal:  { bg: '#e3f2ef', color: '#23766a' },
+  gold:  { bg: '#f4ecda', color: '#b89040' },
+  coral: { bg: '#fceee4', color: '#b8724a' },
+};
+
+function HeroStatCard({
+  title, value, unit, subtext, icon: Icon, family, dark = false,
+}: {
+  title: string; value: string | number; unit?: string;
+  subtext?: string; icon: React.ElementType; family: IconFamily; dark?: boolean;
+}) {
+  const style = ICON_STYLES[family];
+  return (
+    <div
+      className="rounded-[14px] p-[22px] border"
+      style={{
+        background: dark ? '#1b342f' : '#ffffff',
+        borderColor: dark ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.045)',
+        boxShadow: '0 1px 6px rgba(0,0,0,0.04)',
+      }}
+    >
+      <div className="flex items-start justify-between mb-4">
+        <span className="text-[10.5px] font-semibold uppercase tracking-[0.09em]" style={{ color: dark ? '#62847c' : '#8aa29a' }}>
+          {title}
+        </span>
+        <div className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-[8px]"
+          style={{ background: dark ? 'rgba(255,255,255,0.08)' : style.bg }}>
+          <Icon className="h-[13px] w-[13px]" strokeWidth={2.3} style={{ color: dark ? '#d4a853' : style.color }} />
+        </div>
+      </div>
+      <div>
+        <span className="text-[40px] font-semibold leading-none tracking-[-0.03em]"
+          style={{ color: dark ? '#ece7df' : '#18231f' }}>
+          {value}
+        </span>
+        {unit && <span className="ml-px text-[19px] font-normal" style={{ color: dark ? '#4a6e66' : '#8aa29a' }}>{unit}</span>}
+      </div>
+      {subtext && <p className="mt-[10px] text-[12px]" style={{ color: dark ? '#4a6e66' : '#8aa29a' }}>{subtext}</p>}
+    </div>
+  );
 }
 
-function StatCard({ title, value, icon: Icon, change, suffix, color }: StatCardProps) {
+function CompactStatCard({
+  title, value, icon: Icon, family,
+}: {
+  title: string; value: string | number; icon: React.ElementType; family: IconFamily;
+}) {
+  const style = ICON_STYLES[family];
   return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <p className="mt-2 text-3xl font-bold tracking-tight">
-              {value}{suffix && <span className="ml-1 text-lg font-medium text-muted-foreground">{suffix}</span>}
-            </p>
-            {change !== undefined && (
-              <div className={`mt-1 flex items-center gap-1 text-xs font-medium ${change >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                {change >= 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
-                {Math.abs(change)}% vs last month
-              </div>
-            )}
-          </div>
-          <div className={`rounded-xl p-3 ${color}`}>
-            <Icon className="h-5 w-5 text-white" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="flex items-center gap-[11px] rounded-[12px] border px-[18px] py-[15px]"
+      style={{ background: '#ffffff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+      <div className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[9px]"
+        style={{ background: style.bg }}>
+        <Icon className="h-[14px] w-[14px]" strokeWidth={2} style={{ color: style.color }} />
+      </div>
+      <div>
+        <div className="mb-[3px] text-[10px] font-semibold uppercase tracking-[0.07em] text-[#8aa29a]">{title}</div>
+        <div className="text-[22px] font-semibold leading-none tracking-[-0.02em] text-[#18231f]">{value}</div>
+      </div>
+    </div>
   );
 }
 
@@ -103,16 +134,28 @@ export default function DashboardPage() {
     );
   }
 
+  const greeting = (() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; })();
+  const today = new Date().toLocaleDateString('en-BD', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 px-[2px] py-[2px]">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          {(() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; })()}, {user?.firstName} 👋
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Here's what's happening at your resort today
-        </p>
+      <div className="flex items-end justify-between mb-4 animate-fade-up">
+        <div>
+          <h1 className="font-display text-[27px] font-medium tracking-[-0.01em] text-[#18231f]">
+            {greeting}, {user?.firstName}
+          </h1>
+          <p className="mt-[5px] text-[13px] text-[#7a9890]">
+            {today}
+          </p>
+        </div>
+        <a
+          href="/dashboard/bookings/new"
+          className="rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
+          style={{ background: '#1b342f' }}
+        >
+          + New Booking
+        </a>
       </div>
 
       {/* Stat Cards & Charts — hidden for housekeeping staff */}
@@ -135,119 +178,132 @@ export default function DashboardPage() {
         </div>
       )}
       {user?.role !== 'STAFF' && user?.role !== 'CHEF' && <>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Total Rooms" value={stats?.totalRooms || 0} icon={BedDouble} color="bg-resort-600" />
-        <StatCard title="Occupancy Rate" value={stats?.occupancyRate || 0} icon={TrendingUp} suffix="%" color="bg-blue-500" />
-        <StatCard title="Today Check-ins" value={stats?.todayCheckIns || 0} icon={CalendarCheck} color="bg-green-500" />
-        <StatCard title="Today Check-outs" value={stats?.todayCheckOuts || 0} icon={CalendarX} color="bg-orange-500" />
-        <StatCard title="Active Bookings" value={stats?.activeBookings || 0} icon={Users} color="bg-purple-500" />
-        {['OWNER', 'MANAGER', 'SHAREHOLDER'].includes(user?.role ?? '') && (
-          <StatCard title="Monthly Revenue" value={formatCurrency(stats?.monthlyRevenue || 0)} icon={DollarSign} change={stats?.revenueGrowth} color="bg-emerald-500" />
+      {/* Primary stat cards — 4 hero */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 animate-fade-up [animation-delay:60ms]">
+        <HeroStatCard
+          title="Occupancy" value={stats?.occupancyRate || 0} unit="%"
+          subtext={`${stats?.totalRooms || 0} rooms · ${Math.round(((stats?.occupancyRate || 0) / 100) * (stats?.totalRooms || 0))} occupied`}
+          icon={TrendingUp} family="teal"
+        />
+        <HeroStatCard
+          title="Check-ins Today" value={stats?.todayCheckIns || 0}
+          subtext="Confirmed arrivals"
+          icon={CalendarCheck} family="teal"
+        />
+        <HeroStatCard
+          title="Check-outs Today" value={stats?.todayCheckOuts || 0}
+          subtext={`${inHouseCount} currently in-house`}
+          icon={CalendarX} family="teal"
+        />
+        {['OWNER', 'MANAGER', 'SHAREHOLDER'].includes(user?.role ?? '') ? (
+          <HeroStatCard
+            title="Monthly Revenue" value={formatCurrency(stats?.monthlyRevenue || 0)}
+            subtext={stats?.revenueGrowth !== undefined ? `${stats.revenueGrowth >= 0 ? '+' : ''}${stats.revenueGrowth}% vs last month` : undefined}
+            icon={Banknote} family="gold" dark
+          />
+        ) : (
+          <HeroStatCard
+            title="Active Bookings" value={stats?.activeBookings || 0}
+            subtext="Currently active"
+            icon={Users} family="gold"
+          />
         )}
-        <StatCard title="Open Tickets" value={stats?.openTickets || 0} icon={Ticket} color="bg-red-500" />
-        <StatCard title="Pending Cleaning" value={stats?.pendingHousekeeping || 0} icon={Sparkles} color="bg-yellow-500" />
-        <StatCard title="Maintenance" value={(stats as { openMaintenance?: number })?.openMaintenance || 0} icon={Wrench} color="bg-orange-600" />
+      </div>
+
+      {/* Secondary compact cards — 5 */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 animate-fade-up [animation-delay:110ms]">
+        <CompactStatCard title="Active Bookings" value={stats?.activeBookings || 0} icon={Users} family="gold" />
+        <CompactStatCard title="Total Rooms" value={stats?.totalRooms || 0} icon={BedDouble} family="teal" />
+        <CompactStatCard title="Open Tickets" value={stats?.openTickets || 0} icon={AlertCircle} family="coral" />
+        <CompactStatCard title="Pending Clean" value={stats?.pendingHousekeeping || 0} icon={Sparkles} family="teal" />
+        <CompactStatCard title="Maintenance" value={(stats as { openMaintenance?: number })?.openMaintenance || 0} icon={Wrench} family="teal" />
       </div>
 
       {/* Today's Arrivals & Departures */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-3 lg:grid-cols-2 animate-fade-up [animation-delay:160ms]">
         {/* Arrivals */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <LogIn className="h-4 w-4 text-emerald-600" />
-              Today's Arrivals
-              <span className="ml-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                {arrivals.length}
-              </span>
-            </CardTitle>
-            <a href="/dashboard/bookings?status=CONFIRMED" className="text-xs text-resort-600 hover:underline">View all</a>
-          </CardHeader>
-          <CardContent>
-            {arrivals.length === 0 ? (
-              <div className="flex flex-col items-center py-6 text-center gap-2">
-                <CheckCircle2 className="h-8 w-8 text-gray-300" />
-                <p className="text-sm text-muted-foreground">No arrivals today</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {arrivals.map((b: any) => (
-                  <div key={b.id} className="flex items-center justify-between rounded-xl border border-gray-100 dark:border-gray-800 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="h-8 w-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-xs font-bold text-emerald-700 dark:text-emerald-400 shrink-0">
-                        {b.guest.firstName[0]}{b.guest.lastName[0]}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate text-gray-900 dark:text-white">{b.guest.firstName} {b.guest.lastName}</p>
-                        <p className="text-xs text-gray-500">Room {b.room.number} · {b.nights}n</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {b.status === 'CHECKED_IN' ? (
-                        <span className="text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-full font-medium">In</span>
-                      ) : (
-                        <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">
-                          <Clock className="inline w-3 h-3 mr-0.5" />Due
-                        </span>
-                      )}
-                    </div>
+        <div className="rounded-[14px] border overflow-hidden" style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+          <div className="flex items-center justify-between border-b px-5 py-[15px]" style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
+            <div className="flex items-center gap-2">
+              <LogIn className="h-[13px] w-[13px] text-[#23766a]" strokeWidth={2.5} />
+              <span className="text-[13px] font-semibold text-[#18231f]">Today's Arrivals</span>
+              <span className="rounded-full bg-[#e3f2ef] px-2 py-px text-[11px] font-semibold text-[#23766a]">{arrivals.length}</span>
+            </div>
+            <a href="/dashboard/bookings?status=CONFIRMED" className="text-[12px] font-medium text-[#23766a] hover:underline">View all →</a>
+          </div>
+          {arrivals.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-8 text-center">
+              <CheckCircle2 className="h-8 w-8 text-gray-200" />
+              <p className="text-[13px] text-[#8aa29a]">No arrivals today</p>
+            </div>
+          ) : (
+            <div className="divide-y" style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
+              {arrivals.map((b: any) => (
+                <div key={b.id} className="flex items-center gap-3 px-5 py-4 hover:bg-[#faf9f7] transition-colors">
+                  <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-[#e3f2ef] text-[12px] font-semibold text-[#23766a]">
+                    {b.guest.firstName[0]}{b.guest.lastName[0]}
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[14px] font-medium text-[#18231f] truncate">{b.guest.firstName} {b.guest.lastName}</p>
+                    <p className="mt-0.5 text-[12px] text-[#8aa29a]">Room {b.room.number} · {b.nights} nights</p>
+                  </div>
+                  {b.status === 'CHECKED_IN' ? (
+                    <span className="rounded-[7px] border border-[#23766a]/20 bg-[#e3f2ef] px-[11px] py-[5px] text-[11.5px] font-medium text-[#23766a]">In</span>
+                  ) : (
+                    <div className="flex items-center gap-[5px] rounded-[7px] border border-[#c9a04a]/20 bg-[#fef5e7] px-[11px] py-[5px]">
+                      <div className="h-[5px] w-[5px] rounded-full bg-[#c9a04a]" />
+                      <span className="text-[11.5px] font-medium text-[#a8843a]">Due</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Departures */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <LogOut className="h-4 w-4 text-indigo-600" />
-              Today's Departures
-              <span className="ml-1 rounded-full bg-indigo-100 dark:bg-indigo-900/30 px-2 py-0.5 text-xs font-bold text-indigo-700 dark:text-indigo-400">
-                {departures.length}
-              </span>
-            </CardTitle>
-            <span className="text-xs text-gray-400">{inHouseCount} in-house</span>
-          </CardHeader>
-          <CardContent>
-            {departures.length === 0 ? (
-              <div className="flex flex-col items-center py-6 text-center gap-2">
-                <CheckCircle2 className="h-8 w-8 text-gray-300" />
-                <p className="text-sm text-muted-foreground">No departures today</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {departures.map((b: any) => (
-                  <div key={b.id} className="flex items-center justify-between rounded-xl border border-gray-100 dark:border-gray-800 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-xs font-bold text-indigo-700 dark:text-indigo-400 shrink-0">
-                        {b.guest.firstName[0]}{b.guest.lastName[0]}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate text-gray-900 dark:text-white">{b.guest.firstName} {b.guest.lastName}</p>
-                        <p className="text-xs text-gray-500">Room {b.room.number} · {b.nights}n stay</p>
-                      </div>
-                    </div>
-                    <div className="shrink-0">
-                      {b.status === 'CHECKED_OUT' ? (
-                        <span className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 px-2 py-0.5 rounded-full font-medium">Out</span>
-                      ) : (
-                        <span className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 px-2 py-0.5 rounded-full font-medium">
-                          <Clock className="inline w-3 h-3 mr-0.5" />Pending
-                        </span>
-                      )}
-                    </div>
+        <div className="rounded-[14px] border overflow-hidden" style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+          <div className="flex items-center justify-between border-b px-5 py-[15px]" style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
+            <div className="flex items-center gap-2">
+              <LogOut className="h-[13px] w-[13px] text-[#23766a]" strokeWidth={2.5} />
+              <span className="text-[13px] font-semibold text-[#18231f]">Today's Departures</span>
+              <span className="rounded-full bg-[#e3f2ef] px-2 py-px text-[11px] font-semibold text-[#23766a]">{departures.length}</span>
+            </div>
+            <span className="text-[12px] text-[#8aa29a]">{inHouseCount} in-house</span>
+          </div>
+          {departures.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-8 text-center">
+              <CheckCircle2 className="h-8 w-8 text-gray-200" />
+              <p className="text-[13px] text-[#8aa29a]">No departures today</p>
+            </div>
+          ) : (
+            <div className="divide-y" style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
+              {departures.map((b: any) => (
+                <div key={b.id} className="flex items-center gap-3 px-5 py-4 hover:bg-[#faf9f7] transition-colors">
+                  <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-[#e3f2ef] text-[12px] font-semibold text-[#23766a]">
+                    {b.guest.firstName[0]}{b.guest.lastName[0]}
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[14px] font-medium text-[#18231f] truncate">{b.guest.firstName} {b.guest.lastName}</p>
+                    <p className="mt-0.5 text-[12px] text-[#8aa29a]">Room {b.room.number} · {b.nights}n stay</p>
+                  </div>
+                  {b.status === 'CHECKED_OUT' ? (
+                    <span className="rounded-[7px] border border-black/8 bg-[#f5f4f1] px-[11px] py-[5px] text-[11.5px] font-medium text-[#8aa29a]">Out</span>
+                  ) : (
+                    <div className="flex items-center gap-[5px] rounded-[7px] border border-[#c9a04a]/20 bg-[#fef5e7] px-[11px] py-[5px]">
+                      <div className="h-[5px] w-[5px] rounded-full bg-[#c9a04a]" />
+                      <span className="text-[11.5px] font-medium text-[#a8843a]">Pending</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Charts Row */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-3 lg:grid-cols-2 animate-fade-up [animation-delay:210ms]">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Revenue (Last 12 months)</CardTitle>

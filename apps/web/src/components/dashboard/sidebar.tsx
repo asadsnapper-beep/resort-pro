@@ -207,18 +207,17 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="flex h-full w-60 flex-col bg-resort-900">
+    <aside className="flex h-full w-60 flex-col bg-[#1b342f]">
       {/* Logo */}
-      <div className="flex h-14 items-center gap-3 border-b border-white/8 px-4">
-        {/* LogoMark: circle with gold dot ring */}
+      <div className="flex h-14 items-center gap-3 border-b border-white/[0.07] px-[18px]">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-resort-600">
           <span className="h-[11px] w-[11px] rounded-full border-[1.5px] border-gold-500" />
         </span>
         <div className="min-w-0">
-          <p className="truncate font-display text-[15px] font-medium text-white">
+          <p className="truncate font-display text-[14px] font-medium text-[#ece7df]">
             {tenant?.name || 'ResortPro'}
           </p>
-          <p className="text-[11px] text-[#8fa8a1] capitalize">
+          <p className="text-[10.5px] text-[#62847c] capitalize">
             {role === 'OWNER' ? `${tenant?.plan?.toLowerCase() || 'free'} plan` : roleConfig.label}
           </p>
         </div>
@@ -237,7 +236,7 @@ export function Sidebar() {
                 onClick={() => toggleGroup(group)}
                 className="flex w-full items-center justify-between px-4 py-1.5 text-left"
               >
-                <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#7f938e]">
+                <span className="text-[9px] font-semibold uppercase tracking-[0.15em] text-[#4a6e66]">
                   {groupLabel}
                 </span>
                 <ChevronDown
@@ -263,11 +262,11 @@ export function Sidebar() {
                           className={cn(
                             'flex items-center gap-2.5 rounded-r-lg py-[7px] pl-3 pr-3 text-[13.5px] font-medium transition-colors',
                             active
-                              ? 'border-l-2 border-gold-500 bg-white/8 pl-[10px] text-white'
-                              : 'border-l-2 border-transparent text-[#c2d0cb] hover:bg-white/5 hover:text-white',
+                              ? 'border-l-2 border-gold-500 bg-white/[0.08] pl-[10px] text-[#ece7df] font-medium'
+                              : 'border-l-2 border-transparent text-[#9bbdb7] font-normal hover:bg-white/5 hover:text-[#ece7df]',
                           )}
                         >
-                          <Icon className="h-4 w-4 shrink-0 opacity-80" />
+                          <Icon className={`h-4 w-4 shrink-0 ${active ? 'text-[#ece7df]' : 'text-[#6a9990]'}`} />
                           {label}
                         </Link>
                       </li>
@@ -285,7 +284,7 @@ export function Sidebar() {
         <Link
           href="/docs"
           target="_blank"
-          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13.5px] font-medium text-[#c2d0cb] transition-colors hover:bg-white/5 hover:text-white"
+          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-normal text-[#9bbdb7] transition-colors hover:bg-white/5 hover:text-[#ece7df]"
         >
           <LifeBuoy className="h-4 w-4 shrink-0 opacity-80" />
           {t('helpDocs')}
@@ -296,13 +295,13 @@ export function Sidebar() {
       </div>
 
       {/* User footer */}
-      <div className="border-t border-white/8 p-3">
+      <div className="border-t border-white/[0.07] p-3">
         <div className="flex items-center gap-2.5">
           <Link href="/dashboard/profile" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-resort-600 text-xs font-bold text-white transition-opacity hover:opacity-80">
             {user ? `${user.firstName[0]}${user.lastName[0]}` : 'U'}
           </Link>
           <Link href="/dashboard/profile" className="min-w-0 flex-1 group">
-            <p className="truncate text-[13px] font-medium text-white group-hover:text-gold-400 transition-colors">
+            <p className="truncate text-[13px] font-medium text-[#ece7df] group-hover:text-gold-400 transition-colors">
               {user ? `${user.firstName} ${user.lastName}` : 'User'}
             </p>
             {role === 'OWNER' ? (
