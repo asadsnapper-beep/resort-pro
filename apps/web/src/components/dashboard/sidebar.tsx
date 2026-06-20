@@ -207,27 +207,27 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="flex h-full w-64 flex-col border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+    <aside className="flex h-full w-60 flex-col bg-resort-900">
       {/* Logo */}
-      <div className="flex h-16 items-center gap-3 border-b border-gray-200 px-5 dark:border-gray-800">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-resort-700 font-display text-lg font-bold text-gold-400">
-          R
-        </div>
+      <div className="flex h-14 items-center gap-3 border-b border-white/8 px-4">
+        {/* LogoMark: circle with gold dot ring */}
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-resort-600">
+          <span className="h-[11px] w-[11px] rounded-full border-[1.5px] border-gold-500" />
+        </span>
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+          <p className="truncate font-display text-[15px] font-medium text-white">
             {tenant?.name || 'ResortPro'}
           </p>
-          <p className="text-xs text-gray-400 capitalize">
+          <p className="text-[11px] text-[#8fa8a1] capitalize">
             {role === 'OWNER' ? `${tenant?.plan?.toLowerCase() || 'free'} plan` : roleConfig.label}
           </p>
         </div>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-3 scrollbar-hide">
+      <nav className="flex-1 overflow-y-auto py-2 scrollbar-hide">
         {Object.entries(grouped).map(([group, items]) => {
           const isCollapsed = collapsed[group];
-          // Get translation key from first item in group (all items in a group share same groupKey)
           const groupKey = items[0]?.groupKey;
           const groupLabel: string = groupKey ? t(groupKey) : group;
           return (
@@ -237,12 +237,12 @@ export function Sidebar() {
                 onClick={() => toggleGroup(group)}
                 className="flex w-full items-center justify-between px-4 py-1.5 text-left"
               >
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#7f938e]">
                   {groupLabel}
                 </span>
                 <ChevronDown
                   className={cn(
-                    'h-3 w-3 text-gray-300 transition-transform',
+                    'h-3 w-3 text-[#7f938e] transition-transform',
                     isCollapsed && '-rotate-90',
                   )}
                 />
@@ -250,7 +250,7 @@ export function Sidebar() {
 
               {/* Group items */}
               {!isCollapsed && (
-                <ul className="space-y-0.5 px-3 pb-1">
+                <ul className="space-y-0.5 px-2 pb-1">
                   {items.map(({ href, labelKey, labelFallback, icon: Icon }) => {
                     const label: string = t(labelKey) ?? labelFallback;
                     const active =
@@ -261,13 +261,13 @@ export function Sidebar() {
                         <Link
                           href={href}
                           className={cn(
-                            'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                            'flex items-center gap-2.5 rounded-r-lg py-[7px] pl-3 pr-3 text-[13.5px] font-medium transition-colors',
                             active
-                              ? 'bg-resort-50 text-resort-700 dark:bg-resort-900/20 dark:text-resort-400'
-                              : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white',
+                              ? 'border-l-2 border-gold-500 bg-white/8 pl-[10px] text-white'
+                              : 'border-l-2 border-transparent text-[#c2d0cb] hover:bg-white/5 hover:text-white',
                           )}
                         >
-                          <Icon className="h-4 w-4 shrink-0" />
+                          <Icon className="h-4 w-4 shrink-0 opacity-80" />
                           {label}
                         </Link>
                       </li>
@@ -281,32 +281,32 @@ export function Sidebar() {
       </nav>
 
       {/* Help link + Language switcher */}
-      <div className="px-3 pb-2 space-y-1">
+      <div className="px-2 pb-2 space-y-0.5">
         <Link
           href="/docs"
           target="_blank"
-          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
+          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13.5px] font-medium text-[#c2d0cb] transition-colors hover:bg-white/5 hover:text-white"
         >
-          <LifeBuoy className="h-4 w-4 shrink-0" />
+          <LifeBuoy className="h-4 w-4 shrink-0 opacity-80" />
           {t('helpDocs')}
         </Link>
         <div className="px-1">
-          <LanguageSwitcher currentLocale={locale} variant="dropdown" theme="light" className="w-full" />
+          <LanguageSwitcher currentLocale={locale} variant="dropdown" theme="dark" className="w-full" />
         </div>
       </div>
 
       {/* User footer */}
-      <div className="border-t border-gray-200 p-4 dark:border-gray-800">
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard/profile" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-resort-100 text-xs font-bold text-resort-700 transition-opacity hover:opacity-80 dark:bg-resort-900 dark:text-resort-300">
+      <div className="border-t border-white/8 p-3">
+        <div className="flex items-center gap-2.5">
+          <Link href="/dashboard/profile" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-resort-600 text-xs font-bold text-white transition-opacity hover:opacity-80">
             {user ? `${user.firstName[0]}${user.lastName[0]}` : 'U'}
           </Link>
           <Link href="/dashboard/profile" className="min-w-0 flex-1 group">
-            <p className="truncate text-sm font-medium text-gray-900 group-hover:text-[#1a6b5e] dark:text-white">
+            <p className="truncate text-[13px] font-medium text-white group-hover:text-gold-400 transition-colors">
               {user ? `${user.firstName} ${user.lastName}` : 'User'}
             </p>
             {role === 'OWNER' ? (
-              <span className="text-[11px] text-gray-400 truncate">
+              <span className="text-[11px] text-[#8fa8a1] truncate">
                 {tenant?.plan?.toLowerCase() || 'free'} plan
               </span>
             ) : (
@@ -322,7 +322,7 @@ export function Sidebar() {
           </Link>
           <button
             onClick={handleLogout}
-            className="text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-200"
+            className="text-[#8fa8a1] transition-colors hover:text-white"
             title="Logout"
           >
             <LogOut className="h-4 w-4" />

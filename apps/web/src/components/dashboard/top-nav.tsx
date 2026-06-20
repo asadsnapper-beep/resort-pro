@@ -69,42 +69,41 @@ export function TopNav() {
   const unread = notificationsRes?.data?.data?.filter((n: { isRead: boolean }) => !n.isRead)?.length || 0;
 
   return (
-    <header className="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+    <header className="border-b border-resort-900/10 bg-white dark:border-white/8 dark:bg-resort-900/60">
       <TrialBanner />
-      <div className="flex h-16 items-center justify-between px-6">
-      <div className="flex items-center gap-3 flex-1 max-w-md">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <input
-            placeholder="Search rooms, bookings, guests..."
-            className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-resort-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-          />
+      <div className="flex h-13 items-center justify-between px-5">
+        <div className="flex items-center gap-3 flex-1 max-w-sm">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8fa8a1]" />
+            <input
+              placeholder="Search rooms, bookings, guests..."
+              className="w-full rounded-full border border-resort-900/10 bg-[#f5f4f1] py-1.5 pl-8 pr-4 text-[13px] text-resort-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-resort-600/30 dark:border-white/10 dark:bg-white/5 dark:text-white"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <ElectronStatusBadge />
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="h-8 w-8 text-[#8fa8a1] hover:text-resort-900 dark:hover:text-white"
+          >
+            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
+
+          <Button variant="ghost" size="icon" className="relative h-8 w-8 text-[#8fa8a1] hover:text-resort-900 dark:hover:text-white">
+            <Bell className="h-4 w-4" />
+            {unread > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                {unread > 9 ? '9+' : unread}
+              </span>
+            )}
+          </Button>
         </div>
       </div>
-
-      <div className="flex items-center gap-2">
-        {/* Online/offline indicator — Electron only */}
-        <ElectronStatusBadge />
-
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          className="text-gray-500"
-        >
-          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </Button>
-
-        <Button variant="ghost" size="icon" className="relative text-gray-500">
-          <Bell className="h-4 w-4" />
-          {unread > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-              {unread > 9 ? '9+' : unread}
-            </span>
-          )}
-        </Button>
-      </div>
-    </div>
     </header>
   );
 }
