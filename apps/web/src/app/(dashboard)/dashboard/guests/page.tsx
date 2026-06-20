@@ -3,9 +3,6 @@
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { guestsApi } from '@/lib/api';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { ConfirmModal } from '@/components/ui/modal';
 import { GuestModal } from '@/components/guests/GuestModal';
 import { GuestDetailSheet } from '@/components/guests/GuestDetailSheet';
@@ -58,112 +55,185 @@ export default function GuestsPage() {
     mutationFn: (id: string) => guestsApi.delete(id),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['guests'] }); toast({ title: 'Guest deleted' }); setDeleteGuest(null); setSelectedGuest(null); },
     onError: (err: { response?: { data?: { error?: string } } }) =>
-      toast({ title: 'Cannot delete guest', description: err?.response?.data?.error ?? 'Failed to delete guest', variant: 'destructive' }),
+      toast({ title: 'Cannot delete guest', description: err?.response?.data?.error ?? 'Failed to delete', variant: 'destructive' }),
   });
 
   const guests: Guest[] = data?.data?.data ?? [];
   const pagination = data?.data?.pagination;
   const total = pagination?.total ?? 0;
+  const nationalities = new Set(guests.filter(g => g.nationality).map(g => g.nationality)).size;
+  const withPhone = guests.filter(g => g.phone).length;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 animate-fade-up">
+      {/* Header */}
+      <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Guests</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{total > 0 ? `${total} guest${total !== 1 ? 's' : ''} registered` : 'Manage your guest profiles'}</p>
+          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Guests</h1>
+          <p className="mt-[4px] text-[13px] text-[#7a9890]">
+            {total > 0 ? `${total} guest${total !== 1 ? 's' : ''} registered` : 'Manage your guest profiles'}
+          </p>
         </div>
-        <Button className="gap-2" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> Add Guest</Button>
+        <button
+          onClick={() => setAddOpen(true)}
+          className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
+          style={{ background: '#1b342f' }}
+        >
+          <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} />
+          Add Guest
+        </button>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Total Guests', value: total || 0, icon: Users, color: 'bg-resort-50 border-resort-200 text-resort-700' },
-          { label: 'With Phone', value: guests.filter(g => g.phone).length, icon: Phone, color: 'bg-green-50 border-green-200 text-green-700' },
-          { label: 'Nationalities', value: new Set(guests.filter(g => g.nationality).map(g => g.nationality)).size, icon: Globe, color: 'bg-blue-50 border-blue-200 text-blue-700' },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className={`rounded-xl border p-4 ${color}`}>
-            <div className="flex items-center gap-2 mb-1"><Icon className="h-4 w-4 opacity-70" /><p className="text-xs font-medium opacity-70">{label}</p></div>
-            <p className="text-2xl font-bold">{value}</p>
+          { label: 'Total Guests',   value: total,       icon: Users, bg: '#e3f2ef', color: '#23766a' },
+          { label: 'With Phone',     value: withPhone,   icon: Phone, bg: '#f4ecda', color: '#b89040' },
+          { label: 'Nationalities',  value: nationalities, icon: Globe, bg: '#fceee4', color: '#b8724a' },
+        ].map(({ label, value, icon: Icon, bg, color }) => (
+          <div key={label} className="flex items-center gap-[11px] rounded-[12px] border px-[18px] py-[15px]"
+            style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+            <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px]" style={{ background: bg }}>
+              <Icon className="h-[14px] w-[14px]" strokeWidth={2} style={{ color }} />
+            </div>
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.07em] text-[#8aa29a]">{label}</div>
+              <div className="text-[22px] font-semibold leading-none tracking-[-0.02em] text-[#18231f]">{value}</div>
+            </div>
           </div>
         ))}
       </div>
 
       {/* Search */}
       <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input value={search} onChange={(e) => handleSearch(e.target.value)} placeholder="Search by name or email..." className="pl-9" />
+        <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8aa29a]" />
+        <input
+          value={search}
+          onChange={(e) => handleSearch(e.target.value)}
+          placeholder="Search by name or email..."
+          className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-[8px] pl-9 pr-4 text-[13px] text-[#18231f] placeholder:text-[#8aa29a] focus:outline-none focus:ring-1 focus:ring-resort-600/20"
+        />
       </div>
 
       {/* Table */}
-      <Card className="overflow-hidden">
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="space-y-px">{[...Array(6)].map((_, i) => <div key={i} className="h-[68px] bg-gray-50 animate-pulse border-b" />)}</div>
-          ) : guests.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <Users className="h-14 w-14 text-gray-200 mb-4" />
-              <p className="font-medium text-gray-500">{debouncedSearch ? 'No guests found' : 'No guests yet'}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{debouncedSearch ? 'Try a different search' : 'Add your first guest to get started'}</p>
-              {!debouncedSearch && <Button className="mt-4 gap-2" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> Add Guest</Button>}
+      <div className="rounded-[14px] border overflow-hidden"
+        style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+        {isLoading ? (
+          <div className="space-y-px">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-[68px] animate-pulse" style={{ background: i % 2 === 0 ? '#faf9f7' : '#fff' }} />
+            ))}
+          </div>
+        ) : guests.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-20">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#f5f4f1]">
+              <Users className="h-7 w-7 text-[#c5bdb4]" />
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b bg-gray-50 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    <th className="px-5 py-3 text-left">Guest</th>
-                    <th className="px-5 py-3 text-left">Contact</th>
-                    <th className="px-5 py-3 text-left">Nationality</th>
-                    <th className="px-5 py-3 text-left">ID</th>
-                    <th className="px-5 py-3 text-left">Added</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {guests.map((guest) => (
-                    <tr key={guest.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedGuest(guest)}>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-resort-100 text-sm font-bold text-resort-700">
-                            {getInitials(guest.firstName, guest.lastName)}
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold text-gray-900">{guest.firstName} {guest.lastName}</p>
-                            {guest.notes && <p className="text-xs text-amber-600 truncate max-w-[160px]">📝 {guest.notes}</p>}
-                          </div>
+            <div className="text-center">
+              <p className="text-[14px] font-medium text-[#18231f]">{debouncedSearch ? 'No guests found' : 'No guests yet'}</p>
+              <p className="mt-1 text-[13px] text-[#8aa29a]">{debouncedSearch ? 'Try a different search' : 'Add your first guest to get started'}</p>
+            </div>
+            {!debouncedSearch && (
+              <button
+                onClick={() => setAddOpen(true)}
+                className="mt-1 flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0]"
+                style={{ background: '#1b342f' }}
+              >
+                <Plus className="h-[13px] w-[13px]" /> Add Guest
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]"
+                  style={{ borderColor: 'rgba(0,0,0,0.05)', background: '#faf9f7' }}>
+                  <th className="px-5 py-3 text-left">Guest</th>
+                  <th className="px-5 py-3 text-left">Contact</th>
+                  <th className="px-5 py-3 text-left">Nationality</th>
+                  <th className="px-5 py-3 text-left">ID</th>
+                  <th className="px-5 py-3 text-left">Added</th>
+                </tr>
+              </thead>
+              <tbody>
+                {guests.map((guest) => (
+                  <tr
+                    key={guest.id}
+                    className="cursor-pointer border-b transition-colors hover:bg-[#faf9f7]"
+                    style={{ borderColor: 'rgba(0,0,0,0.04)' }}
+                    onClick={() => setSelectedGuest(guest)}
+                  >
+                    <td className="px-5 py-[14px]">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-full bg-[#e3f2ef] text-[12px] font-semibold text-[#23766a]">
+                          {getInitials(guest.firstName, guest.lastName)}
                         </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-1.5 text-sm text-gray-700"><Mail className="h-3.5 w-3.5 text-muted-foreground" />{guest.email}</div>
-                        {guest.phone && <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5"><Phone className="h-3 w-3" />{guest.phone}</div>}
-                      </td>
-                      <td className="px-5 py-4">
-                        {guest.nationality
-                          ? <div className="flex items-center gap-1.5 text-sm"><Globe className="h-3.5 w-3.5 text-muted-foreground" />{guest.nationality}</div>
-                          : <span className="text-muted-foreground">—</span>}
-                      </td>
-                      <td className="px-5 py-4">
-                        {guest.idType
-                          ? <div><p className="text-xs text-muted-foreground">{guest.idType.replace('_', ' ')}</p><p className="text-sm font-medium">{guest.idNumber ?? '—'}</p></div>
-                          : <span className="text-muted-foreground">—</span>}
-                      </td>
-                      <td className="px-5 py-4 text-sm text-muted-foreground">{formatDate(guest.createdAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                        <div>
+                          <p className="text-[13.5px] font-medium text-[#18231f]">{guest.firstName} {guest.lastName}</p>
+                          {guest.notes && (
+                            <p className="mt-px max-w-[160px] truncate text-[11.5px] text-[#b89040]">📝 {guest.notes}</p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-5 py-[14px]">
+                      <div className="flex items-center gap-1.5 text-[13px] text-[#18231f]">
+                        <Mail className="h-3.5 w-3.5 text-[#8aa29a]" />{guest.email}
+                      </div>
+                      {guest.phone && (
+                        <div className="mt-[3px] flex items-center gap-1.5 text-[11.5px] text-[#8aa29a]">
+                          <Phone className="h-3 w-3" />{guest.phone}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-5 py-[14px]">
+                      {guest.nationality ? (
+                        <div className="flex items-center gap-1.5 text-[13px] text-[#18231f]">
+                          <Globe className="h-3.5 w-3.5 text-[#8aa29a]" />{guest.nationality}
+                        </div>
+                      ) : <span className="text-[#c5bdb4]">—</span>}
+                    </td>
+                    <td className="px-5 py-[14px]">
+                      {guest.idType ? (
+                        <div>
+                          <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8aa29a]">{guest.idType.replace('_', ' ')}</p>
+                          <p className="text-[13px] font-medium text-[#18231f]">{guest.idNumber ?? '—'}</p>
+                        </div>
+                      ) : <span className="text-[#c5bdb4]">—</span>}
+                    </td>
+                    <td className="px-5 py-[14px] text-[13px] text-[#8aa29a]">{formatDate(guest.createdAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Pagination */}
       {pagination && pagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} of {total}</p>
+          <p className="text-[12.5px] text-[#8aa29a]">
+            Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} of {total}
+          </p>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)} className="gap-1"><ChevronLeft className="h-4 w-4" /> Previous</Button>
-            <Button variant="outline" size="sm" disabled={page === pagination.totalPages} onClick={() => setPage(p => p + 1)} className="gap-1">Next <ChevronRight className="h-4 w-4" /></Button>
+            <button
+              disabled={page === 1}
+              onClick={() => setPage(p => p - 1)}
+              className="flex items-center gap-1 rounded-[8px] border px-4 py-[7px] text-[12.5px] font-medium transition-colors disabled:opacity-40"
+              style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.09)', color: '#18231f' }}
+            >
+              <ChevronLeft className="h-3.5 w-3.5" /> Previous
+            </button>
+            <button
+              disabled={page === pagination.totalPages}
+              onClick={() => setPage(p => p + 1)}
+              className="flex items-center gap-1 rounded-[8px] border px-4 py-[7px] text-[12.5px] font-medium transition-colors disabled:opacity-40"
+              style={{ background: '#1b342f', borderColor: '#1b342f', color: '#dfd9d0' }}
+            >
+              Next <ChevronRight className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
       )}
