@@ -7,14 +7,11 @@
  */
 
 import type { FastifyInstance } from 'fastify';
-import Tesseract from 'tesseract.js';
-import { parse as parseMRZ } from 'mrz';
 import { requireRole } from '../middleware/auth';
 
 // ── MRZ parser ────────────────────────────────────────────────────────────────
 
-function tryParseMRZ(text: string): Record<string, string> | null {
-  // Extract lines that look like MRZ (only A-Z, 0-9, <, length 30 or 44)
+async function tryParseMRZ(text: string): Promise<Record<string, string> | null> {
   const lines = text
     .split('\n')
     .map(l => l.replace(/\s+/g, '').toUpperCase())
@@ -23,21 +20,14 @@ function tryParseMRZ(text: string): Record<string, string> | null {
   if (lines.length < 2) return null;
 
   try {
-    // Try TD3 (passport, 2 lines × 44) first
+    const { parse: parseMRZ } = await import('mrz');
     if (lines.some(l => l.length === 44)) {
       const td3Lines = lines.filter(l => l.length === 44).slice(0, 2);
-      if (td3Lines.length === 2) {
-        const result = parseMRZ(td3Lines);
-        return flattenMRZ(result);
-      }
+      if (td3Lines.length === 2) return flattenMRZ(parseMRZ(td3Lines));
     }
-    // Try TD1 (ID card, 3 lines × 30)
     if (lines.some(l => l.length === 30)) {
       const td1Lines = lines.filter(l => l.length === 30).slice(0, 3);
-      if (td1Lines.length >= 2) {
-        const result = parseMRZ(td1Lines);
-        return flattenMRZ(result);
-      }
+      if (td1Lines.length >= 2) return flattenMRZ(parseMRZ(td1Lines));
     }
   } catch {
     // MRZ parse failed — not a standard document
@@ -131,7 +121,8 @@ export async function idScanRoutes(app: FastifyInstance) {
       let rawText  = '';
       let confidence = 0;
       try {
-        const result = await Tesseract.recognize(fileBuffer, 'eng+ben', {
+        const Tesseract = await import('tesseract.js');
+        const result = await Tesseract.default.recognize(fileBuffer, 'eng+ben', {
           // @ts-ignore — logger not in types but valid
           logger: () => {},
         });
@@ -143,7 +134,7 @@ export async function idScanRoutes(app: FastifyInstance) {
       }
 
       // ── Parse fields ─────────────────────────────────────────────────────
-      const mrzFields = tryParseMRZ(rawText);
+      const mrzFields = await tryParseMRZ(rawText);
       const fields = mrzFields ?? parseRawText(rawText);
 
       return reply.send({
