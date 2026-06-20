@@ -367,49 +367,55 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Website Visitors Widget (optional — only shows if tracking data exists) */}
+      {/* Website Visitors Widget */}
       {websiteStats && (websiteStats.total30d > 0 || true) && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Globe className="h-4 w-4 text-indigo-500" />
-              Website Visitors
-            </CardTitle>
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span className="font-semibold text-gray-700">{websiteStats.todayViews} today</span>
-              <span>·</span>
-              <span>{websiteStats.total30d} last 30 days</span>
-              <a href="/dashboard/website" className="text-indigo-600 hover:underline ml-1">Edit site →</a>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {websiteStats.total30d === 0 ? (
-              <div className="flex flex-col items-center py-4 gap-2 text-center">
-                <Globe className="h-8 w-8 text-gray-200" />
-                <p className="text-sm text-muted-foreground">No visitors yet. Share your booking website to start tracking.</p>
-                <a href="/dashboard/website" className="text-xs text-indigo-600 hover:underline">Set up your website →</a>
+        <div className="rounded-[14px] border px-[22px] py-[18px] animate-fade-up [animation-delay:250ms]"
+          style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-[28px] w-[28px] items-center justify-center rounded-[8px] bg-[#fceee4]">
+                <Globe className="h-[12px] w-[12px] text-[#b8724a]" strokeWidth={2.5} />
               </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={80}>
-                <AreaChart data={websiteStats.chartData} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
-                  <defs>
-                    <linearGradient id="visitorGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <Tooltip
-                    formatter={(v: number) => [v, 'Visitors']}
-                    contentStyle={{ background: '#1f2937', border: 'none', borderRadius: 8, fontSize: 11 }}
-                    labelStyle={{ color: '#9ca3af' }}
-                    itemStyle={{ color: '#e5e7eb' }}
-                  />
-                  <Area type="monotone" dataKey="views" stroke="#6366f1" fill="url(#visitorGrad)" strokeWidth={1.5} dot={false} />
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
+              <div>
+                <p className="text-[13px] font-semibold text-[#18231f]">Website Visitors</p>
+                <p className="text-[11px] text-[#8aa29a]">Last 30 days</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-[22px] font-semibold leading-none tracking-[-0.02em] text-[#18231f]">{websiteStats.total30d}</p>
+              <p className="mt-[3px] text-[11px] text-[#8aa29a]">
+                <span className="font-medium text-[#23766a]">{websiteStats.todayViews}</span> today
+                {' · '}
+                <a href="/dashboard/website" className="text-[#23766a] hover:underline">Edit site →</a>
+              </p>
+            </div>
+          </div>
+          {websiteStats.total30d === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-4 text-center">
+              <Globe className="h-8 w-8 text-[#d6cfc4]" />
+              <p className="text-[13px] text-[#8aa29a]">No visitors yet. Share your booking website to start tracking.</p>
+              <a href="/dashboard/website" className="text-[12px] font-medium text-[#23766a] hover:underline">Set up your website →</a>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={72}>
+              <AreaChart data={websiteStats.chartData} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+                <defs>
+                  <linearGradient id="visitorGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#b8724a" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="#b8724a" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Tooltip
+                  formatter={(v: number) => [v, 'Visitors']}
+                  contentStyle={{ background: '#1b342f', border: 'none', borderRadius: 10, fontSize: 11 }}
+                  labelStyle={{ color: '#9bbdb7' }}
+                  itemStyle={{ color: '#ece7df' }}
+                />
+                <Area type="monotone" dataKey="views" stroke="#b8724a" fill="url(#visitorGrad)" strokeWidth={1.5} dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </div>
       )}
 
       {/* Recent Bookings + Low Stock */}
