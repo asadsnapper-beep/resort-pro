@@ -79,6 +79,25 @@ function CompactStatCard({
   );
 }
 
+const STATUS_PILL: Record<string, { bg: string; border: string; text: string; label: string }> = {
+  CONFIRMED:   { bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Confirmed' },
+  CHECKED_IN:  { bg: '#f4ecda', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'In House'  },
+  CHECKED_OUT: { bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)',      text: '#8aa29a', label: 'Checked Out'},
+  PENDING:     { bg: '#fceee4', border: 'rgba(184,114,74,0.2)',  text: '#b8724a', label: 'Pending'   },
+  CANCELLED:   { bg: '#fef2f2', border: 'rgba(200,60,60,0.15)',  text: '#c43c3c', label: 'Cancelled' },
+  NO_SHOW:     { bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)',      text: '#8aa29a', label: 'No Show'   },
+};
+
+function BookingStatusPill({ status }: { status: string }) {
+  const s = STATUS_PILL[status] ?? STATUS_PILL.PENDING;
+  return (
+    <span className="shrink-0 rounded-[7px] border px-[10px] py-[4px] text-[11px] font-semibold"
+      style={{ background: s.bg, borderColor: s.border, color: s.text }}>
+      {s.label}
+    </span>
+  );
+}
+
 export default function DashboardPage() {
   const { user } = useAuthStore();
 
@@ -419,57 +438,83 @@ export default function DashboardPage() {
       )}
 
       {/* Recent Bookings + Low Stock */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="text-base">Recent Bookings</CardTitle>
-            <a href="/dashboard/bookings" className="text-xs text-resort-600 hover:underline">View all</a>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {recentBookings.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">No recent bookings</p>
-              ) : (
-                recentBookings.map((booking: Record<string, unknown>) => (
-                  <div key={booking.id as string} className="flex items-center justify-between rounded-lg border p-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {(booking.guest as { firstName: string; lastName: string })?.firstName} {(booking.guest as { firstName: string; lastName: string })?.lastName}
+      <div className="grid gap-3 lg:grid-cols-3 animate-fade-up [animation-delay:290ms]">
+        {/* Recent Bookings */}
+        <div className="lg:col-span-2 rounded-[14px] border overflow-hidden"
+          style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+          <div className="flex items-center justify-between border-b px-5 py-[15px]"
+            style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-[28px] w-[28px] items-center justify-center rounded-[8px] bg-[#e3f2ef]">
+                <Users className="h-[12px] w-[12px] text-[#23766a]" strokeWidth={2.5} />
+              </div>
+              <span className="text-[13px] font-semibold text-[#18231f]">Recent Bookings</span>
+            </div>
+            <a href="/dashboard/bookings" className="text-[12px] font-medium text-[#23766a] hover:underline">View all →</a>
+          </div>
+          {recentBookings.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-8 text-center">
+              <Users className="h-8 w-8 text-[#d6cfc4]" />
+              <p className="text-[13px] text-[#8aa29a]">No recent bookings</p>
+            </div>
+          ) : (
+            <div className="divide-y" style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
+              {recentBookings.map((booking: Record<string, unknown>) => {
+                const guest = booking.guest as { firstName: string; lastName: string };
+                const room = booking.room as { name: string };
+                const initials = `${guest?.firstName?.[0] ?? ''}${guest?.lastName?.[0] ?? ''}`;
+                return (
+                  <div key={booking.id as string} className="flex items-center gap-3 px-5 py-[13px] hover:bg-[#faf9f7] transition-colors">
+                    <div className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-full bg-[#e3f2ef] text-[11px] font-semibold text-[#23766a]">
+                      {initials}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13.5px] font-medium text-[#18231f] truncate">
+                        {guest?.firstName} {guest?.lastName}
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        {(booking.room as { name: string })?.name} · {formatDate(booking.checkIn as string)} → {formatDate(booking.checkOut as string)}
+                      <p className="mt-px text-[11.5px] text-[#8aa29a]">
+                        {room?.name} · {formatDate(booking.checkIn as string)} → {formatDate(booking.checkOut as string)}
                       </p>
                     </div>
-                    <StatusBadge status={booking.status as string} />
+                    <BookingStatusPill status={booking.status as string} />
                   </div>
-                ))
-              )}
+                );
+              })}
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </div>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Low Stock Alerts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {lowStock.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">All stock levels OK</p>
-              ) : (
-                lowStock.map((item: Record<string, unknown>) => (
-                  <div key={item.id as string} className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">{item.name as string}</p>
-                      <p className="text-xs text-muted-foreground">{String(item.currentStock)} {item.unit as string} left</p>
-                    </div>
-                    <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Low</span>
-                  </div>
-                ))
-              )}
+        {/* Low Stock Alerts */}
+        <div className="rounded-[14px] border overflow-hidden"
+          style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+          <div className="flex items-center gap-2.5 border-b px-5 py-[15px]"
+            style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
+            <div className="flex h-[28px] w-[28px] items-center justify-center rounded-[8px] bg-[#fceee4]">
+              <AlertCircle className="h-[12px] w-[12px] text-[#b8724a]" strokeWidth={2.5} />
             </div>
-          </CardContent>
-        </Card>
+            <span className="text-[13px] font-semibold text-[#18231f]">Low Stock</span>
+          </div>
+          {lowStock.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-8 text-center">
+              <AlertCircle className="h-8 w-8 text-[#d6cfc4]" />
+              <p className="text-[13px] text-[#8aa29a]">All stock levels OK</p>
+            </div>
+          ) : (
+            <div className="divide-y" style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
+              {lowStock.map((item: Record<string, unknown>) => (
+                <div key={item.id as string} className="flex items-center justify-between px-5 py-[13px]">
+                  <div className="min-w-0">
+                    <p className="text-[13.5px] font-medium text-[#18231f] truncate">{item.name as string}</p>
+                    <p className="mt-px text-[11.5px] text-[#8aa29a]">{String(item.currentStock)} {item.unit as string} left</p>
+                  </div>
+                  <span className="ml-3 shrink-0 rounded-[7px] border border-[#b8724a]/20 bg-[#fceee4] px-[10px] py-[4px] text-[11px] font-semibold text-[#b8724a]">
+                    Low
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
       </>} {/* end non-STAFF block */}
     </div>
