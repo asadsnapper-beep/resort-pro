@@ -129,14 +129,17 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
     });
   };
 
+  const selectCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[8px] text-[13px] text-[#18231f] focus:outline-none focus:ring-1 focus:ring-resort-600/20';
+  const inputCls  = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#8aa29a] focus:outline-none focus:ring-1 focus:ring-resort-600/20';
+  const labelCls  = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+
   return (
     <Modal open={open} onClose={onClose} title="New F&B Order" description="Create a food & beverage order" className="max-w-2xl">
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4 pt-1">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Guest (optional)</label>
-            <select value={guestId} onChange={e => setGuestId(e.target.value)}
-              className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
+            <label className={labelCls}>Guest (optional)</label>
+            <select value={guestId} onChange={e => setGuestId(e.target.value)} className={selectCls}>
               <option value="">Walk-in</option>
               {guests.map((g: { id: string; firstName: string; lastName: string }) => (
                 <option key={g.id} value={g.id}>{g.firstName} {g.lastName}</option>
@@ -144,67 +147,90 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Table Number</label>
-            <Input value={tableNumber} onChange={e => setTableNumber(e.target.value)} placeholder="Table 4, Room 201..." />
+            <label className={labelCls}>Table Number</label>
+            <input className={inputCls} value={tableNumber} onChange={e => setTableNumber(e.target.value)} placeholder="Table 4, Room 201…" />
           </div>
         </div>
         <div>
-          <label className="mb-2 block text-sm font-medium text-gray-700">Menu Items</label>
-          <div className="max-h-48 overflow-y-auto rounded-lg border divide-y">
+          <label className={labelCls}>Menu Items</label>
+          <div className="max-h-48 overflow-y-auto rounded-[10px] border divide-y" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
             {menuItems.map((item: MenuItem) => (
-              <div key={item.id} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50">
+              <div key={item.id} className="flex items-center justify-between px-3 py-2 hover:bg-[#faf9f7]">
                 <div>
-                  <span className="text-sm font-medium">{item.name}</span>
-                  <span className="ml-2 text-xs text-muted-foreground">{item.category}</span>
+                  <span className="text-[13px] font-medium text-[#18231f]">{item.name}</span>
+                  <span className="ml-2 text-[11.5px] text-[#8aa29a]">{item.category}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-resort-700">{formatCurrency(Number(item.price))}</span>
-                  <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => addToCart(item)}>+ Add</Button>
+                  <span className="text-[13px] font-semibold text-[#23766a]">{formatCurrency(Number(item.price))}</span>
+                  <button type="button" onClick={() => addToCart(item)}
+                    className="rounded-[7px] border px-[9px] py-[4px] text-[11.5px] font-medium transition-colors"
+                    style={{ background: '#e3f2ef', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                    + Add
+                  </button>
                 </div>
               </div>
             ))}
-            {menuItems.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">No available menu items</p>}
+            {menuItems.length === 0 && <p className="py-4 text-center text-[13px] text-[#8aa29a]">No available menu items</p>}
           </div>
         </div>
         {cart.length > 0 && (
-          <div className="rounded-lg border">
-            <div className="px-3 py-2 border-b bg-gray-50 text-xs font-semibold text-muted-foreground uppercase">Order Summary</div>
-            <div className="divide-y">
+          <div className="rounded-[10px] border overflow-hidden" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
+            <div className="px-3 py-2 border-b text-[10.5px] font-semibold uppercase tracking-[0.07em] text-[#8aa29a]"
+              style={{ borderColor: 'rgba(0,0,0,0.05)', background: '#faf9f7' }}>Order Summary</div>
+            <div className="divide-y" style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
               {cart.map(item => (
                 <div key={item.menuItemId} className="flex items-center gap-3 px-3 py-2">
-                  <span className="flex-1 text-sm font-medium">{item.name}</span>
+                  <span className="flex-1 text-[13px] font-medium text-[#18231f]">{item.name}</span>
                   <div className="flex items-center gap-1">
                     <button type="button" onClick={() => updateQty(item.menuItemId, item.quantity - 1)}
-                      className="h-6 w-6 rounded border text-xs hover:bg-gray-100 flex items-center justify-center">−</button>
-                    <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
+                      className="flex h-6 w-6 items-center justify-center rounded-[6px] border text-[12px] hover:bg-[#f4f1eb]"
+                      style={{ borderColor: 'rgba(0,0,0,0.09)' }}>−</button>
+                    <span className="w-6 text-center text-[13px] font-medium text-[#18231f]">{item.quantity}</span>
                     <button type="button" onClick={() => updateQty(item.menuItemId, item.quantity + 1)}
-                      className="h-6 w-6 rounded border text-xs hover:bg-gray-100 flex items-center justify-center">+</button>
+                      className="flex h-6 w-6 items-center justify-center rounded-[6px] border text-[12px] hover:bg-[#f4f1eb]"
+                      style={{ borderColor: 'rgba(0,0,0,0.09)' }}>+</button>
                   </div>
-                  <span className="text-sm font-semibold w-16 text-right">{formatCurrency(item.price * item.quantity)}</span>
-                  <button type="button" onClick={() => updateQty(item.menuItemId, 0)}>
-                    <Trash2 className="h-3.5 w-3.5 text-red-400 hover:text-red-600" />
+                  <span className="w-16 text-right text-[13px] font-semibold text-[#18231f]">{formatCurrency(item.price * item.quantity)}</span>
+                  <button type="button" onClick={() => updateQty(item.menuItemId, 0)} className="text-[#c5bdb4] hover:text-[#c43c3c]">
+                    <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
               ))}
             </div>
-            <div className="flex items-center justify-between px-3 py-2 border-t bg-gray-50">
-              <span className="text-sm font-semibold">Total</span>
-              <span className="text-sm font-bold text-resort-700">{formatCurrency(total)}</span>
+            <div className="flex items-center justify-between px-3 py-2 border-t" style={{ borderColor: 'rgba(0,0,0,0.05)', background: '#faf9f7' }}>
+              <span className="text-[13px] font-semibold text-[#18231f]">Total</span>
+              <span className="text-[13px] font-bold text-[#23766a]">{formatCurrency(total)}</span>
             </div>
           </div>
         )}
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Order Notes</label>
-          <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Allergies, preferences..." />
+          <label className={labelCls}>Order Notes</label>
+          <input className={inputCls} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Allergies, preferences…" />
         </div>
-        <div className="flex gap-3 justify-end pt-2 border-t">
-          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="submit" loading={loading} disabled={cart.length === 0}>Place Order ({cart.length} items · {formatCurrency(total)})</Button>
+        <div className="flex gap-3 justify-end pt-2 border-t" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
+          <button type="button" onClick={onClose}
+            className="rounded-[9px] border px-4 py-[8px] text-[13px] font-medium text-[#6b8880] hover:bg-[#f4f1eb]"
+            style={{ borderColor: 'rgba(0,0,0,0.09)' }}>
+            Cancel
+          </button>
+          <button type="submit" disabled={loading || cart.length === 0}
+            className="rounded-[9px] px-4 py-[8px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80 disabled:opacity-40"
+            style={{ background: '#1b342f' }}>
+            {loading ? 'Placing…' : `Place Order (${cart.length} item${cart.length !== 1 ? 's' : ''} · ${formatCurrency(total)})`}
+          </button>
         </div>
       </form>
     </Modal>
   );
 }
+
+const ORDER_STATUS_PILL: Record<string, { bg: string; border: string; text: string; label: string }> = {
+  PENDING:   { bg: '#f4ecda', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'Pending' },
+  PREPARING: { bg: '#fceee4', border: 'rgba(184,114,74,0.2)',  text: '#b8724a', label: 'Preparing' },
+  READY:     { bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Ready' },
+  DELIVERED: { bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Delivered' },
+  CANCELLED: { bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)',      text: '#8aa29a', label: 'Cancelled' },
+};
 
 // ── Standard order card (non-chef) ───────────────────────────────────────────
 function OrderCard({ order, expanded, onToggleExpand }: {
@@ -221,20 +247,34 @@ function OrderCard({ order, expanded, onToggleExpand }: {
     onError: () => toast({ title: 'Error', description: 'Failed to update order', variant: 'destructive' }),
   });
   const nextStatus = STATUS_NEXT[order.status];
+  const cfg = ORDER_STATUS_PILL[order.status] ?? ORDER_STATUS_PILL.PENDING;
 
   return (
-    <Card className="overflow-hidden hover:shadow-md transition-shadow">
-      <CardContent className="p-4">
+    <div className="rounded-[14px] border bg-white overflow-hidden transition-shadow hover:shadow-sm"
+      style={{ borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+      <div className="p-4">
         <div className="flex items-center gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <StatusBadge status={order.status} />
-              {order.guest && <span className="text-sm font-medium">{order.guest.firstName} {order.guest.lastName}</span>}
-              {order.tableNumber && <span className="text-xs text-muted-foreground bg-gray-100 rounded px-2 py-0.5">📍 {order.tableNumber}</span>}
-              <span className="text-xs text-muted-foreground ml-auto">{formatDate(order.createdAt)}</span>
+              <span className="inline-flex items-center rounded-[7px] border px-[10px] py-[4px] text-[11px] font-semibold"
+                style={{ background: cfg.bg, borderColor: cfg.border, color: cfg.text }}>
+                {cfg.label}
+              </span>
+              {order.guest && (
+                <span className="text-[13.5px] font-medium text-[#18231f]">
+                  {order.guest.firstName} {order.guest.lastName}
+                </span>
+              )}
+              {order.tableNumber && (
+                <span className="rounded-[6px] border px-[8px] py-[3px] text-[11.5px] text-[#6b8880]"
+                  style={{ background: '#f4f1eb', borderColor: 'rgba(0,0,0,0.07)' }}>
+                  📍 {order.tableNumber}
+                </span>
+              )}
+              <span className="text-[12px] text-[#8aa29a] ml-auto">{formatDate(order.createdAt)}</span>
             </div>
             <button className="mt-1 text-left" onClick={onToggleExpand}>
-              <p className="text-xs text-resort-600 hover:underline">
+              <p className="text-[12px] text-[#23766a] hover:underline">
                 {order.items.length} item{order.items.length !== 1 ? 's' : ''} · {formatCurrency(Number(order.totalAmount))}
                 {expanded ? ' ▲' : ' ▼'}
               </p>
@@ -242,34 +282,38 @@ function OrderCard({ order, expanded, onToggleExpand }: {
           </div>
           <div className="flex gap-2 flex-shrink-0">
             {nextStatus && (
-              <Button size="sm" variant="outline" className="text-xs"
+              <button
                 onClick={() => statusMutation.mutate({ id: order.id, status: nextStatus })}
-                loading={statusMutation.isPending}>
+                disabled={statusMutation.isPending}
+                className="rounded-[8px] border px-[12px] py-[6px] text-[12px] font-medium transition-colors"
+                style={{ background: '#1b342f', borderColor: '#1b342f', color: '#dfd9d0' }}>
                 {STATUS_LABEL[order.status]}
-              </Button>
+              </button>
             )}
             {(order.status === 'PENDING' || order.status === 'PREPARING') && (
-              <Button size="sm" variant="outline" className="text-xs text-red-600 border-red-200 hover:bg-red-50"
+              <button
                 onClick={() => statusMutation.mutate({ id: order.id, status: 'CANCELLED' })}
-                disabled={statusMutation.isPending}>
-                <XCircle className="h-3.5 w-3.5" />
-              </Button>
+                disabled={statusMutation.isPending}
+                className="rounded-[8px] border p-[6px] transition-colors"
+                style={{ background: '#fef2f2', borderColor: 'rgba(200,60,60,0.18)', color: '#c43c3c' }}>
+                <XCircle className="h-[14px] w-[14px]" />
+              </button>
             )}
           </div>
         </div>
         {expanded && (
-          <div className="mt-3 pt-3 border-t space-y-1.5">
+          <div className="mt-3 pt-3 border-t space-y-1.5" style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
             {order.items.map(item => (
-              <div key={item.id} className="flex items-center justify-between text-sm">
-                <span className="text-gray-700">{item.quantity}× {item.menuItem.name}</span>
-                <span className="font-medium">{formatCurrency(Number(item.unitPrice) * item.quantity)}</span>
+              <div key={item.id} className="flex items-center justify-between">
+                <span className="text-[13px] text-[#18231f]">{item.quantity}× {item.menuItem.name}</span>
+                <span className="text-[13px] font-medium text-[#18231f]">{formatCurrency(Number(item.unitPrice) * item.quantity)}</span>
               </div>
             ))}
-            {order.notes && <p className="text-xs text-muted-foreground mt-2 italic">📝 {order.notes}</p>}
+            {order.notes && <p className="text-[11.5px] text-[#8aa29a] mt-1 italic">📝 {order.notes}</p>}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -574,47 +618,83 @@ export default function OrdersPage() {
   const stats = statsData?.data?.data ?? {};
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 animate-fade-up">
+      {/* Header */}
+      <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">F&B Orders</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Food & beverage order management</p>
+          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">F&B Orders</h1>
+          <p className="mt-[4px] text-[13px] text-[#7a9890]">Food & beverage order management</p>
         </div>
-        <Button className="gap-2" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> New Order</Button>
+        <button
+          onClick={() => setAddOpen(true)}
+          className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
+          style={{ background: '#1b342f' }}>
+          <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} /> New Order
+        </button>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          { label: 'Total Orders', value: total,                   icon: ShoppingBag,  color: 'bg-resort-50 border-resort-200 text-resort-700' },
-          { label: 'Pending',      value: stats.pending   ?? 0,    icon: Clock,        color: 'bg-amber-50 border-amber-200 text-amber-700' },
-          { label: 'Preparing',    value: stats.preparing ?? 0,    icon: ChefHat,      color: 'bg-orange-50 border-orange-200 text-orange-700' },
-          { label: 'Ready',        value: stats.ready     ?? 0,    icon: CheckCircle2, color: 'bg-green-50 border-green-200 text-green-700' },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className={`rounded-xl border p-4 ${color}`}>
-            <div className="flex items-center gap-2 mb-1"><Icon className="h-4 w-4 opacity-70" /><p className="text-xs font-medium opacity-70">{label}</p></div>
-            <p className="text-2xl font-bold">{value}</p>
+          { label: 'Total Orders', value: total,                icon: ShoppingBag, bg: '#e3f2ef', color: '#23766a' },
+          { label: 'Pending',      value: stats.pending   ?? 0, icon: Clock,       bg: '#f4ecda', color: '#b89040' },
+          { label: 'Preparing',    value: stats.preparing ?? 0, icon: ChefHat,     bg: '#fceee4', color: '#b8724a' },
+          { label: 'Ready',        value: stats.ready     ?? 0, icon: CheckCircle2,bg: '#e3f2ef', color: '#23766a' },
+        ].map(({ label, value, icon: Icon, bg, color }) => (
+          <div key={label} className="flex items-center gap-[11px] rounded-[12px] border px-[18px] py-[15px]"
+            style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+            <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px]" style={{ background: bg }}>
+              <Icon className="h-[14px] w-[14px]" strokeWidth={2} style={{ color }} />
+            </div>
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.07em] text-[#8aa29a]">{label}</div>
+              <div className="text-[22px] font-semibold leading-none tracking-[-0.02em] text-[#18231f]">{value}</div>
+            </div>
           </div>
         ))}
       </div>
 
-      <div className="flex gap-2 flex-wrap">
+      {/* Filter pills */}
+      <div className="flex gap-1.5 flex-wrap">
         {STATUS_FILTERS.map(s => (
           <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${statusFilter === s ? 'bg-resort-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-            {s ? s.replace('_', ' ') : 'All'}
+            className="rounded-[8px] border px-[12px] py-[7px] text-[12px] font-medium transition-colors"
+            style={statusFilter === s
+              ? { background: '#1b342f', color: '#dfd9d0', borderColor: '#1b342f' }
+              : { background: '#fff', color: '#6b8880', borderColor: 'rgba(0,0,0,0.09)' }}>
+            {s ? ORDER_STATUS_PILL[s]?.label ?? s : 'All'}
           </button>
         ))}
       </div>
 
+      {/* Order list */}
       <div className="space-y-3">
         {isLoading ? (
-          [...Array(5)].map((_, i) => <div key={i} className="h-24 rounded-xl bg-gray-100 animate-pulse" />)
+          [...Array(5)].map((_, i) => (
+            <div key={i} className="h-20 animate-pulse rounded-[14px]" style={{ background: '#f5f4f1' }} />
+          ))
         ) : orders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-gray-200 rounded-2xl">
-            <ShoppingBag className="h-14 w-14 text-gray-200 mb-4" />
-            <p className="font-medium text-gray-500">{statusFilter ? 'No orders with this status' : 'No orders yet'}</p>
-            <p className="mt-1 text-sm text-muted-foreground">{statusFilter ? 'Try a different filter' : 'Place your first food order'}</p>
-            {!statusFilter && <Button className="mt-4 gap-2" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> New Order</Button>}
+          <div className="flex flex-col items-center justify-center gap-3 py-20 text-center rounded-[14px] border-2 border-dashed"
+            style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#f5f4f1]">
+              <ShoppingBag className="h-7 w-7 text-[#c5bdb4]" />
+            </div>
+            <div>
+              <p className="text-[14px] font-medium text-[#18231f]">
+                {statusFilter ? 'No orders with this status' : 'No orders yet'}
+              </p>
+              <p className="mt-1 text-[12.5px] text-[#8aa29a]">
+                {statusFilter ? 'Try a different filter' : 'Place your first food order'}
+              </p>
+            </div>
+            {!statusFilter && (
+              <button
+                onClick={() => setAddOpen(true)}
+                className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0]"
+                style={{ background: '#1b342f' }}>
+                <Plus className="h-[13px] w-[13px]" /> New Order
+              </button>
+            )}
           </div>
         ) : (
           orders.map(order => (
@@ -624,12 +704,21 @@ export default function OrdersPage() {
         )}
       </div>
 
+      {/* Pagination */}
       {pagination && pagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} of {total}</p>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)} className="gap-1"><ChevronLeft className="h-4 w-4" /> Previous</Button>
-            <Button variant="outline" size="sm" disabled={page === pagination.totalPages} onClick={() => setPage(p => p + 1)} className="gap-1">Next <ChevronRight className="h-4 w-4" /></Button>
+          <p className="text-[12.5px] text-[#8aa29a]">Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} of {total}</p>
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
+              className="flex h-8 items-center gap-1 rounded-[8px] border px-3 text-[12.5px] font-medium disabled:opacity-40"
+              style={{ borderColor: 'rgba(0,0,0,0.09)', color: '#18231f' }}>
+              <ChevronLeft className="h-3.5 w-3.5" /> Previous
+            </button>
+            <button onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))} disabled={page >= pagination.totalPages}
+              className="flex h-8 items-center gap-1 rounded-[8px] border px-3 text-[12.5px] font-medium disabled:opacity-40"
+              style={{ background: '#1b342f', borderColor: '#1b342f', color: '#dfd9d0' }}>
+              Next <ChevronRight className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
       )}

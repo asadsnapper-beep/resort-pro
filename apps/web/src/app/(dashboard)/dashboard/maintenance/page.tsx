@@ -33,17 +33,17 @@ interface Ticket {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const PRIORITY_META: Record<Priority, { label: string; color: string; dot: string }> = {
-  URGENT: { label: 'Urgent',  color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',      dot: 'bg-red-500' },
-  HIGH:   { label: 'High',    color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400', dot: 'bg-orange-500' },
-  NORMAL: { label: 'Normal',  color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',  dot: 'bg-blue-500' },
-  LOW:    { label: 'Low',     color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',      dot: 'bg-gray-400' },
+const PRIORITY_META: Record<Priority, { label: string; bg: string; border: string; text: string; dot: string }> = {
+  URGENT: { label: 'Urgent', bg: '#fef2f2', border: 'rgba(200,60,60,0.18)',  text: '#c43c3c', dot: '#c43c3c' },
+  HIGH:   { label: 'High',   bg: '#fceee4', border: 'rgba(184,114,74,0.2)', text: '#b8724a', dot: '#b8724a' },
+  NORMAL: { label: 'Normal', bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)', text: '#23766a', dot: '#23766a' },
+  LOW:    { label: 'Low',    bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)',      text: '#8aa29a', dot: '#8aa29a' },
 };
 
-const STATUS_META: Record<Status, { label: string; color: string; icon: React.ElementType }> = {
-  OPEN:        { label: 'Open',        color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',       icon: AlertTriangle },
-  IN_PROGRESS: { label: 'In Progress', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: Clock },
-  RESOLVED:    { label: 'Resolved',    color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', icon: CheckCircle2 },
+const STATUS_META: Record<Status, { label: string; bg: string; border: string; text: string; icon: React.ElementType }> = {
+  OPEN:        { label: 'Open',        bg: '#fef2f2', border: 'rgba(200,60,60,0.18)',  text: '#c43c3c', icon: AlertTriangle },
+  IN_PROGRESS: { label: 'In Progress', bg: '#f4ecda', border: 'rgba(184,144,64,0.2)', text: '#b89040', icon: Clock },
+  RESOLVED:    { label: 'Resolved',    bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)', text: '#23766a', icon: CheckCircle2 },
 };
 
 const ISSUE_META: Record<IssueType, { label: string; icon: React.ElementType; emoji: string }> = {
@@ -109,47 +109,39 @@ function CreateTicketModal({ onClose }: { onClose: () => void }) {
   const staff = staffRes ?? [];
   const isValid = form.roomId && form.issueType && form.description.trim();
 
+  const selectCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] focus:outline-none focus:ring-1 focus:ring-resort-600/20';
+  const labelCls  = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800">
-          <h2 className="text-lg font-bold">New Maintenance Ticket</h2>
-          <button onClick={onClose} className="rounded-xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-            <X className="h-4 w-4 text-gray-500" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(27,52,47,0.45)', backdropFilter: 'blur(4px)' }}>
+      <div className="bg-white rounded-[18px] w-full max-w-lg max-h-[90vh] overflow-y-auto"
+        style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+        <div className="flex items-center justify-between px-6 py-5 border-b" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
+          <h2 className="font-display text-[18px] font-medium text-[#18231f]">New Maintenance Ticket</h2>
+          <button onClick={onClose} className="rounded-[8px] p-1.5 transition-colors hover:bg-[#f4f1eb]">
+            <X className="h-4 w-4 text-[#8aa29a]" />
           </button>
         </div>
 
         <div className="p-6 space-y-5">
-          {/* Room */}
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Room *</label>
-            <select
-              className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-resort-500"
-              value={form.roomId}
-              onChange={e => set('roomId', e.target.value)}
-            >
-              <option value="">Select room...</option>
-              {rooms.map(r => (
-                <option key={r.id} value={r.id}>{r.name} (#{r.number})</option>
-              ))}
+            <label className={labelCls}>Room *</label>
+            <select className={selectCls} value={form.roomId} onChange={e => set('roomId', e.target.value)}>
+              <option value="">Select room…</option>
+              {rooms.map(r => <option key={r.id} value={r.id}>{r.name} (#{r.number})</option>)}
             </select>
           </div>
 
-          {/* Issue type */}
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">Issue Type *</label>
+            <label className={labelCls}>Issue Type *</label>
             <div className="grid grid-cols-4 gap-2">
               {(Object.entries(ISSUE_META) as [IssueType, typeof ISSUE_META[IssueType]][]).map(([type, meta]) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => set('issueType', type)}
-                  className={`flex flex-col items-center gap-1.5 rounded-xl border-2 py-3 px-2 text-xs font-semibold transition-all ${
-                    form.issueType === type
-                      ? 'border-resort-500 bg-resort-50 dark:bg-resort-900/20 text-resort-700'
-                      : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300'
-                  }`}
-                >
+                <button key={type} type="button" onClick={() => set('issueType', type)}
+                  className="flex flex-col items-center gap-1.5 rounded-[10px] border-2 py-3 px-2 text-[11px] font-semibold transition-all"
+                  style={form.issueType === type
+                    ? { borderColor: '#23766a', background: '#e3f2ef', color: '#23766a' }
+                    : { borderColor: 'rgba(0,0,0,0.07)', color: '#6b8880' }}>
                   <span className="text-xl">{meta.emoji}</span>
                   {meta.label}
                 </button>
@@ -157,47 +149,31 @@ function CreateTicketModal({ onClose }: { onClose: () => void }) {
             </div>
           </div>
 
-          {/* Description */}
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Description *</label>
-            <textarea
-              rows={3}
-              placeholder="Describe the issue in detail..."
-              className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm bg-transparent focus:outline-none focus:ring-2 focus:ring-resort-500 resize-none"
-              value={form.description}
-              onChange={e => set('description', e.target.value)}
-            />
+            <label className={labelCls}>Description *</label>
+            <textarea rows={3} placeholder="Describe the issue in detail…"
+              className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#8aa29a] focus:outline-none focus:ring-1 focus:ring-resort-600/20 resize-none"
+              value={form.description} onChange={e => set('description', e.target.value)} />
           </div>
 
-          {/* Priority */}
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">Priority</label>
+            <label className={labelCls}>Priority</label>
             <div className="flex gap-2">
               {PRIORITY_ORDER.map(p => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => set('priority', p)}
-                  className={`flex-1 rounded-xl border-2 py-2 text-xs font-semibold transition-all ${
-                    form.priority === p
-                      ? `border-current ${PRIORITY_META[p].color}`
-                      : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:border-gray-300'
-                  }`}
-                >
+                <button key={p} type="button" onClick={() => set('priority', p)}
+                  className="flex-1 rounded-[8px] border-2 py-[7px] text-[11.5px] font-semibold transition-all"
+                  style={form.priority === p
+                    ? { borderColor: PRIORITY_META[p].text, background: PRIORITY_META[p].bg, color: PRIORITY_META[p].text }
+                    : { borderColor: 'rgba(0,0,0,0.08)', color: '#8aa29a' }}>
                   {PRIORITY_META[p].label}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Assign to */}
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Assign To (optional)</label>
-            <select
-              className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-resort-500"
-              value={form.assignedTo}
-              onChange={e => set('assignedTo', e.target.value)}
-            >
+            <label className={labelCls}>Assign To (optional)</label>
+            <select className={selectCls} value={form.assignedTo} onChange={e => set('assignedTo', e.target.value)}>
               <option value="">Unassigned</option>
               {staff.map(s => (
                 <option key={s.userId} value={s.userId}>
@@ -209,15 +185,17 @@ function CreateTicketModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="flex gap-3 px-6 pb-6">
-          <Button variant="outline" className="flex-1" onClick={onClose} disabled={isPending}>Cancel</Button>
-          <Button
-            className="flex-1 bg-resort-600 hover:bg-resort-700 text-white gap-2"
-            disabled={!isValid || isPending}
-            onClick={() => mutate()}
-          >
+          <button onClick={onClose} disabled={isPending}
+            className="flex-1 rounded-[9px] border py-[9px] text-[13px] font-medium text-[#6b8880] transition-colors hover:bg-[#f4f1eb]"
+            style={{ borderColor: 'rgba(0,0,0,0.09)' }}>
+            Cancel
+          </button>
+          <button disabled={!isValid || isPending} onClick={() => mutate()}
+            className="flex-1 flex items-center justify-center gap-2 rounded-[9px] py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80 disabled:opacity-40"
+            style={{ background: '#1b342f' }}>
             {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
             Create Ticket
-          </Button>
+          </button>
         </div>
       </div>
     </div>
@@ -243,32 +221,33 @@ function ResolveModal({ ticket, onClose }: { ticket: Ticket; onClose: () => void
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md p-6">
-        <h3 className="text-lg font-bold mb-1">Resolve Ticket</h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          Room <strong>{ticket.room.name} #{ticket.room.number}</strong> · {ISSUE_META[ticket.issueType].emoji} {ISSUE_META[ticket.issueType].label}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(27,52,47,0.45)', backdropFilter: 'blur(4px)' }}>
+      <div className="bg-white rounded-[18px] w-full max-w-md p-6"
+        style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+        <h3 className="font-display text-[18px] font-medium text-[#18231f] mb-1">Resolve Ticket</h3>
+        <p className="text-[13px] text-[#8aa29a] mb-4">
+          Room <strong className="text-[#18231f]">{ticket.room.name} #{ticket.room.number}</strong>{' '}
+          · {ISSUE_META[ticket.issueType].emoji} {ISSUE_META[ticket.issueType].label}
         </p>
         <div className="mb-4">
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Resolution Notes (optional)</label>
-          <textarea
-            rows={3}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm bg-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
-            placeholder="What was done to fix the issue?"
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-          />
+          <label className="block text-[11.5px] font-medium text-[#6b8880] mb-1.5">Resolution Notes (optional)</label>
+          <textarea rows={3} placeholder="What was done to fix the issue?"
+            className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#8aa29a] focus:outline-none focus:ring-1 focus:ring-resort-600/20 resize-none"
+            value={notes} onChange={e => setNotes(e.target.value)} />
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" className="flex-1" onClick={onClose} disabled={isPending}>Cancel</Button>
-          <Button
-            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
-            onClick={() => mutate()}
-            disabled={isPending}
-          >
+          <button onClick={onClose} disabled={isPending}
+            className="flex-1 rounded-[9px] border py-[9px] text-[13px] font-medium text-[#6b8880] transition-colors hover:bg-[#f4f1eb]"
+            style={{ borderColor: 'rgba(0,0,0,0.09)' }}>
+            Cancel
+          </button>
+          <button onClick={() => mutate()} disabled={isPending}
+            className="flex-1 flex items-center justify-center gap-2 rounded-[9px] py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80 disabled:opacity-40"
+            style={{ background: '#1b342f' }}>
             {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
             Mark Resolved
-          </Button>
+          </button>
         </div>
       </div>
     </div>
@@ -308,28 +287,30 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
 
   return (
     <>
-      <div className={`rounded-2xl border bg-white dark:bg-gray-900 p-5 transition-shadow hover:shadow-md ${
-        ticket.priority === 'URGENT' && ticket.status !== 'RESOLVED'
-          ? 'border-red-200 dark:border-red-900/40'
-          : 'border-gray-100 dark:border-gray-800'
-      }`}>
+      <div className="rounded-[14px] border bg-white p-5 transition-shadow hover:shadow-sm"
+        style={{
+          borderColor: ticket.priority === 'URGENT' && ticket.status !== 'RESOLVED'
+            ? 'rgba(200,60,60,0.25)' : 'rgba(0,0,0,0.045)',
+          boxShadow: '0 1px 6px rgba(0,0,0,0.04)',
+        }}>
         {/* Top row */}
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-center gap-2.5 min-w-0">
-            {/* Issue icon */}
-            <div className="h-10 w-10 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-lg shrink-0">
+            <div className="h-[38px] w-[38px] rounded-[10px] flex items-center justify-center text-[18px] shrink-0"
+              style={{ background: '#f4f1eb' }}>
               {issueMeta.emoji}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <p className="text-sm font-semibold text-gray-900 dark:text-white">{issueMeta.label}</p>
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${priorityMeta.color}`}>
+                <p className="text-[13.5px] font-semibold text-[#18231f]">{issueMeta.label}</p>
+                <span className="inline-flex items-center rounded-[7px] border px-[9px] py-[3px] text-[11px] font-semibold"
+                  style={{ background: priorityMeta.bg, borderColor: priorityMeta.border, color: priorityMeta.text }}>
                   {priorityMeta.label}
                 </span>
               </div>
-              <div className="flex items-center gap-2 mt-0.5">
-                <BedDouble className="h-3 w-3 text-gray-400 shrink-0" />
-                <p className="text-xs text-gray-500 truncate">
+              <div className="flex items-center gap-1.5 mt-[3px]">
+                <BedDouble className="h-[11px] w-[11px] text-[#8aa29a] shrink-0" />
+                <p className="text-[11.5px] text-[#8aa29a] truncate">
                   {ticket.room.name} #{ticket.room.number}
                   {ticket.room.floor ? ` · Floor ${ticket.room.floor}` : ''}
                 </p>
@@ -337,19 +318,16 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
             </div>
           </div>
 
-          {/* Status badge + actions */}
           <div className="flex items-center gap-2 shrink-0">
-            <span className={`flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${statusMeta.color}`}>
-              <StatusIcon className="h-3 w-3" />
+            <span className="inline-flex items-center gap-1 rounded-[7px] border px-[9px] py-[3px] text-[11px] font-semibold"
+              style={{ background: statusMeta.bg, borderColor: statusMeta.border, color: statusMeta.text }}>
+              <StatusIcon className="h-[10px] w-[10px]" />
               {statusMeta.label}
             </span>
             {ticket.status !== 'RESOLVED' && (
               <button
-                onClick={() => {
-                  if (confirm('Delete this ticket?')) deleteTicket();
-                }}
-                className="rounded-lg p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-red-400"
-              >
+                onClick={() => { if (confirm('Delete this ticket?')) deleteTicket(); }}
+                className="rounded-[7px] p-1.5 transition-colors hover:bg-[#fef2f2] text-[#c5bdb4] hover:text-[#c43c3c]">
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             )}
@@ -357,30 +335,29 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
         </div>
 
         {/* Description */}
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">{ticket.description}</p>
+        <p className="text-[13px] text-[#6b8880] mb-3 line-clamp-2">{ticket.description}</p>
 
         {/* Resolution notes */}
         {ticket.notes && ticket.status === 'RESOLVED' && (
-          <div className="mb-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2">
-            <p className="text-xs text-emerald-700 dark:text-emerald-400"><strong>Resolution:</strong> {ticket.notes}</p>
+          <div className="mb-3 rounded-[8px] px-3 py-2" style={{ background: '#e3f2ef' }}>
+            <p className="text-[12px] text-[#23766a]"><strong>Resolution:</strong> {ticket.notes}</p>
           </div>
         )}
 
         {/* Meta row */}
-        <div className="flex items-center gap-4 text-xs text-gray-400 mb-3 flex-wrap">
+        <div className="flex items-center gap-4 mb-3 flex-wrap">
           {ticket.assignedTo && (
-            <span className="flex items-center gap-1">
-              <User className="h-3 w-3" />
-              Assigned
+            <span className="flex items-center gap-1 text-[11.5px] text-[#8aa29a]">
+              <User className="h-[11px] w-[11px]" /> Assigned
             </span>
           )}
-          <span className="flex items-center gap-1">
-            <Clock className="h-3 w-3" />
+          <span className="flex items-center gap-1 text-[11.5px] text-[#8aa29a]">
+            <Clock className="h-[11px] w-[11px]" />
             {formatDate(ticket.createdAt)}
           </span>
           {ticket.resolvedAt && (
-            <span className="flex items-center gap-1 text-emerald-500">
-              <CheckCircle2 className="h-3 w-3" />
+            <span className="flex items-center gap-1 text-[11.5px] text-[#23766a]">
+              <CheckCircle2 className="h-[11px] w-[11px]" />
               Resolved {formatDate(ticket.resolvedAt)}
             </span>
           )}
@@ -390,24 +367,21 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
         {ticket.status !== 'RESOLVED' && (
           <div className="flex gap-2">
             {ticket.status === 'OPEN' && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="flex-1 text-amber-700 border-amber-200 hover:bg-amber-50 dark:border-amber-900/40 dark:text-amber-400 dark:hover:bg-amber-900/20 text-xs"
+              <button
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] border py-[7px] text-[12px] font-medium transition-colors"
+                style={{ background: '#f4ecda', borderColor: 'rgba(184,144,64,0.2)', color: '#b89040' }}
                 onClick={() => changeStatus('IN_PROGRESS')}
-                disabled={changingStatus}
-              >
-                {changingStatus ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Clock className="h-3 w-3 mr-1" />}
+                disabled={changingStatus}>
+                {changingStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : <Clock className="h-3 w-3" />}
                 Start Work
-              </Button>
+              </button>
             )}
-            <Button
-              size="sm"
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1"
-              onClick={() => setResolveOpen(true)}
-            >
+            <button
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] py-[7px] text-[12px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
+              style={{ background: '#1b342f' }}
+              onClick={() => setResolveOpen(true)}>
               <CheckCircle2 className="h-3 w-3" /> Resolve
-            </Button>
+            </button>
           </div>
         )}
       </div>
@@ -445,68 +419,63 @@ export default function MaintenancePage() {
   const tickets = ticketsRes ?? [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 animate-fade-up">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Maintenance</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Track and resolve room technical issues</p>
+          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Maintenance</h1>
+          <p className="mt-[4px] text-[13px] text-[#7a9890]">Track and resolve room technical issues</p>
         </div>
-        <Button
-          className="bg-resort-600 hover:bg-resort-700 text-white gap-2"
-          onClick={() => setShowCreate(true)}
-        >
-          <Plus className="h-4 w-4" /> New Ticket
-        </Button>
+        <button
+          className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
+          style={{ background: '#1b342f' }}
+          onClick={() => setShowCreate(true)}>
+          <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} /> New Ticket
+        </button>
       </div>
 
-      {/* Summary strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
-          { label: 'Open',          value: summary.open,          color: 'border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-900/40',       text: 'text-red-700 dark:text-red-400',       icon: AlertTriangle },
-          { label: 'In Progress',   value: summary.inProgress,    color: 'border-amber-200 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-900/40', text: 'text-amber-700 dark:text-amber-400',   icon: Clock },
-          { label: 'Resolved Today',value: summary.resolvedToday, color: 'border-emerald-200 bg-emerald-50 dark:bg-emerald-900/10 dark:border-emerald-900/40', text: 'text-emerald-700 dark:text-emerald-400', icon: CheckCircle2 },
-          { label: 'Urgent Open',   value: summary.urgent,        color: 'border-rose-200 bg-rose-50 dark:bg-rose-900/10 dark:border-rose-900/40',    text: 'text-rose-700 dark:text-rose-400',     icon: Zap },
-        ].map(({ label, value, color, text, icon: Icon }) => (
-          <div key={label} className={`rounded-2xl border p-5 ${color}`}>
-            <div className="flex items-center gap-2 mb-1">
-              <Icon className={`h-4 w-4 ${text}`} />
-              <p className="text-xs font-medium text-muted-foreground">{label}</p>
+          { label: 'Open',           value: summary.open,          icon: AlertTriangle, bg: '#fef2f2', color: '#c43c3c' },
+          { label: 'In Progress',    value: summary.inProgress,    icon: Clock,         bg: '#f4ecda', color: '#b89040' },
+          { label: 'Resolved Today', value: summary.resolvedToday, icon: CheckCircle2,  bg: '#e3f2ef', color: '#23766a' },
+          { label: 'Urgent Open',    value: summary.urgent,        icon: Zap,           bg: '#fceee4', color: '#b8724a' },
+        ].map(({ label, value, icon: Icon, bg, color }) => (
+          <div key={label} className="flex items-center gap-[11px] rounded-[12px] border px-[18px] py-[15px]"
+            style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+            <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px]" style={{ background: bg }}>
+              <Icon className="h-[14px] w-[14px]" strokeWidth={2} style={{ color }} />
             </div>
-            <p className={`text-3xl font-bold ${text}`}>{value}</p>
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.07em] text-[#8aa29a]">{label}</div>
+              <div className="text-[22px] font-semibold leading-none tracking-[-0.02em] text-[#18231f]">{value}</div>
+            </div>
           </div>
         ))}
       </div>
 
       {/* Filters */}
       <div className="flex gap-2 flex-wrap">
-        <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
+        <div className="flex gap-1 rounded-[10px] p-1" style={{ background: '#f4f1eb' }}>
           {(['', 'OPEN', 'IN_PROGRESS', 'RESOLVED'] as const).map(s => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                statusFilter === s
-                  ? 'bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white'
-                  : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-            >
+            <button key={s} onClick={() => setStatusFilter(s)}
+              className="rounded-[8px] px-3 py-[6px] text-[12px] font-semibold transition-all"
+              style={statusFilter === s
+                ? { background: '#fff', color: '#18231f', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }
+                : { color: '#8aa29a' }}>
               {s === '' ? 'All Status' : STATUS_META[s].label}
             </button>
           ))}
         </div>
 
-        <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
+        <div className="flex gap-1 rounded-[10px] p-1" style={{ background: '#f4f1eb' }}>
           {(['', ...PRIORITY_ORDER] as const).map(p => (
-            <button
-              key={p}
-              onClick={() => setPriorityFilter(p)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                priorityFilter === p
-                  ? 'bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white'
-                  : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-            >
+            <button key={p} onClick={() => setPriorityFilter(p)}
+              className="rounded-[8px] px-3 py-[6px] text-[12px] font-semibold transition-all"
+              style={priorityFilter === p
+                ? { background: '#fff', color: '#18231f', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }
+                : { color: '#8aa29a' }}>
               {p === '' ? 'All Priority' : PRIORITY_META[p].label}
             </button>
           ))}
@@ -517,24 +486,27 @@ export default function MaintenancePage() {
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-48 rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
+            <div key={i} className="h-48 animate-pulse rounded-[14px]" style={{ background: '#f5f4f1' }} />
           ))}
         </div>
       ) : tickets.length === 0 ? (
         <div className="flex flex-col items-center py-20 gap-3 text-center">
-          <div className="h-16 w-16 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-            <Wrench className="h-8 w-8 text-gray-300" />
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#f5f4f1]">
+            <Wrench className="h-7 w-7 text-[#c5bdb4]" />
           </div>
           <div>
-            <p className="font-semibold text-gray-900 dark:text-white">No maintenance tickets</p>
-            <p className="text-sm text-muted-foreground mt-0.5">
+            <p className="text-[14px] font-medium text-[#18231f]">No maintenance tickets</p>
+            <p className="mt-1 text-[12.5px] text-[#8aa29a]">
               {statusFilter || priorityFilter ? 'Try adjusting your filters' : 'All rooms are in good shape!'}
             </p>
           </div>
           {!statusFilter && !priorityFilter && (
-            <Button className="mt-2 bg-resort-600 hover:bg-resort-700 text-white gap-2" onClick={() => setShowCreate(true)}>
-              <Plus className="h-4 w-4" /> New Ticket
-            </Button>
+            <button
+              className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0]"
+              style={{ background: '#1b342f' }}
+              onClick={() => setShowCreate(true)}>
+              <Plus className="h-[13px] w-[13px]" /> New Ticket
+            </button>
           )}
         </div>
       ) : (

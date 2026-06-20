@@ -4,11 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { housekeepingApi, roomsApi, staffApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
-import { StatusBadge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -29,13 +25,24 @@ interface HKTask {
 
 const TASK_TYPES = ['DAILY', 'DEEP_CLEAN', 'TURNDOWN', 'CHECKOUT', 'CHECKIN'] as const;
 const STATUS_FILTERS = ['', 'PENDING', 'IN_PROGRESS', 'COMPLETED', 'SKIPPED'];
-const TYPE_COLORS: Record<string, string> = {
-  DAILY: 'bg-blue-100 text-blue-700',
-  DEEP_CLEAN: 'bg-purple-100 text-purple-700',
-  TURNDOWN: 'bg-amber-100 text-amber-700',
-  CHECKOUT: 'bg-red-100 text-red-700',
-  CHECKIN: 'bg-green-100 text-green-700',
+
+const TYPE_PILL: Record<string, { bg: string; border: string; text: string; label: string }> = {
+  DAILY:      { bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Daily' },
+  DEEP_CLEAN: { bg: '#fceee4', border: 'rgba(184,114,74,0.2)',  text: '#b8724a', label: 'Deep Clean' },
+  TURNDOWN:   { bg: '#f4ecda', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'Turndown' },
+  CHECKOUT:   { bg: '#fef2f2', border: 'rgba(200,60,60,0.15)',  text: '#c43c3c', label: 'Checkout' },
+  CHECKIN:    { bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Check-In' },
 };
+
+const STATUS_PILL: Record<string, { bg: string; border: string; text: string; label: string }> = {
+  PENDING:     { bg: '#f4ecda', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'Pending' },
+  IN_PROGRESS: { bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)', text: '#23766a', label: 'In Progress' },
+  COMPLETED:   { bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)', text: '#23766a', label: 'Completed' },
+  SKIPPED:     { bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)',      text: '#8aa29a', label: 'Skipped' },
+};
+
+const selectCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[8px] text-[13px] text-[#18231f] focus:outline-none focus:ring-1 focus:ring-resort-600/20';
+const labelCls  = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
 
 function NewTaskModal({ open, onClose, loading, onSubmit }: {
   open: boolean; onClose: () => void; loading: boolean;
@@ -43,14 +50,13 @@ function NewTaskModal({ open, onClose, loading, onSubmit }: {
 }) {
   const { data: roomsData } = useQuery({ queryKey: ['rooms-list'], queryFn: () => roomsApi.list({ limit: 200, isActive: true }) });
   const { data: staffData } = useQuery({ queryKey: ['staff-list'], queryFn: () => staffApi.list({ limit: 100, department: 'HOUSEKEEPING' }) });
-  const rooms = roomsData?.data?.data ?? [];
+  const rooms     = roomsData?.data?.data ?? [];
   const staffList = staffData?.data?.data ?? [];
 
   const blankForm = { roomId: '', assignedToId: '', type: '', scheduledDate: new Date().toISOString().split('T')[0], notes: '' };
   const [form, setForm] = useState(blankForm);
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
-  // Reset form each time modal opens
   useEffect(() => { if (open) setForm(blankForm); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -58,23 +64,21 @@ function NewTaskModal({ open, onClose, loading, onSubmit }: {
     if (!form.roomId || !form.type || !form.scheduledDate) {
       toast({ title: 'Missing fields', description: 'Room, type and date are required', variant: 'destructive' }); return;
     }
-    const payload: Record<string, string | undefined> = {
+    onSubmit({
       roomId: form.roomId,
       type: form.type,
       scheduledDate: form.scheduledDate,
       notes: form.notes || undefined,
       assignedToId: form.assignedToId || undefined,
-    };
-    onSubmit(payload);
+    });
   };
 
   return (
     <Modal open={open} onClose={onClose} title="New Housekeeping Task" description="Schedule a cleaning or maintenance task" className="max-w-lg">
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4 pt-1">
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Room *</label>
-          <select value={form.roomId} onChange={e => set('roomId', e.target.value)}
-            className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
+          <label className={labelCls}>Room *</label>
+          <select value={form.roomId} onChange={e => set('roomId', e.target.value)} className={selectCls}>
             <option value="">Select room</option>
             {rooms.map((r: { id: string; number: string; name: string }) => (
               <option key={r.id} value={r.id}>#{r.number} — {r.name}</option>
@@ -83,22 +87,21 @@ function NewTaskModal({ open, onClose, loading, onSubmit }: {
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Task Type *</label>
-            <select value={form.type} onChange={e => set('type', e.target.value)}
-              className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
+            <label className={labelCls}>Task Type *</label>
+            <select value={form.type} onChange={e => set('type', e.target.value)} className={selectCls}>
               <option value="">Select type</option>
-              {TASK_TYPES.map(t => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
+              {TASK_TYPES.map(t => <option key={t} value={t}>{TYPE_PILL[t]?.label ?? t}</option>)}
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Scheduled Date *</label>
-            <Input type="date" value={form.scheduledDate} onChange={e => set('scheduledDate', e.target.value)} />
+            <label className={labelCls}>Scheduled Date *</label>
+            <input type="date" value={form.scheduledDate} onChange={e => set('scheduledDate', e.target.value)}
+              className={selectCls} />
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Assign To (Housekeeping Staff)</label>
-          <select value={form.assignedToId} onChange={e => set('assignedToId', e.target.value)}
-            className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
+          <label className={labelCls}>Assign To (Housekeeping Staff)</label>
+          <select value={form.assignedToId} onChange={e => set('assignedToId', e.target.value)} className={selectCls}>
             <option value="">Unassigned</option>
             {staffList.map((s: { id: string; user: { firstName: string; lastName: string } }) => (
               <option key={s.id} value={s.id}>{s.user.firstName} {s.user.lastName}</option>
@@ -106,14 +109,22 @@ function NewTaskModal({ open, onClose, loading, onSubmit }: {
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Notes</label>
+          <label className={labelCls}>Notes</label>
           <textarea value={form.notes} onChange={e => set('notes', e.target.value)} rows={2}
             placeholder="Any special instructions..."
-            className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none" />
+            className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#8aa29a] focus:outline-none focus:ring-1 focus:ring-resort-600/20 resize-none" />
         </div>
-        <div className="flex gap-3 justify-end pt-2 border-t">
-          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="submit" loading={loading}>Create Task</Button>
+        <div className="flex gap-3 justify-end pt-2 border-t" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
+          <button type="button" onClick={onClose}
+            className="rounded-[9px] border px-4 py-[8px] text-[13px] font-medium text-[#6b8880] transition-colors hover:bg-[#f4f1eb]"
+            style={{ borderColor: 'rgba(0,0,0,0.09)' }}>
+            Cancel
+          </button>
+          <button type="submit" disabled={loading}
+            className="rounded-[9px] px-5 py-[8px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80 disabled:opacity-50"
+            style={{ background: '#1b342f' }}>
+            {loading ? 'Creating…' : 'Create Task'}
+          </button>
         </div>
       </form>
     </Modal>
@@ -123,10 +134,10 @@ function NewTaskModal({ open, onClose, loading, onSubmit }: {
 export default function HousekeepingPage() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('');
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [addOpen, setAddOpen] = useState(false);
-  const [dateFilter, setDateFilter] = useState('');
+  const [search, setSearch]             = useState('');
+  const [page, setPage]                 = useState(1);
+  const [addOpen, setAddOpen]           = useState(false);
+  const [dateFilter, setDateFilter]     = useState('');
 
   const { user } = useAuthStore();
   const canManage = ['OWNER', 'MANAGER', 'RECEPTIONIST'].includes(user?.role ?? '');
@@ -173,148 +184,233 @@ export default function HousekeepingPage() {
   const completedCount  = stats.completed  ?? 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 animate-fade-up">
+
+      {/* Header */}
+      <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Housekeeping</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Schedule and track room cleaning tasks</p>
+          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Housekeeping</h1>
+          <p className="mt-[4px] text-[13px] text-[#7a9890]">Schedule and track room cleaning tasks</p>
         </div>
         {canManage && (
-          <Button className="gap-2" onClick={() => setAddOpen(true)}>
-            <Plus className="h-4 w-4" /> New Task
-          </Button>
+          <button
+            onClick={() => setAddOpen(true)}
+            className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
+            style={{ background: '#1b342f' }}
+          >
+            <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} /> New Task
+          </button>
         )}
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
+      {/* Stats row */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          { label: 'Total Tasks', value: total || 0, icon: CheckSquare, color: 'bg-resort-50 border-resort-200 text-resort-700' },
-          { label: 'Pending', value: pendingCount, icon: Clock, color: 'bg-amber-50 border-amber-200 text-amber-700' },
-          { label: 'In Progress', value: inProgressCount, icon: AlertCircle, color: 'bg-blue-50 border-blue-200 text-blue-700' },
-          { label: 'Completed', value: completedCount, icon: CheckCircle2, color: 'bg-green-50 border-green-200 text-green-700' },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className={`rounded-xl border p-4 ${color}`}>
-            <div className="flex items-center gap-2 mb-1"><Icon className="h-4 w-4 opacity-70" /><p className="text-xs font-medium opacity-70">{label}</p></div>
-            <p className="text-2xl font-bold">{value}</p>
+          { label: 'Total Tasks',  value: total || 0,    icon: CheckSquare, bg: '#e3f2ef', color: '#23766a' },
+          { label: 'Pending',      value: pendingCount,   icon: Clock,       bg: '#f4ecda', color: '#b89040' },
+          { label: 'In Progress',  value: inProgressCount,icon: AlertCircle, bg: '#fceee4', color: '#b8724a' },
+          { label: 'Completed',    value: completedCount, icon: CheckCircle2,bg: '#e3f2ef', color: '#23766a' },
+        ].map(({ label, value, icon: Icon, bg, color }) => (
+          <div key={label} className="flex items-center gap-[11px] rounded-[12px] border px-[18px] py-[15px]"
+            style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+            <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px]" style={{ background: bg }}>
+              <Icon className="h-[14px] w-[14px]" strokeWidth={2} style={{ color }} />
+            </div>
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.07em] text-[#8aa29a]">{label}</div>
+              <div className="text-[22px] font-semibold leading-none tracking-[-0.02em] text-[#18231f]">{value}</div>
+            </div>
           </div>
         ))}
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
         <div className="relative max-w-xs flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Search room or staff..." className="pl-9" />
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8aa29a]" />
+          <input
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            placeholder="Search room or staff…"
+            className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-[8px] pl-9 pr-4 text-[13px] text-[#18231f] placeholder:text-[#8aa29a] focus:outline-none focus:ring-1 focus:ring-resort-600/20"
+          />
         </div>
-        <Input type="date" value={dateFilter} onChange={e => { setDateFilter(e.target.value); setPage(1); }} className="max-w-[160px]" />
-        <div className="flex gap-2 flex-wrap">
-          {STATUS_FILTERS.map(s => (
-            <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${statusFilter === s ? 'bg-resort-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-              {s ? s.replace('_', ' ') : 'All'}
-            </button>
-          ))}
+        <input
+          type="date"
+          value={dateFilter}
+          onChange={e => { setDateFilter(e.target.value); setPage(1); }}
+          className="rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[8px] text-[13px] text-[#18231f] focus:outline-none focus:ring-1 focus:ring-resort-600/20 max-w-[160px]"
+        />
+        <div className="flex gap-1.5 flex-wrap">
+          {STATUS_FILTERS.map(s => {
+            const active = statusFilter === s;
+            return (
+              <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
+                className="rounded-[8px] border px-[12px] py-[7px] text-[12px] font-medium transition-colors"
+                style={active
+                  ? { background: '#1b342f', color: '#dfd9d0', borderColor: '#1b342f' }
+                  : { background: '#fff', color: '#6b8880', borderColor: 'rgba(0,0,0,0.09)' }}>
+                {s ? s.replace('_', ' ') : 'All'}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Table */}
-      <Card className="overflow-hidden">
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="space-y-px">{[...Array(6)].map((_, i) => <div key={i} className="h-[72px] bg-gray-50 animate-pulse border-b" />)}</div>
-          ) : tasks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <CheckSquare className="h-14 w-14 text-gray-200 mb-4" />
-              <p className="font-medium text-gray-500">{search || statusFilter || dateFilter ? 'No tasks found' : 'No tasks scheduled'}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{search || statusFilter || dateFilter ? 'Try adjusting filters' : 'Create your first housekeeping task'}</p>
-              {!search && !statusFilter && !dateFilter && canManage && <Button className="mt-4 gap-2" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> New Task</Button>}
+      <div className="overflow-hidden rounded-[14px] border"
+        style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+        {isLoading ? (
+          <div className="space-y-px p-4">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-[68px] animate-pulse rounded-[10px]" style={{ background: '#f5f4f1' }} />
+            ))}
+          </div>
+        ) : tasks.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#f5f4f1]">
+              <CheckSquare className="h-7 w-7 text-[#c5bdb4]" />
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b bg-gray-50 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    <th className="px-5 py-3 text-left">Room</th>
-                    <th className="px-5 py-3 text-left">Type</th>
-                    <th className="px-5 py-3 text-left">Assigned To</th>
-                    <th className="px-5 py-3 text-left">Scheduled</th>
-                    <th className="px-5 py-3 text-left">Status</th>
-                    <th className="px-5 py-3 text-left">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {tasks.map(task => (
-                    <tr key={task.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2">
-                          <Bed className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <div>
+              <p className="text-[14px] font-medium text-[#18231f]">
+                {search || statusFilter || dateFilter ? 'No tasks found' : 'No tasks scheduled'}
+              </p>
+              <p className="mt-1 text-[12.5px] text-[#8aa29a]">
+                {search || statusFilter || dateFilter ? 'Try adjusting your filters' : 'Create your first housekeeping task'}
+              </p>
+            </div>
+            {!search && !statusFilter && !dateFilter && canManage && (
+              <button
+                onClick={() => setAddOpen(true)}
+                className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0]"
+                style={{ background: '#1b342f' }}
+              >
+                <Plus className="h-[13px] w-[13px]" /> New Task
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]"
+                  style={{ borderColor: 'rgba(0,0,0,0.05)', background: '#faf9f7' }}>
+                  <th className="px-5 py-3 text-left">Room</th>
+                  <th className="px-5 py-3 text-left">Type</th>
+                  <th className="px-5 py-3 text-left">Assigned To</th>
+                  <th className="px-5 py-3 text-left">Scheduled</th>
+                  <th className="px-5 py-3 text-left">Status</th>
+                  <th className="px-5 py-3 text-left">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tasks.map(task => {
+                  const typeCfg   = TYPE_PILL[task.type]   ?? { bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)', text: '#6b8880', label: task.type };
+                  const statusCfg = STATUS_PILL[task.status] ?? { bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)', text: '#8aa29a', label: task.status };
+                  return (
+                    <tr key={task.id}
+                      className="border-b transition-colors hover:bg-[#faf9f7]"
+                      style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
+                      <td className="px-5 py-[14px]">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px] bg-[#e3f2ef]">
+                            <Bed className="h-[13px] w-[13px] text-[#23766a]" strokeWidth={2} />
+                          </div>
                           <div>
-                            <p className="text-sm font-medium">{task.room.name}</p>
-                            <p className="text-xs text-muted-foreground">#{task.room.number} · Floor {task.room.floor}</p>
+                            <p className="text-[13.5px] font-medium text-[#18231f]">{task.room.name}</p>
+                            <p className="text-[11.5px] text-[#8aa29a]">#{task.room.number} · Floor {task.room.floor}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-5 py-4">
-                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${TYPE_COLORS[task.type] ?? 'bg-gray-100 text-gray-700'}`}>
-                          {task.type.replace('_', ' ')}
+                      <td className="px-5 py-[14px]">
+                        <span className="inline-flex items-center rounded-[7px] border px-[10px] py-[4px] text-[11px] font-semibold"
+                          style={{ background: typeCfg.bg, borderColor: typeCfg.border, color: typeCfg.text }}>
+                          {typeCfg.label}
                         </span>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-5 py-[14px]">
                         {task.assignedTo ? (
-                          <div className="flex items-center gap-1.5 text-sm">
-                            <User className="h-3.5 w-3.5 text-muted-foreground" />
-                            {task.assignedTo.user.firstName} {task.assignedTo.user.lastName}
+                          <div className="flex items-center gap-1.5">
+                            <div className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-[#e3f2ef] text-[10px] font-bold text-[#23766a]">
+                              {task.assignedTo.user.firstName[0]}{task.assignedTo.user.lastName[0]}
+                            </div>
+                            <span className="text-[13px] text-[#18231f]">
+                              {task.assignedTo.user.firstName} {task.assignedTo.user.lastName}
+                            </span>
                           </div>
                         ) : (
-                          <span className="text-xs text-muted-foreground italic">Unassigned</span>
+                          <span className="text-[12.5px] italic text-[#c5bdb4]">Unassigned</span>
                         )}
                       </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                          <CalendarDays className="h-3.5 w-3.5" />
+                      <td className="px-5 py-[14px]">
+                        <div className="flex items-center gap-1.5 text-[13px] text-[#18231f]">
+                          <CalendarDays className="h-[13px] w-[13px] text-[#8aa29a]" />
                           {formatDate(task.scheduledDate)}
                         </div>
+                        {task.completedAt && (
+                          <p className="mt-px text-[11.5px] text-[#23766a]">Done {formatDate(task.completedAt)}</p>
+                        )}
                       </td>
-                      <td className="px-5 py-4"><StatusBadge status={task.status} /></td>
-                      <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
-                        <div className="flex gap-1">
+                      <td className="px-5 py-[14px]">
+                        <span className="inline-flex items-center rounded-[7px] border px-[10px] py-[4px] text-[11px] font-semibold"
+                          style={{ background: statusCfg.bg, borderColor: statusCfg.border, color: statusCfg.text }}>
+                          {statusCfg.label}
+                        </span>
+                      </td>
+                      <td className="px-5 py-[14px]" onClick={e => e.stopPropagation()}>
+                        <div className="flex gap-1.5">
                           {task.status === 'PENDING' && (
-                            <Button size="sm" variant="outline" className="text-xs text-blue-700 border-blue-200 hover:bg-blue-50"
-                              onClick={() => statusMutation.mutate({ id: task.id, status: 'IN_PROGRESS' })}>
+                            <button
+                              onClick={() => statusMutation.mutate({ id: task.id, status: 'IN_PROGRESS' })}
+                              className="rounded-[7px] border px-[10px] py-[5px] text-[11.5px] font-medium transition-colors"
+                              style={{ background: '#e3f2ef', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
                               Start
-                            </Button>
+                            </button>
                           )}
                           {task.status === 'IN_PROGRESS' && (
-                            <Button size="sm" variant="outline" className="text-xs text-green-700 border-green-200 hover:bg-green-50"
-                              onClick={() => statusMutation.mutate({ id: task.id, status: 'COMPLETED' })}>
+                            <button
+                              onClick={() => statusMutation.mutate({ id: task.id, status: 'COMPLETED' })}
+                              className="rounded-[7px] border px-[10px] py-[5px] text-[11.5px] font-medium transition-colors"
+                              style={{ background: '#1b342f', borderColor: '#1b342f', color: '#dfd9d0' }}>
                               Complete
-                            </Button>
+                            </button>
                           )}
                           {(task.status === 'PENDING' || task.status === 'IN_PROGRESS') && (
-                            <Button size="sm" variant="outline" className="text-xs text-gray-500 hover:bg-gray-50"
-                              onClick={() => statusMutation.mutate({ id: task.id, status: 'SKIPPED' })}>
+                            <button
+                              onClick={() => statusMutation.mutate({ id: task.id, status: 'SKIPPED' })}
+                              className="rounded-[7px] border px-[10px] py-[5px] text-[11.5px] font-medium transition-colors"
+                              style={{ background: '#f5f4f1', borderColor: 'rgba(0,0,0,0.08)', color: '#8aa29a' }}>
                               Skip
-                            </Button>
+                            </button>
                           )}
                         </div>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Pagination */}
       {pagination && pagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} of {total}</p>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)} className="gap-1"><ChevronLeft className="h-4 w-4" /> Previous</Button>
-            <Button variant="outline" size="sm" disabled={page === pagination.totalPages} onClick={() => setPage(p => p + 1)} className="gap-1">Next <ChevronRight className="h-4 w-4" /></Button>
+          <p className="text-[12.5px] text-[#8aa29a]">
+            Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} of {total}
+          </p>
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
+              className="flex h-8 items-center gap-1 rounded-[8px] border px-3 text-[12.5px] font-medium disabled:opacity-40"
+              style={{ borderColor: 'rgba(0,0,0,0.09)', color: '#18231f' }}>
+              <ChevronLeft className="h-3.5 w-3.5" /> Previous
+            </button>
+            <button onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))} disabled={page >= pagination.totalPages}
+              className="flex h-8 items-center gap-1 rounded-[8px] border px-3 text-[12.5px] font-medium disabled:opacity-40"
+              style={{ background: '#1b342f', borderColor: '#1b342f', color: '#dfd9d0' }}>
+              Next <ChevronRight className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
       )}
