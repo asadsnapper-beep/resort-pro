@@ -327,31 +327,36 @@ export default function SettingsPage() {
   const activeTab = TABS.find(t => t.id === tab);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 animate-fade-up">
       {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Manage your resort configuration</p>
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Settings</h1>
+          <p className="mt-[4px] text-[13px] text-[#7a9890]">Manage your resort configuration</p>
+        </div>
       </div>
 
       {/* Tenant Info Banner */}
       {tenant && (
-        <div className="flex items-center gap-3 rounded-xl border border-resort-200 bg-resort-50 dark:bg-resort-950/30 dark:border-resort-800 px-5 py-3">
-          <Info className="h-4 w-4 text-resort-600 flex-shrink-0" />
-          <p className="text-sm text-resort-700 dark:text-resort-300">
-            You are managing <strong>{tenant.name}</strong> — slug: <code className="font-mono bg-resort-100 dark:bg-resort-900 px-1.5 py-0.5 rounded text-xs">{tenant.slug}</code>
+        <div className="flex items-center gap-3 rounded-[10px] border px-5 py-3"
+          style={{ background: '#e3f2ef', borderColor: 'rgba(35,118,106,0.18)' }}>
+          <Info className="h-4 w-4 shrink-0" style={{ color: '#23766a' }} />
+          <p className="text-[13px]" style={{ color: '#23766a' }}>
+            Managing <strong>{tenant.name}</strong> — slug:{' '}
+            <code className="font-mono rounded-[5px] px-1.5 py-0.5 text-[12px]"
+              style={{ background: 'rgba(35,118,106,0.12)', color: '#1a5e54' }}>{tenant.slug}</code>
           </p>
         </div>
       )}
 
       {/* Settings layout: left sidebar + content */}
-      <div className="flex gap-8 items-start">
+      <div className="flex gap-6 items-start">
 
         {/* ── Left sidebar nav ───────────────────────────────────────────── */}
-        <aside className="hidden md:flex flex-col gap-6 w-52 flex-shrink-0 sticky top-4">
+        <aside className="hidden md:flex flex-col gap-5 w-48 flex-shrink-0 sticky top-4">
           {TAB_GROUPS.map(({ group, items }) => (
             <div key={group}>
-              <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+              <p className="mb-1.5 px-3 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]">
                 {group}
               </p>
               <nav className="flex flex-col gap-0.5">
@@ -359,13 +364,13 @@ export default function SettingsPage() {
                   <button
                     key={id}
                     onClick={() => setTab(id)}
-                    className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors text-left w-full ${
-                      tab === id
-                        ? 'bg-resort-50 dark:bg-resort-900/40 text-resort-700 dark:text-resort-300'
-                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100'
-                    }`}
+                    className="flex items-center gap-2.5 rounded-[8px] px-3 py-[8px] text-[13px] font-medium transition-colors text-left w-full"
+                    style={tab === id
+                      ? { background: '#e3f2ef', color: '#23766a' }
+                      : { color: '#6b8880' }}
                   >
-                    <Icon className={`h-4 w-4 flex-shrink-0 ${tab === id ? 'text-resort-600 dark:text-resort-400' : 'text-gray-400'}`} />
+                    <Icon className="h-[15px] w-[15px] flex-shrink-0"
+                      style={{ color: tab === id ? '#23766a' : '#9bbdb7' }} />
                     {label}
                   </button>
                 ))}
@@ -379,7 +384,7 @@ export default function SettingsPage() {
           <select
             value={tab}
             onChange={e => setTab(e.target.value as Tab)}
-            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-resort-500"
+            className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-2 text-[13px] font-medium focus:outline-none focus:ring-1 focus:ring-resort-600/20"
           >
             {TAB_GROUPS.map(({ group, items }) => (
               <optgroup key={group} label={group}>
@@ -392,7 +397,7 @@ export default function SettingsPage() {
         </div>
 
         {/* ── Content area ───────────────────────────────────────────────── */}
-        <div className="flex-1 min-w-0 space-y-6">
+        <div className="flex-1 min-w-0 space-y-5">
 
       {/* General */}
       {tab === 'general' && (

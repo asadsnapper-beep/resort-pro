@@ -4,55 +4,52 @@ import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/auth';
 import { authApi } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
 import {
-  User, Mail, Phone, Lock, Eye, EyeOff,
-  CheckCircle2, Shield,
+  User, Mail, Phone, Lock, Eye, EyeOff, CheckCircle2, Shield,
 } from 'lucide-react';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 
-// ─── Role badge config (mirrors sidebar) ──────────────────────────────────────
-const ROLE_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  OWNER:        { label: 'Owner',        color: 'text-yellow-700', bg: 'bg-yellow-50 border-yellow-200' },
-  MANAGER:      { label: 'Manager',      color: 'text-resort-700', bg: 'bg-resort-50 border-resort-200' },
-  SHAREHOLDER:  { label: 'Shareholder',  color: 'text-amber-700',  bg: 'bg-amber-50 border-amber-200' },
-  RECEPTIONIST: { label: 'Receptionist', color: 'text-emerald-700',bg: 'bg-emerald-50 border-emerald-200' },
-  MARKETER:     { label: 'Marketer',     color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200' },
-  DEVELOPER:    { label: 'Developer',    color: 'text-gray-700',   bg: 'bg-gray-100 border-gray-200' },
-  STAFF:        { label: 'Staff',        color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200' },
-  GUEST:        { label: 'Guest',        color: 'text-gray-500',   bg: 'bg-gray-100 border-gray-200' },
+const ROLE_CONFIG: Record<string, { label: string; bg: string; border: string; text: string }> = {
+  OWNER:        { label: 'Owner',        bg: '#f4ecda', border: 'rgba(184,144,64,0.25)',   text: '#b89040' },
+  MANAGER:      { label: 'Manager',      bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)',    text: '#23766a' },
+  SHAREHOLDER:  { label: 'Shareholder',  bg: '#f4ecda', border: 'rgba(184,144,64,0.25)',   text: '#b89040' },
+  RECEPTIONIST: { label: 'Receptionist', bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)',    text: '#23766a' },
+  MARKETER:     { label: 'Marketer',     bg: '#fceee4', border: 'rgba(184,114,74,0.2)',    text: '#b8724a' },
+  DEVELOPER:    { label: 'Developer',    bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)',         text: '#6b8880' },
+  STAFF:        { label: 'Staff',        bg: '#fceee4', border: 'rgba(184,114,74,0.2)',    text: '#b8724a' },
+  GUEST:        { label: 'Guest',        bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)',         text: '#8aa29a' },
 };
+
+const AVATAR_COLORS = [
+  { bg: '#23766a', id: 'teal' },
+  { bg: '#1b342f', id: 'dark' },
+  { bg: '#d4a853', id: 'gold' },
+  { bg: '#b8724a', id: 'coral' },
+  { bg: '#4a6e66', id: 'sage' },
+  { bg: '#7a5c2a', id: 'brown' },
+];
 
 function getInitials(first: string, last: string) {
   return `${first[0] ?? ''}${last[0] ?? ''}`.toUpperCase();
 }
 
-// ─── Avatar color palette ─────────────────────────────────────────────────────
-const AVATAR_COLORS = [
-  { bg: 'bg-resort-600',  text: 'text-white', id: 'resort' },
-  { bg: 'bg-blue-600',    text: 'text-white', id: 'blue' },
-  { bg: 'bg-purple-600',  text: 'text-white', id: 'purple' },
-  { bg: 'bg-rose-500',    text: 'text-white', id: 'rose' },
-  { bg: 'bg-amber-500',   text: 'text-white', id: 'amber' },
-  { bg: 'bg-teal-600',    text: 'text-white', id: 'teal' },
-];
+const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#8aa29a] focus:outline-none focus:ring-1 focus:ring-resort-600/20 transition-colors';
+const labelCls = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+const cardCls  = 'rounded-[14px] border bg-white p-6 space-y-5';
+const cardStyle = { borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' };
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuthStore();
   const role = user?.role ?? 'STAFF';
   const roleConf = ROLE_CONFIG[role] ?? ROLE_CONFIG.STAFF;
 
-  // ── Profile form state ────────────────────────────────────────────────────
-  const [firstName, setFirstName] = useState(user?.firstName ?? '');
-  const [lastName,  setLastName]  = useState(user?.lastName ?? '');
-  const [phone,     setPhone]     = useState(user?.phone ?? '');
-  const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl ?? '');
-  const [avatarColor, setAvatarColor] = useState('resort');
+  const [firstName,    setFirstName]    = useState(user?.firstName ?? '');
+  const [lastName,     setLastName]     = useState(user?.lastName ?? '');
+  const [phone,        setPhone]        = useState(user?.phone ?? '');
+  const [avatarUrl,    setAvatarUrl]    = useState(user?.avatarUrl ?? '');
+  const [avatarColor,  setAvatarColor]  = useState('#23766a');
   const [savingProfile, setSavingProfile] = useState(false);
 
-  // ── Fetch fresh user data on mount (phone/avatarUrl not in JWT) ──────────
   useEffect(() => {
     authApi.me().then(res => {
       const fresh = res?.data?.data;
@@ -62,11 +59,10 @@ export default function ProfilePage() {
       setLastName(fresh.lastName ?? '');
       setPhone(fresh.phone ?? '');
       setAvatarUrl(fresh.avatarUrl ?? '');
-    }).catch(() => { /* silently ignore — form already has store values */ });
+    }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Password form state ───────────────────────────────────────────────────
   const [currentPwd,  setCurrentPwd]  = useState('');
   const [newPwd,      setNewPwd]      = useState('');
   const [confirmPwd,  setConfirmPwd]  = useState('');
@@ -75,9 +71,7 @@ export default function ProfilePage() {
   const [savingPwd,   setSavingPwd]   = useState(false);
 
   const initials = getInitials(firstName || user?.firstName || 'U', lastName || user?.lastName || '');
-  const colorConf = AVATAR_COLORS.find(c => c.id === avatarColor) ?? AVATAR_COLORS[0];
 
-  // Password strength
   const pwdChecks = {
     length:    newPwd.length >= 8,
     uppercase: /[A-Z]/.test(newPwd),
@@ -99,7 +93,7 @@ export default function ProfilePage() {
         avatarUrl: avatarUrl.trim() || null,
       });
       updateUser(res.data.data);
-      toast({ title: 'Profile updated ✓', description: 'Your changes have been saved.' });
+      toast({ title: 'Profile updated', description: 'Your changes have been saved.' });
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       toast({ title: 'Error', description: e?.response?.data?.error ?? 'Could not update profile', variant: 'destructive' });
@@ -124,7 +118,7 @@ export default function ProfilePage() {
     setSavingPwd(true);
     try {
       await authApi.changePassword({ currentPassword: currentPwd, newPassword: newPwd });
-      toast({ title: 'Password changed ✓', description: 'You have been signed out on other devices.' });
+      toast({ title: 'Password changed', description: 'You have been signed out on other devices.' });
       setCurrentPwd(''); setNewPwd(''); setConfirmPwd('');
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
@@ -135,79 +129,80 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 pb-12">
+    <div className="mx-auto max-w-2xl space-y-5 pb-12 animate-fade-up">
 
-      {/* ── Page header ──────────────────────────────────────────────────── */}
+      {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Manage your personal information and password</p>
+        <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">My Profile</h1>
+        <p className="mt-[4px] text-[13px] text-[#7a9890]">Manage your personal information and password</p>
       </div>
 
-      {/* ── Avatar + identity card ────────────────────────────────────────── */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-        <div className="flex items-start gap-5">
+      {/* Avatar + identity card */}
+      <div className={cardCls} style={cardStyle}>
+        {/* Identity row */}
+        <div className="flex items-center gap-4">
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={avatarUrl}
+              alt="Avatar"
+              className="h-[68px] w-[68px] rounded-[14px] object-cover shrink-0"
+              style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}
+              onError={() => setAvatarUrl('')}
+            />
+          ) : (
+            <div
+              className="flex h-[68px] w-[68px] shrink-0 items-center justify-center rounded-[14px] text-[22px] font-bold text-white"
+              style={{ background: avatarColor, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+            >
+              {initials}
+            </div>
+          )}
 
-          {/* Avatar */}
-          <div className="shrink-0">
-            {avatarUrl ? (
-              <div className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={avatarUrl}
-                  alt="Avatar"
-                  className="h-20 w-20 rounded-2xl object-cover ring-4 ring-white shadow-md"
-                  onError={() => setAvatarUrl('')}
-                />
-              </div>
-            ) : (
-              <div className={cn(
-                'flex h-20 w-20 items-center justify-center rounded-2xl text-2xl font-bold shadow-md ring-4 ring-white',
-                colorConf.bg, colorConf.text,
-              )}>
-                {initials}
-              </div>
-            )}
-          </div>
-
-          {/* Name + role */}
           <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold text-gray-900 truncate">
+            <h2 className="text-[16px] font-semibold text-[#18231f] truncate">
               {user?.firstName} {user?.lastName}
             </h2>
-            <p className="text-sm text-gray-500 truncate">{user?.email}</p>
-            <div className="mt-2 flex items-center gap-2">
-              <span className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold', roleConf.bg, roleConf.color)}>
-                <Shield className="h-3 w-3" />
+            <p className="text-[13px] text-[#8aa29a] truncate mt-[1px]">{user?.email}</p>
+            <div className="mt-2">
+              <span className="inline-flex items-center gap-1.5 rounded-[7px] border px-[10px] py-[4px] text-[11px] font-semibold"
+                style={{ background: roleConf.bg, borderColor: roleConf.border, color: roleConf.text }}>
+                <Shield className="h-[10px] w-[10px]" />
                 {roleConf.label}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Avatar upload */}
-        <div className="mt-4 rounded-xl bg-gray-50 border border-gray-200 p-4 space-y-3">
+        <div className="border-t" style={{ borderColor: 'rgba(0,0,0,0.05)' }} />
+
+        {/* Photo upload */}
+        <div className="rounded-[10px] p-4 space-y-3" style={{ background: '#faf9f7', border: '1px solid rgba(0,0,0,0.04)' }}>
+          <p className="text-[11.5px] font-medium text-[#6b8880]">Profile photo</p>
           <ImageUpload
             value={avatarUrl || null}
             onChange={url => setAvatarUrl(url ?? '')}
             folder="profiles"
-            label="Profile photo"
-            hint="JPEG, PNG or WebP · max 5 MB · or paste a URL"
+            label=""
+            hint="JPEG, PNG or WebP · max 5 MB"
             aspectRatio="square"
-            className="max-w-[140px]"
+            className="max-w-[120px]"
           />
           {!avatarUrl && (
             <div>
-              <p className="text-xs font-medium text-gray-600 mb-1.5">Or pick a color</p>
+              <p className="text-[11px] text-[#8aa29a] mb-2">Or pick an avatar color</p>
               <div className="flex gap-2">
                 {AVATAR_COLORS.map(c => (
                   <button
                     key={c.id}
-                    onClick={() => setAvatarColor(c.id)}
-                    className={cn(
-                      'h-7 w-7 rounded-full transition-transform hover:scale-110',
-                      c.bg,
-                      avatarColor === c.id && 'ring-2 ring-offset-2 ring-gray-400 scale-110',
-                    )}
+                    onClick={() => setAvatarColor(c.bg)}
+                    className="h-[26px] w-[26px] rounded-full transition-transform hover:scale-110"
+                    style={{
+                      background: c.bg,
+                      outline: avatarColor === c.bg ? `2px solid ${c.bg}` : 'none',
+                      outlineOffset: '2px',
+                      transform: avatarColor === c.bg ? 'scale(1.15)' : undefined,
+                    }}
                   />
                 ))}
               </div>
@@ -216,127 +211,135 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* ── Personal info form ────────────────────────────────────────────── */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">
-        <div className="flex items-center gap-2 mb-1">
-          <User className="h-4 w-4 text-gray-400" />
-          <h3 className="font-semibold text-gray-900">Personal Information</h3>
+      {/* Personal info */}
+      <div className={cardCls} style={cardStyle}>
+        <div className="flex items-center gap-2">
+          <div className="flex h-[30px] w-[30px] items-center justify-center rounded-[8px]" style={{ background: '#e3f2ef' }}>
+            <User className="h-[13px] w-[13px]" style={{ color: '#23766a' }} />
+          </div>
+          <h3 className="text-[14px] font-semibold text-[#18231f]">Personal Information</h3>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1.5">First name</label>
-            <Input value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="First name" />
+            <label className={labelCls}>First name</label>
+            <input className={inputCls} value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="First name" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1.5">Last name</label>
-            <Input value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Last name" />
+            <label className={labelCls}>Last name</label>
+            <input className={inputCls} value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Last name" />
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1.5">Email address</label>
+          <label className={labelCls}>Email address</label>
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-300" />
-            <Input value={user?.email ?? ''} disabled className="pl-9 bg-gray-50 text-gray-400 cursor-not-allowed" />
+            <Mail className="absolute left-3 top-1/2 h-[13px] w-[13px] -translate-y-1/2 text-[#c5bdb4]" />
+            <input
+              value={user?.email ?? ''}
+              disabled
+              className="w-full rounded-[8px] border border-black/5 bg-[#f0ede8] pl-9 pr-4 py-[9px] text-[13px] text-[#8aa29a] cursor-not-allowed"
+            />
           </div>
-          <p className="mt-1 text-xs text-gray-400">Email cannot be changed. Contact support if needed.</p>
+          <p className="mt-1 text-[11.5px] text-[#8aa29a]">Email cannot be changed. Contact support if needed.</p>
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1.5">Phone number</label>
+          <label className={labelCls}>Phone number</label>
           <div className="relative">
-            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-300" />
-            <Input
+            <Phone className="absolute left-3 top-1/2 h-[13px] w-[13px] -translate-y-1/2 text-[#c5bdb4]" />
+            <input
+              className={inputCls + ' pl-9'}
               value={phone}
               onChange={e => setPhone(e.target.value)}
               placeholder="+880 1700 000000"
-              className="pl-9"
             />
           </div>
         </div>
 
         <div className="flex justify-end pt-1">
-          <Button
+          <button
             onClick={handleSaveProfile}
             disabled={savingProfile}
-            className="bg-[#1a6b5e] hover:bg-[#145a4f] min-w-[120px]"
+            className="flex items-center gap-1.5 rounded-[9px] px-5 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80 disabled:opacity-50"
+            style={{ background: '#1b342f' }}
           >
             {savingProfile ? 'Saving…' : 'Save Changes'}
-          </Button>
+          </button>
         </div>
       </div>
 
-      {/* ── Change password ───────────────────────────────────────────────── */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">
-        <div className="flex items-center gap-2 mb-1">
-          <Lock className="h-4 w-4 text-gray-400" />
-          <h3 className="font-semibold text-gray-900">Change Password</h3>
+      {/* Change password */}
+      <div className={cardCls} style={cardStyle}>
+        <div className="flex items-center gap-2">
+          <div className="flex h-[30px] w-[30px] items-center justify-center rounded-[8px]" style={{ background: '#f4ecda' }}>
+            <Lock className="h-[13px] w-[13px]" style={{ color: '#b89040' }} />
+          </div>
+          <h3 className="text-[14px] font-semibold text-[#18231f]">Change Password</h3>
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1.5">Current password</label>
+          <label className={labelCls}>Current password</label>
           <div className="relative">
-            <Input
+            <input
               type={showCurrent ? 'text' : 'password'}
               value={currentPwd}
               onChange={e => setCurrentPwd(e.target.value)}
               placeholder="Enter current password"
-              className="pr-10"
+              className={inputCls + ' pr-10'}
             />
             <button
               type="button"
               onClick={() => setShowCurrent(v => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#c5bdb4] hover:text-[#8aa29a]"
             >
-              {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {showCurrent ? <EyeOff className="h-[14px] w-[14px]" /> : <Eye className="h-[14px] w-[14px]" />}
             </button>
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1.5">New password</label>
+          <label className={labelCls}>New password</label>
           <div className="relative">
-            <Input
+            <input
               type={showNew ? 'text' : 'password'}
               value={newPwd}
               onChange={e => setNewPwd(e.target.value)}
               placeholder="Enter new password"
-              className="pr-10"
+              className={inputCls + ' pr-10'}
             />
             <button
               type="button"
               onClick={() => setShowNew(v => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#c5bdb4] hover:text-[#8aa29a]"
             >
-              {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {showNew ? <EyeOff className="h-[14px] w-[14px]" /> : <Eye className="h-[14px] w-[14px]" />}
             </button>
           </div>
 
-          {/* Password strength indicator */}
           {newPwd.length > 0 && (
-            <div className="mt-2 space-y-1.5">
+            <div className="mt-2.5 space-y-2">
               <div className="flex gap-1">
                 {[0, 1, 2].map(i => (
-                  <div
-                    key={i}
-                    className={cn(
-                      'h-1 flex-1 rounded-full transition-colors',
-                      i < pwdStrength
-                        ? pwdStrength === 1 ? 'bg-red-400' : pwdStrength === 2 ? 'bg-amber-400' : 'bg-green-500'
-                        : 'bg-gray-200',
-                    )}
+                  <div key={i} className="h-1 flex-1 rounded-full transition-colors"
+                    style={{
+                      background: i < pwdStrength
+                        ? pwdStrength === 1 ? '#f87171' : pwdStrength === 2 ? '#d4a853' : '#23766a'
+                        : '#e8e4dd',
+                    }}
                   />
                 ))}
               </div>
-              <div className="space-y-0.5">
+              <div className="space-y-1">
                 {[
                   { check: pwdChecks.length,    label: 'At least 8 characters' },
                   { check: pwdChecks.uppercase, label: 'One uppercase letter' },
                   { check: pwdChecks.number,    label: 'One number' },
                 ].map(({ check, label }) => (
-                  <p key={label} className={cn('flex items-center gap-1.5 text-xs', check ? 'text-green-600' : 'text-gray-400')}>
-                    <CheckCircle2 className={cn('h-3 w-3', check ? 'text-green-500' : 'text-gray-300')} />
+                  <p key={label} className="flex items-center gap-1.5 text-[12px]"
+                    style={{ color: check ? '#23766a' : '#8aa29a' }}>
+                    <CheckCircle2 className="h-[11px] w-[11px]"
+                      style={{ color: check ? '#23766a' : '#c5bdb4' }} />
                     {label}
                   </p>
                 ))}
@@ -346,32 +349,34 @@ export default function ProfilePage() {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1.5">Confirm new password</label>
-          <Input
+          <label className={labelCls}>Confirm new password</label>
+          <input
             type="password"
             value={confirmPwd}
             onChange={e => setConfirmPwd(e.target.value)}
             placeholder="Re-enter new password"
-            className={cn(
-              confirmPwd && confirmPwd !== newPwd && 'border-red-300 focus-visible:ring-red-300',
-              confirmPwd && confirmPwd === newPwd && newPwd && 'border-green-400 focus-visible:ring-green-300',
-            )}
+            className={inputCls}
+            style={confirmPwd && confirmPwd !== newPwd
+              ? { borderColor: '#f87171', boxShadow: '0 0 0 2px rgba(248,113,113,0.2)' }
+              : confirmPwd && confirmPwd === newPwd && newPwd
+              ? { borderColor: '#23766a', boxShadow: '0 0 0 2px rgba(35,118,106,0.15)' }
+              : {}}
           />
           {confirmPwd && confirmPwd !== newPwd && (
-            <p className="mt-1 text-xs text-red-500">Passwords do not match</p>
+            <p className="mt-1 text-[11.5px]" style={{ color: '#f87171' }}>Passwords do not match</p>
           )}
         </div>
 
-        <div className="flex items-center justify-between pt-1">
-          <p className="text-xs text-gray-400">Changing your password will sign you out on other devices.</p>
-          <Button
+        <div className="flex items-center justify-between gap-4 pt-1">
+          <p className="text-[11.5px] text-[#8aa29a]">Changing your password signs you out on other devices.</p>
+          <button
             onClick={handleChangePassword}
             disabled={savingPwd || !currentPwd || !newPwd || !confirmPwd}
-            variant="outline"
-            className="border-[#1a6b5e] text-[#1a6b5e] hover:bg-[#f0faf8] min-w-[140px]"
+            className="shrink-0 flex items-center gap-1.5 rounded-[9px] border px-5 py-[8px] text-[13px] font-medium transition-colors disabled:opacity-40"
+            style={{ borderColor: 'rgba(35,118,106,0.3)', color: '#23766a', background: '#e3f2ef' }}
           >
             {savingPwd ? 'Changing…' : 'Change Password'}
-          </Button>
+          </button>
         </div>
       </div>
 
