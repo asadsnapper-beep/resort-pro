@@ -487,9 +487,7 @@ export default function HomePage() {
                 Start your free trial
               </Link>
               <a
-                href="https://demo.resortpro.io"
-                target="_blank"
-                rel="noopener noreferrer"
+                href="/try"
                 className="inline-flex items-center gap-[7px] rounded-full border-[1.5px] border-resort-600/35 px-[26px] py-3.5 text-[15.5px] font-semibold text-[#1f5950] transition-all hover:-translate-y-px hover:border-resort-600 hover:bg-resort-600/[0.06]"
               >
                 Explore the live demo <span className="text-[13px]">↗</span>
