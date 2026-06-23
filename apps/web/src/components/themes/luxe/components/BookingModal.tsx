@@ -343,16 +343,26 @@ export function BookingModal({ room, data, onClose }: BookingModalProps) {
                 <div className="space-y-2 text-sm border-t border-gray-200 pt-4">
                   <div className="flex justify-between">
                     <span className="text-gray-500">Room</span>
-                    <span className="font-medium text-right max-w-[60%] truncate">{room.name}</span>
+                    <span className="font-medium text-right max-w-[60%] truncate text-gray-900">{room.name || room.type || 'Room'}</span>
                   </div>
-                  {[
-                    { label: 'Check-in',  value: new Date(checkIn).toLocaleDateString('en-US',  { month: 'short', day: 'numeric', year: 'numeric' }) },
-                    { label: 'Check-out', value: new Date(checkOut).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) },
-                    { label: 'Duration',  value: `${confirmation.nights} night${confirmation.nights !== 1 ? 's' : ''}` },
-                  ].map(({ label, value }) => (
+                  {(() => {
+                    const fmtDate = (d: string) => {
+                      if (!d) return '—';
+                      // Parse date-only strings as local time to avoid timezone off-by-one
+                      const [y, m, day] = d.split('-').map(Number);
+                      const dt = new Date(y, m - 1, day);
+                      return isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    };
+                    const nightsVal = confirmation.nights ?? nights;
+                    return [
+                      { label: 'Check-in',  value: fmtDate(checkIn) },
+                      { label: 'Check-out', value: fmtDate(checkOut) },
+                      { label: 'Duration',  value: nightsVal > 0 ? `${nightsVal} night${nightsVal !== 1 ? 's' : ''}` : '—' },
+                    ];
+                  })().map(({ label, value }) => (
                     <div key={label} className="flex justify-between">
                       <span className="text-gray-500">{label}</span>
-                      <span className="font-medium">{value}</span>
+                      <span className="font-medium text-gray-900">{value}</span>
                     </div>
                   ))}
                   <div className="flex justify-between pt-2 border-t border-gray-200">

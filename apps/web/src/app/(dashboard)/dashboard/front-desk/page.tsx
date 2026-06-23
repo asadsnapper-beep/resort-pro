@@ -1,5 +1,6 @@
 'use client';
 
+import { ModalShell } from '@/components/ui/modal-shell';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { frontDeskApi, bookingsApi, roomsApi } from '@/lib/api';
@@ -35,34 +36,13 @@ function nights(ci: string, co: string) {
 }
 
 const ROOM_STATUS_PILL: Record<string, { bg: string; border: string; text: string; label: string }> = {
-  AVAILABLE:   { bg: '#e3f2ef', border: 'rgba(35,118,106,0.25)',  text: '#23766a', label: 'Available'   },
-  OCCUPIED:    { bg: '#f4ecda', border: 'rgba(184,144,64,0.25)',  text: '#b89040', label: 'Occupied'    },
-  CLEANING:    { bg: '#fceee4', border: 'rgba(184,114,74,0.25)',  text: '#b8724a', label: 'Cleaning'    },
-  MAINTENANCE: { bg: '#fef2f2', border: 'rgba(200,60,60,0.2)',   text: '#c43c3c', label: 'Maintenance' },
+  AVAILABLE:   { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.25)',  text: '#23766a', label: 'Available'   },
+  OCCUPIED:    { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.25)',  text: '#b89040', label: 'Occupied'    },
+  CLEANING:    { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.25)',  text: '#b8724a', label: 'Cleaning'    },
+  MAINTENANCE: { bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.2)',   text: '#c43c3c', label: 'Maintenance' },
   RESERVED:    { bg: '#f5f0fe', border: 'rgba(120,70,200,0.2)',  text: '#7846c8', label: 'Reserved'    },
 };
 
-// ── Modal Shell ────────────────────────────────────────────────────────────────
-function ModalShell({ title, sub, onClose, children, footer }: {
-  title: string; sub?: string; onClose: () => void;
-  children: React.ReactNode; footer: React.ReactNode;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(27,52,47,0.45)', backdropFilter: 'blur(4px)' }}>
-      <div className="w-full max-w-md overflow-hidden rounded-[18px] bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b px-6 py-[18px]" style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
-          <div>
-            <h2 className="font-display text-[18px] font-medium text-[#18231f]">{title}</h2>
-            {sub && <p className="mt-[2px] text-[12.5px] text-[#8aa29a]">{sub}</p>}
-          </div>
-          <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-full text-[#8aa29a] transition-colors hover:bg-[#f5f4f1] hover:text-[#18231f]">✕</button>
-        </div>
-        <div className="max-h-[65vh] overflow-y-auto p-6 space-y-4">{children}</div>
-        <div className="flex gap-2.5 border-t px-6 py-4" style={{ borderColor: 'rgba(0,0,0,0.05)' }}>{footer}</div>
-      </div>
-    </div>
-  );
-}
 
 function ModalInput({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -96,17 +76,17 @@ function CheckInModal({ booking, onClose, onSuccess }: { booking: Booking; onClo
   });
 
   return (
-    <ModalShell title="Check In" sub={`${booking.guest.firstName} ${booking.guest.lastName}`} onClose={onClose} footer={
+    <ModalShell open={true} title="Check In" description={`${booking.guest.firstName} ${booking.guest.lastName}`} onClose={onClose} maxWidth="480px" footer={
       <>
-        <button onClick={onClose} className="flex-1 rounded-[9px] border px-4 py-[10px] text-[13px] font-medium" style={{ borderColor: 'rgba(0,0,0,0.09)', color: '#18231f' }}>Cancel</button>
+        <button onClick={onClose} className="flex-1 rounded-[9px] border px-4 py-[10px] text-[13px] font-medium" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text)' }}>Cancel</button>
         <button onClick={() => mutation.mutate()} disabled={mutation.isPending}
-          className="flex-1 rounded-[9px] px-4 py-[10px] text-[13px] font-medium text-[#dfd9d0] disabled:opacity-60" style={{ background: '#1b342f' }}>
+          className="flex-1 rounded-[9px] px-4 py-[10px] text-[13px] font-medium text-[#dfd9d0] disabled:opacity-60" style={{ background: 'var(--rp-btn-accent)' }}>
           {mutation.isPending ? 'Checking in…' : 'Confirm Check-In'}
         </button>
       </>
     }>
       {/* Summary */}
-      <div className="rounded-[12px] border p-4 space-y-2 text-[13px]" style={{ background: '#f5f4f1', borderColor: 'rgba(0,0,0,0.05)' }}>
+      <div className="rounded-[12px] border p-4 space-y-2 text-[13px]" style={{ background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border)' }}>
         {[
           ['Booking', `#${booking.confirmationNo}`],
           ['Room', `${booking.room.number} — ${booking.room.name}`],
@@ -119,7 +99,7 @@ function CheckInModal({ booking, onClose, onSuccess }: { booking: Booking; onClo
           </div>
         ))}
         {balance > 0 && (
-          <div className="flex justify-between border-t pt-2 font-semibold" style={{ borderColor: 'rgba(0,0,0,0.07)', color: '#b89040' }}>
+          <div className="flex justify-between border-t pt-2 font-semibold" style={{ borderColor: 'var(--rp-border)', color: '#b89040' }}>
             <span>Balance due</span><span>{fmt(balance, tenant?.currency)}</span>
           </div>
         )}
@@ -165,20 +145,20 @@ function CheckOutModal({ booking, onClose, onSuccess }: { booking: Booking; onCl
   });
 
   return (
-    <ModalShell title="Check Out" sub={`${booking.guest.firstName} ${booking.guest.lastName} · Room ${booking.room.number}`} onClose={onClose} footer={
+    <ModalShell open={true} title="Check Out" description={`${booking.guest.firstName} ${booking.guest.lastName} · Room ${booking.room.number}`} onClose={onClose} maxWidth="480px" footer={
       <>
-        <button onClick={onClose} className="flex-1 rounded-[9px] border px-4 py-[10px] text-[13px] font-medium" style={{ borderColor: 'rgba(0,0,0,0.09)', color: '#18231f' }}>Cancel</button>
+        <button onClick={onClose} className="flex-1 rounded-[9px] border px-4 py-[10px] text-[13px] font-medium" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text)' }}>Cancel</button>
         <button onClick={() => mutation.mutate()} disabled={mutation.isPending}
-          className="flex-1 rounded-[9px] px-4 py-[10px] text-[13px] font-medium text-[#dfd9d0] disabled:opacity-60" style={{ background: '#1b342f' }}>
+          className="flex-1 rounded-[9px] px-4 py-[10px] text-[13px] font-medium text-[#dfd9d0] disabled:opacity-60" style={{ background: 'var(--rp-btn-accent)' }}>
           {mutation.isPending ? 'Processing…' : 'Confirm Check-Out'}
         </button>
       </>
     }>
-      <div className="rounded-[12px] border p-4 space-y-2 text-[13px]" style={{ background: '#f5f4f1', borderColor: 'rgba(0,0,0,0.05)' }}>
+      <div className="rounded-[12px] border p-4 space-y-2 text-[13px]" style={{ background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border)' }}>
         <div className="flex justify-between"><span className="text-[#8aa29a]">Room ({n} nights)</span><span className="text-[#18231f]">{fmt(Number(booking.totalAmount), tenant?.currency)}</span></div>
-        <div className="flex justify-between border-t pt-2 font-semibold" style={{ borderColor: 'rgba(0,0,0,0.06)' }}><span className="text-[#18231f]">Total</span><span className="text-[#18231f]">{fmt(Number(booking.totalAmount), tenant?.currency)}</span></div>
+        <div className="flex justify-between border-t pt-2 font-semibold" style={{ borderColor: 'var(--rp-border)' }}><span className="text-[#18231f]">Total</span><span className="text-[#18231f]">{fmt(Number(booking.totalAmount), tenant?.currency)}</span></div>
         <div className="flex justify-between text-[#23766a]"><span>Already paid</span><span>-{fmt(Number(booking.paidAmount), tenant?.currency)}</span></div>
-        <div className={`flex justify-between border-t pt-2 text-[14px] font-bold ${balance > 0 ? 'text-[#c43c3c]' : 'text-[#23766a]'}`} style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
+        <div className={`flex justify-between border-t pt-2 text-[14px] font-bold ${balance > 0 ? 'text-[#c43c3c]' : 'text-[#23766a]'}`} style={{ borderColor: 'var(--rp-border)' }}>
           <span>Balance due</span><span>{fmt(balance, tenant?.currency)}</span>
         </div>
       </div>
@@ -190,8 +170,8 @@ function CheckOutModal({ booking, onClose, onSuccess }: { booking: Booking; onCl
               <button key={m} onClick={() => setPaymentMethod(m)}
                 className="flex-1 rounded-[8px] border-2 py-[8px] text-[12px] font-semibold transition-all"
                 style={paymentMethod === m
-                  ? { borderColor: '#23766a', background: '#e3f2ef', color: '#23766a' }
-                  : { borderColor: 'rgba(0,0,0,0.09)', color: '#8aa29a' }}>
+                  ? { borderColor: '#23766a', background: 'var(--rp-teal-bg)', color: '#23766a' }
+                  : { borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-muted)' }}>
                 {m === 'CASH' ? '💵 Cash' : m === 'CARD' ? '💳 Card' : '🏦 Bank'}
               </button>
             ))}
@@ -240,13 +220,22 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
   const set = (k: string, v: unknown) => setForm(f => ({ ...f, [k]: v }));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(27,52,47,0.45)', backdropFilter: 'blur(4px)' }}>
-      <div className="w-full max-w-lg overflow-hidden rounded-[18px] bg-white shadow-2xl">
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-6 py-[18px]" style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
-          <h2 className="font-display text-[18px] font-medium text-[#18231f]">New Walk-In</h2>
-          <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-full text-[#8aa29a] hover:bg-[#f5f4f1] hover:text-[#18231f]">✕</button>
+    <ModalShell
+      open={true}
+      onClose={onClose}
+      title="New Walk-In"
+      maxWidth="520px"
+      footer={
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} className="flex-1 rounded-[9px] border px-4 py-[10px] text-[13px] font-medium" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text)' }}>Cancel</button>
+          <button onClick={() => mutation.mutate()} disabled={mutation.isPending || !form.guestName || !form.roomId}
+            className="flex-1 rounded-[9px] px-4 py-[10px] text-[13px] font-medium text-[#dfd9d0] disabled:opacity-50" style={{ background: 'var(--rp-btn-accent)' }}>
+            {mutation.isPending ? 'Checking in…' : 'Check In Guest'}
+          </button>
         </div>
-        <div className="max-h-[65vh] overflow-y-auto p-6 space-y-4">
+      }
+    >
+      <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <ModalInput label="Guest name *">
@@ -282,7 +271,7 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
             </select>
           </ModalInput>
           {estimatedTotal > 0 && (
-            <div className="flex justify-between rounded-[10px] border p-3 text-[13px]" style={{ background: '#e3f2ef', borderColor: 'rgba(35,118,106,0.2)' }}>
+            <div className="flex justify-between rounded-[10px] border p-3 text-[13px]" style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)' }}>
               <span className="text-[#23766a]">{n} night{n !== 1 ? 's' : ''} × {fmt(Number(selectedRoom?.basePrice), tenant?.currency)}</span>
               <span className="font-bold text-[#23766a]">{fmt(estimatedTotal, tenant?.currency)}</span>
             </div>
@@ -294,8 +283,8 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
                 <button key={m} onClick={() => set('paymentMethod', m)}
                   className="flex-1 rounded-[8px] border-2 py-[7px] text-[11.5px] font-semibold transition-all"
                   style={form.paymentMethod === m
-                    ? { borderColor: '#23766a', background: '#e3f2ef', color: '#23766a' }
-                    : { borderColor: 'rgba(0,0,0,0.09)', color: '#8aa29a' }}>
+                    ? { borderColor: '#23766a', background: 'var(--rp-teal-bg)', color: '#23766a' }
+                    : { borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-muted)' }}>
                   {m === 'CASH' ? '💵' : m === 'CARD' ? '💳' : m === 'BANK_TRANSFER' ? '🏦' : '⏳'} {m === 'BANK_TRANSFER' ? 'Bank' : m.charAt(0) + m.slice(1).toLowerCase()}
                 </button>
               ))}
@@ -304,16 +293,8 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
           <ModalInput label="Notes">
             <textarea value={form.roomNotes} onChange={e => set('roomNotes', e.target.value)} rows={2} placeholder="Key card issued, special requests…" className={`${inputCls} resize-none`} />
           </ModalInput>
-        </div>
-        <div className="flex gap-2.5 border-t px-6 py-4" style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
-          <button onClick={onClose} className="flex-1 rounded-[9px] border px-4 py-[10px] text-[13px] font-medium" style={{ borderColor: 'rgba(0,0,0,0.09)', color: '#18231f' }}>Cancel</button>
-          <button onClick={() => mutation.mutate()} disabled={mutation.isPending || !form.guestName || !form.roomId}
-            className="flex-1 rounded-[9px] px-4 py-[10px] text-[13px] font-medium text-[#dfd9d0] disabled:opacity-50" style={{ background: '#1b342f' }}>
-            {mutation.isPending ? 'Checking in…' : 'Check In Guest'}
-          </button>
-        </div>
       </div>
-    </div>
+    </ModalShell>
   );
 }
 
@@ -324,8 +305,8 @@ function BookingCard({ booking, onCheckIn, onCheckOut }: { booking: Booking; onC
   const n = nights(booking.checkIn, booking.checkOut);
 
   return (
-    <div className="rounded-[14px] border p-4 transition-shadow hover:shadow-sm"
-      style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+    <div className="rounded-[14px] border p-4 transition-shadow hover:shadow-sm bg-white dark:bg-white/5"
+      style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -363,14 +344,14 @@ function BookingCard({ booking, onCheckIn, onCheckOut }: { booking: Booking; onC
           {onCheckIn && (
             <button onClick={onCheckIn}
               className="flex items-center gap-1.5 rounded-[8px] px-[12px] py-[7px] text-[12px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
-              style={{ background: '#1b342f' }}>
+              style={{ background: 'var(--rp-btn-accent)' }}>
               <LogIn className="h-3.5 w-3.5" /> Check In
             </button>
           )}
           {onCheckOut && (
             <button onClick={onCheckOut}
-              className="flex items-center gap-1.5 rounded-[8px] border px-[12px] py-[7px] text-[12px] font-medium transition-colors hover:bg-[#faf9f7]"
-              style={{ borderColor: 'rgba(0,0,0,0.1)', color: '#18231f' }}>
+              className="flex items-center gap-1.5 rounded-[8px] border px-[12px] py-[7px] text-[12px] font-medium transition-colors hover:bg-[#faf9f7] dark:hover:bg-white/5"
+              style={{ borderColor: 'rgba(0,0,0,0.1)', color: 'var(--rp-text)' }}>
               <LogOut className="h-3.5 w-3.5" /> Check Out
             </button>
           )}
@@ -413,7 +394,7 @@ function RoomMap({ onCheckIn, onCheckOut }: { onCheckIn: (b: Booking) => void; o
                   {room.booking?.status === 'CONFIRMED' && (
                     <button onClick={() => onCheckIn(room.booking as unknown as Booking)}
                       className="mt-2 w-full rounded-[7px] py-[5px] text-[11px] font-semibold text-[#dfd9d0] transition-opacity hover:opacity-80"
-                      style={{ background: '#1b342f' }}>Check In</button>
+                      style={{ background: 'var(--rp-btn-accent)' }}>Check In</button>
                   )}
                   {room.booking?.status === 'CHECKED_IN' && (
                     <button onClick={() => onCheckOut(room.booking as unknown as Booking)}
@@ -428,7 +409,7 @@ function RoomMap({ onCheckIn, onCheckOut }: { onCheckIn: (b: Booking) => void; o
       ))}
       {floors.length === 0 && <div className="py-12 text-center text-[13px] text-[#8aa29a]">No rooms found</div>}
       {/* Legend */}
-      <div className="flex flex-wrap gap-2 border-t pt-5" style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
+      <div className="flex flex-wrap gap-2 border-t pt-5" style={{ borderColor: 'var(--rp-border)' }}>
         {Object.entries(ROOM_STATUS_PILL).map(([, s]) => (
           <span key={s.label} className="rounded-[7px] border px-[10px] py-[5px] text-[11px] font-semibold"
             style={{ background: s.bg, borderColor: s.border, color: s.text }}>{s.label}</span>
@@ -464,11 +445,11 @@ export default function FrontDeskPage() {
   const stats = d?.roomStats;
 
   const STAT_CARDS = [
-    { label: 'Total Rooms', value: stats?.total,       bg: '#f5f4f1', color: '#18231f', icon: BedDouble },
-    { label: 'Occupied',    value: stats?.occupied,    bg: '#f4ecda', color: '#b89040', icon: Users     },
-    { label: 'Available',   value: stats?.available,   bg: '#e3f2ef', color: '#23766a', icon: Sparkles  },
-    { label: 'Cleaning',    value: stats?.cleaning,    bg: '#fceee4', color: '#b8724a', icon: Sparkles  },
-    { label: 'Maintenance', value: stats?.maintenance, bg: '#fef2f2', color: '#c43c3c', icon: Wrench    },
+    { label: 'Total Rooms', value: stats?.total,       bg: 'var(--rp-surface-3)', color: 'var(--rp-text)', icon: BedDouble },
+    { label: 'Occupied',    value: stats?.occupied,    bg: 'var(--rp-amber-bg)', color: '#b89040', icon: Users     },
+    { label: 'Available',   value: stats?.available,   bg: 'var(--rp-teal-bg)', color: '#23766a', icon: Sparkles  },
+    { label: 'Cleaning',    value: stats?.cleaning,    bg: 'var(--rp-coral-bg)', color: '#b8724a', icon: Sparkles  },
+    { label: 'Maintenance', value: stats?.maintenance, bg: 'var(--rp-red-bg)', color: '#c43c3c', icon: Wrench    },
   ];
 
   const TABS = [
@@ -501,25 +482,25 @@ export default function FrontDeskPage() {
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => refetch()}
-            className="flex h-[38px] w-[38px] items-center justify-center rounded-[9px] border transition-colors hover:bg-[#faf9f7]"
-            style={{ borderColor: 'rgba(0,0,0,0.09)', color: '#8aa29a' }}>
+            className="flex h-[38px] w-[38px] items-center justify-center rounded-[9px] border transition-colors hover:bg-[#faf9f7] dark:hover:bg-white/5"
+            style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-muted)' }}>
             <RefreshCw className="h-4 w-4" />
           </button>
-          <div className="flex overflow-hidden rounded-[9px] border" style={{ borderColor: 'rgba(0,0,0,0.09)' }}>
+          <div className="flex overflow-hidden rounded-[9px] border" style={{ borderColor: 'var(--rp-border-md)' }}>
             <button onClick={() => setView('list')}
               className="px-3 py-[9px] text-[12.5px] font-medium transition-colors"
-              style={view === 'list' ? { background: '#1b342f', color: '#dfd9d0' } : { color: '#8aa29a' }}>
+              style={view === 'list' ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' } : { color: 'var(--rp-text-muted)' }}>
               <List className="h-4 w-4" />
             </button>
             <button onClick={() => setView('map')}
               className="px-3 py-[9px] text-[12.5px] font-medium transition-colors"
-              style={view === 'map' ? { background: '#1b342f', color: '#dfd9d0' } : { color: '#8aa29a' }}>
+              style={view === 'map' ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' } : { color: 'var(--rp-text-muted)' }}>
               <LayoutGrid className="h-4 w-4" />
             </button>
           </div>
           <button onClick={() => setWalkInOpen(true)}
             className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
-            style={{ background: '#1b342f' }}>
+            style={{ background: 'var(--rp-btn-accent)' }}>
             <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} /> Walk-In
           </button>
         </div>
@@ -528,8 +509,8 @@ export default function FrontDeskPage() {
       {/* Stats bar */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {STAT_CARDS.map(({ label, value, bg, color, icon: Icon }) => (
-          <div key={label} className="flex items-center gap-[11px] rounded-[12px] border px-[16px] py-[13px]"
-            style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+          <div key={label} className="flex items-center gap-[11px] rounded-[12px] border px-[16px] py-[13px] bg-white dark:bg-white/5"
+            style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
             <div className="flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-[8px]" style={{ background: bg }}>
               <Icon className="h-[13px] w-[13px]" strokeWidth={2} style={{ color }} />
             </div>
@@ -544,9 +525,9 @@ export default function FrontDeskPage() {
       {/* Arrivals quick-stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: "Today's Arrivals",   value: d?.arrivals.count,   sub: `${d?.arrivals.pending ?? 0} pending`,   bg: '#1b342f', text: '#dfd9d0', sub2: '#4a6e66' },
-          { label: "Today's Departures", value: d?.departures.count, sub: `${d?.departures.pending ?? 0} pending`, bg: '#23766a', text: '#e3f2ef', sub2: '#6a9990' },
-          { label: 'Guests In-House',    value: d?.inHouse.count,    sub: `${d?.totalGuests ?? 0} total guests`,  bg: '#f4ecda', text: '#18231f', sub2: '#8aa29a' },
+          { label: "Today's Arrivals",   value: d?.arrivals.count,   sub: `${d?.arrivals.pending ?? 0} pending`,   bg: '#1b342f', text: '#dfd9d0', sub2: 'var(--rp-text-accent)' },
+          { label: "Today's Departures", value: d?.departures.count, sub: `${d?.departures.pending ?? 0} pending`, bg: '#23766a', text: 'var(--rp-teal-bg)', sub2: '#6a9990' },
+          { label: 'Guests In-House',    value: d?.inHouse.count,    sub: `${d?.totalGuests ?? 0} total guests`,  bg: 'var(--rp-amber-bg)', text: 'var(--rp-text)', sub2: 'var(--rp-text-muted)' },
         ].map(({ label, value, sub, bg, text, sub2 }) => (
           <div key={label} className="rounded-[14px] p-5" style={{ background: bg }}>
             <div className="text-[38px] font-semibold leading-none tracking-[-0.03em]" style={{ color: text }}>{value ?? 0}</div>
@@ -558,26 +539,26 @@ export default function FrontDeskPage() {
 
       {/* Content: List or Map */}
       {view === 'map' ? (
-        <div className="rounded-[14px] border p-6"
-          style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+        <div className="rounded-[14px] border p-6 bg-white dark:bg-white/5"
+          style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           <h2 className="mb-6 text-[13px] font-semibold text-[#18231f]">Room Map</h2>
           <RoomMap onCheckIn={b => setCheckInFor(b)} onCheckOut={b => setCheckOutFor(b)} />
         </div>
       ) : (
-        <div className="rounded-[14px] border overflow-hidden"
-          style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+        <div className="rounded-[14px] border overflow-hidden bg-white dark:bg-white/5"
+          style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           {/* Tabs */}
-          <div className="flex border-b px-4" style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
+          <div className="flex border-b px-4" style={{ borderColor: 'var(--rp-border)' }}>
             {TABS.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)}
                 className="flex items-center gap-2 border-b-2 px-4 py-4 text-[13px] font-medium transition-colors"
                 style={tab === t.id
                   ? { borderColor: '#23766a', color: '#23766a' }
-                  : { borderColor: 'transparent', color: '#8aa29a' }}>
+                  : { borderColor: 'transparent', color: 'var(--rp-text-muted)' }}>
                 {t.label}
                 {t.count !== undefined && (
                   <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                    style={tab === t.id ? { background: '#e3f2ef', color: '#23766a' } : { background: '#f5f4f1', color: '#8aa29a' }}>
+                    style={tab === t.id ? { background: 'var(--rp-teal-bg)', color: '#23766a' } : { background: 'var(--rp-surface-3)', color: 'var(--rp-text-muted)' }}>
                     {t.count}
                   </span>
                 )}

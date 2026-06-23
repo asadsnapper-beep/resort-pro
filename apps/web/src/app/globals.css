@@ -60,3 +60,87 @@
   .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
   .scrollbar-hide::-webkit-scrollbar { display: none; }
 }
+
+/* ── ResortPro Semantic Color Tokens ──────────────────────────────────────────
+   Define once here. Components use var(--rp-*) — dark mode is automatic.
+   ────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Text */
+  --rp-text:          #18231f;
+  --rp-text-muted:    #8aa29a;
+  --rp-text-subtle:   #6b8880;
+  --rp-text-faint:    #c5bdb4;
+  --rp-text-accent:   #4a6e66;
+
+  /* Surfaces */
+  --rp-surface:       #ffffff;
+  --rp-surface-2:     #faf9f7;
+  --rp-surface-3:     #f4f1eb;
+  --rp-surface-4:     #f0ede8;
+  --rp-modal:         #ffffff;
+
+  /* Borders */
+  --rp-border:        rgba(0,0,0,0.06);
+  --rp-border-md:     rgba(0,0,0,0.08);
+
+  /* Brand button */
+  --rp-btn-accent:      #1b342f;
+  --rp-btn-accent-text: #dfd9d0;
+
+  /* Status backgrounds */
+  --rp-teal-bg:       #e3f2ef;
+  --rp-amber-bg:      #f4ecda;
+  --rp-red-bg:        #fef2f2;
+  --rp-coral-bg:      #fceee4;
+  --rp-teal-soft:     #f5faf9;
+}
+
+.dark {
+  /* Text */
+  --rp-text:          #dfd9d0;
+  --rp-text-muted:    #94b8b0;
+  --rp-text-subtle:   #94b8b0;
+  --rp-text-faint:    #6e8580;
+  --rp-text-accent:   #6d9990;
+
+  /* Surfaces */
+  --rp-surface:       rgba(255,255,255,0.07);
+  --rp-surface-2:     rgba(255,255,255,0.04);
+  --rp-surface-3:     rgba(255,255,255,0.05);
+  --rp-surface-4:     rgba(255,255,255,0.06);
+  --rp-modal:         #1a2e2a;
+
+  /* Borders */
+  --rp-border:        rgba(255,255,255,0.08);
+  --rp-border-md:     rgba(255,255,255,0.10);
+
+  /* Status backgrounds */
+  --rp-teal-bg:       rgba(35,118,106,0.20);
+  --rp-amber-bg:      rgba(184,144,64,0.18);
+  --rp-red-bg:        rgba(196,60,60,0.15);
+  --rp-coral-bg:      rgba(184,100,60,0.18);
+  --rp-teal-soft:     rgba(35,118,106,0.08);
+}
+
+/* ── Tailwind className overrides (for className="text-[#18231f]" patterns) ── */
+.dark .text-\[\#18231f\] { color: var(--rp-text) !important; }
+.dark .text-\[\#8aa29a\] { color: var(--rp-text-muted) !important; }
+.dark .text-\[\#7a9890\] { color: var(--rp-text-muted) !important; }
+.dark .text-\[\#6b8880\] { color: var(--rp-text-subtle) !important; }
+.dark .text-\[\#4a6e66\] { color: var(--rp-text-accent) !important; }
+.dark .text-\[\#b5afa7\] { color: var(--rp-text-faint) !important; }
+.dark .text-\[\#c5bdb4\] { color: var(--rp-text-faint) !important; }
+.dark .text-\[\#d6cfc4\] { color: var(--rp-text-faint) !important; }
+
+.dark .bg-\[\#f5f4f1\] { background-color: var(--rp-surface-3) !important; }
+.dark .bg-\[\#f4f1eb\] { background-color: var(--rp-surface-3) !important; }
+.dark .bg-\[\#faf9f7\] { background-color: var(--rp-surface-2) !important; }
+.dark .bg-white\/5    { background-color: rgba(255,255,255,0.07) !important; }
+
+.dark .border-black\/5        { border-color: var(--rp-border) !important; }
+.dark .border-black\/\[0\.07\] { border-color: var(--rp-border) !important; }
+.dark .border-black\/\[0\.045\]{ border-color: var(--rp-border) !important; }
+.dark .border-black\/\[0\.09\] { border-color: var(--rp-border-md) !important; }
+
+.dark main .bg-white { background-color: var(--rp-surface) !important; }

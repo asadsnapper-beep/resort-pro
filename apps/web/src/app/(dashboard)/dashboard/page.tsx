@@ -1,7 +1,11 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { dashboardApi, websiteApi } from '@/lib/api';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTheme } from 'next-themes';
+import { dashboardApi, websiteApi, bookingsApi } from '@/lib/api';
+import { NewBookingModal } from '@/components/bookings/NewBookingModal';
+import { toast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/badge';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -16,9 +20,9 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 type IconFamily = 'teal' | 'gold' | 'coral';
 
 const ICON_STYLES: Record<IconFamily, { bg: string; color: string }> = {
-  teal:  { bg: '#e3f2ef', color: '#23766a' },
-  gold:  { bg: '#f4ecda', color: '#b89040' },
-  coral: { bg: '#fceee4', color: '#b8724a' },
+  teal:  { bg: 'var(--rp-teal-bg)', color: '#23766a' },
+  gold:  { bg: 'var(--rp-amber-bg)', color: '#b89040' },
+  coral: { bg: 'var(--rp-coral-bg)', color: '#b8724a' },
 };
 
 function HeroStatCard({
@@ -27,33 +31,34 @@ function HeroStatCard({
   title: string; value: string | number; unit?: string;
   subtext?: string; icon: React.ElementType; family: IconFamily; dark?: boolean;
 }) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   const style = ICON_STYLES[family];
+  const bg = dark ? '#1b342f' : isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)';
+  const border = isDark ? 'rgba(255,255,255,0.08)' : dark ? 'var(--rp-border-md)' : 'var(--rp-border)';
   return (
     <div
       className="rounded-[14px] p-[22px] border"
-      style={{
-        background: dark ? '#1b342f' : '#ffffff',
-        borderColor: dark ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.045)',
-        boxShadow: '0 1px 6px rgba(0,0,0,0.04)',
-      }}
+      style={{ background: bg, borderColor: border, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}
     >
       <div className="flex items-start justify-between mb-4">
-        <span className="text-[10.5px] font-semibold uppercase tracking-[0.09em]" style={{ color: dark ? '#62847c' : '#8aa29a' }}>
+        <span className="text-[10.5px] font-semibold uppercase tracking-[0.09em]"
+          style={{ color: dark ? '#62847c' : isDark ? '#94b8b0' : 'var(--rp-text-muted)' }}>
           {title}
         </span>
         <div className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-[8px]"
-          style={{ background: dark ? 'rgba(255,255,255,0.08)' : style.bg }}>
+          style={{ background: dark || isDark ? 'rgba(255,255,255,0.08)' : style.bg }}>
           <Icon className="h-[13px] w-[13px]" strokeWidth={2.3} style={{ color: dark ? '#d4a853' : style.color }} />
         </div>
       </div>
       <div>
         <span className="text-[40px] font-semibold leading-none tracking-[-0.03em]"
-          style={{ color: dark ? '#ece7df' : '#18231f' }}>
+          style={{ color: dark ? '#ece7df' : isDark ? '#dfd9d0' : 'var(--rp-text)' }}>
           {value}
         </span>
-        {unit && <span className="ml-px text-[19px] font-normal" style={{ color: dark ? '#4a6e66' : '#8aa29a' }}>{unit}</span>}
+        {unit && <span className="ml-px text-[19px] font-normal" style={{ color: dark ? 'var(--rp-text-accent)' : isDark ? '#94b8b0' : 'var(--rp-text-muted)' }}>{unit}</span>}
       </div>
-      {subtext && <p className="mt-[10px] text-[12px]" style={{ color: dark ? '#4a6e66' : '#8aa29a' }}>{subtext}</p>}
+      {subtext && <p className="mt-[10px] text-[12px]" style={{ color: dark ? 'var(--rp-text-accent)' : isDark ? '#94b8b0' : 'var(--rp-text-muted)' }}>{subtext}</p>}
     </div>
   );
 }
@@ -63,29 +68,37 @@ function CompactStatCard({
 }: {
   title: string; value: string | number; icon: React.ElementType; family: IconFamily;
 }) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   const style = ICON_STYLES[family];
   return (
     <div className="flex items-center gap-[11px] rounded-[12px] border px-[18px] py-[15px]"
-      style={{ background: '#ffffff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+      style={{
+        background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)',
+        borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-border)',
+        boxShadow: '0 1px 6px rgba(0,0,0,0.04)',
+      }}>
       <div className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[9px]"
-        style={{ background: style.bg }}>
+        style={{ background: isDark ? 'rgba(255,255,255,0.08)' : style.bg }}>
         <Icon className="h-[14px] w-[14px]" strokeWidth={2} style={{ color: style.color }} />
       </div>
       <div>
-        <div className="mb-[3px] text-[10px] font-semibold uppercase tracking-[0.07em] text-[#8aa29a]">{title}</div>
-        <div className="text-[22px] font-semibold leading-none tracking-[-0.02em] text-[#18231f]">{value}</div>
+        <div className="mb-[3px] text-[10px] font-semibold uppercase tracking-[0.07em]"
+          style={{ color: isDark ? '#94b8b0' : 'var(--rp-text-muted)' }}>{title}</div>
+        <div className="text-[22px] font-semibold leading-none tracking-[-0.02em]"
+          style={{ color: isDark ? '#dfd9d0' : 'var(--rp-text)' }}>{value}</div>
       </div>
     </div>
   );
 }
 
 const STATUS_PILL: Record<string, { bg: string; border: string; text: string; label: string }> = {
-  CONFIRMED:   { bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Confirmed' },
-  CHECKED_IN:  { bg: '#f4ecda', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'In House'  },
-  CHECKED_OUT: { bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)',      text: '#8aa29a', label: 'Checked Out'},
-  PENDING:     { bg: '#fceee4', border: 'rgba(184,114,74,0.2)',  text: '#b8724a', label: 'Pending'   },
-  CANCELLED:   { bg: '#fef2f2', border: 'rgba(200,60,60,0.15)',  text: '#c43c3c', label: 'Cancelled' },
-  NO_SHOW:     { bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)',      text: '#8aa29a', label: 'No Show'   },
+  CONFIRMED:   { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Confirmed' },
+  CHECKED_IN:  { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'In House'  },
+  CHECKED_OUT: { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)', label: 'Checked Out'},
+  PENDING:     { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a', label: 'Pending'   },
+  CANCELLED:   { bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)',  text: '#c43c3c', label: 'Cancelled' },
+  NO_SHOW:     { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)', label: 'No Show'   },
 };
 
 function BookingStatusPill({ status }: { status: string }) {
@@ -100,6 +113,13 @@ function BookingStatusPill({ status }: { status: string }) {
 
 export default function DashboardPage() {
   const { user } = useAuthStore();
+  const queryClient = useQueryClient();
+  const { resolvedTheme } = useTheme();
+  const [newBookingOpen, setNewBookingOpen] = useState(false);
+  const isDark = resolvedTheme === 'dark';
+  const cardBg = isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)';
+  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-border)';
+  const dividerColor = isDark ? 'rgba(255,255,255,0.06)' : 'var(--rp-border)';
 
   const { data: statsRes, isLoading } = useQuery({
     queryKey: ['dashboard-stats'],
@@ -168,13 +188,13 @@ export default function DashboardPage() {
             {today}
           </p>
         </div>
-        <a
-          href="/dashboard/bookings/new"
+        <button
+          onClick={() => setNewBookingOpen(true)}
           className="rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
-          style={{ background: '#1b342f' }}
+          style={{ background: 'var(--rp-btn-accent)' }}
         >
           + New Booking
-        </a>
+        </button>
       </div>
 
       {/* Stat Cards & Charts — hidden for housekeeping staff */}
@@ -241,8 +261,8 @@ export default function DashboardPage() {
       {/* Today's Arrivals & Departures */}
       <div className="grid gap-3 lg:grid-cols-2 animate-fade-up [animation-delay:160ms]">
         {/* Arrivals */}
-        <div className="rounded-[14px] border overflow-hidden" style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
-          <div className="flex items-center justify-between border-b px-5 py-[15px]" style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
+        <div className="rounded-[14px] border overflow-hidden" style={{ background: cardBg, borderColor: cardBorder, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+          <div className="flex items-center justify-between border-b px-5 py-[15px]" style={{ borderColor: dividerColor }}>
             <div className="flex items-center gap-2">
               <LogIn className="h-[13px] w-[13px] text-[#23766a]" strokeWidth={2.5} />
               <span className="text-[13px] font-semibold text-[#18231f]">Today's Arrivals</span>
@@ -256,9 +276,9 @@ export default function DashboardPage() {
               <p className="text-[13px] text-[#8aa29a]">No arrivals today</p>
             </div>
           ) : (
-            <div className="divide-y" style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
+            <div className="divide-y" style={{ borderColor: dividerColor }}>
               {arrivals.map((b: any) => (
-                <div key={b.id} className="flex items-center gap-3 px-5 py-4 hover:bg-[#faf9f7] transition-colors">
+                <div key={b.id} className="flex items-center gap-3 px-5 py-4 hover:bg-[#faf9f7] dark:hover:bg-white/5 transition-colors">
                   <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-[#e3f2ef] text-[12px] font-semibold text-[#23766a]">
                     {b.guest.firstName[0]}{b.guest.lastName[0]}
                   </div>
@@ -281,8 +301,8 @@ export default function DashboardPage() {
         </div>
 
         {/* Departures */}
-        <div className="rounded-[14px] border overflow-hidden" style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
-          <div className="flex items-center justify-between border-b px-5 py-[15px]" style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
+        <div className="rounded-[14px] border overflow-hidden" style={{ background: cardBg, borderColor: cardBorder, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+          <div className="flex items-center justify-between border-b px-5 py-[15px]" style={{ borderColor: dividerColor }}>
             <div className="flex items-center gap-2">
               <LogOut className="h-[13px] w-[13px] text-[#23766a]" strokeWidth={2.5} />
               <span className="text-[13px] font-semibold text-[#18231f]">Today's Departures</span>
@@ -296,9 +316,9 @@ export default function DashboardPage() {
               <p className="text-[13px] text-[#8aa29a]">No departures today</p>
             </div>
           ) : (
-            <div className="divide-y" style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
+            <div className="divide-y" style={{ borderColor: dividerColor }}>
               {departures.map((b: any) => (
-                <div key={b.id} className="flex items-center gap-3 px-5 py-4 hover:bg-[#faf9f7] transition-colors">
+                <div key={b.id} className="flex items-center gap-3 px-5 py-4 hover:bg-[#faf9f7] dark:hover:bg-white/5 transition-colors">
                   <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-[#e3f2ef] text-[12px] font-semibold text-[#23766a]">
                     {b.guest.firstName[0]}{b.guest.lastName[0]}
                   </div>
@@ -325,7 +345,7 @@ export default function DashboardPage() {
       <div className="grid gap-3 lg:grid-cols-2 animate-fade-up [animation-delay:210ms]">
         {/* Revenue Chart */}
         <div className="rounded-[14px] border px-[22px] py-[18px]"
-          style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+          style={{ background: cardBg, borderColor: cardBorder, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           <div className="mb-4 flex items-center justify-between">
             <div>
               <p className="text-[13px] font-semibold text-[#18231f]">Revenue</p>
@@ -344,11 +364,11 @@ export default function DashboardPage() {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.04)" />
-              <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#8aa29a' }} tickLine={false} axisLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: '#8aa29a' }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+              <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--rp-text-muted)' }} tickLine={false} axisLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: 'var(--rp-text-muted)' }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
               <Tooltip
                 formatter={(v) => [formatCurrency(Number(v)), 'Revenue']}
-                contentStyle={{ background: '#1b342f', border: 'none', borderRadius: 10, fontSize: 12 }}
+                contentStyle={{ background: 'var(--rp-btn-accent)', border: 'none', borderRadius: 10, fontSize: 12 }}
                 labelStyle={{ color: '#9bbdb7' }}
                 itemStyle={{ color: '#ece7df' }}
               />
@@ -359,7 +379,7 @@ export default function DashboardPage() {
 
         {/* Occupancy Chart */}
         <div className="rounded-[14px] border px-[22px] py-[18px]"
-          style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+          style={{ background: cardBg, borderColor: cardBorder, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           <div className="mb-4 flex items-center justify-between">
             <div>
               <p className="text-[13px] font-semibold text-[#18231f]">Occupancy Rate</p>
@@ -372,11 +392,11 @@ export default function DashboardPage() {
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={occupancyData.slice(-14)} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.04)" />
-              <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#8aa29a' }} tickLine={false} axisLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: '#8aa29a' }} tickLine={false} axisLine={false} unit="%" domain={[0, 100]} />
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--rp-text-muted)' }} tickLine={false} axisLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: 'var(--rp-text-muted)' }} tickLine={false} axisLine={false} unit="%" domain={[0, 100]} />
               <Tooltip
                 formatter={(v) => [`${v}%`, 'Occupancy']}
-                contentStyle={{ background: '#1b342f', border: 'none', borderRadius: 10, fontSize: 12 }}
+                contentStyle={{ background: 'var(--rp-btn-accent)', border: 'none', borderRadius: 10, fontSize: 12 }}
                 labelStyle={{ color: '#9bbdb7' }}
                 itemStyle={{ color: '#ece7df' }}
               />
@@ -389,7 +409,7 @@ export default function DashboardPage() {
       {/* Website Visitors Widget */}
       {websiteStats && (websiteStats.total30d > 0 || true) && (
         <div className="rounded-[14px] border px-[22px] py-[18px] animate-fade-up [animation-delay:250ms]"
-          style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+          style={{ background: cardBg, borderColor: cardBorder, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="flex h-[28px] w-[28px] items-center justify-center rounded-[8px] bg-[#fceee4]">
@@ -426,7 +446,7 @@ export default function DashboardPage() {
                 </defs>
                 <Tooltip
                   formatter={(v: number) => [v, 'Visitors']}
-                  contentStyle={{ background: '#1b342f', border: 'none', borderRadius: 10, fontSize: 11 }}
+                  contentStyle={{ background: 'var(--rp-btn-accent)', border: 'none', borderRadius: 10, fontSize: 11 }}
                   labelStyle={{ color: '#9bbdb7' }}
                   itemStyle={{ color: '#ece7df' }}
                 />
@@ -441,9 +461,9 @@ export default function DashboardPage() {
       <div className="grid gap-3 lg:grid-cols-3 animate-fade-up [animation-delay:290ms]">
         {/* Recent Bookings */}
         <div className="lg:col-span-2 rounded-[14px] border overflow-hidden"
-          style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+          style={{ background: cardBg, borderColor: cardBorder, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           <div className="flex items-center justify-between border-b px-5 py-[15px]"
-            style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
+            style={{ borderColor: dividerColor }}>
             <div className="flex items-center gap-2.5">
               <div className="flex h-[28px] w-[28px] items-center justify-center rounded-[8px] bg-[#e3f2ef]">
                 <Users className="h-[12px] w-[12px] text-[#23766a]" strokeWidth={2.5} />
@@ -458,13 +478,13 @@ export default function DashboardPage() {
               <p className="text-[13px] text-[#8aa29a]">No recent bookings</p>
             </div>
           ) : (
-            <div className="divide-y" style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
+            <div className="divide-y" style={{ borderColor: dividerColor }}>
               {recentBookings.map((booking: Record<string, unknown>) => {
                 const guest = booking.guest as { firstName: string; lastName: string };
                 const room = booking.room as { name: string };
                 const initials = `${guest?.firstName?.[0] ?? ''}${guest?.lastName?.[0] ?? ''}`;
                 return (
-                  <div key={booking.id as string} className="flex items-center gap-3 px-5 py-[13px] hover:bg-[#faf9f7] transition-colors">
+                  <div key={booking.id as string} className="flex items-center gap-3 px-5 py-[13px] hover:bg-[#faf9f7] dark:hover:bg-white/5 transition-colors">
                     <div className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-full bg-[#e3f2ef] text-[11px] font-semibold text-[#23766a]">
                       {initials}
                     </div>
@@ -486,9 +506,9 @@ export default function DashboardPage() {
 
         {/* Low Stock Alerts */}
         <div className="rounded-[14px] border overflow-hidden"
-          style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+          style={{ background: cardBg, borderColor: cardBorder, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           <div className="flex items-center gap-2.5 border-b px-5 py-[15px]"
-            style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
+            style={{ borderColor: dividerColor }}>
             <div className="flex h-[28px] w-[28px] items-center justify-center rounded-[8px] bg-[#fceee4]">
               <AlertCircle className="h-[12px] w-[12px] text-[#b8724a]" strokeWidth={2.5} />
             </div>
@@ -500,7 +520,7 @@ export default function DashboardPage() {
               <p className="text-[13px] text-[#8aa29a]">All stock levels OK</p>
             </div>
           ) : (
-            <div className="divide-y" style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
+            <div className="divide-y" style={{ borderColor: dividerColor }}>
               {lowStock.map((item: Record<string, unknown>) => (
                 <div key={item.id as string} className="flex items-center justify-between px-5 py-[13px]">
                   <div className="min-w-0">
@@ -517,6 +537,23 @@ export default function DashboardPage() {
         </div>
       </div>
       </>} {/* end non-STAFF block */}
+
+      <NewBookingModal
+        open={newBookingOpen}
+        onClose={() => setNewBookingOpen(false)}
+        loading={false}
+        onSubmit={async (data) => {
+          try {
+            await bookingsApi.create(data);
+            queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+            toast({ title: 'Booking confirmed!', description: 'Guest reservation has been created.' });
+            setNewBookingOpen(false);
+          } catch (err: unknown) {
+            const e = err as { response?: { data?: { error?: string } } };
+            toast({ title: 'Booking failed', description: e?.response?.data?.error || 'Please try again', variant: 'destructive' });
+          }
+        }}
+      />
     </div>
   );
 }

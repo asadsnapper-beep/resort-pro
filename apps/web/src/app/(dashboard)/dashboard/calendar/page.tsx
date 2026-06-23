@@ -1,14 +1,15 @@
 'use client';
 
+import { createPortal } from 'react-dom';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { bookingsApi } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import {
   ChevronLeft, ChevronRight, Loader2, BedDouble,
-  CalendarDays, RefreshCw, Plus,
+  CalendarDays, RefreshCw, Plus, X,
 } from 'lucide-react';
-import { cn, formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -17,8 +18,8 @@ interface GanttBooking {
   confirmationNumber: string;
   guestName: string;
   guestId: string;
-  checkIn: string;   // 'YYYY-MM-DD'
-  checkOut: string;  // 'YYYY-MM-DD'
+  checkIn: string;
+  checkOut: string;
   nights: number;
   status: string;
   totalAmount: number;
@@ -40,19 +41,19 @@ interface GanttRoom {
 
 interface GanttData {
   rooms: GanttRoom[];
-  dates: string[];   // 'YYYY-MM-DD' array
+  dates: string[];
   from: string;
   to: string;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const STATUS_CONFIG: Record<string, { bg: string; text: string; border: string; label: string }> = {
-  CONFIRMED:   { bg: 'bg-indigo-500',   text: 'text-white', border: 'border-indigo-600',   label: 'Confirmed' },
-  CHECKED_IN:  { bg: 'bg-emerald-500',  text: 'text-white', border: 'border-emerald-600',  label: 'Checked In' },
-  CHECKED_OUT: { bg: 'bg-gray-400',     text: 'text-white', border: 'border-gray-500',     label: 'Checked Out' },
-  PENDING:     { bg: 'bg-amber-400',    text: 'text-white', border: 'border-amber-500',    label: 'Pending' },
-  CONFLICT:    { bg: 'bg-red-500',      text: 'text-white', border: 'border-red-600',      label: '⚠ Conflict' },
+const STATUS_CONFIG: Record<string, { bg: string; text: string; border: string; bar: string; label: string }> = {
+  CONFIRMED:   { bg: 'var(--rp-teal-bg)', text: '#23766a', border: 'rgba(35,118,106,0.2)',  bar: '#23766a', label: 'Confirmed' },
+  CHECKED_IN:  { bg: '#1b342f', text: '#dfd9d0', border: 'rgba(27,52,47,0.5)',   bar: '#1b342f', label: 'Checked In' },
+  CHECKED_OUT: { bg: 'var(--rp-surface-3)', text: 'var(--rp-text-muted)', border: 'var(--rp-border-md)',     bar: '#9bbdb7', label: 'Checked Out' },
+  PENDING:     { bg: 'var(--rp-amber-bg)', text: '#b89040', border: 'rgba(184,144,64,0.2)', bar: '#d4a853', label: 'Pending' },
+  CONFLICT:    { bg: 'var(--rp-red-bg)', text: '#c43c3c', border: 'rgba(200,60,60,0.2)',  bar: '#c43c3c', label: '⚠ Conflict' },
 };
 
 const ROOM_TYPE_SHORT: Record<string, string> = {
@@ -83,53 +84,14 @@ function formatHeaderDate(dateStr: string) {
 function formatMonthTitle(from: string, to: string) {
   const s = new Date(from + 'T00:00:00');
   const e = new Date(to + 'T00:00:00');
-  if (s.getMonth() === e.getMonth()) {
-    return `${MONTH_LABELS[s.getMonth()]} ${s.getFullYear()}`;
-  }
+  if (s.getMonth() === e.getMonth()) return `${MONTH_LABELS[s.getMonth()]} ${s.getFullYear()}`;
   return `${MONTH_LABELS[s.getMonth()]} – ${MONTH_LABELS[e.getMonth()]} ${e.getFullYear()}`;
-}
-
-// ── Booking Tooltip ───────────────────────────────────────────────────────────
-
-function BookingTooltip({ booking, onClose, onOpen }: {
-  booking: GanttBooking;
-  onClose: () => void;
-  onOpen: () => void;
-}) {
-  const cfg = STATUS_CONFIG[booking.status] ?? STATUS_CONFIG.PENDING;
-  return (
-    <div className="absolute z-50 left-0 top-full mt-1 w-56 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl p-3 text-left"
-         onClick={e => e.stopPropagation()}>
-      <div className="flex items-center justify-between mb-2">
-        <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', cfg.bg, cfg.text)}>{cfg.label}</span>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xs">✕</button>
-      </div>
-      <p className="text-sm font-semibold text-gray-900 dark:text-white">{booking.guestName}</p>
-      <p className="text-xs text-gray-500 mt-0.5">#{booking.confirmationNumber}</p>
-      <div className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-400">
-        <p>📅 {booking.checkIn} → {booking.checkOut}</p>
-        <p>🌙 {booking.nights} night{booking.nights !== 1 ? 's' : ''}</p>
-        <p>👥 {booking.adults} adult{booking.adults !== 1 ? 's' : ''}{booking.children > 0 ? ` + ${booking.children} child` : ''}</p>
-        <p>💰 {formatCurrency(booking.totalAmount)}</p>
-      </div>
-      <button
-        onClick={onOpen}
-        className="mt-3 w-full text-xs bg-indigo-600 hover:bg-indigo-700 text-white py-1.5 rounded-lg transition-colors"
-      >
-        Open Booking →
-      </button>
-    </div>
-  );
 }
 
 // ── Gantt Row ─────────────────────────────────────────────────────────────────
 
 function GanttRow({
-  room,
-  dates,
-  todayStr,
-  onCellClick,
-  onBookingClick,
+  room, dates, todayStr, onCellClick, onBookingClick,
 }: {
   room: GanttRoom;
   dates: string[];
@@ -137,54 +99,61 @@ function GanttRow({
   onCellClick: (roomId: string, date: string) => void;
   onBookingClick: (booking: GanttBooking) => void;
 }) {
-  const router = useRouter();
   const totalDays = dates.length;
   const isMaintenance = room.status === 'MAINTENANCE';
 
   return (
-    <div className="flex border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-gray-800/20 group">
+    <div className="flex border-b group" style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
       {/* Room info column */}
-      <div className="w-44 shrink-0 flex items-center gap-2 px-3 py-2 border-r border-gray-100 dark:border-gray-800">
-        <div className={cn(
-          'w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0',
-          isMaintenance
-            ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-            : 'bg-resort-50 text-resort-700 dark:bg-resort-900/20 dark:text-resort-400'
-        )}>
-          {isMaintenance ? '🔧' : ROOM_TYPE_SHORT[room.type] ?? room.type.slice(0, 3)}
+      <div className="w-44 shrink-0 flex items-center gap-2 px-3 py-2 border-r"
+        style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
+        <div className="flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-[8px] text-[10px] font-bold"
+          style={isMaintenance
+            ? { background: 'var(--rp-coral-bg)', color: '#b8724a' }
+            : { background: 'var(--rp-teal-bg)', color: '#23766a' }}>
+          {isMaintenance ? '🔧' : (ROOM_TYPE_SHORT[room.type] ?? room.type.slice(0, 3))}
         </div>
         <div className="min-w-0">
-          <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">
-            Room {room.number}
-          </p>
-          <p className="text-[10px] text-gray-400 truncate">{room.name || room.type}</p>
+          <p className="text-[12px] font-semibold truncate text-[#18231f] dark:text-[#dfd9d0]">Room {room.number}</p>
+          <p className="text-[10px] truncate text-[#8aa29a] dark:text-[#94b8b0]">{room.name || room.type}</p>
         </div>
       </div>
 
       {/* Timeline area */}
       <div className="flex-1 relative" style={{ minHeight: 52 }}>
-        {/* Day cells (for click + today highlight) */}
+        {/* Day cells */}
         <div className="absolute inset-0 flex">
           {dates.map(date => (
             <div
               key={date}
               onClick={() => !isMaintenance && onCellClick(room.id, date)}
-              className={cn(
-                'flex-1 border-r border-gray-100 dark:border-gray-800 last:border-r-0',
-                date === todayStr && 'bg-amber-50 dark:bg-amber-900/10',
-                !isMaintenance && 'cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/10',
-                isMaintenance && 'bg-orange-50/50 dark:bg-orange-900/5 cursor-not-allowed',
-              )}
+              className="flex-1 border-r last:border-r-0 transition-colors"
+              style={{
+                borderColor: 'rgba(0,0,0,0.04)',
+                background: isMaintenance
+                  ? 'rgba(184,114,74,0.04)'
+                  : date === todayStr
+                  ? 'var(--rp-amber-bg)'
+                  : undefined,
+                cursor: isMaintenance ? 'not-allowed' : 'pointer',
+              }}
+              onMouseEnter={e => {
+                if (!isMaintenance) (e.currentTarget as HTMLElement).style.background = 'var(--rp-teal-bg)';
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.background = isMaintenance
+                  ? 'rgba(184,114,74,0.04)'
+                  : date === todayStr ? 'var(--rp-amber-bg)' : '';
+              }}
             />
           ))}
         </div>
 
-        {/* Booking blocks */}
+        {/* Booking bars */}
         {room.bookings.map(booking => {
           const startIdx = dates.indexOf(booking.checkIn);
-          const endIdx = dates.indexOf(booking.checkOut); // checkout day = empty (guest leaves)
+          const endIdx = dates.indexOf(booking.checkOut);
 
-          // Clamp to visible range
           const clampedStart = Math.max(0, startIdx === -1
             ? (new Date(booking.checkIn + 'T00:00:00') < new Date(dates[0] + 'T00:00:00') ? 0 : totalDays)
             : startIdx);
@@ -200,23 +169,17 @@ function GanttRow({
           const cfg = STATUS_CONFIG[booking.status] ?? STATUS_CONFIG.PENDING;
 
           return (
-            <div
-              key={booking.id}
-              className="absolute top-1/2 -translate-y-1/2"
-              style={{ left: `${leftPct}%`, width: `${widthPct}%`, padding: '0 2px' }}
-            >
+            <div key={booking.id} className="absolute top-1/2 -translate-y-1/2"
+              style={{ left: `${leftPct}%`, width: `${widthPct}%`, padding: '0 2px' }}>
               <div
                 onClick={e => { e.stopPropagation(); onBookingClick(booking); }}
-                className={cn(
-                  'relative h-8 rounded-md px-2 flex items-center cursor-pointer transition-all hover:opacity-90 hover:shadow-md border',
-                  cfg.bg, cfg.text, cfg.border,
-                )}
+                className="relative flex h-[30px] cursor-pointer items-center rounded-[7px] border px-2 transition-all hover:opacity-90 hover:shadow-md"
+                style={{ background: cfg.bar, borderColor: cfg.border, color: 'var(--rp-surface)' }}
               >
                 <p className="text-[11px] font-medium truncate">{booking.guestName}</p>
                 {booking.nights > 1 && (
                   <p className="text-[10px] opacity-70 ml-1 shrink-0">·{booking.nights}n</p>
                 )}
-
               </div>
             </div>
           );
@@ -224,8 +187,9 @@ function GanttRow({
 
         {/* Maintenance overlay */}
         {isMaintenance && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-xs text-orange-500 font-medium bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded">
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <span className="rounded-[7px] border px-2 py-0.5 text-[11px] font-medium"
+              style={{ background: 'var(--rp-coral-bg)', borderColor: 'rgba(184,114,74,0.2)', color: '#b8724a' }}>
               🔧 Maintenance
             </span>
           </div>
@@ -239,24 +203,16 @@ function GanttRow({
 
 function Legend() {
   return (
-    <div className="flex items-center gap-4 text-xs text-gray-500">
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
       {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
         <div key={key} className="flex items-center gap-1.5">
-          <span className={cn('w-3 h-3 rounded-sm', cfg.bg)} />
-          {cfg.label}
+          <span className="h-[10px] w-[10px] rounded-[3px]" style={{ background: cfg.bar }} />
+          <span className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">{cfg.label}</span>
         </div>
       ))}
       <div className="flex items-center gap-1.5">
-        <span className="w-3 h-3 rounded-sm bg-amber-100 border border-amber-200" />
-        Today
-      </div>
-      <div className="flex items-center gap-1.5">
-        <span className="w-3 h-3 rounded-sm bg-orange-100" />
-        Maintenance
-      </div>
-      <div className="flex items-center gap-1.5">
-        <span className="w-3 h-3 rounded-sm bg-red-500" />
-        Conflict
+        <span className="h-[10px] w-[10px] rounded-[3px] border" style={{ background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.3)' }} />
+        <span className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">Today</span>
       </div>
     </div>
   );
@@ -264,13 +220,12 @@ function Legend() {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-const WINDOW = 30; // days shown at once
+const WINDOW = 30;
 
 export default function BookingCalendarPage() {
   const router = useRouter();
   const todayStr = today();
 
-  // Start from Monday of current week
   const getDefaultFrom = () => {
     const d = new Date();
     const day = d.getDay();
@@ -315,7 +270,6 @@ export default function BookingCalendarPage() {
     setActiveBooking(prev => prev?.id === booking.id ? null : booking);
   };
 
-  // Scroll to today column on load
   useEffect(() => {
     if (!data || !containerRef.current) return;
     const todayIdx = data.dates.indexOf(todayStr);
@@ -326,7 +280,6 @@ export default function BookingCalendarPage() {
     }
   }, [data, todayStr]);
 
-  // Click outside to close active booking tooltip
   useEffect(() => {
     const handler = () => setActiveBooking(null);
     document.addEventListener('click', handler);
@@ -336,7 +289,7 @@ export default function BookingCalendarPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-resort-600" />
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#23766a' }} />
       </div>
     );
   }
@@ -349,65 +302,73 @@ export default function BookingCalendarPage() {
   ).length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 animate-fade-up">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <CalendarDays className="w-6 h-6 text-resort-600" />
+          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">
             Booking Calendar
           </h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <p className="mt-[4px] text-[13px] text-[#7a9890]">
             {rooms.length} rooms · {totalBookings} bookings · {occupiedToday} occupied today
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => navigate('today')}
-            className="text-sm px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          >
+          <button onClick={() => navigate('today')}
+            className="rounded-[9px] border px-3 py-2 text-[13px] transition-colors hover:bg-[#f4f1eb]"
+            style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
             Today
           </button>
-          <button
-            onClick={() => load(fromDate)}
-            className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            title="Refresh"
-          >
+          <button onClick={() => load(fromDate)} title="Refresh"
+            className="rounded-[9px] border p-2 transition-colors hover:bg-[#f4f1eb]"
+            style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-muted)' }}>
             <RefreshCw className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => router.push('/dashboard/bookings?new=1')}
-            className="flex items-center gap-2 px-4 py-2 bg-resort-700 hover:bg-resort-800 text-white rounded-lg text-sm font-medium transition-colors"
-          >
+          <button onClick={() => router.push('/dashboard/bookings?new=1')}
+            className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors"
+            style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
             <Plus className="w-4 h-4" />
             New Booking
           </button>
         </div>
       </div>
 
+      {/* Quick stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Rooms',      value: rooms.length,                                      bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a' },
+          { label: 'Occupied Today',   value: occupiedToday,                                     bg: '#1b342f', border: 'rgba(27,52,47,0.5)',    text: '#dfd9d0' },
+          { label: 'Maintenance',      value: rooms.filter(r => r.status === 'MAINTENANCE').length, bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)', text: '#b8724a' },
+          { label: 'Bookings in View', value: totalBookings,                                     bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
+        ].map(({ label, value, bg, border, text }) => (
+          <div key={label} className="rounded-[14px] border p-4"
+            style={{ background: bg, borderColor: border }}>
+            <p className="text-[22px] font-semibold tracking-[-0.02em]" style={{ color: text }}>{value}</p>
+            <p className="text-[12px] mt-0.5 font-medium opacity-80" style={{ color: text }}>{label}</p>
+          </div>
+        ))}
+      </div>
+
       {/* Calendar card */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
+      <div className="rounded-[14px] border bg-white dark:bg-white/5 overflow-hidden"
+        style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+
         {/* Navigation bar */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-          <button
-            onClick={() => navigate('prev')}
-            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"
-          >
+        <div className="flex items-center justify-between border-b px-4 py-3"
+          style={{ borderColor: 'var(--rp-border)' }}>
+          <button onClick={() => navigate('prev')}
+            className="rounded-[8px] p-1.5 transition-colors hover:bg-[#f4f1eb] text-[#6b8880] dark:text-[#94b8b0]">
             <ChevronLeft className="w-5 h-5" />
           </button>
-
           <div className="text-center">
-            <p className="text-sm font-semibold text-gray-900 dark:text-white">
+            <p className="text-[13.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">
               {formatMonthTitle(fromDate, toDate)}
             </p>
-            <p className="text-xs text-gray-400">{fromDate} → {toDate}</p>
+            <p className="text-[11px] text-[#8aa29a] dark:text-[#94b8b0]">{fromDate} → {toDate}</p>
           </div>
-
-          <button
-            onClick={() => navigate('next')}
-            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"
-          >
+          <button onClick={() => navigate('next')}
+            className="rounded-[8px] p-1.5 transition-colors hover:bg-[#f4f1eb] text-[#6b8880] dark:text-[#94b8b0]">
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>
@@ -415,10 +376,13 @@ export default function BookingCalendarPage() {
         {/* Gantt grid */}
         <div className="overflow-x-auto" ref={containerRef}>
           <div style={{ minWidth: Math.max(900, 176 + dates.length * 42) }}>
+
             {/* Date header row */}
-            <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 sticky top-0 z-10">
-              <div className="w-44 shrink-0 border-r border-gray-200 dark:border-gray-700 px-3 py-2">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Room</p>
+            <div className="sticky top-0 z-10 flex border-b"
+              style={{ background: 'var(--rp-surface-2)', borderColor: 'var(--rp-border)' }}>
+              <div className="w-44 shrink-0 border-r px-3 py-2.5"
+                style={{ borderColor: 'var(--rp-border)' }}>
+                <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] dark:text-[#94b8b0]">Room</p>
               </div>
               <div className="flex-1 flex">
                 {dates.map(date => {
@@ -426,28 +390,22 @@ export default function BookingCalendarPage() {
                   const isToday = date === todayStr;
                   const isWeekend = new Date(date + 'T00:00:00').getDay() % 6 === 0;
                   return (
-                    <div
-                      key={date}
-                      className={cn(
-                        'flex-1 flex flex-col items-center justify-center py-1.5 border-r border-gray-100 dark:border-gray-800 last:border-r-0 text-center',
-                        isToday && 'bg-amber-50 dark:bg-amber-900/20',
-                      )}
-                    >
-                      <p className={cn(
-                        'text-[10px] font-medium uppercase tracking-wide',
-                        isToday ? 'text-amber-600' : isWeekend ? 'text-indigo-400' : 'text-gray-400',
-                      )}>
+                    <div key={date}
+                      className="flex-1 flex flex-col items-center justify-center border-r py-1.5 last:border-r-0 text-center"
+                      style={{
+                        borderColor: 'rgba(0,0,0,0.04)',
+                        background: isToday ? 'var(--rp-amber-bg)' : undefined,
+                      }}>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.06em]"
+                        style={{ color: isToday ? '#b89040' : isWeekend ? '#23766a' : 'var(--rp-text-muted)' }}>
                         {day}
                       </p>
-                      <p className={cn(
-                        'text-xs font-bold',
-                        isToday ? 'text-amber-600' : isWeekend ? 'text-indigo-500 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300',
-                      )}>
+                      <p className="text-[12px] font-bold"
+                        style={{ color: isToday ? '#b89040' : isWeekend ? '#23766a' : 'var(--rp-text)' }}>
                         {d}
                       </p>
-                      {/* Show month label on 1st or first visible */}
                       {(d === 1 || date === dates[0]) && (
-                        <p className="text-[9px] text-gray-400">{month}</p>
+                        <p className="text-[9px] text-[#c5bdb4] dark:text-[#6e8580]">{month}</p>
                       )}
                     </div>
                   );
@@ -458,8 +416,8 @@ export default function BookingCalendarPage() {
             {/* Room rows */}
             {rooms.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <BedDouble className="w-10 h-10 text-gray-300" />
-                <p className="text-gray-400 text-sm">No rooms found. Add rooms first.</p>
+                <BedDouble className="w-10 h-10 text-[#c5bdb4] dark:text-[#6e8580]" />
+                <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No rooms found. Add rooms first.</p>
               </div>
             ) : (
               rooms.map(room => (
@@ -477,89 +435,72 @@ export default function BookingCalendarPage() {
         </div>
 
         {/* Footer legend */}
-        <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800">
+        <div className="border-t px-4 py-3" style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
           <Legend />
         </div>
       </div>
 
       {/* Active booking detail panel */}
-      {activeBooking && (
-        <div
-          className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
-          onClick={() => setActiveBooking(null)}
-        >
-          <div
-            className="absolute right-4 top-20 w-80 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-2xl p-5"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Status badge */}
+      {activeBooking && createPortal((
+        <div className="fixed inset-0 z-40" style={{ background: 'rgba(27,52,47,0.35)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setActiveBooking(null)}>
+          <div className="absolute right-4 top-20 w-[300px] rounded-[18px] border bg-white dark:bg-white/5 p-5 shadow-2xl"
+            style={{ borderColor: 'var(--rp-border)', boxShadow: '0 20px 60px rgba(27,52,47,0.25)' }}
+            onClick={e => e.stopPropagation()}>
+
+            {/* Status + close */}
             <div className="flex items-center justify-between mb-4">
-              <span className={cn(
-                'text-xs px-2.5 py-1 rounded-full font-semibold',
-                STATUS_CONFIG[activeBooking.status]?.bg,
-                STATUS_CONFIG[activeBooking.status]?.text,
-              )}>
+              <span className="rounded-[7px] border px-[10px] py-[4px] text-[11px] font-semibold"
+                style={{
+                  background: STATUS_CONFIG[activeBooking.status]?.bg ?? 'var(--rp-surface-3)',
+                  borderColor: STATUS_CONFIG[activeBooking.status]?.border ?? 'var(--rp-border-md)',
+                  color: STATUS_CONFIG[activeBooking.status]?.text ?? 'var(--rp-text-muted)',
+                }}>
                 {STATUS_CONFIG[activeBooking.status]?.label ?? activeBooking.status}
               </span>
-              <button
-                onClick={() => setActiveBooking(null)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              >✕</button>
+              <button onClick={() => setActiveBooking(null)}
+                className="flex h-[26px] w-[26px] items-center justify-center rounded-full transition-colors hover:bg-[#f4f1eb] text-[#8aa29a] dark:text-[#94b8b0]">
+                <X className="w-3.5 h-3.5" />
+              </button>
             </div>
 
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">{activeBooking.guestName}</h3>
-            <p className="text-sm text-gray-500 mt-0.5">#{activeBooking.confirmationNumber}</p>
+            <h3 className="font-display text-[18px] font-medium text-[#18231f] dark:text-[#dfd9d0]">
+              {activeBooking.guestName}
+            </h3>
+            <p className="text-[12px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">
+              #{activeBooking.confirmationNumber}
+            </p>
 
-            <div className="mt-4 space-y-2.5 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Check-in</span>
-                <span className="font-medium text-gray-900 dark:text-white">{activeBooking.checkIn}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Check-out</span>
-                <span className="font-medium text-gray-900 dark:text-white">{activeBooking.checkOut}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Nights</span>
-                <span className="font-medium text-gray-900 dark:text-white">{activeBooking.nights}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Guests</span>
-                <span className="font-medium text-gray-900 dark:text-white">
-                  {activeBooking.adults} adult{activeBooking.adults !== 1 ? 's' : ''}
-                  {activeBooking.children > 0 ? ` + ${activeBooking.children} child` : ''}
+            <div className="mt-4 space-y-2.5">
+              {[
+                { label: 'Check-in',  value: activeBooking.checkIn },
+                { label: 'Check-out', value: activeBooking.checkOut },
+                { label: 'Nights',    value: String(activeBooking.nights) },
+                { label: 'Guests',    value: `${activeBooking.adults} adult${activeBooking.adults !== 1 ? 's' : ''}${activeBooking.children > 0 ? ` + ${activeBooking.children} child` : ''}` },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex justify-between text-[13px]">
+                  <span style={{ color: 'var(--rp-text-muted)' }}>{label}</span>
+                  <span className="font-medium text-[#18231f] dark:text-[#dfd9d0]">{value}</span>
+                </div>
+              ))}
+              <div className="flex justify-between border-t pt-2.5 text-[13px]"
+                style={{ borderColor: 'var(--rp-border)' }}>
+                <span style={{ color: 'var(--rp-text-muted)' }}>Total</span>
+                <span className="font-semibold text-[15px] text-[#18231f] dark:text-[#dfd9d0]">
+                  {formatCurrency(activeBooking.totalAmount)}
                 </span>
-              </div>
-              <div className="flex justify-between border-t border-gray-100 dark:border-gray-800 pt-2.5">
-                <span className="text-gray-500">Total</span>
-                <span className="font-bold text-gray-900 dark:text-white">{formatCurrency(activeBooking.totalAmount)}</span>
               </div>
             </div>
 
             <button
               onClick={() => { setActiveBooking(null); router.push(`/dashboard/bookings/${activeBooking.id}`); }}
-              className="mt-4 w-full bg-resort-700 hover:bg-resort-800 text-white py-2.5 rounded-xl text-sm font-medium transition-colors"
-            >
+              className="mt-4 w-full rounded-[10px] py-2.5 text-[13px] font-medium transition-colors"
+              style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
               Open Booking Details →
             </button>
           </div>
         </div>
-      )}
-
-      {/* Quick stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Rooms', value: rooms.length, color: 'text-indigo-600', bg: 'bg-indigo-50 dark:bg-indigo-900/20' },
-          { label: 'Occupied Today', value: occupiedToday, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
-          { label: 'Maintenance', value: rooms.filter(r => r.status === 'MAINTENANCE').length, color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-900/20' },
-          { label: 'Bookings in View', value: totalBookings, color: 'text-resort-700', bg: 'bg-resort-50 dark:bg-resort-900/20' },
-        ].map(({ label, value, color, bg }) => (
-          <div key={label} className={cn('rounded-2xl p-4 border border-gray-100 dark:border-gray-800', bg)}>
-            <p className={cn('text-2xl font-bold', color)}>{value}</p>
-            <p className="text-sm text-gray-500 mt-0.5">{label}</p>
-          </div>
-        ))}
-      </div>
+      ), document.body)}
     </div>
   );
 }

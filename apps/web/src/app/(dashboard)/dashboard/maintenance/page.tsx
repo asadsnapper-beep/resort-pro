@@ -1,5 +1,6 @@
 'use client';
 
+import { ModalShell } from '@/components/ui/modal-shell';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { maintenanceApi, roomsApi, staffApi } from '@/lib/api';
@@ -8,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/lib/utils';
 import {
-  Wrench, Plus, X, Loader2, CheckCircle2, AlertTriangle,
+  Wrench, Plus, Loader2, CheckCircle2, AlertTriangle,
   Clock, ChevronDown, Wind, Droplets, Zap, Sofa,
   DoorOpen, Wifi, Tv, HelpCircle, User, BedDouble, Trash2,
 } from 'lucide-react';
@@ -34,16 +35,16 @@ interface Ticket {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const PRIORITY_META: Record<Priority, { label: string; bg: string; border: string; text: string; dot: string }> = {
-  URGENT: { label: 'Urgent', bg: '#fef2f2', border: 'rgba(200,60,60,0.18)',  text: '#c43c3c', dot: '#c43c3c' },
-  HIGH:   { label: 'High',   bg: '#fceee4', border: 'rgba(184,114,74,0.2)', text: '#b8724a', dot: '#b8724a' },
-  NORMAL: { label: 'Normal', bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)', text: '#23766a', dot: '#23766a' },
-  LOW:    { label: 'Low',    bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)',      text: '#8aa29a', dot: '#8aa29a' },
+  URGENT: { label: 'Urgent', bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.18)',  text: '#c43c3c', dot: '#c43c3c' },
+  HIGH:   { label: 'High',   bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)', text: '#b8724a', dot: '#b8724a' },
+  NORMAL: { label: 'Normal', bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)', text: '#23766a', dot: '#23766a' },
+  LOW:    { label: 'Low',    bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)', dot: 'var(--rp-text-muted)' },
 };
 
 const STATUS_META: Record<Status, { label: string; bg: string; border: string; text: string; icon: React.ElementType }> = {
-  OPEN:        { label: 'Open',        bg: '#fef2f2', border: 'rgba(200,60,60,0.18)',  text: '#c43c3c', icon: AlertTriangle },
-  IN_PROGRESS: { label: 'In Progress', bg: '#f4ecda', border: 'rgba(184,144,64,0.2)', text: '#b89040', icon: Clock },
-  RESOLVED:    { label: 'Resolved',    bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)', text: '#23766a', icon: CheckCircle2 },
+  OPEN:        { label: 'Open',        bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.18)',  text: '#c43c3c', icon: AlertTriangle },
+  IN_PROGRESS: { label: 'In Progress', bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)', text: '#b89040', icon: Clock },
+  RESOLVED:    { label: 'Resolved',    bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)', text: '#23766a', icon: CheckCircle2 },
 };
 
 const ISSUE_META: Record<IssueType, { label: string; icon: React.ElementType; emoji: string }> = {
@@ -113,18 +114,28 @@ function CreateTicketModal({ onClose }: { onClose: () => void }) {
   const labelCls  = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(27,52,47,0.45)', backdropFilter: 'blur(4px)' }}>
-      <div className="bg-white rounded-[18px] w-full max-w-lg max-h-[90vh] overflow-y-auto"
-        style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
-        <div className="flex items-center justify-between px-6 py-5 border-b" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
-          <h2 className="font-display text-[18px] font-medium text-[#18231f]">New Maintenance Ticket</h2>
-          <button onClick={onClose} className="rounded-[8px] p-1.5 transition-colors hover:bg-[#f4f1eb]">
-            <X className="h-4 w-4 text-[#8aa29a]" />
+    <ModalShell
+      open={true}
+      onClose={onClose}
+      title="New Maintenance Ticket"
+      maxWidth="520px"
+      footer={
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} disabled={isPending}
+            className="flex-1 rounded-[9px] border py-[9px] text-[13px] font-medium text-[#6b8880] transition-colors hover:bg-[#f4f1eb]"
+            style={{ borderColor: 'var(--rp-border-md)' }}>
+            Cancel
+          </button>
+          <button disabled={!isValid || isPending} onClick={() => mutate()}
+            className="flex-1 flex items-center justify-center gap-2 rounded-[9px] py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80 disabled:opacity-40"
+            style={{ background: 'var(--rp-btn-accent)' }}>
+            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
+            Create Ticket
           </button>
         </div>
-
-        <div className="p-6 space-y-5">
+      }
+    >
+      <div className="space-y-5">
           <div>
             <label className={labelCls}>Room *</label>
             <select className={selectCls} value={form.roomId} onChange={e => set('roomId', e.target.value)}>
@@ -140,8 +151,8 @@ function CreateTicketModal({ onClose }: { onClose: () => void }) {
                 <button key={type} type="button" onClick={() => set('issueType', type)}
                   className="flex flex-col items-center gap-1.5 rounded-[10px] border-2 py-3 px-2 text-[11px] font-semibold transition-all"
                   style={form.issueType === type
-                    ? { borderColor: '#23766a', background: '#e3f2ef', color: '#23766a' }
-                    : { borderColor: 'rgba(0,0,0,0.07)', color: '#6b8880' }}>
+                    ? { borderColor: '#23766a', background: 'var(--rp-teal-bg)', color: '#23766a' }
+                    : { borderColor: 'var(--rp-border)', color: 'var(--rp-text-subtle)' }}>
                   <span className="text-xl">{meta.emoji}</span>
                   {meta.label}
                 </button>
@@ -164,7 +175,7 @@ function CreateTicketModal({ onClose }: { onClose: () => void }) {
                   className="flex-1 rounded-[8px] border-2 py-[7px] text-[11.5px] font-semibold transition-all"
                   style={form.priority === p
                     ? { borderColor: PRIORITY_META[p].text, background: PRIORITY_META[p].bg, color: PRIORITY_META[p].text }
-                    : { borderColor: 'rgba(0,0,0,0.08)', color: '#8aa29a' }}>
+                    : { borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-muted)' }}>
                   {PRIORITY_META[p].label}
                 </button>
               ))}
@@ -183,22 +194,7 @@ function CreateTicketModal({ onClose }: { onClose: () => void }) {
             </select>
           </div>
         </div>
-
-        <div className="flex gap-3 px-6 pb-6">
-          <button onClick={onClose} disabled={isPending}
-            className="flex-1 rounded-[9px] border py-[9px] text-[13px] font-medium text-[#6b8880] transition-colors hover:bg-[#f4f1eb]"
-            style={{ borderColor: 'rgba(0,0,0,0.09)' }}>
-            Cancel
-          </button>
-          <button disabled={!isValid || isPending} onClick={() => mutate()}
-            className="flex-1 flex items-center justify-center gap-2 rounded-[9px] py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80 disabled:opacity-40"
-            style={{ background: '#1b342f' }}>
-            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
-            Create Ticket
-          </button>
-        </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }
 
@@ -221,36 +217,37 @@ function ResolveModal({ ticket, onClose }: { ticket: Ticket; onClose: () => void
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(27,52,47,0.45)', backdropFilter: 'blur(4px)' }}>
-      <div className="bg-white rounded-[18px] w-full max-w-md p-6"
-        style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
-        <h3 className="font-display text-[18px] font-medium text-[#18231f] mb-1">Resolve Ticket</h3>
-        <p className="text-[13px] text-[#8aa29a] mb-4">
-          Room <strong className="text-[#18231f]">{ticket.room.name} #{ticket.room.number}</strong>{' '}
-          · {ISSUE_META[ticket.issueType].emoji} {ISSUE_META[ticket.issueType].label}
-        </p>
-        <div className="mb-4">
+    <ModalShell
+      open={true}
+      onClose={onClose}
+      title="Resolve Ticket"
+      description={`Room ${ticket.room.name} #${ticket.room.number} · ${ISSUE_META[ticket.issueType].emoji} ${ISSUE_META[ticket.issueType].label}`}
+      maxWidth="440px"
+      footer={
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} disabled={isPending}
+            className="flex-1 rounded-[9px] border py-[9px] text-[13px] font-medium text-[#6b8880] transition-colors hover:bg-[#f4f1eb]"
+            style={{ borderColor: 'var(--rp-border-md)' }}>
+            Cancel
+          </button>
+          <button onClick={() => mutate()} disabled={isPending}
+            className="flex-1 flex items-center justify-center gap-2 rounded-[9px] py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80 disabled:opacity-40"
+            style={{ background: 'var(--rp-btn-accent)' }}>
+            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+            Mark Resolved
+          </button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <div>
           <label className="block text-[11.5px] font-medium text-[#6b8880] mb-1.5">Resolution Notes (optional)</label>
           <textarea rows={3} placeholder="What was done to fix the issue?"
             className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#8aa29a] focus:outline-none focus:ring-1 focus:ring-resort-600/20 resize-none"
             value={notes} onChange={e => setNotes(e.target.value)} />
         </div>
-        <div className="flex gap-3">
-          <button onClick={onClose} disabled={isPending}
-            className="flex-1 rounded-[9px] border py-[9px] text-[13px] font-medium text-[#6b8880] transition-colors hover:bg-[#f4f1eb]"
-            style={{ borderColor: 'rgba(0,0,0,0.09)' }}>
-            Cancel
-          </button>
-          <button onClick={() => mutate()} disabled={isPending}
-            className="flex-1 flex items-center justify-center gap-2 rounded-[9px] py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80 disabled:opacity-40"
-            style={{ background: '#1b342f' }}>
-            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-            Mark Resolved
-          </button>
-        </div>
       </div>
-    </div>
+    </ModalShell>
   );
 }
 
@@ -287,17 +284,17 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
 
   return (
     <>
-      <div className="rounded-[14px] border bg-white p-5 transition-shadow hover:shadow-sm"
+      <div className="rounded-[14px] border bg-white dark:bg-white/5 p-5 transition-shadow hover:shadow-sm"
         style={{
           borderColor: ticket.priority === 'URGENT' && ticket.status !== 'RESOLVED'
-            ? 'rgba(200,60,60,0.25)' : 'rgba(0,0,0,0.045)',
+            ? 'rgba(200,60,60,0.25)' : 'var(--rp-border)',
           boxShadow: '0 1px 6px rgba(0,0,0,0.04)',
         }}>
         {/* Top row */}
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="h-[38px] w-[38px] rounded-[10px] flex items-center justify-center text-[18px] shrink-0"
-              style={{ background: '#f4f1eb' }}>
+              style={{ background: 'var(--rp-surface-3)' }}>
               {issueMeta.emoji}
             </div>
             <div className="min-w-0">
@@ -339,7 +336,7 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
 
         {/* Resolution notes */}
         {ticket.notes && ticket.status === 'RESOLVED' && (
-          <div className="mb-3 rounded-[8px] px-3 py-2" style={{ background: '#e3f2ef' }}>
+          <div className="mb-3 rounded-[8px] px-3 py-2" style={{ background: 'var(--rp-teal-bg)' }}>
             <p className="text-[12px] text-[#23766a]"><strong>Resolution:</strong> {ticket.notes}</p>
           </div>
         )}
@@ -369,7 +366,7 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
             {ticket.status === 'OPEN' && (
               <button
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] border py-[7px] text-[12px] font-medium transition-colors"
-                style={{ background: '#f4ecda', borderColor: 'rgba(184,144,64,0.2)', color: '#b89040' }}
+                style={{ background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.2)', color: '#b89040' }}
                 onClick={() => changeStatus('IN_PROGRESS')}
                 disabled={changingStatus}>
                 {changingStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : <Clock className="h-3 w-3" />}
@@ -378,7 +375,7 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
             )}
             <button
               className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] py-[7px] text-[12px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
-              style={{ background: '#1b342f' }}
+              style={{ background: 'var(--rp-btn-accent)' }}
               onClick={() => setResolveOpen(true)}>
               <CheckCircle2 className="h-3 w-3" /> Resolve
             </button>
@@ -428,7 +425,7 @@ export default function MaintenancePage() {
         </div>
         <button
           className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
-          style={{ background: '#1b342f' }}
+          style={{ background: 'var(--rp-btn-accent)' }}
           onClick={() => setShowCreate(true)}>
           <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} /> New Ticket
         </button>
@@ -437,13 +434,13 @@ export default function MaintenancePage() {
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
-          { label: 'Open',           value: summary.open,          icon: AlertTriangle, bg: '#fef2f2', color: '#c43c3c' },
-          { label: 'In Progress',    value: summary.inProgress,    icon: Clock,         bg: '#f4ecda', color: '#b89040' },
-          { label: 'Resolved Today', value: summary.resolvedToday, icon: CheckCircle2,  bg: '#e3f2ef', color: '#23766a' },
-          { label: 'Urgent Open',    value: summary.urgent,        icon: Zap,           bg: '#fceee4', color: '#b8724a' },
+          { label: 'Open',           value: summary.open,          icon: AlertTriangle, bg: 'var(--rp-red-bg)', color: '#c43c3c' },
+          { label: 'In Progress',    value: summary.inProgress,    icon: Clock,         bg: 'var(--rp-amber-bg)', color: '#b89040' },
+          { label: 'Resolved Today', value: summary.resolvedToday, icon: CheckCircle2,  bg: 'var(--rp-teal-bg)', color: '#23766a' },
+          { label: 'Urgent Open',    value: summary.urgent,        icon: Zap,           bg: 'var(--rp-coral-bg)', color: '#b8724a' },
         ].map(({ label, value, icon: Icon, bg, color }) => (
-          <div key={label} className="flex items-center gap-[11px] rounded-[12px] border px-[18px] py-[15px]"
-            style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+          <div key={label} className="flex items-center gap-[11px] rounded-[12px] border px-[18px] py-[15px] bg-white dark:bg-white/5"
+            style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
             <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px]" style={{ background: bg }}>
               <Icon className="h-[14px] w-[14px]" strokeWidth={2} style={{ color }} />
             </div>
@@ -457,25 +454,25 @@ export default function MaintenancePage() {
 
       {/* Filters */}
       <div className="flex gap-2 flex-wrap">
-        <div className="flex gap-1 rounded-[10px] p-1" style={{ background: '#f4f1eb' }}>
+        <div className="flex gap-1 rounded-[10px] p-1" style={{ background: 'var(--rp-surface-3)' }}>
           {(['', 'OPEN', 'IN_PROGRESS', 'RESOLVED'] as const).map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
               className="rounded-[8px] px-3 py-[6px] text-[12px] font-semibold transition-all"
               style={statusFilter === s
-                ? { background: '#fff', color: '#18231f', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }
-                : { color: '#8aa29a' }}>
+                ? { color: 'var(--rp-text)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }
+                : { color: 'var(--rp-text-muted)' }}>
               {s === '' ? 'All Status' : STATUS_META[s].label}
             </button>
           ))}
         </div>
 
-        <div className="flex gap-1 rounded-[10px] p-1" style={{ background: '#f4f1eb' }}>
+        <div className="flex gap-1 rounded-[10px] p-1" style={{ background: 'var(--rp-surface-3)' }}>
           {(['', ...PRIORITY_ORDER] as const).map(p => (
             <button key={p} onClick={() => setPriorityFilter(p)}
               className="rounded-[8px] px-3 py-[6px] text-[12px] font-semibold transition-all"
               style={priorityFilter === p
-                ? { background: '#fff', color: '#18231f', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }
-                : { color: '#8aa29a' }}>
+                ? { color: 'var(--rp-text)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }
+                : { color: 'var(--rp-text-muted)' }}>
               {p === '' ? 'All Priority' : PRIORITY_META[p].label}
             </button>
           ))}
@@ -486,7 +483,7 @@ export default function MaintenancePage() {
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-48 animate-pulse rounded-[14px]" style={{ background: '#f5f4f1' }} />
+            <div key={i} className="h-48 animate-pulse rounded-[14px]" style={{ background: 'var(--rp-surface-3)' }} />
           ))}
         </div>
       ) : tickets.length === 0 ? (
@@ -503,7 +500,7 @@ export default function MaintenancePage() {
           {!statusFilter && !priorityFilter && (
             <button
               className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0]"
-              style={{ background: '#1b342f' }}
+              style={{ background: 'var(--rp-btn-accent)' }}
               onClick={() => setShowCreate(true)}>
               <Plus className="h-[13px] w-[13px]" /> New Ticket
             </button>

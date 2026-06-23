@@ -1,5 +1,6 @@
 'use client';
 
+import { createPortal } from 'react-dom';
 import { useEffect, useState } from 'react';
 import { adminEndpoints } from '@/lib/admin-api';
 import { toast } from '@/hooks/use-toast';
@@ -111,7 +112,7 @@ function AnnouncementModal({ ann, onClose, onSave }: ModalProps) {
     }
   };
 
-  return (
+  return createPortal((
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-lg bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
@@ -260,7 +261,7 @@ function AnnouncementModal({ ann, onClose, onSave }: ModalProps) {
         </form>
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 // ── Announcement Card ──────────────────────────────────────────────────────

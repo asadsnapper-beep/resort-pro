@@ -1,14 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { ModalShell } from '@/components/ui/modal-shell';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { roomsApi, guestsApi, ratePlansApi } from '@/lib/api';
-import { Modal } from '@/components/ui/modal';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
 import { Search, BedDouble, ChevronRight, ChevronLeft, Tags, UserPlus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -113,7 +111,10 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
   });
 
   useEffect(() => {
-    if (!open) {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
       setStep(1); setStep1Data(null); setSelectedRoom(null);
       setSelectedGuest(null); setGuestSearch(''); setSpecialRequests('');
       setShowNewGuest(false); setNewGuestForm({ firstName: '', lastName: '', email: '', phone: '' });
@@ -143,7 +144,14 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
   const stepTitles = ['Select Dates', 'Choose Room', 'Select Guest', 'Confirm'];
 
   return (
-    <Modal open={open} onClose={onClose} title="New Booking" className="max-w-2xl">
+    <ModalShell
+      open={open}
+      onClose={onClose}
+      title="New Booking"
+      description="Create a new room reservation"
+      maxWidth="680px"
+    >
+      <div>
       {/* Step Indicator */}
       <div className="mb-6 flex items-center gap-2">
         {stepTitles.map((title, i) => (
@@ -152,14 +160,14 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
               'flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors',
               step > i + 1 ? 'bg-resort-600 text-white' :
               step === i + 1 ? 'bg-resort-600 text-white ring-4 ring-resort-100' :
-              'bg-gray-100 text-gray-400'
+              'bg-gray-100 dark:bg-white/10 text-gray-400 dark:text-white/40'
             )}>
               {step > i + 1 ? '✓' : i + 1}
             </div>
-            <span className={cn('text-xs font-medium', step === i + 1 ? 'text-resort-700' : 'text-gray-400')}>
+            <span className={cn('text-xs font-medium', step === i + 1 ? 'text-resort-700 dark:text-[#4db6ac]' : 'text-gray-400 dark:text-white/30')}>
               {title}
             </span>
-            {i < 3 && <div className={cn('h-px w-6 flex-1', step > i + 1 ? 'bg-resort-400' : 'bg-gray-200')} />}
+            {i < 3 && <div className={cn('h-px w-6 flex-1', step > i + 1 ? 'bg-resort-400' : 'bg-gray-200 dark:bg-white/10')} />}
           </div>
         ))}
       </div>
@@ -169,28 +177,103 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
         <form onSubmit={hs1(handleStep1)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Check-in Date</label>
-              <Input {...reg1('checkIn')} type="date" min={new Date().toISOString().split('T')[0]} />
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-[#94b8b0]">Check-in Date</label>
+              <input
+                {...reg1('checkIn')}
+                type="date"
+                min={new Date().toISOString().split('T')[0]}
+                style={{
+                  width: '100%',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(0,0,0,0.05)',
+                  background: 'var(--rp-surface-3)',
+                  padding: '9px 12px',
+                  fontSize: '13px',
+                  color: 'var(--rp-text)',
+                  outline: 'none',
+                }}
+              />
               {e1.checkIn && <p className="mt-1 text-xs text-red-500">{e1.checkIn.message}</p>}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Check-out Date</label>
-              <Input {...reg1('checkOut')} type="date" min={checkIn || new Date().toISOString().split('T')[0]} />
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-[#94b8b0]">Check-out Date</label>
+              <input
+                {...reg1('checkOut')}
+                type="date"
+                min={checkIn || new Date().toISOString().split('T')[0]}
+                style={{
+                  width: '100%',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(0,0,0,0.05)',
+                  background: 'var(--rp-surface-3)',
+                  padding: '9px 12px',
+                  fontSize: '13px',
+                  color: 'var(--rp-text)',
+                  outline: 'none',
+                }}
+              />
               {e1.checkOut && <p className="mt-1 text-xs text-red-500">{e1.checkOut.message}</p>}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Adults</label>
-              <Input {...reg1('adults')} type="number" min={1} max={10} />
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-[#94b8b0]">Adults</label>
+              <input
+                {...reg1('adults')}
+                type="number"
+                min={1}
+                max={10}
+                style={{
+                  width: '100%',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(0,0,0,0.05)',
+                  background: 'var(--rp-surface-3)',
+                  padding: '9px 12px',
+                  fontSize: '13px',
+                  color: 'var(--rp-text)',
+                  outline: 'none',
+                }}
+              />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Children</label>
-              <Input {...reg1('children')} type="number" min={0} max={10} />
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-[#94b8b0]">Children</label>
+              <input
+                {...reg1('children')}
+                type="number"
+                min={0}
+                max={10}
+                style={{
+                  width: '100%',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(0,0,0,0.05)',
+                  background: 'var(--rp-surface-3)',
+                  padding: '9px 12px',
+                  fontSize: '13px',
+                  color: 'var(--rp-text)',
+                  outline: 'none',
+                }}
+              />
             </div>
           </div>
           <div className="flex justify-end pt-2">
-            <Button type="submit" className="gap-2">Next <ChevronRight className="h-4 w-4" /></Button>
+            <button
+              type="submit"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderRadius: '9px',
+                border: 'none',
+                background: 'var(--rp-btn-accent)',
+                color: 'var(--rp-btn-accent-text)',
+                fontSize: '13px',
+                fontWeight: 500,
+                padding: '9px 12px',
+                cursor: 'pointer',
+              }}
+            >
+              Next <ChevronRight className="h-4 w-4" />
+            </button>
           </div>
         </form>
       )}
@@ -244,7 +327,24 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
           )}
 
           <div className="flex justify-between pt-2">
-            <Button variant="outline" onClick={() => setStep(1)} className="gap-2"><ChevronLeft className="h-4 w-4" /> Back</Button>
+            <button
+              onClick={() => setStep(1)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderRadius: '9px',
+                border: '1px solid rgba(0,0,0,0.08)',
+                background: 'transparent',
+                color: 'var(--rp-text-subtle)',
+                fontSize: '13px',
+                fontWeight: 500,
+                padding: '9px 12px',
+                cursor: 'pointer',
+              }}
+            >
+              <ChevronLeft className="h-4 w-4" /> Back
+            </button>
           </div>
         </div>
       )}
@@ -261,11 +361,21 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
               {/* Search existing guest */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
+                <input
                   value={guestSearch}
                   onChange={(e) => setGuestSearch(e.target.value)}
                   placeholder="Search guest by name or email..."
-                  className="pl-9"
+                  style={{
+                    width: '100%',
+                    paddingLeft: '36px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(0,0,0,0.05)',
+                    background: 'var(--rp-surface-3)',
+                    padding: '9px 12px 9px 36px',
+                    fontSize: '13px',
+                    color: 'var(--rp-text)',
+                    outline: 'none',
+                  }}
                 />
               </div>
 
@@ -324,53 +434,124 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="mb-1 block text-xs text-gray-600">First name *</label>
-                  <Input
+                  <input
                     value={newGuestForm.firstName}
                     onChange={e => setNewGuestForm(p => ({ ...p, firstName: e.target.value }))}
                     placeholder="John"
+                    style={{
+                      width: '100%',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(0,0,0,0.05)',
+                      background: 'var(--rp-surface-3)',
+                      padding: '9px 12px',
+                      fontSize: '13px',
+                      color: 'var(--rp-text)',
+                      outline: 'none',
+                    }}
                   />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-gray-600">Last name *</label>
-                  <Input
+                  <input
                     value={newGuestForm.lastName}
                     onChange={e => setNewGuestForm(p => ({ ...p, lastName: e.target.value }))}
                     placeholder="Doe"
+                    style={{
+                      width: '100%',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(0,0,0,0.05)',
+                      background: 'var(--rp-surface-3)',
+                      padding: '9px 12px',
+                      fontSize: '13px',
+                      color: 'var(--rp-text)',
+                      outline: 'none',
+                    }}
                   />
                 </div>
               </div>
               <div>
                 <label className="mb-1 block text-xs text-gray-600">Email *</label>
-                <Input
+                <input
                   type="email"
                   value={newGuestForm.email}
                   onChange={e => setNewGuestForm(p => ({ ...p, email: e.target.value }))}
                   placeholder="guest@email.com"
+                  style={{
+                    width: '100%',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(0,0,0,0.05)',
+                    background: 'var(--rp-surface-3)',
+                    padding: '9px 12px',
+                    fontSize: '13px',
+                    color: 'var(--rp-text)',
+                    outline: 'none',
+                  }}
                 />
               </div>
               <div>
                 <label className="mb-1 block text-xs text-gray-600">Phone</label>
-                <Input
+                <input
                   type="tel"
                   value={newGuestForm.phone}
                   onChange={e => setNewGuestForm(p => ({ ...p, phone: e.target.value }))}
                   placeholder="+880..."
+                  style={{
+                    width: '100%',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(0,0,0,0.05)',
+                    background: 'var(--rp-surface-3)',
+                    padding: '9px 12px',
+                    fontSize: '13px',
+                    color: 'var(--rp-text)',
+                    outline: 'none',
+                  }}
                 />
               </div>
               {newGuestError && <p className="text-xs text-red-500">{newGuestError}</p>}
-              <Button
-                className="w-full"
-                loading={createGuestMut.isPending}
-                disabled={!newGuestForm.firstName || !newGuestForm.lastName || !newGuestForm.email}
+              <button
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  borderRadius: '9px',
+                  border: 'none',
+                  background: 'var(--rp-btn-accent)',
+                  color: 'var(--rp-btn-accent-text)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  padding: '9px 12px',
+                  cursor: 'pointer',
+                  opacity: createGuestMut.isPending || !newGuestForm.firstName || !newGuestForm.lastName || !newGuestForm.email ? 0.6 : 1,
+                }}
+                disabled={!newGuestForm.firstName || !newGuestForm.lastName || !newGuestForm.email || createGuestMut.isPending}
                 onClick={() => { setNewGuestError(null); createGuestMut.mutate(newGuestForm); }}
               >
-                <UserPlus className="h-4 w-4 mr-1.5" /> Create & Select Guest
-              </Button>
+                <UserPlus className="h-4 w-4" /> Create & Select Guest
+              </button>
             </div>
           )}
 
           <div className="flex justify-between pt-2">
-            <Button variant="outline" onClick={() => setStep(2)} className="gap-2"><ChevronLeft className="h-4 w-4" /> Back</Button>
+            <button
+              onClick={() => setStep(2)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderRadius: '9px',
+                border: '1px solid rgba(0,0,0,0.08)',
+                background: 'transparent',
+                color: 'var(--rp-text-subtle)',
+                fontSize: '13px',
+                fontWeight: 500,
+                padding: '9px 12px',
+                cursor: 'pointer',
+              }}
+            >
+              <ChevronLeft className="h-4 w-4" /> Back
+            </button>
           </div>
         </div>
       )}
@@ -412,7 +593,7 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Special Requests (optional)</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-[#94b8b0]">Special Requests (optional)</label>
             <textarea
               value={specialRequests}
               onChange={(e) => setSpecialRequests(e.target.value)}
@@ -423,13 +604,49 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
           </div>
 
           <div className="flex justify-between pt-2">
-            <Button variant="outline" onClick={() => setStep(3)} className="gap-2"><ChevronLeft className="h-4 w-4" /> Back</Button>
-            <Button onClick={handleSubmit} loading={loading} className="gap-2 min-w-32">
+            <button
+              onClick={() => setStep(3)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderRadius: '9px',
+                border: '1px solid rgba(0,0,0,0.08)',
+                background: 'transparent',
+                color: 'var(--rp-text-subtle)',
+                fontSize: '13px',
+                fontWeight: 500,
+                padding: '9px 12px',
+                cursor: 'pointer',
+              }}
+            >
+              <ChevronLeft className="h-4 w-4" /> Back
+            </button>
+            <button
+              onClick={handleSubmit}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderRadius: '9px',
+                border: 'none',
+                background: 'var(--rp-btn-accent)',
+                color: 'var(--rp-btn-accent-text)',
+                fontSize: '13px',
+                fontWeight: 500,
+                padding: '9px 12px',
+                cursor: 'pointer',
+                minWidth: '128px',
+                opacity: loading ? 0.6 : 1,
+              }}
+              disabled={loading}
+            >
               Confirm Booking
-            </Button>
+            </button>
           </div>
         </div>
       )}
-    </Modal>
+      </div>
+    </ModalShell>
   );
 }

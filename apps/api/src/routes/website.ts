@@ -8,7 +8,7 @@ import { resolveRate } from './ratePlans';
 import { sendWebBookingEmails } from '../utils/guest-emails';
 
 const websiteSchema = z.object({
-  heroTitle: z.string().min(1),
+  heroTitle: z.string().optional().default('Welcome'),
   heroSubtitle: z.string().optional(),
   heroImage: z.string().url().optional(),
   aboutTitle: z.string().optional(),
