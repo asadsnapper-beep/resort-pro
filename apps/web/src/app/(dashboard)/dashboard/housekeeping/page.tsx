@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTheme } from 'next-themes';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { housekeepingApi, roomsApi, staffApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
@@ -27,18 +28,18 @@ const TASK_TYPES = ['DAILY', 'DEEP_CLEAN', 'TURNDOWN', 'CHECKOUT', 'CHECKIN'] as
 const STATUS_FILTERS = ['', 'PENDING', 'IN_PROGRESS', 'COMPLETED', 'SKIPPED'];
 
 const TYPE_PILL: Record<string, { bg: string; border: string; text: string; label: string }> = {
-  DAILY:      { bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Daily' },
-  DEEP_CLEAN: { bg: '#fceee4', border: 'rgba(184,114,74,0.2)',  text: '#b8724a', label: 'Deep Clean' },
-  TURNDOWN:   { bg: '#f4ecda', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'Turndown' },
-  CHECKOUT:   { bg: '#fef2f2', border: 'rgba(200,60,60,0.15)',  text: '#c43c3c', label: 'Checkout' },
-  CHECKIN:    { bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Check-In' },
+  DAILY:      { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Daily' },
+  DEEP_CLEAN: { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a', label: 'Deep Clean' },
+  TURNDOWN:   { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'Turndown' },
+  CHECKOUT:   { bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)',  text: '#c43c3c', label: 'Checkout' },
+  CHECKIN:    { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Check-In' },
 };
 
 const STATUS_PILL: Record<string, { bg: string; border: string; text: string; label: string }> = {
-  PENDING:     { bg: '#f4ecda', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'Pending' },
-  IN_PROGRESS: { bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)', text: '#23766a', label: 'In Progress' },
-  COMPLETED:   { bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)', text: '#23766a', label: 'Completed' },
-  SKIPPED:     { bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)',      text: '#8aa29a', label: 'Skipped' },
+  PENDING:     { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'Pending' },
+  IN_PROGRESS: { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)', text: '#23766a', label: 'In Progress' },
+  COMPLETED:   { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)', text: '#23766a', label: 'Completed' },
+  SKIPPED:     { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)', label: 'Skipped' },
 };
 
 const selectCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[8px] text-[13px] text-[#18231f] focus:outline-none focus:ring-1 focus:ring-resort-600/20';
@@ -114,15 +115,15 @@ function NewTaskModal({ open, onClose, loading, onSubmit }: {
             placeholder="Any special instructions..."
             className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#8aa29a] focus:outline-none focus:ring-1 focus:ring-resort-600/20 resize-none" />
         </div>
-        <div className="flex gap-3 justify-end pt-2 border-t" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
+        <div className="flex gap-3 justify-end pt-2 border-t" style={{ borderColor: 'var(--rp-border)' }}>
           <button type="button" onClick={onClose}
             className="rounded-[9px] border px-4 py-[8px] text-[13px] font-medium text-[#6b8880] transition-colors hover:bg-[#f4f1eb]"
-            style={{ borderColor: 'rgba(0,0,0,0.09)' }}>
+            style={{ borderColor: 'var(--rp-border-md)' }}>
             Cancel
           </button>
           <button type="submit" disabled={loading}
             className="rounded-[9px] px-5 py-[8px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80 disabled:opacity-50"
-            style={{ background: '#1b342f' }}>
+            style={{ background: 'var(--rp-btn-accent)' }}>
             {loading ? 'Creating…' : 'Create Task'}
           </button>
         </div>
@@ -133,6 +134,8 @@ function NewTaskModal({ open, onClose, loading, onSubmit }: {
 
 export default function HousekeepingPage() {
   const queryClient = useQueryClient();
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch]             = useState('');
   const [page, setPage]                 = useState(1);
@@ -196,7 +199,7 @@ export default function HousekeepingPage() {
           <button
             onClick={() => setAddOpen(true)}
             className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
-            style={{ background: '#1b342f' }}
+            style={{ background: 'var(--rp-btn-accent)' }}
           >
             <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} /> New Task
           </button>
@@ -206,13 +209,12 @@ export default function HousekeepingPage() {
       {/* Stats row */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          { label: 'Total Tasks',  value: total || 0,    icon: CheckSquare, bg: '#e3f2ef', color: '#23766a' },
-          { label: 'Pending',      value: pendingCount,   icon: Clock,       bg: '#f4ecda', color: '#b89040' },
-          { label: 'In Progress',  value: inProgressCount,icon: AlertCircle, bg: '#fceee4', color: '#b8724a' },
-          { label: 'Completed',    value: completedCount, icon: CheckCircle2,bg: '#e3f2ef', color: '#23766a' },
+          { label: 'Total Tasks',  value: total || 0,    icon: CheckSquare, bg: 'var(--rp-teal-bg)', color: '#23766a' },
+          { label: 'Pending',      value: pendingCount,   icon: Clock,       bg: 'var(--rp-amber-bg)', color: '#b89040' },
+          { label: 'In Progress',  value: inProgressCount,icon: AlertCircle, bg: 'var(--rp-coral-bg)', color: '#b8724a' },
+          { label: 'Completed',    value: completedCount, icon: CheckCircle2,bg: 'var(--rp-teal-bg)', color: '#23766a' },
         ].map(({ label, value, icon: Icon, bg, color }) => (
-          <div key={label} className="flex items-center gap-[11px] rounded-[12px] border px-[18px] py-[15px]"
-            style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+          <div key={label} className="flex items-center gap-[11px] rounded-[12px] border px-[18px] py-[15px] bg-white dark:bg-white/5" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
             <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px]" style={{ background: bg }}>
               <Icon className="h-[14px] w-[14px]" strokeWidth={2} style={{ color }} />
             </div>
@@ -248,8 +250,8 @@ export default function HousekeepingPage() {
               <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
                 className="rounded-[8px] border px-[12px] py-[7px] text-[12px] font-medium transition-colors"
                 style={active
-                  ? { background: '#1b342f', color: '#dfd9d0', borderColor: '#1b342f' }
-                  : { background: '#fff', color: '#6b8880', borderColor: 'rgba(0,0,0,0.09)' }}>
+                  ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', borderColor: '#1b342f' }
+                  : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', color: isDark ? '#94b8b0' : 'var(--rp-text-subtle)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)' }}>
                 {s ? s.replace('_', ' ') : 'All'}
               </button>
             );
@@ -258,12 +260,11 @@ export default function HousekeepingPage() {
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-[14px] border"
-        style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+      <div className="overflow-hidden rounded-[14px] border bg-white dark:bg-white/5" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
         {isLoading ? (
           <div className="space-y-px p-4">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-[68px] animate-pulse rounded-[10px]" style={{ background: '#f5f4f1' }} />
+              <div key={i} className="h-[68px] animate-pulse rounded-[10px]" style={{ background: 'var(--rp-surface-3)' }} />
             ))}
           </div>
         ) : tasks.length === 0 ? (
@@ -283,7 +284,7 @@ export default function HousekeepingPage() {
               <button
                 onClick={() => setAddOpen(true)}
                 className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0]"
-                style={{ background: '#1b342f' }}
+                style={{ background: 'var(--rp-btn-accent)' }}
               >
                 <Plus className="h-[13px] w-[13px]" /> New Task
               </button>
@@ -294,7 +295,7 @@ export default function HousekeepingPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]"
-                  style={{ borderColor: 'rgba(0,0,0,0.05)', background: '#faf9f7' }}>
+                  style={{ borderColor: 'var(--rp-border)', background: 'var(--rp-surface-2)' }}>
                   <th className="px-5 py-3 text-left">Room</th>
                   <th className="px-5 py-3 text-left">Type</th>
                   <th className="px-5 py-3 text-left">Assigned To</th>
@@ -305,11 +306,11 @@ export default function HousekeepingPage() {
               </thead>
               <tbody>
                 {tasks.map(task => {
-                  const typeCfg   = TYPE_PILL[task.type]   ?? { bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)', text: '#6b8880', label: task.type };
-                  const statusCfg = STATUS_PILL[task.status] ?? { bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)', text: '#8aa29a', label: task.status };
+                  const typeCfg   = TYPE_PILL[task.type]   ?? { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)', text: 'var(--rp-text-subtle)', label: task.type };
+                  const statusCfg = STATUS_PILL[task.status] ?? { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)', text: 'var(--rp-text-muted)', label: task.status };
                   return (
                     <tr key={task.id}
-                      className="border-b transition-colors hover:bg-[#faf9f7]"
+                      className="border-b transition-colors hover:bg-[#faf9f7] dark:hover:bg-white/5"
                       style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
                       <td className="px-5 py-[14px]">
                         <div className="flex items-center gap-2.5">
@@ -363,7 +364,7 @@ export default function HousekeepingPage() {
                             <button
                               onClick={() => statusMutation.mutate({ id: task.id, status: 'IN_PROGRESS' })}
                               className="rounded-[7px] border px-[10px] py-[5px] text-[11.5px] font-medium transition-colors"
-                              style={{ background: '#e3f2ef', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                              style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
                               Start
                             </button>
                           )}
@@ -371,7 +372,7 @@ export default function HousekeepingPage() {
                             <button
                               onClick={() => statusMutation.mutate({ id: task.id, status: 'COMPLETED' })}
                               className="rounded-[7px] border px-[10px] py-[5px] text-[11.5px] font-medium transition-colors"
-                              style={{ background: '#1b342f', borderColor: '#1b342f', color: '#dfd9d0' }}>
+                              style={{ background: 'var(--rp-btn-accent)', borderColor: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
                               Complete
                             </button>
                           )}
@@ -379,7 +380,7 @@ export default function HousekeepingPage() {
                             <button
                               onClick={() => statusMutation.mutate({ id: task.id, status: 'SKIPPED' })}
                               className="rounded-[7px] border px-[10px] py-[5px] text-[11.5px] font-medium transition-colors"
-                              style={{ background: '#f5f4f1', borderColor: 'rgba(0,0,0,0.08)', color: '#8aa29a' }}>
+                              style={{ background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-muted)' }}>
                               Skip
                             </button>
                           )}
@@ -403,12 +404,12 @@ export default function HousekeepingPage() {
           <div className="flex items-center gap-1.5">
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
               className="flex h-8 items-center gap-1 rounded-[8px] border px-3 text-[12.5px] font-medium disabled:opacity-40"
-              style={{ borderColor: 'rgba(0,0,0,0.09)', color: '#18231f' }}>
+              style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text)' }}>
               <ChevronLeft className="h-3.5 w-3.5" /> Previous
             </button>
             <button onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))} disabled={page >= pagination.totalPages}
               className="flex h-8 items-center gap-1 rounded-[8px] border px-3 text-[12.5px] font-medium disabled:opacity-40"
-              style={{ background: '#1b342f', borderColor: '#1b342f', color: '#dfd9d0' }}>
+              style={{ background: 'var(--rp-btn-accent)', borderColor: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
               Next <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>

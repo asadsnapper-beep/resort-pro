@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, Search, Moon, Sun, AlertTriangle, ArrowRight, X } from 'lucide-react';
+import { Bell, Search, Moon, Sun, AlertTriangle, ArrowRight, X, PanelLeft, PanelLeftClose } from 'lucide-react';
 import { ElectronStatusBadge } from './ElectronStatusBadge';
 import { useTheme } from 'next-themes';
 import { useQuery } from '@tanstack/react-query';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useState } from 'react';
 import { useAuthStore } from '@/store/auth';
+import { useUiStore } from '@/store/ui';
 
 function TrialBanner() {
   const [dismissed, setDismissed] = useState(false);
@@ -59,6 +60,7 @@ function TrialBanner() {
 
 export function TopNav() {
   const { theme, setTheme } = useTheme();
+  const { sidebarCollapsed, toggleSidebar } = useUiStore();
 
   const { data: notificationsRes } = useQuery({
     queryKey: ['notifications'],
@@ -73,6 +75,14 @@ export function TopNav() {
       <TrialBanner />
       <div className="flex h-[52px] items-center justify-between px-5">
         <div className="flex items-center gap-3 flex-1 max-w-sm">
+          <button
+            onClick={toggleSidebar}
+            title={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+            aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+            className="hidden md:flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-[#8fa8a1] transition-colors hover:bg-black/5 hover:text-resort-900 dark:hover:bg-white/5 dark:hover:text-white"
+          >
+            {sidebarCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          </button>
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8aa29a]" />
             <input

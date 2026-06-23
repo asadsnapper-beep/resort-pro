@@ -1,5 +1,6 @@
 'use client';
 
+import { useTheme } from 'next-themes';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
@@ -24,17 +25,19 @@ interface Stats {
 }
 
 const STATUS_PILL: Record<string, { label: string; bg: string; border: string; text: string; icon: React.ReactNode }> = {
-  DRAFT:     { label: 'Draft',     bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)',       text: '#6b8880', icon: <FileText className="h-3 w-3" /> },
-  SENT:      { label: 'Sent',      bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)',   text: '#23766a', icon: <Clock className="h-3 w-3" /> },
-  PAID:      { label: 'Paid',      bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)',   text: '#23766a', icon: <CheckCircle2 className="h-3 w-3" /> },
-  PARTIAL:   { label: 'Partial',   bg: '#f4ecda', border: 'rgba(184,144,64,0.2)',   text: '#b89040', icon: <TrendingUp className="h-3 w-3" /> },
-  OVERDUE:   { label: 'Overdue',   bg: '#fef2f2', border: 'rgba(200,60,60,0.15)',   text: '#c43c3c', icon: <AlertTriangle className="h-3 w-3" /> },
-  CANCELLED: { label: 'Cancelled', bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)',       text: '#8aa29a', icon: null },
+  DRAFT:     { label: 'Draft',     bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',       text: 'var(--rp-text-subtle)', icon: <FileText className="h-3 w-3" /> },
+  SENT:      { label: 'Sent',      bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',   text: '#23766a', icon: <Clock className="h-3 w-3" /> },
+  PAID:      { label: 'Paid',      bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',   text: '#23766a', icon: <CheckCircle2 className="h-3 w-3" /> },
+  PARTIAL:   { label: 'Partial',   bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',   text: '#b89040', icon: <TrendingUp className="h-3 w-3" /> },
+  OVERDUE:   { label: 'Overdue',   bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)',   text: '#c43c3c', icon: <AlertTriangle className="h-3 w-3" /> },
+  CANCELLED: { label: 'Cancelled', bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',       text: 'var(--rp-text-muted)', icon: null },
 };
 
 const FILTERS = ['All', 'DRAFT', 'SENT', 'PAID', 'PARTIAL', 'OVERDUE'] as const;
 
 export default function InvoicesPage() {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   const router = useRouter();
   const { tenant } = useAuthStore();
   const currency = tenant?.currency ?? 'BDT';
@@ -74,7 +77,7 @@ export default function InvoicesPage() {
         <button
           onClick={() => router.push('/dashboard/invoices/new')}
           className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
-          style={{ background: '#1b342f' }}
+          style={{ background: 'var(--rp-btn-accent)' }}
         >
           <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} /> New Invoice
         </button>
@@ -83,13 +86,12 @@ export default function InvoicesPage() {
       {/* Stats row */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          { label: 'Total Invoiced', value: fmt(stats.totalInvoiced), sub: `${stats.totalCount} invoices`,   bg: '#e3f2ef', color: '#23766a', icon: FileText   },
-          { label: 'Collected',      value: fmt(stats.collected),     sub: `${stats.paidCount} paid`,        bg: '#e3f2ef', color: '#23766a', icon: CheckCircle2 },
-          { label: 'Outstanding',    value: fmt(stats.outstanding),   sub: 'unpaid balance',                 bg: '#fef2f2', color: '#c43c3c', icon: AlertTriangle },
-          { label: 'This Month',     value: fmt(stats.thisMonth),     sub: `${stats.thisMonthCount} invoice${stats.thisMonthCount !== 1 ? 's' : ''}`, bg: '#f4ecda', color: '#b89040', icon: TrendingUp },
+          { label: 'Total Invoiced', value: fmt(stats.totalInvoiced), sub: `${stats.totalCount} invoices`,   bg: 'var(--rp-teal-bg)', color: '#23766a', icon: FileText   },
+          { label: 'Collected',      value: fmt(stats.collected),     sub: `${stats.paidCount} paid`,        bg: 'var(--rp-teal-bg)', color: '#23766a', icon: CheckCircle2 },
+          { label: 'Outstanding',    value: fmt(stats.outstanding),   sub: 'unpaid balance',                 bg: 'var(--rp-red-bg)', color: '#c43c3c', icon: AlertTriangle },
+          { label: 'This Month',     value: fmt(stats.thisMonth),     sub: `${stats.thisMonthCount} invoice${stats.thisMonthCount !== 1 ? 's' : ''}`, bg: 'var(--rp-amber-bg)', color: '#b89040', icon: TrendingUp },
         ].map(({ label, value, sub, bg, color, icon: Icon }) => (
-          <div key={label} className="flex items-center gap-[11px] rounded-[12px] border px-[18px] py-[15px]"
-            style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+          <div key={label} className="flex items-center gap-[11px] rounded-[12px] border px-[18px] py-[15px] bg-white dark:bg-white/5" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
             <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px]" style={{ background: bg }}>
               <Icon className="h-[14px] w-[14px]" strokeWidth={2} style={{ color }} />
             </div>
@@ -118,8 +120,8 @@ export default function InvoicesPage() {
             <button key={f} onClick={() => { setStatus(f); setPage(1); }}
               className="rounded-[8px] border px-[12px] py-[7px] text-[12px] font-medium transition-colors"
               style={status === f
-                ? { background: '#1b342f', color: '#dfd9d0', borderColor: '#1b342f' }
-                : { background: '#fff', color: '#6b8880', borderColor: 'rgba(0,0,0,0.09)' }}>
+                ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', borderColor: '#1b342f' }
+                : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', color: isDark ? '#94b8b0' : 'var(--rp-text-subtle)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)' }}>
               {f === 'All' ? 'All' : STATUS_PILL[f]?.label ?? f}
             </button>
           ))}
@@ -127,12 +129,11 @@ export default function InvoicesPage() {
       </div>
 
       {/* Invoice Table */}
-      <div className="overflow-hidden rounded-[14px] border"
-        style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+      <div className="overflow-hidden rounded-[14px] border bg-white dark:bg-white/5" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
         {isLoading ? (
           <div className="space-y-px p-4">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-14 animate-pulse rounded-[10px]" style={{ background: '#f5f4f1' }} />
+              <div key={i} className="h-14 animate-pulse rounded-[10px]" style={{ background: 'var(--rp-surface-3)' }} />
             ))}
           </div>
         ) : invoices.length === 0 ? (
@@ -149,7 +150,7 @@ export default function InvoicesPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]"
-                style={{ borderColor: 'rgba(0,0,0,0.05)', background: '#faf9f7' }}>
+                style={{ borderColor: 'var(--rp-border)', background: 'var(--rp-surface-2)' }}>
                 <th className="px-5 py-3 text-left">Invoice</th>
                 <th className="px-4 py-3 text-left">Guest</th>
                 <th className="hidden px-4 py-3 text-left md:table-cell">Booking</th>
@@ -166,7 +167,7 @@ export default function InvoicesPage() {
                 return (
                   <tr key={inv.id}
                     onClick={() => router.push(`/dashboard/invoices/${inv.id}`)}
-                    className="cursor-pointer border-b transition-colors hover:bg-[#faf9f7]"
+                    className="cursor-pointer border-b transition-colors hover:bg-[#faf9f7] dark:hover:bg-white/5"
                     style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
                     <td className="px-5 py-[14px]">
                       <div className="flex items-center gap-2.5">
@@ -230,7 +231,7 @@ export default function InvoicesPage() {
           <div className="flex items-center gap-1.5">
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
               className="flex h-8 w-8 items-center justify-center rounded-[8px] border disabled:opacity-40"
-              style={{ borderColor: 'rgba(0,0,0,0.09)', color: '#18231f' }}>
+              style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text)' }}>
               <ChevronLeft className="h-3.5 w-3.5" />
             </button>
             {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
@@ -240,15 +241,15 @@ export default function InvoicesPage() {
                 <button key={n} onClick={() => setPage(n)}
                   className="flex h-8 w-8 items-center justify-center rounded-[8px] border text-[12.5px] font-medium transition-colors"
                   style={n === page
-                    ? { background: '#1b342f', color: '#dfd9d0', borderColor: '#1b342f' }
-                    : { borderColor: 'rgba(0,0,0,0.09)', color: '#18231f' }}>
+                    ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', borderColor: '#1b342f' }
+                    : { borderColor: 'var(--rp-border-md)', color: 'var(--rp-text)' }}>
                   {n}
                 </button>
               );
             })}
             <button onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))} disabled={page >= pagination.totalPages}
               className="flex h-8 w-8 items-center justify-center rounded-[8px] border disabled:opacity-40"
-              style={{ background: '#1b342f', borderColor: '#1b342f', color: '#dfd9d0' }}>
+              style={{ background: 'var(--rp-btn-accent)', borderColor: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>

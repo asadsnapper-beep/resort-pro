@@ -1,13 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTheme } from 'next-themes';
+import { createPortal } from 'react-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Modal } from '@/components/ui/modal';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Monitor, UserCheck } from 'lucide-react';
+import { Monitor, UserCheck, Loader2, X } from 'lucide-react';
 
 const DEPARTMENTS = ['FRONT_DESK', 'HOUSEKEEPING', 'RESTAURANT', 'MAINTENANCE', 'SECURITY', 'MANAGEMENT'] as const;
 
@@ -61,8 +60,23 @@ interface Props {
 }
 
 export function StaffModal({ open, onClose, onSubmit, loading, staff }: Props) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+  const [isMounted, setIsMounted] = useState(false);
   const [giveAccess, setGiveAccess] = useState(false);
   const [selectedRole, setSelectedRole] = useState('RECEPTIONIST');
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+  }, [open]);
 
   const schema = staff
     ? editSchema
@@ -101,127 +115,135 @@ export function StaffModal({ open, onClose, onSubmit, loading, staff }: Props) {
 
   const formatDept = (d: string) => d.replace(/_/g, ' ');
 
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={staff ? 'Edit Staff Member' : 'Add Staff Member'}
-      description={staff ? `Editing ${staff.user.firstName} ${staff.user.lastName}` : 'Add a new team member'}
-      className="max-w-xl"
-    >
-      <form onSubmit={handleSubmit(d => onSubmit(d, giveAccess))} className="space-y-4">
+  const inputCls = `w-full rounded-[8px] border border-black/5 dark:border-white/10 px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30 ${isDark ? 'bg-white/5 text-[#dfd9d0] placeholder:text-white/30' : 'bg-[#f4f1eb]'}`;
+  const labelCls = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+  const errCls   = 'mt-1 text-[11.5px] text-[#c43c3c]';
+
+  if (!isMounted || !open) return null;
+
+  const modalContent = (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+      <div className="w-full max-w-xl rounded-2xl bg-white dark:bg-[#1a2e2a] overflow-hidden shadow-2xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-white/10">
+          <div>
+            <h2 className="font-semibold text-base text-gray-900 dark:text-[#dfd9d0]">
+              {staff ? 'Edit Staff Member' : 'Add Staff Member'}
+            </h2>
+            <p className="text-xs text-gray-500 dark:text-[#94b8b0] mt-0.5">
+              {staff ? `Editing ${staff.user.firstName} ${staff.user.lastName}` : 'Add a new team member'}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="px-6 py-6 overflow-y-auto max-h-[calc(100vh-180px)]">
+          <form onSubmit={handleSubmit(d => onSubmit(d, giveAccess))} className="space-y-4">
 
         {/* Name */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">First Name</label>
-            <Input {...register('firstName')} placeholder="Jane" />
-            {errors.firstName && <p className="mt-1 text-xs text-red-500">{errors.firstName.message}</p>}
+            <label className={labelCls}>First Name</label>
+            <input {...register('firstName')} placeholder="Jane" className={inputCls} />
+            {errors.firstName && <p className={errCls}>{errors.firstName.message}</p>}
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Last Name</label>
-            <Input {...register('lastName')} placeholder="Doe" />
-            {errors.lastName && <p className="mt-1 text-xs text-red-500">{errors.lastName.message}</p>}
+            <label className={labelCls}>Last Name</label>
+            <input {...register('lastName')} placeholder="Doe" className={inputCls} />
+            {errors.lastName && <p className={errCls}>{errors.lastName.message}</p>}
           </div>
         </div>
 
         {/* Department + Position */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Department</label>
-            <select
-              {...register('department')}
-              className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-            >
+            <label className={labelCls}>Department</label>
+            <select {...register('department')}
+              className={inputCls + ' cursor-pointer'}>
               <option value="">Select department</option>
               {DEPARTMENTS.map(d => <option key={d} value={d}>{formatDept(d)}</option>)}
             </select>
-            {errors.department && <p className="mt-1 text-xs text-red-500">{errors.department.message}</p>}
+            {errors.department && <p className={errCls}>{errors.department.message}</p>}
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Position / Title</label>
-            <Input {...register('position')} placeholder="Front Desk Manager" />
-            {errors.position && <p className="mt-1 text-xs text-red-500">{errors.position.message}</p>}
+            <label className={labelCls}>Position / Title</label>
+            <input {...register('position')} placeholder="Front Desk Manager" className={inputCls} />
+            {errors.position && <p className={errCls}>{errors.position.message}</p>}
           </div>
         </div>
 
         {/* Phone + Hire Date */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Phone <span className="text-gray-400">(optional)</span></label>
-            <Input {...register('phone')} placeholder="+1 234 567 8900" />
+            <label className={labelCls}>Phone <span style={{ color: 'var(--rp-text-faint)' }}>(optional)</span></label>
+            <input {...register('phone')} placeholder="+1 234 567 8900" className={inputCls} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Hire Date</label>
-            <Input {...register('hireDate')} type="date" />
-            {errors.hireDate && <p className="mt-1 text-xs text-red-500">{errors.hireDate.message}</p>}
+            <label className={labelCls}>Hire Date</label>
+            <input {...register('hireDate')} type="date" className={inputCls} />
+            {errors.hireDate && <p className={errCls}>{errors.hireDate.message}</p>}
           </div>
         </div>
 
         {/* System Access Toggle — create mode only */}
         {!staff && (
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
-            <div className="p-4 bg-gray-50 border-b">
-              <p className="text-sm font-medium text-gray-700">Dashboard Access</p>
-              <p className="text-xs text-gray-500 mt-0.5">Will this person log in to ResortPro?</p>
+          <div className="rounded-[12px] border overflow-hidden" style={{ borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-border)' }}>
+            <div className="px-4 py-3" style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'var(--rp-surface-2)', borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-border)'}` }}>
+              <p className="text-[13px] font-medium" style={{ color: isDark ? '#dfd9d0' : 'var(--rp-text)' }}>Dashboard Access</p>
+              <p className="text-[12px] mt-0.5" style={{ color: 'var(--rp-text-muted)' }}>Will this person log in to ResortPro?</p>
             </div>
-            <div className="grid grid-cols-2 divide-x">
-              <button
-                type="button"
-                onClick={() => setGiveAccess(false)}
-                className={`p-4 flex flex-col items-center gap-2 transition-colors ${
-                  !giveAccess ? 'bg-white text-gray-900' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
-                }`}
-              >
-                <UserCheck className={`h-5 w-5 ${!giveAccess ? 'text-gray-600' : 'text-gray-300'}`} />
-                <span className="text-xs font-medium">No Access</span>
-                <span className="text-[11px] text-center leading-tight text-gray-400">HR record only — no login</span>
-                {!giveAccess && <span className="text-[10px] font-semibold text-[#1a6b5e] bg-[#f0faf8] px-2 py-0.5 rounded-full">Selected</span>}
-              </button>
-              <button
-                type="button"
-                onClick={() => setGiveAccess(true)}
-                className={`p-4 flex flex-col items-center gap-2 transition-colors ${
-                  giveAccess ? 'bg-white text-gray-900' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
-                }`}
-              >
-                <Monitor className={`h-5 w-5 ${giveAccess ? 'text-[#1a6b5e]' : 'text-gray-300'}`} />
-                <span className="text-xs font-medium">Give Access</span>
-                <span className="text-[11px] text-center leading-tight text-gray-400">Send invite to log in</span>
-                {giveAccess && <span className="text-[10px] font-semibold text-[#1a6b5e] bg-[#f0faf8] px-2 py-0.5 rounded-full">Selected</span>}
-              </button>
+            <div className="grid grid-cols-2" style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-border)'}` }}>
+              {[
+                { value: false, Icon: UserCheck, label: 'No Access', sub: 'HR record only — no login' },
+                { value: true,  Icon: Monitor,   label: 'Give Access', sub: 'Send invite to log in' },
+              ].map(({ value, Icon, label, sub }) => (
+                <button key={String(value)} type="button" onClick={() => setGiveAccess(value)}
+                  className="p-4 flex flex-col items-center gap-2 transition-colors"
+                  style={giveAccess === value
+                    ? { background: isDark ? 'rgba(255,255,255,0.10)' : 'var(--rp-surface)' }
+                    : { background: isDark ? 'rgba(255,255,255,0.04)' : 'var(--rp-surface-2)' }}>
+                  <Icon className="h-5 w-5"
+                    style={{ color: giveAccess === value ? '#23766a' : 'var(--rp-text-faint)' }} />
+                  <span className="text-[12.5px] font-medium" style={{ color: giveAccess === value ? (isDark ? '#dfd9d0' : 'var(--rp-text)') : 'var(--rp-text-muted)' }}>{label}</span>
+                  <span className="text-[11px] text-center leading-tight" style={{ color: 'var(--rp-text-faint)' }}>{sub}</span>
+                  {giveAccess === value && (
+                    <span className="text-[10.5px] font-semibold rounded-full px-2 py-0.5"
+                      style={{ background: 'var(--rp-teal-bg)', color: '#23766a' }}>Selected</span>
+                  )}
+                </button>
+              ))}
             </div>
           </div>
         )}
 
-        {/* Access fields — shown only when giveAccess = true */}
+        {/* Access fields */}
         {!staff && giveAccess && (
-          <div className="space-y-4 rounded-xl border border-[#1a6b5e]/20 bg-[#f0faf8] p-4">
+          <div className="space-y-4 rounded-[12px] border p-4"
+            style={{ background: isDark ? 'rgba(35,118,106,0.1)' : 'var(--rp-teal-soft)', borderColor: 'rgba(35,118,106,0.2)' }}>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Email Address</label>
-              <Input {...register('email')} type="email" placeholder="jane@resort.com" />
-              {errors.email && <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>}
-              <p className="mt-1 text-xs text-gray-500">An invite will be sent to this email</p>
+              <label className={labelCls}>Email Address</label>
+              <input {...register('email')} type="email" placeholder="jane@resort.com" className={inputCls} />
+              {errors.email && <p className={errCls}>{errors.email.message}</p>}
+              <p className="mt-1 text-[11.5px]" style={{ color: 'var(--rp-text-muted)' }}>An invite will be sent to this email</p>
             </div>
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">System Role</label>
+              <label className={labelCls}>System Role</label>
               <div className="grid grid-cols-2 gap-2">
                 {ROLES.map(({ value, emoji, label, desc }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => handleRoleSelect(value)}
-                    className={`p-3 rounded-lg border text-left transition-colors ${
-                      selectedRole === value
-                        ? 'border-[#1a6b5e] bg-white shadow-sm'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-0.5">
+                  <button key={value} type="button" onClick={() => handleRoleSelect(value)}
+                    className="p-3 rounded-[10px] border text-left transition-all"
+                    style={selectedRole === value
+                      ? { borderColor: '#23766a', background: isDark ? 'rgba(35,118,106,0.15)' : 'var(--rp-surface)', boxShadow: '0 0 0 3px rgba(35,118,106,0.12)' }
+                      : { borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-border)', background: isDark ? 'rgba(255,255,255,0.05)' : 'var(--rp-surface)' }}>
+                    <div className="flex items-center gap-1.5 mb-0.5">
                       <span>{emoji}</span>
-                      <span className={`text-xs font-semibold ${selectedRole === value ? 'text-[#1a6b5e]' : 'text-gray-800'}`}>{label}</span>
+                      <span className="text-[12px] font-semibold" style={{ color: selectedRole === value ? '#23766a' : (isDark ? '#dfd9d0' : 'var(--rp-text)') }}>{label}</span>
                     </div>
-                    <p className="text-[11px] text-gray-400 leading-tight">{desc}</p>
+                    <p className="text-[11px] leading-tight" style={{ color: 'var(--rp-text-muted)' }}>{desc}</p>
                   </button>
                 ))}
               </div>
@@ -230,13 +252,24 @@ export function StaffModal({ open, onClose, onSubmit, loading, staff }: Props) {
           </div>
         )}
 
-        <div className="flex gap-3 justify-end pt-2 border-t">
-          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="submit" loading={loading}>
+        <div className="flex gap-3 justify-end pt-2" style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-border)'}` }}>
+          <button type="button" onClick={onClose}
+            className="rounded-[9px] border px-4 py-2 text-[13px] font-medium transition-colors hover:bg-[#f4f1eb] dark:hover:bg-white/10"
+            style={{ borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
+            Cancel
+          </button>
+          <button type="submit" disabled={loading}
+            className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors disabled:opacity-50"
+            style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+            {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {staff ? 'Save Changes' : giveAccess ? 'Add & Send Invite' : 'Add Staff Member'}
-          </Button>
+          </button>
         </div>
-      </form>
-    </Modal>
+          </form>
+        </div>
+      </div>
+    </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

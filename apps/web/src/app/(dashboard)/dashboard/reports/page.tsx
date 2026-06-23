@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTheme } from 'next-themes';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { reportsApi } from '@/lib/api';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+// shadcn cards removed — using native divs with design tokens
 import { useToast } from '@/hooks/use-toast';
 import {
   FileBarChart2, Calendar, Mail, Printer, TrendingUp,
@@ -30,20 +31,19 @@ function KpiCard({ label, value, sub, icon: Icon, color }: {
   icon: React.ElementType; color: string;
 }) {
   return (
-    <Card>
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
-            <p className="mt-1.5 text-2xl font-bold tracking-tight">{value}</p>
-            {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
-          </div>
-          <div className={`rounded-xl p-2.5 ${color}`}>
-            <Icon className="h-5 w-5 text-white" />
-          </div>
+    <div className="rounded-[14px] border bg-white p-5"
+      style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]">{label}</p>
+          <p className="mt-1.5 text-[22px] font-semibold tracking-[-0.02em] text-[#18231f]">{value}</p>
+          {sub && <p className="mt-0.5 text-[11px] text-[#c5bdb4]">{sub}</p>}
         </div>
-      </CardContent>
-    </Card>
+        <div className="flex h-[36px] w-[36px] items-center justify-center rounded-[9px]" style={{ background: color }}>
+          <Icon className="h-[15px] w-[15px] text-white" />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -52,10 +52,11 @@ function SectionHeader({ icon: Icon, title, count }: {
 }) {
   return (
     <div className="flex items-center gap-2 mb-3">
-      <Icon className="h-4 w-4 text-muted-foreground" />
-      <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wide">{title}</h3>
+      <Icon className="h-[14px] w-[14px]" style={{ color: '#23766a' }} />
+      <h3 className="text-[12px] font-semibold uppercase tracking-[0.07em] text-[#18231f]">{title}</h3>
       {count !== undefined && (
-        <span className="ml-1 rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs font-bold text-gray-600 dark:text-gray-300">
+        <span className="ml-1 rounded-[6px] border px-[8px] py-[2px] text-[11px] font-bold"
+          style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
           {count}
         </span>
       )}
@@ -67,6 +68,8 @@ function SectionHeader({ icon: Icon, title, count }: {
 function DispatchSettings() {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
 
   const { data: dispatchRes } = useQuery({
     queryKey: ['report-dispatch'],
@@ -130,86 +133,71 @@ function DispatchSettings() {
 
   const set = (key: string, value: any) => setForm(prev => ({ ...prev, [key]: value }));
 
-  return (
-    <Card className="no-print">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Bell className="h-4 w-4 text-resort-600" />
-            <CardTitle className="text-sm font-semibold uppercase tracking-wide">Auto-Dispatch Daily Report</CardTitle>
-          </div>
-          {/* Master enable toggle */}
-          <button
-            onClick={() => set('enabled', !form.enabled)}
-            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${form.enabled ? 'bg-resort-600' : 'bg-gray-300 dark:bg-gray-600'}`}
-          >
-            <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg transition-transform ${form.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
-          </button>
-        </div>
-        <p className="text-xs text-muted-foreground mt-1">
-          Send the daily report automatically to Telegram and/or WhatsApp every evening.
-        </p>
-      </CardHeader>
+  const inputCls = 'mt-1 block w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30';
 
-      <CardContent className="space-y-5">
-        {/* Dispatch time */}
-        <div className="flex items-center gap-3">
-          <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+  return (
+    <div className="rounded-[14px] border bg-white no-print"
+      style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+      <div className="flex items-center justify-between px-5 pt-5 pb-3">
+        <div className="flex items-center gap-2">
+          <div className="flex h-[30px] w-[30px] items-center justify-center rounded-[8px]" style={{ background: isDark ? 'rgba(35,118,106,0.2)' : 'var(--rp-teal-bg)' }}>
+            <Bell className="h-[14px] w-[14px]" style={{ color: '#23766a' }} />
+          </div>
+          <span className="text-[12.5px] font-semibold uppercase tracking-[0.07em] text-[#18231f]">Auto-Dispatch Daily Report</span>
+        </div>
+        <button
+          onClick={() => set('enabled', !form.enabled)}
+          className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors"
+          style={{ background: form.enabled ? '#23766a' : '#d1cfc9' }}
+        >
+          <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg transition-transform ${form.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
+        </button>
+      </div>
+      <p className="px-5 pb-4 text-[12px] text-[#8aa29a]">
+        Send the daily report automatically to Telegram and/or WhatsApp every evening.
+      </p>
+
+      <div className="px-5 pb-5 space-y-5 border-t" style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
+        <div className="pt-4 flex items-center gap-3">
+          <Clock className="h-4 w-4 shrink-0 text-[#8aa29a] dark:text-[#94b8b0]" />
           <div className="flex-1">
-            <label className="text-xs font-medium text-muted-foreground">Send Time (24h, server timezone)</label>
-            <input
-              type="time"
-              value={form.dispatchTime}
-              onChange={e => set('dispatchTime', e.target.value)}
-              className="mt-1 block w-full rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-sm bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-resort-500"
-            />
+            <label className="text-[11.5px] font-medium text-[#6b8880]">Send Time (24h, server timezone)</label>
+            <input type="time" value={form.dispatchTime} onChange={e => set('dispatchTime', e.target.value)} className={inputCls} />
           </div>
         </div>
 
         {/* ── Telegram ── */}
-        <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 space-y-3">
+        <div className="rounded-[10px] border p-4 space-y-3" style={{ borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-border)', background: isDark ? 'rgba(255,255,255,0.05)' : 'var(--rp-surface-2)' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Send className="h-4 w-4 text-blue-500" />
-              <span className="text-sm font-medium">Telegram</span>
+              <Send className="h-[14px] w-[14px]" style={{ color: '#23766a' }} />
+              <span className="text-[13px] font-medium text-[#18231f]">Telegram</span>
             </div>
             <button
               onClick={() => set('telegramEnabled', !form.telegramEnabled)}
-              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${form.telegramEnabled ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+              className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors"
+              style={{ background: form.telegramEnabled ? '#23766a' : '#d1cfc9' }}
             >
               <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${form.telegramEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
             </button>
           </div>
-
           {form.telegramEnabled && (
             <div className="space-y-2">
               <div>
-                <label className="text-xs text-muted-foreground">Bot Token</label>
-                <input
-                  type="password"
-                  placeholder="123456789:ABCdefGhIJKlmNoPQRstuVWxyz"
-                  value={form.telegramBotToken}
-                  onChange={e => set('telegramBotToken', e.target.value)}
-                  className="mt-0.5 block w-full rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-sm bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-resort-500"
-                />
-                <p className="mt-0.5 text-xs text-muted-foreground">Create a bot via <a href="https://t.me/BotFather" target="_blank" rel="noreferrer" className="text-blue-500 hover:underline">@BotFather</a> to get a token.</p>
+                <label className="text-[11px] text-[#6b8880]">Bot Token</label>
+                <input type="password" placeholder="123456789:ABCdefGhIJKlmNoPQRstuVWxyz" value={form.telegramBotToken}
+                  onChange={e => set('telegramBotToken', e.target.value)} className={inputCls} />
+                <p className="mt-0.5 text-[11px] text-[#8aa29a]">Create a bot via <a href="https://t.me/BotFather" target="_blank" rel="noreferrer" style={{ color: '#23766a' }}>@BotFather</a> to get a token.</p>
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Chat ID</label>
-                <input
-                  type="text"
-                  placeholder="-1001234567890 or your personal chat ID"
-                  value={form.telegramChatId}
-                  onChange={e => set('telegramChatId', e.target.value)}
-                  className="mt-0.5 block w-full rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-sm bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-resort-500"
-                />
-                <p className="mt-0.5 text-xs text-muted-foreground">Send a message to the bot, then call <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">/getUpdates</code> to find your chat_id.</p>
+                <label className="text-[11px] text-[#6b8880]">Chat ID</label>
+                <input type="text" placeholder="-1001234567890 or your personal chat ID" value={form.telegramChatId}
+                  onChange={e => set('telegramChatId', e.target.value)} className={inputCls} />
+                <p className="mt-0.5 text-[11px] text-[#8aa29a]">Send a message to the bot, then call <code className="rounded px-1" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-surface-4)' }}>/getUpdates</code> to find your chat_id.</p>
               </div>
-              <button
-                onClick={() => testMut.mutate('telegram')}
-                disabled={testingChannel === 'telegram' || !form.telegramBotToken || !form.telegramChatId}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 hover:bg-blue-100 transition-colors disabled:opacity-50"
-              >
+              <button onClick={() => testMut.mutate('telegram')} disabled={testingChannel === 'telegram' || !form.telegramBotToken || !form.telegramChatId}
+                className="flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12px] transition-colors disabled:opacity-50"
+                style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
                 {testingChannel === 'telegram' ? '⏳ Sending…' : <><Send className="h-3 w-3" /> Send Test Message</>}
               </button>
             </div>
@@ -217,69 +205,60 @@ function DispatchSettings() {
         </div>
 
         {/* ── WhatsApp ── */}
-        <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 space-y-3">
+        <div className="rounded-[10px] border p-4 space-y-3" style={{ borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-border)', background: isDark ? 'rgba(255,255,255,0.05)' : 'var(--rp-surface-2)' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <MessageCircle className="h-4 w-4 text-green-500" />
-              <span className="text-sm font-medium">WhatsApp</span>
+              <MessageCircle className="h-[14px] w-[14px]" style={{ color: '#23766a' }} />
+              <span className="text-[13px] font-medium text-[#18231f]">WhatsApp</span>
             </div>
             <button
               onClick={() => set('whatsappEnabled', !form.whatsappEnabled)}
-              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${form.whatsappEnabled ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+              className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors"
+              style={{ background: form.whatsappEnabled ? '#23766a' : '#d1cfc9' }}
             >
               <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${form.whatsappEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
             </button>
           </div>
-
           {form.whatsappEnabled && (
             <div className="space-y-2">
               <div>
-                <label className="text-xs text-muted-foreground">Recipient Phone Number</label>
-                <input
-                  type="tel"
-                  placeholder="+8801XXXXXXXXX"
-                  value={form.whatsappPhone}
-                  onChange={e => set('whatsappPhone', e.target.value)}
-                  className="mt-0.5 block w-full rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-sm bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-resort-500"
-                />
-                <p className="mt-0.5 text-xs text-muted-foreground">Uses the WhatsApp gateway from Settings → SMS & WhatsApp.</p>
+                <label className="text-[11px] text-[#6b8880]">Recipient Phone Number</label>
+                <input type="tel" placeholder="+8801XXXXXXXXX" value={form.whatsappPhone}
+                  onChange={e => set('whatsappPhone', e.target.value)} className={inputCls} />
+                <p className="mt-0.5 text-[11px] text-[#8aa29a]">Uses the WhatsApp gateway from Settings → SMS & WhatsApp.</p>
               </div>
-              <button
-                onClick={() => testMut.mutate('whatsapp')}
-                disabled={testingChannel === 'whatsapp' || !form.whatsappPhone}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-green-50 dark:bg-green-900/20 text-green-600 hover:bg-green-100 transition-colors disabled:opacity-50"
-              >
+              <button onClick={() => testMut.mutate('whatsapp')} disabled={testingChannel === 'whatsapp' || !form.whatsappPhone}
+                className="flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12px] transition-colors disabled:opacity-50"
+                style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
                 {testingChannel === 'whatsapp' ? '⏳ Sending…' : <><MessageCircle className="h-3 w-3" /> Send Test Message</>}
               </button>
             </div>
           )}
         </div>
 
-        {/* Last dispatched info */}
         {dispatch?.lastDispatchedAt && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+          <div className="flex items-center gap-2 text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">
+            <CheckCircle2 className="h-3.5 w-3.5" style={{ color: '#23766a' }} />
             Last sent: {new Date(dispatch.lastDispatchedAt).toLocaleString()} (date: {dispatch.lastDispatchDate})
           </div>
         )}
 
-        {/* Save */}
-        <div className="flex justify-end pt-2 border-t border-gray-100 dark:border-gray-800">
-          <button
-            onClick={() => saveMut.mutate()}
-            disabled={saveMut.isPending}
-            className="px-4 py-2 text-sm rounded-lg bg-resort-600 text-white hover:bg-resort-700 transition-colors disabled:opacity-50"
-          >
+        <div className="flex justify-end pt-2 border-t" style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
+          <button onClick={() => saveMut.mutate()} disabled={saveMut.isPending}
+            className="rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors disabled:opacity-50"
+            style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
             {saveMut.isPending ? 'Saving…' : 'Save Settings'}
           </button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function ReportsPage() {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   const { toast } = useToast();
   const [date, setDate] = useState(toLocalDate(new Date()));
   const [emailAddr, setEmailAddr] = useState('');
@@ -323,70 +302,47 @@ export default function ReportsPage() {
         }
       `}</style>
 
-      <div className="space-y-6">
+      <div className="space-y-6 animate-fade-up">
         {/* ── Header ── */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between no-print">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <FileBarChart2 className="h-6 w-6 text-resort-600" />
-              Daily Report
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              End-of-day summary for front desk & management
-            </p>
+            <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Daily Report</h1>
+            <p className="mt-[4px] text-[13px] text-[#7a9890]">End-of-day summary for front desk & management</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             {/* Date navigator */}
-            <div className="flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <button
-                onClick={() => changeDate(-1)}
-                className="px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-r border-gray-200 dark:border-gray-700"
-              >
-                ←
-              </button>
-              <div className="relative">
-                <input
-                  type="date"
-                  value={date}
-                  max={toLocalDate(new Date())}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="px-3 py-2 text-sm bg-transparent focus:outline-none cursor-pointer"
-                />
-              </div>
-              <button
-                onClick={() => changeDate(1)}
-                disabled={date >= toLocalDate(new Date())}
-                className="px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-l border-gray-200 dark:border-gray-700 disabled:opacity-40"
-              >
-                →
-              </button>
+            <div className="flex items-center overflow-hidden rounded-[9px] border" style={{ borderColor: 'var(--rp-border-md)' }}>
+              <button onClick={() => changeDate(-1)}
+                className="px-3 py-2 text-[13px] hover:bg-[#f4f1eb] transition-colors border-r"
+                style={{ borderColor: 'var(--rp-border)' }}>←</button>
+              <input type="date" value={date} max={toLocalDate(new Date())} onChange={(e) => setDate(e.target.value)}
+                className="px-3 py-2 text-[13px] bg-transparent focus:outline-none cursor-pointer text-[#18231f]" />
+              <button onClick={() => changeDate(1)} disabled={date >= toLocalDate(new Date())}
+                className="px-3 py-2 text-[13px] hover:bg-[#f4f1eb] transition-colors border-l disabled:opacity-40"
+                style={{ borderColor: 'var(--rp-border)' }}>→</button>
             </div>
 
-            {/* Today shortcut */}
             {date !== toLocalDate(new Date()) && (
-              <button
-                onClick={() => setDate(toLocalDate(new Date()))}
-                className="px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              >
-                Today
-              </button>
+              <button onClick={() => setDate(toLocalDate(new Date()))}
+                className="rounded-[9px] border px-3 py-2 text-[12px] transition-colors hover:bg-[#f4f1eb]"
+                style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>Today</button>
             )}
 
             {/* Email button */}
             <button
               onClick={() => setShowEmailInput(!showEmailInput)}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              className="flex items-center gap-1.5 rounded-[9px] border px-3 py-2 text-[13px] transition-colors hover:bg-[#f4f1eb]"
+              style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}
             >
               <Mail className="h-4 w-4" />
               Email
             </button>
 
             {/* Print */}
-            <button
-              onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
+            <button onClick={handlePrint}
+              className="flex items-center gap-1.5 rounded-[9px] border px-3 py-2 text-[13px] transition-colors hover:bg-[#f4f1eb]"
+              style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
               <Printer className="h-4 w-4" />
               Print
             </button>
@@ -396,24 +352,17 @@ export default function ReportsPage() {
         {/* Email input row */}
         {showEmailInput && (
           <div className="flex items-center gap-2 no-print">
-            <input
-              type="email"
-              placeholder="recipient@email.com (leave blank for account email)"
-              value={emailAddr}
-              onChange={(e) => setEmailAddr(e.target.value)}
-              className="flex-1 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-resort-500"
-            />
-            <button
-              onClick={() => emailMut.mutate()}
-              disabled={emailMut.isPending}
-              className="px-4 py-2 text-sm rounded-lg bg-resort-600 text-white hover:bg-resort-700 transition-colors disabled:opacity-50"
-            >
+            <input type="email" placeholder="recipient@email.com (leave blank for account email)"
+              value={emailAddr} onChange={(e) => setEmailAddr(e.target.value)}
+              className="flex-1 rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-2 text-[13px] text-[#18231f] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30" />
+            <button onClick={() => emailMut.mutate()} disabled={emailMut.isPending}
+              className="rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors disabled:opacity-50"
+              style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
               {emailMut.isPending ? 'Sending…' : 'Send Report'}
             </button>
-            <button
-              onClick={() => setShowEmailInput(false)}
-              className="px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 transition-colors"
-            >
+            <button onClick={() => setShowEmailInput(false)}
+              className="rounded-[9px] border px-3 py-2 text-[13px] transition-colors hover:bg-[#f4f1eb]"
+              style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
               Cancel
             </button>
           </div>
@@ -424,299 +373,260 @@ export default function ReportsPage() {
           <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-24 rounded-xl bg-gray-200 dark:bg-gray-800 animate-pulse" />
+                <div key={i} className="h-24 rounded-[14px] animate-pulse" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-surface-4)' }} />
               ))}
             </div>
-            <div className="h-48 rounded-xl bg-gray-200 dark:bg-gray-800 animate-pulse" />
-            <div className="h-48 rounded-xl bg-gray-200 dark:bg-gray-800 animate-pulse" />
+            <div className="h-48 rounded-[14px] animate-pulse" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-surface-4)' }} />
+            <div className="h-48 rounded-[14px] animate-pulse" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-surface-4)' }} />
           </div>
         )}
 
         {report && (
           <div id="report-content" className="space-y-6">
             {/* Report date banner */}
-            <div className="rounded-xl border border-resort-200 bg-resort-50 dark:bg-resort-900/10 dark:border-resort-800 px-5 py-4 flex items-center justify-between">
+            <div className="rounded-[12px] border px-5 py-4 flex items-center justify-between"
+              style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)' }}>
               <div className="flex items-center gap-3">
-                <Calendar className="h-5 w-5 text-resort-600" />
+                <Calendar className="h-[18px] w-[18px]" style={{ color: '#23766a' }} />
                 <div>
-                  <p className="text-sm font-semibold text-resort-800 dark:text-resort-300">
-                    {formatDisplayDate(date)}
-                  </p>
-                  <p className="text-xs text-resort-600 dark:text-resort-400">{report.tenant.name}</p>
+                  <p className="text-[13.5px] font-semibold" style={{ color: '#1b342f' }}>{formatDisplayDate(date)}</p>
+                  <p className="text-[12px]" style={{ color: '#23766a' }}>{report.tenant.name}</p>
                 </div>
               </div>
-              <span className="text-xs text-resort-500">Generated {new Date().toLocaleTimeString()}</span>
+              <span className="text-[11.5px]" style={{ color: '#4a8c80' }}>Generated {new Date().toLocaleTimeString()}</span>
             </div>
 
             {/* ── KPI strip ── */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <KpiCard
-                label="Occupancy"
-                value={`${report.occupancy.rate}%`}
-                sub={`${report.occupancy.occupied} / ${report.occupancy.totalRooms} rooms`}
-                icon={TrendingUp}
-                color="bg-resort-600"
-              />
-              <KpiCard
-                label="Total Revenue"
-                value={formatCurrency(report.revenue.total)}
-                sub={`Rooms + F&B + Extras`}
-                icon={DollarSign}
-                color="bg-emerald-500"
-              />
-              <KpiCard
-                label="Arrivals"
-                value={report.arrivals.length}
-                sub={`${report.arrivals.filter((a: any) => a.status === 'CHECKED_IN').length} checked in`}
-                icon={LogIn}
-                color="bg-blue-500"
-              />
-              <KpiCard
-                label="Departures"
-                value={report.departures.length}
-                sub={`${report.departures.filter((d: any) => d.status === 'CHECKED_OUT').length} checked out`}
-                icon={LogOut}
-                color="bg-indigo-500"
-              />
+              <KpiCard label="Occupancy" value={`${report.occupancy.rate}%`}
+                sub={`${report.occupancy.occupied} / ${report.occupancy.totalRooms} rooms`} icon={TrendingUp} color="#23766a" />
+              <KpiCard label="Total Revenue" value={formatCurrency(report.revenue.total)}
+                sub="Rooms + F&B + Extras" icon={DollarSign} color="#1b342f" />
+              <KpiCard label="Arrivals" value={report.arrivals.length}
+                sub={`${report.arrivals.filter((a: any) => a.status === 'CHECKED_IN').length} checked in`} icon={LogIn} color="#b89040" />
+              <KpiCard label="Departures" value={report.departures.length}
+                sub={`${report.departures.filter((d: any) => d.status === 'CHECKED_OUT').length} checked out`} icon={LogOut} color="#b8724a" />
             </div>
 
             {/* ── Revenue & Payments ── */}
             <div className="grid gap-6 lg:grid-cols-2">
               {/* Revenue breakdown */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <SectionHeader icon={DollarSign} title="Revenue Breakdown" />
-                </CardHeader>
-                <CardContent className="space-y-3">
+              <div className="rounded-[14px] border bg-white p-5"
+                style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+                <div className="pb-3"><SectionHeader icon={DollarSign} title="Revenue Breakdown" /></div>
+                <div className="space-y-3">
                   {[
-                    { label: 'Room Revenue', amount: report.revenue.rooms, color: 'bg-resort-500' },
-                    { label: 'Restaurant & F&B', amount: report.revenue.restaurant, color: 'bg-orange-500' },
-                    { label: 'Extras & Charges', amount: report.revenue.extras, color: 'bg-purple-500' },
+                    { label: 'Room Revenue', amount: report.revenue.rooms, color: '#23766a' },
+                    { label: 'Restaurant & F&B', amount: report.revenue.restaurant, color: '#b8724a' },
+                    { label: 'Extras & Charges', amount: report.revenue.extras, color: '#b89040' },
                   ].map(({ label, amount, color }) => {
                     const pct = report.revenue.total > 0 ? Math.round((amount / report.revenue.total) * 100) : 0;
                     return (
                       <div key={label}>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-muted-foreground">{label}</span>
-                          <span className="font-medium">{formatCurrency(amount)}</span>
+                        <div className="flex justify-between text-[13px] mb-1.5">
+                          <span style={{ color: 'var(--rp-text-muted)' }}>{label}</span>
+                          <span className="font-medium text-[#18231f] dark:text-[#dfd9d0]">{formatCurrency(amount)}</span>
                         </div>
-                        <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-gray-800">
-                          <div className={`h-2 rounded-full ${color} transition-all`} style={{ width: `${pct}%` }} />
+                        <div className="h-[6px] w-full rounded-full" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-surface-4)' }}>
+                          <div className="h-[6px] rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
                         </div>
                       </div>
                     );
                   })}
-                  <div className="pt-2 border-t border-gray-100 dark:border-gray-800 flex justify-between font-semibold text-sm">
-                    <span>Total</span>
-                    <span className="text-resort-600">{formatCurrency(report.revenue.total)}</span>
+                  <div className="pt-2 border-t flex justify-between text-[13px] font-semibold" style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
+                    <span style={{ color: 'var(--rp-text)' }}>Total</span>
+                    <span style={{ color: '#23766a' }}>{formatCurrency(report.revenue.total)}</span>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
               {/* Payment methods */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <SectionHeader icon={CreditCard} title="Payment Methods" />
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {[
-                      { label: 'Cash', icon: Banknote, amount: report.payments.cash, color: 'text-emerald-600' },
-                      { label: 'Card / Online', icon: CreditCard, amount: report.payments.card, color: 'text-blue-600' },
-                      { label: 'Bank Transfer', icon: Building2, amount: report.payments.bankTransfer, color: 'text-purple-600' },
-                      { label: 'Other', icon: DollarSign, amount: report.payments.other, color: 'text-gray-600' },
-                    ].map(({ label, icon: Icon, amount, color }) => (
-                      <div key={label} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
-                        <div className="flex items-center gap-2.5">
-                          <Icon className={`h-4 w-4 ${color}`} />
-                          <span className="text-sm">{label}</span>
+              <div className="rounded-[14px] border bg-white p-5"
+                style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+                <div className="pb-3"><SectionHeader icon={CreditCard} title="Payment Methods" /></div>
+                <div className="space-y-2">
+                  {[
+                    { label: 'Cash', icon: Banknote, amount: report.payments.cash, accent: '#23766a', accentBg: 'var(--rp-teal-bg)' },
+                    { label: 'Card / Online', icon: CreditCard, amount: report.payments.card, accent: '#1b342f', accentBg: 'var(--rp-teal-bg)' },
+                    { label: 'Bank Transfer', icon: Building2, amount: report.payments.bankTransfer, accent: '#b89040', accentBg: 'var(--rp-amber-bg)' },
+                    { label: 'Other', icon: DollarSign, amount: report.payments.other, accent: 'var(--rp-text-muted)', accentBg: 'var(--rp-surface-3)' },
+                  ].map(({ label, icon: Icon, amount, accent, accentBg }) => (
+                    <div key={label} className="flex items-center justify-between rounded-[9px] p-3"
+                      style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'var(--rp-surface-2)' }}>
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px]" style={{ background: accentBg }}>
+                          <Icon className="h-[13px] w-[13px]" style={{ color: accent }} />
                         </div>
-                        <span className={`text-sm font-semibold ${amount > 0 ? color : 'text-muted-foreground'}`}>
-                          {formatCurrency(amount)}
-                        </span>
+                        <span className="text-[13px] text-[#18231f] dark:text-[#dfd9d0]">{label}</span>
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                      <span className="text-[13px] font-semibold" style={{ color: amount > 0 ? accent : 'var(--rp-text-muted)' }}>
+                        {formatCurrency(amount)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {/* ── Arrivals table ── */}
-            <Card>
-              <CardHeader className="pb-3">
-                <SectionHeader icon={LogIn} title="Arrivals" count={report.arrivals.length} />
-              </CardHeader>
-              <CardContent>
-                {report.arrivals.length === 0 ? (
-                  <p className="text-sm text-center text-muted-foreground py-6">No arrivals today</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-left text-xs text-muted-foreground border-b border-gray-100 dark:border-gray-800">
-                          <th className="pb-2 font-medium">Guest</th>
-                          <th className="pb-2 font-medium">Room</th>
-                          <th className="pb-2 font-medium text-right">Nights</th>
-                          <th className="pb-2 font-medium text-right">Check-out</th>
-                          <th className="pb-2 font-medium text-right">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                        {report.arrivals.map((a: any) => (
-                          <tr key={a.bookingId} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
-                            <td className="py-2.5 font-medium">{a.guestName}</td>
-                            <td className="py-2.5 text-muted-foreground">{a.room}</td>
-                            <td className="py-2.5 text-right">{a.nights}n</td>
-                            <td className="py-2.5 text-right text-muted-foreground">{a.checkOut}</td>
-                            <td className="py-2.5 text-right">
-                              {a.status === 'CHECKED_IN' ? (
-                                <span className="inline-block px-2 py-0.5 rounded-full text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-medium">In</span>
-                              ) : (
-                                <span className="inline-block px-2 py-0.5 rounded-full text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">Due</span>
-                              )}
-                            </td>
-                          </tr>
+            <div className="rounded-[14px] border bg-white p-5"
+              style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+              <div className="pb-3"><SectionHeader icon={LogIn} title="Arrivals" count={report.arrivals.length} /></div>
+              {report.arrivals.length === 0 ? (
+                <p className="text-[13px] text-center py-6 text-[#8aa29a] dark:text-[#94b8b0]">No arrivals today</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="text-left border-b" style={{ borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', background: isDark ? 'rgba(255,255,255,0.05)' : 'var(--rp-surface-2)' }}>
+                        {['Guest','Room','Nights','Check-out','Status'].map((h, i) => (
+                          <th key={h} className={`pb-2.5 pt-2 text-[10.5px] font-semibold uppercase tracking-[0.08em] ${i > 1 ? 'text-right' : ''}`}
+                            style={{ color: 'var(--rp-text-muted)' }}>{h}</th>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {report.arrivals.map((a: any) => (
+                        <tr key={a.bookingId} className="border-b hover:bg-[#faf9f7] dark:hover:bg-white/5 transition-colors"
+                          style={{ borderColor: 'rgba(0,0,0,0.03)' }}>
+                          <td className="py-2.5 text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{a.guestName}</td>
+                          <td className="py-2.5 text-[13px] text-[#7a9890] dark:text-[#94b8b0]">{a.room}</td>
+                          <td className="py-2.5 text-[13px] text-right text-[#7a9890] dark:text-[#94b8b0]">{a.nights}n</td>
+                          <td className="py-2.5 text-[13px] text-right text-[#7a9890] dark:text-[#94b8b0]">{a.checkOut}</td>
+                          <td className="py-2.5 text-right">
+                            <span className="inline-block rounded-[7px] border px-[9px] py-[3px] text-[11px] font-semibold"
+                              style={a.status === 'CHECKED_IN'
+                                ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }
+                                : { background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.2)', color: '#b89040' }}>
+                              {a.status === 'CHECKED_IN' ? 'In' : 'Due'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
 
             {/* ── Departures table ── */}
-            <Card>
-              <CardHeader className="pb-3">
-                <SectionHeader icon={LogOut} title="Departures" count={report.departures.length} />
-              </CardHeader>
-              <CardContent>
-                {report.departures.length === 0 ? (
-                  <p className="text-sm text-center text-muted-foreground py-6">No departures today</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-left text-xs text-muted-foreground border-b border-gray-100 dark:border-gray-800">
-                          <th className="pb-2 font-medium">Guest</th>
-                          <th className="pb-2 font-medium">Room</th>
-                          <th className="pb-2 font-medium text-right">Bill</th>
-                          <th className="pb-2 font-medium text-right">Paid</th>
-                          <th className="pb-2 font-medium text-right">Balance</th>
-                          <th className="pb-2 font-medium text-right">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                        {report.departures.map((d: any) => {
-                          const balance = d.totalBill - d.paidAmount;
-                          return (
-                            <tr key={d.bookingId} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
-                              <td className="py-2.5 font-medium">{d.guestName}</td>
-                              <td className="py-2.5 text-muted-foreground">{d.room}</td>
-                              <td className="py-2.5 text-right">{formatCurrency(d.totalBill)}</td>
-                              <td className="py-2.5 text-right text-emerald-600">{formatCurrency(d.paidAmount)}</td>
-                              <td className={`py-2.5 text-right font-medium ${balance > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
-                                {balance > 0 ? formatCurrency(balance) : '✓ Settled'}
-                              </td>
-                              <td className="py-2.5 text-right">
-                                {d.status === 'CHECKED_OUT' ? (
-                                  <span className="inline-block px-2 py-0.5 rounded-full text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 font-medium">Out</span>
-                                ) : (
-                                  <span className="inline-block px-2 py-0.5 rounded-full text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 font-medium">Pending</span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <div className="rounded-[14px] border bg-white p-5"
+              style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+              <div className="pb-3"><SectionHeader icon={LogOut} title="Departures" count={report.departures.length} /></div>
+              {report.departures.length === 0 ? (
+                <p className="text-[13px] text-center py-6 text-[#8aa29a] dark:text-[#94b8b0]">No departures today</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="text-left border-b" style={{ borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', background: isDark ? 'rgba(255,255,255,0.05)' : 'var(--rp-surface-2)' }}>
+                        {['Guest','Room','Bill','Paid','Balance','Status'].map((h, i) => (
+                          <th key={h} className={`pb-2.5 pt-2 text-[10.5px] font-semibold uppercase tracking-[0.08em] ${i > 1 ? 'text-right' : ''}`}
+                            style={{ color: 'var(--rp-text-muted)' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {report.departures.map((d: any) => {
+                        const balance = d.totalBill - d.paidAmount;
+                        return (
+                          <tr key={d.bookingId} className="border-b hover:bg-[#faf9f7] dark:hover:bg-white/5 transition-colors"
+                            style={{ borderColor: 'rgba(0,0,0,0.03)' }}>
+                            <td className="py-2.5 text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{d.guestName}</td>
+                            <td className="py-2.5 text-[13px] text-[#7a9890] dark:text-[#94b8b0]">{d.room}</td>
+                            <td className="py-2.5 text-[13px] text-right text-[#18231f] dark:text-[#dfd9d0]">{formatCurrency(d.totalBill)}</td>
+                            <td className="py-2.5 text-[13px] text-right font-medium" style={{ color: '#23766a' }}>{formatCurrency(d.paidAmount)}</td>
+                            <td className="py-2.5 text-[13px] text-right font-medium"
+                              style={{ color: balance > 0 ? '#c43c3c' : '#23766a' }}>
+                              {balance > 0 ? formatCurrency(balance) : '✓ Settled'}
+                            </td>
+                            <td className="py-2.5 text-right">
+                              <span className="inline-block rounded-[7px] border px-[9px] py-[3px] text-[11px] font-semibold"
+                                style={d.status === 'CHECKED_OUT'
+                                  ? { background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-muted)' }
+                                  : { background: 'var(--rp-coral-bg)', borderColor: 'rgba(184,114,74,0.2)', color: '#b8724a' }}>
+                                {d.status === 'CHECKED_OUT' ? 'Out' : 'Pending'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
 
             {/* ── Operations ── */}
             <div className="grid gap-6 lg:grid-cols-3">
               {/* No-shows */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <SectionHeader icon={AlertTriangle} title="No-Shows" count={report.noShows.length} />
-                </CardHeader>
-                <CardContent>
-                  {report.noShows.length === 0 ? (
-                    <div className="flex flex-col items-center py-4 text-center">
-                      <span className="text-2xl mb-1">✅</span>
-                      <p className="text-sm text-muted-foreground">No no-shows today</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {report.noShows.map((n: any) => (
-                        <div key={n.bookingId} className="flex items-center gap-2.5 p-2.5 rounded-lg bg-red-50 dark:bg-red-900/10">
-                          <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{n.guestName}</p>
-                            <p className="text-xs text-muted-foreground">{n.room}</p>
-                          </div>
+              <div className="rounded-[14px] border bg-white p-5"
+                style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+                <div className="pb-3"><SectionHeader icon={AlertTriangle} title="No-Shows" count={report.noShows.length} /></div>
+                {report.noShows.length === 0 ? (
+                  <div className="flex flex-col items-center py-4 text-center">
+                    <span className="text-2xl mb-1">✅</span>
+                    <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No no-shows today</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {report.noShows.map((n: any) => (
+                      <div key={n.bookingId} className="flex items-center gap-2.5 rounded-[9px] p-2.5"
+                        style={{ background: isDark ? 'rgba(196,60,60,0.15)' : 'var(--rp-red-bg)' }}>
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: '#c43c3c' }} />
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-medium truncate text-[#18231f] dark:text-[#dfd9d0]">{n.guestName}</p>
+                          <p className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">{n.room}</p>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {/* Housekeeping */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <SectionHeader icon={Sparkles} title="Housekeeping" />
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/10">
-                      <span className="text-sm text-emerald-700 dark:text-emerald-400">Completed</span>
-                      <span className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{report.housekeeping.completed}</span>
-                    </div>
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-amber-50 dark:bg-amber-900/10">
-                      <span className="text-sm text-amber-700 dark:text-amber-400">Pending</span>
-                      <span className="text-2xl font-bold text-amber-700 dark:text-amber-400">{report.housekeeping.pending}</span>
-                    </div>
-                    {(report.housekeeping.completed + report.housekeeping.pending) > 0 && (
-                      <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-800">
-                        <div
-                          className="h-2 rounded-full bg-emerald-500 transition-all"
-                          style={{
-                            width: `${Math.round(
-                              (report.housekeeping.completed /
-                                (report.housekeeping.completed + report.housekeeping.pending)) * 100
-                            )}%`,
-                          }}
-                        />
-                      </div>
-                    )}
+              <div className="rounded-[14px] border bg-white p-5"
+                style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+                <div className="pb-3"><SectionHeader icon={Sparkles} title="Housekeeping" /></div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between rounded-[9px] p-3" style={{ background: isDark ? 'rgba(35,118,106,0.2)' : 'var(--rp-teal-bg)' }}>
+                    <span className="text-[13px]" style={{ color: '#23766a' }}>Completed</span>
+                    <span className="text-[22px] font-semibold" style={{ color: '#23766a' }}>{report.housekeeping.completed}</span>
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="flex items-center justify-between rounded-[9px] p-3" style={{ background: isDark ? 'rgba(184,144,64,0.18)' : 'var(--rp-amber-bg)' }}>
+                    <span className="text-[13px]" style={{ color: '#b89040' }}>Pending</span>
+                    <span className="text-[22px] font-semibold" style={{ color: '#b89040' }}>{report.housekeeping.pending}</span>
+                  </div>
+                  {(report.housekeeping.completed + report.housekeeping.pending) > 0 && (
+                    <div className="h-[6px] rounded-full" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-surface-4)' }}>
+                      <div className="h-[6px] rounded-full transition-all" style={{
+                        background: '#23766a',
+                        width: `${Math.round((report.housekeeping.completed / (report.housekeeping.completed + report.housekeeping.pending)) * 100)}%`,
+                      }} />
+                    </div>
+                  )}
+                </div>
+              </div>
 
               {/* Maintenance */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <SectionHeader icon={Wrench} title="Maintenance" />
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-red-50 dark:bg-red-900/10">
-                      <span className="text-sm text-red-700 dark:text-red-400">Open Tickets</span>
-                      <span className="text-2xl font-bold text-red-700 dark:text-red-400">{report.maintenance.open}</span>
-                    </div>
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/10">
-                      <span className="text-sm text-emerald-700 dark:text-emerald-400">Resolved Today</span>
-                      <span className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{report.maintenance.resolvedToday}</span>
-                    </div>
+              <div className="rounded-[14px] border bg-white p-5"
+                style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+                <div className="pb-3"><SectionHeader icon={Wrench} title="Maintenance" /></div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between rounded-[9px] p-3" style={{ background: isDark ? 'rgba(196,60,60,0.15)' : 'var(--rp-red-bg)' }}>
+                    <span className="text-[13px]" style={{ color: '#c43c3c' }}>Open Tickets</span>
+                    <span className="text-[22px] font-semibold" style={{ color: '#c43c3c' }}>{report.maintenance.open}</span>
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="flex items-center justify-between rounded-[9px] p-3" style={{ background: isDark ? 'rgba(35,118,106,0.2)' : 'var(--rp-teal-bg)' }}>
+                    <span className="text-[13px]" style={{ color: '#23766a' }}>Resolved Today</span>
+                    <span className="text-[22px] font-semibold" style={{ color: '#23766a' }}>{report.maintenance.resolvedToday}</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Print footer */}
-            <div className="hidden print:block pt-4 border-t border-gray-200 text-xs text-gray-400 text-center">
+            <div className="hidden print:block pt-4 border-t text-[11px] text-center" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-muted)' }}>
               <p>{report.tenant.name} · Daily Report · {formatDisplayDate(date)} · Generated {new Date().toLocaleString()}</p>
               <p className="mt-1">Confidential — ResortPro</p>
             </div>
@@ -725,12 +635,11 @@ export default function ReportsPage() {
 
         {!isLoading && !report && (
           <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
-            <FileBarChart2 className="h-12 w-12 text-gray-300" />
-            <p className="text-muted-foreground">No report data for {date}</p>
-            <button
-              onClick={() => refetch()}
-              className="mt-2 px-4 py-2 text-sm rounded-lg bg-resort-600 text-white hover:bg-resort-700 transition-colors"
-            >
+            <FileBarChart2 className="h-12 w-12 text-[#c5bdb4] dark:text-[#6e8580]" />
+            <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No report data for {date}</p>
+            <button onClick={() => refetch()}
+              className="mt-2 rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors"
+              style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
               Retry
             </button>
           </div>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
+import { useUiStore } from '@/store/ui';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { TopNav } from '@/components/dashboard/top-nav';
 import { PlatformBanner } from '@/components/dashboard/PlatformBanner';
@@ -18,6 +19,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const pathname = usePathname();
   const { isAuthenticated, tenant, setAuth, user, token } = useAuthStore();
+  const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
   const [mounted, setMounted] = useState(false);
   const [statusChecked, setStatusChecked] = useState(false);
 
@@ -108,8 +110,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#efece6] dark:bg-gray-950">
-      {/* Sidebar — hidden on mobile */}
-      <div className="hidden md:flex">
+      {/* Sidebar — hidden on mobile, collapsible on desktop */}
+      <div
+        className={`hidden md:flex overflow-hidden transition-[width] duration-200 ease-in-out ${
+          sidebarCollapsed ? 'w-0' : 'w-60'
+        }`}
+      >
         <Sidebar />
       </div>
       <div className="flex flex-1 flex-col overflow-hidden">

@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Info, AlertTriangle, Wrench, Sparkles, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 interface Announcement {
   id: string;
@@ -13,11 +12,36 @@ interface Announcement {
   isDismissible: boolean;
 }
 
-const TYPE_STYLE: Record<string, { icon: React.ElementType; color: string; bg: string; border: string }> = {
-  info:        { icon: Info,          color: 'text-blue-300',   bg: 'bg-blue-950/40',   border: 'border-blue-500/30' },
-  warning:     { icon: AlertTriangle, color: 'text-amber-300',  bg: 'bg-amber-950/40',  border: 'border-amber-500/30' },
-  maintenance: { icon: Wrench,        color: 'text-orange-300', bg: 'bg-orange-950/40', border: 'border-orange-500/30' },
-  feature:     { icon: Sparkles,      color: 'text-indigo-300', bg: 'bg-indigo-950/40', border: 'border-indigo-500/30' },
+const TYPE_STYLE: Record<string, {
+  icon: React.ElementType;
+  iconBg: string; iconColor: string;
+  bg: string; border: string;
+  titleColor: string; bodyColor: string;
+}> = {
+  info: {
+    icon: Info,
+    iconBg: 'var(--rp-teal-bg)', iconColor: '#23766a',
+    bg: 'var(--rp-teal-soft)', border: 'rgba(35,118,106,0.18)',
+    titleColor: '#1b342f', bodyColor: 'var(--rp-text-accent)',
+  },
+  warning: {
+    icon: AlertTriangle,
+    iconBg: 'var(--rp-amber-bg)', iconColor: '#b89040',
+    bg: '#fdf8ed', border: 'rgba(184,144,64,0.22)',
+    titleColor: '#7a5c2a', bodyColor: '#b89040',
+  },
+  maintenance: {
+    icon: Wrench,
+    iconBg: 'var(--rp-coral-bg)', iconColor: '#b8724a',
+    bg: '#fef7f3', border: 'rgba(184,114,74,0.2)',
+    titleColor: '#7a3c1a', bodyColor: '#b8724a',
+  },
+  feature: {
+    icon: Sparkles,
+    iconBg: '#1b342f', iconColor: '#dfd9d0',
+    bg: '#f0f6f5', border: 'rgba(27,52,47,0.15)',
+    titleColor: '#1b342f', bodyColor: 'var(--rp-text-accent)',
+  },
 };
 
 const DISMISSED_KEY = 'resort_dismissed_announcements';
@@ -66,27 +90,24 @@ export function PlatformBanner() {
   return (
     <div className="space-y-2 mb-4">
       {banners.map((b) => {
-        const style = TYPE_STYLE[b.type] ?? TYPE_STYLE.info;
-        const Icon = style.icon;
+        const s = TYPE_STYLE[b.type] ?? TYPE_STYLE.info;
+        const Icon = s.icon;
         return (
-          <div
-            key={b.id}
-            className={cn(
-              'flex items-start gap-3 px-4 py-3 rounded-xl border',
-              style.bg, style.border
-            )}
-          >
-            <Icon className={cn('w-4 h-4 shrink-0 mt-0.5', style.color)} />
+          <div key={b.id} className="flex items-start gap-3 rounded-[14px] border px-4 py-3"
+            style={{ background: s.bg, borderColor: s.border }}>
+            <div className="flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-[9px]"
+              style={{ background: s.iconBg }}>
+              <Icon className="h-[14px] w-[14px]" style={{ color: s.iconColor }} />
+            </div>
             <div className="flex-1 min-w-0">
-              <p className={cn('text-sm font-semibold', style.color)}>{b.title}</p>
-              <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{b.body}</p>
+              <p className="text-[13px] font-semibold leading-snug" style={{ color: s.titleColor }}>{b.title}</p>
+              <p className="text-[12px] mt-0.5 leading-relaxed" style={{ color: s.bodyColor }}>{b.body}</p>
             </div>
             {b.isDismissible && (
-              <button
-                onClick={() => dismiss(b.id)}
-                className="shrink-0 text-gray-600 hover:text-gray-300 transition-colors mt-0.5"
-              >
-                <X className="w-3.5 h-3.5" />
+              <button onClick={() => dismiss(b.id)}
+                className="flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/10"
+                style={{ color: s.bodyColor }}>
+                <X className="h-3 w-3" />
               </button>
             )}
           </div>

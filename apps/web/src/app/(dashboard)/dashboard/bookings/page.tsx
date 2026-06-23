@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useTheme } from 'next-themes';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bookingsApi, dashboardApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -43,19 +44,19 @@ type Booking = {
 };
 
 const BOOKING_STATUS_PILL: Record<string, { bg: string; border: string; text: string; label: string }> = {
-  CONFIRMED:   { bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Confirmed'   },
-  CHECKED_IN:  { bg: '#f4ecda', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'In House'    },
-  CHECKED_OUT: { bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)',      text: '#8aa29a', label: 'Checked Out' },
-  PENDING:     { bg: '#fceee4', border: 'rgba(184,114,74,0.2)',  text: '#b8724a', label: 'Pending'     },
-  CANCELLED:   { bg: '#fef2f2', border: 'rgba(200,60,60,0.15)',  text: '#c43c3c', label: 'Cancelled'   },
-  NO_SHOW:     { bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)',      text: '#8aa29a', label: 'No Show'     },
+  CONFIRMED:   { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Confirmed'   },
+  CHECKED_IN:  { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'In House'    },
+  CHECKED_OUT: { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)', label: 'Checked Out' },
+  PENDING:     { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a', label: 'Pending'     },
+  CANCELLED:   { bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)',  text: '#c43c3c', label: 'Cancelled'   },
+  NO_SHOW:     { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)', label: 'No Show'     },
 };
 
 const PAYMENT_STATUS_PILL: Record<string, { bg: string; border: string; text: string; label: string }> = {
-  PAID:        { bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Paid'        },
-  PARTIAL:     { bg: '#f4ecda', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'Partial'     },
-  PENDING:     { bg: '#fceee4', border: 'rgba(184,114,74,0.2)',  text: '#b8724a', label: 'Unpaid'      },
-  REFUNDED:    { bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)',      text: '#8aa29a', label: 'Refunded'    },
+  PAID:        { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Paid'        },
+  PARTIAL:     { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'Partial'     },
+  PENDING:     { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a', label: 'Unpaid'      },
+  REFUNDED:    { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)', label: 'Refunded'    },
 };
 
 function StatusPill({ status, map }: { status: string; map: typeof BOOKING_STATUS_PILL }) {
@@ -70,6 +71,8 @@ function StatusPill({ status, map }: { status: string; map: typeof BOOKING_STATU
 
 export default function BookingsPage() {
   const queryClient = useQueryClient();
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   const [statusFilter, setStatusFilter] = useState('');
   const [searchInput, setSearchInput]   = useState('');
   const [dateFrom, setDateFrom]         = useState('');
@@ -135,7 +138,7 @@ export default function BookingsPage() {
           <button
             onClick={() => setWalkInOpen(true)}
             className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium transition-opacity hover:opacity-80"
-            style={{ background: '#f4ecda', color: '#b89040' }}
+            style={{ background: 'var(--rp-amber-bg)', color: '#b89040' }}
           >
             <Zap className="h-[13px] w-[13px]" strokeWidth={2.3} />
             Walk-in
@@ -143,7 +146,7 @@ export default function BookingsPage() {
           <button
             onClick={() => setNewOpen(true)}
             className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
-            style={{ background: '#1b342f' }}
+            style={{ background: 'var(--rp-btn-accent)' }}
           >
             <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} />
             New Booking
@@ -160,15 +163,15 @@ export default function BookingsPage() {
           { label: 'Month Revenue',      value: stats != null ? formatCurrency(stats.monthlyRevenue) : '—', icon: TrendingUp, family: 'coral', shortcut: null },
         ].map(({ label, value, icon: Icon, family, shortcut }) => {
           const iconStyle = {
-            teal:  { bg: '#e3f2ef', color: '#23766a' },
-            gold:  { bg: '#f4ecda', color: '#b89040' },
-            coral: { bg: '#fceee4', color: '#b8724a' },
+            teal:  { bg: 'var(--rp-teal-bg)', color: '#23766a' },
+            gold:  { bg: 'var(--rp-amber-bg)', color: '#b89040' },
+            coral: { bg: 'var(--rp-coral-bg)', color: '#b8724a' },
           }[family]!;
           return (
             <div
               key={label}
-              className={`flex items-center gap-[11px] rounded-[12px] border px-[18px] py-[15px] ${shortcut !== null ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
-              style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}
+              className={`flex items-center gap-[11px] rounded-[12px] border px-[18px] py-[15px] bg-white dark:bg-white/5 ${shortcut !== null ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+              style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}
               onClick={shortcut !== null ? () => applyShortcut(DATE_SHORTCUTS[shortcut]) : undefined}
             >
               <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px]"
@@ -205,8 +208,8 @@ export default function BookingsPage() {
                 onClick={() => { setStatusFilter(s); setPage(1); }}
                 className="rounded-[8px] border px-[12px] py-[6px] text-[12px] font-medium transition-colors"
                 style={statusFilter === s
-                  ? { background: '#1b342f', color: '#dfd9d0', borderColor: '#1b342f' }
-                  : { background: '#fff', color: '#6b8880', borderColor: 'rgba(0,0,0,0.09)' }}
+                  ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', borderColor: '#1b342f' }
+                  : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', color: isDark ? '#94b8b0' : 'var(--rp-text-subtle)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)' }}
               >
                 {STATUS_LABELS[s]}
               </button>
@@ -222,8 +225,8 @@ export default function BookingsPage() {
               onClick={() => activeShortcut === s.label ? clearDateFilter() : applyShortcut(s)}
               className="rounded-[8px] border px-[12px] py-[6px] text-[12px] font-medium transition-colors"
               style={activeShortcut === s.label
-                ? { background: '#e3f2ef', color: '#23766a', borderColor: 'rgba(35,118,106,0.2)' }
-                : { background: '#fff', color: '#6b8880', borderColor: 'rgba(0,0,0,0.09)' }}
+                ? { background: 'var(--rp-teal-bg)', color: '#23766a', borderColor: 'rgba(35,118,106,0.2)' }
+                : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', color: isDark ? '#94b8b0' : 'var(--rp-text-subtle)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)' }}
             >
               {s.label}
             </button>
@@ -263,12 +266,11 @@ export default function BookingsPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-[14px] border overflow-hidden"
-        style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+      <div className="rounded-[14px] border overflow-hidden bg-white dark:bg-white/5" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
         {isLoading ? (
           <div className="space-y-px">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-[68px] animate-pulse" style={{ background: i % 2 === 0 ? '#faf9f7' : '#fff' }} />
+              <div key={i} className="h-[68px] animate-pulse" style={{ background: i % 2 === 0 ? 'var(--rp-surface-2)' : 'var(--rp-surface)' }} />
             ))}
           </div>
         ) : bookings.length === 0 ? (
@@ -288,7 +290,7 @@ export default function BookingsPage() {
               <button
                 onClick={() => setNewOpen(true)}
                 className="mt-1 flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0]"
-                style={{ background: '#1b342f' }}
+                style={{ background: 'var(--rp-btn-accent)' }}
               >
                 <Plus className="h-[13px] w-[13px]" /> New Booking
               </button>
@@ -299,7 +301,7 @@ export default function BookingsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]"
-                  style={{ borderColor: 'rgba(0,0,0,0.05)', background: '#faf9f7' }}>
+                  style={{ borderColor: 'var(--rp-border)', background: 'var(--rp-surface-2)' }}>
                   <th className="px-5 py-3 text-left">Confirmation</th>
                   <th className="px-5 py-3 text-left">Guest</th>
                   <th className="px-5 py-3 text-left">Room</th>
@@ -314,7 +316,7 @@ export default function BookingsPage() {
                 {bookings.map((booking, idx) => (
                   <tr
                     key={booking.id}
-                    className="cursor-pointer border-b transition-colors hover:bg-[#faf9f7]"
+                    className="cursor-pointer border-b transition-colors hover:bg-[#faf9f7] dark:hover:bg-white/5 dark:hover:bg-white/5"
                     style={{ borderColor: 'rgba(0,0,0,0.04)' }}
                     onClick={() => setSelectedBooking(booking)}
                   >
@@ -361,7 +363,7 @@ export default function BookingsPage() {
                       {booking.status === 'CONFIRMED' && (
                         <button
                           className="rounded-[7px] border px-[10px] py-[5px] text-[11.5px] font-medium transition-colors hover:opacity-80"
-                          style={{ background: '#e3f2ef', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}
+                          style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}
                           onClick={(e) => { e.stopPropagation(); setSelectedBooking(booking); }}
                         >
                           Check In
@@ -370,7 +372,7 @@ export default function BookingsPage() {
                       {booking.status === 'CHECKED_IN' && (
                         <button
                           className="rounded-[7px] border px-[10px] py-[5px] text-[11.5px] font-medium transition-colors hover:opacity-80"
-                          style={{ background: '#f4ecda', borderColor: 'rgba(184,144,64,0.2)', color: '#b89040' }}
+                          style={{ background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.2)', color: '#b89040' }}
                           onClick={(e) => { e.stopPropagation(); setSelectedBooking(booking); }}
                         >
                           Check Out
@@ -395,8 +397,7 @@ export default function BookingsPage() {
             <button
               disabled={page === 1}
               onClick={() => setPage(p => p - 1)}
-              className="rounded-[8px] border px-4 py-[7px] text-[12.5px] font-medium transition-colors disabled:opacity-40"
-              style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.09)', color: '#18231f' }}
+              className="rounded-[8px] border px-4 py-[7px] text-[12.5px] font-medium transition-colors disabled:opacity-40 bg-white dark:bg-white/5" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text)' }}
             >
               Previous
             </button>
@@ -404,7 +405,7 @@ export default function BookingsPage() {
               disabled={page === pagination.totalPages}
               onClick={() => setPage(p => p + 1)}
               className="rounded-[8px] border px-4 py-[7px] text-[12.5px] font-medium transition-colors disabled:opacity-40"
-              style={{ background: '#1b342f', borderColor: '#1b342f', color: '#dfd9d0' }}
+              style={{ background: 'var(--rp-btn-accent)', borderColor: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}
             >
               Next
             </button>

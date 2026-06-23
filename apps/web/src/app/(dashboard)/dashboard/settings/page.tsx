@@ -339,7 +339,7 @@ export default function SettingsPage() {
       {/* Tenant Info Banner */}
       {tenant && (
         <div className="flex items-center gap-3 rounded-[10px] border px-5 py-3"
-          style={{ background: '#e3f2ef', borderColor: 'rgba(35,118,106,0.18)' }}>
+          style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.18)' }}>
           <Info className="h-4 w-4 shrink-0" style={{ color: '#23766a' }} />
           <p className="text-[13px]" style={{ color: '#23766a' }}>
             Managing <strong>{tenant.name}</strong> — slug:{' '}
@@ -366,8 +366,8 @@ export default function SettingsPage() {
                     onClick={() => setTab(id)}
                     className="flex items-center gap-2.5 rounded-[8px] px-3 py-[8px] text-[13px] font-medium transition-colors text-left w-full"
                     style={tab === id
-                      ? { background: '#e3f2ef', color: '#23766a' }
-                      : { color: '#6b8880' }}
+                      ? { background: 'var(--rp-teal-bg)', color: '#23766a' }
+                      : { color: 'var(--rp-text-subtle)' }}
                   >
                     <Icon className="h-[15px] w-[15px] flex-shrink-0"
                       style={{ color: tab === id ? '#23766a' : '#9bbdb7' }} />

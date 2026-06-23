@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X, Camera, Upload, Loader2, CheckCircle2, AlertCircle,
   ScanLine, RefreshCw, User, CreditCard,
@@ -48,6 +49,7 @@ const FIELD_LABELS: Record<keyof ScannedFields, string> = {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function IdScanModal({ guestId, guestName, onConfirm, onClose }: IdScanModalProps) {
+  const [mounted,    setMounted]    = useState(false);
   const [step,       setStep]       = useState<Step>('capture');
   const [docType,    setDocType]    = useState('PASSPORT');
   const [preview,    setPreview]    = useState<string | null>(null);
@@ -64,6 +66,12 @@ export function IdScanModal({ guestId, guestName, onConfirm, onClose }: IdScanMo
   const videoRef  = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    if (mounted) document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, [mounted]);
 
   // ── Camera helpers ────────────────────────────────────────────────────────
 
@@ -163,7 +171,9 @@ export function IdScanModal({ guestId, guestName, onConfirm, onClose }: IdScanMo
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
 
@@ -359,6 +369,7 @@ export function IdScanModal({ guestId, guestName, onConfirm, onClose }: IdScanMo
 
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

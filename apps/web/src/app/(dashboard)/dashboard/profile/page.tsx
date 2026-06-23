@@ -10,14 +10,14 @@ import {
 import { ImageUpload } from '@/components/ui/ImageUpload';
 
 const ROLE_CONFIG: Record<string, { label: string; bg: string; border: string; text: string }> = {
-  OWNER:        { label: 'Owner',        bg: '#f4ecda', border: 'rgba(184,144,64,0.25)',   text: '#b89040' },
-  MANAGER:      { label: 'Manager',      bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)',    text: '#23766a' },
-  SHAREHOLDER:  { label: 'Shareholder',  bg: '#f4ecda', border: 'rgba(184,144,64,0.25)',   text: '#b89040' },
-  RECEPTIONIST: { label: 'Receptionist', bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)',    text: '#23766a' },
-  MARKETER:     { label: 'Marketer',     bg: '#fceee4', border: 'rgba(184,114,74,0.2)',    text: '#b8724a' },
-  DEVELOPER:    { label: 'Developer',    bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)',         text: '#6b8880' },
-  STAFF:        { label: 'Staff',        bg: '#fceee4', border: 'rgba(184,114,74,0.2)',    text: '#b8724a' },
-  GUEST:        { label: 'Guest',        bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)',         text: '#8aa29a' },
+  OWNER:        { label: 'Owner',        bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.25)',   text: '#b89040' },
+  MANAGER:      { label: 'Manager',      bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',    text: '#23766a' },
+  SHAREHOLDER:  { label: 'Shareholder',  bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.25)',   text: '#b89040' },
+  RECEPTIONIST: { label: 'Receptionist', bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',    text: '#23766a' },
+  MARKETER:     { label: 'Marketer',     bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',    text: '#b8724a' },
+  DEVELOPER:    { label: 'Developer',    bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',         text: 'var(--rp-text-subtle)' },
+  STAFF:        { label: 'Staff',        bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',    text: '#b8724a' },
+  GUEST:        { label: 'Guest',        bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',         text: 'var(--rp-text-muted)' },
 };
 
 const AVATAR_COLORS = [
@@ -25,7 +25,7 @@ const AVATAR_COLORS = [
   { bg: '#1b342f', id: 'dark' },
   { bg: '#d4a853', id: 'gold' },
   { bg: '#b8724a', id: 'coral' },
-  { bg: '#4a6e66', id: 'sage' },
+  { bg: 'var(--rp-text-accent)', id: 'sage' },
   { bg: '#7a5c2a', id: 'brown' },
 ];
 
@@ -36,7 +36,7 @@ function getInitials(first: string, last: string) {
 const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#8aa29a] focus:outline-none focus:ring-1 focus:ring-resort-600/20 transition-colors';
 const labelCls = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
 const cardCls  = 'rounded-[14px] border bg-white p-6 space-y-5';
-const cardStyle = { borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' };
+const cardStyle = { borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' };
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuthStore();
@@ -174,10 +174,10 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <div className="border-t" style={{ borderColor: 'rgba(0,0,0,0.05)' }} />
+        <div className="border-t" style={{ borderColor: 'var(--rp-border)' }} />
 
         {/* Photo upload */}
-        <div className="rounded-[10px] p-4 space-y-3" style={{ background: '#faf9f7', border: '1px solid rgba(0,0,0,0.04)' }}>
+        <div className="rounded-[10px] p-4 space-y-3" style={{ background: 'var(--rp-surface-2)', border: '1px solid rgba(0,0,0,0.04)' }}>
           <p className="text-[11.5px] font-medium text-[#6b8880]">Profile photo</p>
           <ImageUpload
             value={avatarUrl || null}
@@ -214,7 +214,7 @@ export default function ProfilePage() {
       {/* Personal info */}
       <div className={cardCls} style={cardStyle}>
         <div className="flex items-center gap-2">
-          <div className="flex h-[30px] w-[30px] items-center justify-center rounded-[8px]" style={{ background: '#e3f2ef' }}>
+          <div className="flex h-[30px] w-[30px] items-center justify-center rounded-[8px]" style={{ background: 'var(--rp-teal-bg)' }}>
             <User className="h-[13px] w-[13px]" style={{ color: '#23766a' }} />
           </div>
           <h3 className="text-[14px] font-semibold text-[#18231f]">Personal Information</h3>
@@ -262,7 +262,7 @@ export default function ProfilePage() {
             onClick={handleSaveProfile}
             disabled={savingProfile}
             className="flex items-center gap-1.5 rounded-[9px] px-5 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80 disabled:opacity-50"
-            style={{ background: '#1b342f' }}
+            style={{ background: 'var(--rp-btn-accent)' }}
           >
             {savingProfile ? 'Saving…' : 'Save Changes'}
           </button>
@@ -272,7 +272,7 @@ export default function ProfilePage() {
       {/* Change password */}
       <div className={cardCls} style={cardStyle}>
         <div className="flex items-center gap-2">
-          <div className="flex h-[30px] w-[30px] items-center justify-center rounded-[8px]" style={{ background: '#f4ecda' }}>
+          <div className="flex h-[30px] w-[30px] items-center justify-center rounded-[8px]" style={{ background: 'var(--rp-amber-bg)' }}>
             <Lock className="h-[13px] w-[13px]" style={{ color: '#b89040' }} />
           </div>
           <h3 className="text-[14px] font-semibold text-[#18231f]">Change Password</h3>
@@ -337,9 +337,9 @@ export default function ProfilePage() {
                   { check: pwdChecks.number,    label: 'One number' },
                 ].map(({ check, label }) => (
                   <p key={label} className="flex items-center gap-1.5 text-[12px]"
-                    style={{ color: check ? '#23766a' : '#8aa29a' }}>
+                    style={{ color: check ? '#23766a' : 'var(--rp-text-muted)' }}>
                     <CheckCircle2 className="h-[11px] w-[11px]"
-                      style={{ color: check ? '#23766a' : '#c5bdb4' }} />
+                      style={{ color: check ? '#23766a' : 'var(--rp-text-faint)' }} />
                     {label}
                   </p>
                 ))}
@@ -373,7 +373,7 @@ export default function ProfilePage() {
             onClick={handleChangePassword}
             disabled={savingPwd || !currentPwd || !newPwd || !confirmPwd}
             className="shrink-0 flex items-center gap-1.5 rounded-[9px] border px-5 py-[8px] text-[13px] font-medium transition-colors disabled:opacity-40"
-            style={{ borderColor: 'rgba(35,118,106,0.3)', color: '#23766a', background: '#e3f2ef' }}
+            style={{ borderColor: 'rgba(35,118,106,0.3)', color: '#23766a', background: 'var(--rp-teal-bg)' }}
           >
             {savingPwd ? 'Changing…' : 'Change Password'}
           </button>

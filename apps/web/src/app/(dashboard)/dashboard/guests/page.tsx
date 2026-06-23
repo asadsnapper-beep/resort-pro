@@ -77,7 +77,7 @@ export default function GuestsPage() {
         <button
           onClick={() => setAddOpen(true)}
           className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
-          style={{ background: '#1b342f' }}
+          style={{ background: 'var(--rp-btn-accent)' }}
         >
           <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} />
           Add Guest
@@ -87,12 +87,11 @@ export default function GuestsPage() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Total Guests',   value: total,       icon: Users, bg: '#e3f2ef', color: '#23766a' },
-          { label: 'With Phone',     value: withPhone,   icon: Phone, bg: '#f4ecda', color: '#b89040' },
-          { label: 'Nationalities',  value: nationalities, icon: Globe, bg: '#fceee4', color: '#b8724a' },
+          { label: 'Total Guests',   value: total,       icon: Users, bg: 'var(--rp-teal-bg)', color: '#23766a' },
+          { label: 'With Phone',     value: withPhone,   icon: Phone, bg: 'var(--rp-amber-bg)', color: '#b89040' },
+          { label: 'Nationalities',  value: nationalities, icon: Globe, bg: 'var(--rp-coral-bg)', color: '#b8724a' },
         ].map(({ label, value, icon: Icon, bg, color }) => (
-          <div key={label} className="flex items-center gap-[11px] rounded-[12px] border px-[18px] py-[15px]"
-            style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+          <div key={label} className="flex items-center gap-[11px] rounded-[12px] border px-[18px] py-[15px] bg-white dark:bg-white/5" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
             <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px]" style={{ background: bg }}>
               <Icon className="h-[14px] w-[14px]" strokeWidth={2} style={{ color }} />
             </div>
@@ -116,12 +115,11 @@ export default function GuestsPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-[14px] border overflow-hidden"
-        style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+      <div className="rounded-[14px] border overflow-hidden bg-white dark:bg-white/5" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
         {isLoading ? (
           <div className="space-y-px">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-[68px] animate-pulse" style={{ background: i % 2 === 0 ? '#faf9f7' : '#fff' }} />
+              <div key={i} className="h-[68px] animate-pulse" style={{ background: i % 2 === 0 ? 'var(--rp-surface-2)' : 'var(--rp-surface)' }} />
             ))}
           </div>
         ) : guests.length === 0 ? (
@@ -137,7 +135,7 @@ export default function GuestsPage() {
               <button
                 onClick={() => setAddOpen(true)}
                 className="mt-1 flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0]"
-                style={{ background: '#1b342f' }}
+                style={{ background: 'var(--rp-btn-accent)' }}
               >
                 <Plus className="h-[13px] w-[13px]" /> Add Guest
               </button>
@@ -148,7 +146,7 @@ export default function GuestsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]"
-                  style={{ borderColor: 'rgba(0,0,0,0.05)', background: '#faf9f7' }}>
+                  style={{ borderColor: 'var(--rp-border)', background: 'var(--rp-surface-2)' }}>
                   <th className="px-5 py-3 text-left">Guest</th>
                   <th className="px-5 py-3 text-left">Contact</th>
                   <th className="px-5 py-3 text-left">Nationality</th>
@@ -160,7 +158,7 @@ export default function GuestsPage() {
                 {guests.map((guest) => (
                   <tr
                     key={guest.id}
-                    className="cursor-pointer border-b transition-colors hover:bg-[#faf9f7]"
+                    className="cursor-pointer border-b transition-colors hover:bg-[#faf9f7] dark:hover:bg-white/5"
                     style={{ borderColor: 'rgba(0,0,0,0.04)' }}
                     onClick={() => setSelectedGuest(guest)}
                   >
@@ -221,8 +219,7 @@ export default function GuestsPage() {
             <button
               disabled={page === 1}
               onClick={() => setPage(p => p - 1)}
-              className="flex items-center gap-1 rounded-[8px] border px-4 py-[7px] text-[12.5px] font-medium transition-colors disabled:opacity-40"
-              style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.09)', color: '#18231f' }}
+              className="flex items-center gap-1 rounded-[8px] border px-4 py-[7px] text-[12.5px] font-medium transition-colors disabled:opacity-40 bg-white dark:bg-white/5" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text)' }}
             >
               <ChevronLeft className="h-3.5 w-3.5" /> Previous
             </button>
@@ -230,7 +227,7 @@ export default function GuestsPage() {
               disabled={page === pagination.totalPages}
               onClick={() => setPage(p => p + 1)}
               className="flex items-center gap-1 rounded-[8px] border px-4 py-[7px] text-[12.5px] font-medium transition-colors disabled:opacity-40"
-              style={{ background: '#1b342f', borderColor: '#1b342f', color: '#dfd9d0' }}
+              style={{ background: 'var(--rp-btn-accent)', borderColor: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}
             >
               Next <ChevronRight className="h-3.5 w-3.5" />
             </button>

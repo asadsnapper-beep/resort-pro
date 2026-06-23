@@ -1,8 +1,7 @@
 'use client';
 
-'use client';
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X, CalendarDays, Users, CreditCard, BedDouble, MessageSquare,
   XCircle, LogIn, LogOut, Plus, Link2, CheckCircle2, Clock, AlertTriangle,
@@ -10,9 +9,6 @@ import {
 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { bookingsApi, bookingPaymentApi, packagesApi, guestsApi } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { StatusBadge } from '@/components/ui/badge';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -152,9 +148,28 @@ function ConfirmModal({
 
           {/* Actions */}
           <div className="px-5 pb-5 flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={onCancel} disabled={loading}>
+            <button
+              onClick={onCancel}
+              disabled={loading}
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                borderRadius: '9px',
+                border: '1px solid rgba(0,0,0,0.08)',
+                background: 'transparent',
+                color: 'var(--rp-text-subtle)',
+                fontSize: '13px',
+                fontWeight: 500,
+                padding: '9px 12px',
+                cursor: 'pointer',
+                opacity: loading ? 0.6 : 1,
+              }}
+            >
               Cancel
-            </Button>
+            </button>
             <button
               onClick={onConfirm}
               disabled={loading}
@@ -228,13 +243,47 @@ function ConfirmModal({
 
         {/* Actions */}
         <div className="px-5 pb-5 flex gap-2">
-          <Button variant="outline" className="flex-1" onClick={onCancel} disabled={loading}>
+          <button
+            onClick={onCancel}
+            disabled={loading}
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              borderRadius: '9px',
+              border: '1px solid rgba(0,0,0,0.08)',
+              background: 'transparent',
+              color: 'var(--rp-text-subtle)',
+              fontSize: '13px',
+              fontWeight: 500,
+              padding: '9px 12px',
+              cursor: 'pointer',
+              opacity: loading ? 0.6 : 1,
+            }}
+          >
             Cancel
-          </Button>
+          </button>
           <button
             onClick={onConfirm}
             disabled={loading}
-            className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-2 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              borderRadius: '9px',
+              border: 'none',
+              background: '#4f46e5',
+              color: 'var(--rp-surface)',
+              fontSize: '13px',
+              fontWeight: 500,
+              padding: '9px 12px',
+              cursor: 'pointer',
+              opacity: loading ? 0.6 : 1,
+            }}
           >
             {loading ? <Clock className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
             {loading ? 'Checking out…' : 'Check Out'}
@@ -414,11 +463,20 @@ function PackagesSection({ booking }: { booking: Booking }) {
 export function BookingDetailSheet({ booking, onClose }: Props) {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const [isMounted, setIsMounted] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [payAmount, setPayAmount] = useState('');
   const [payMethod, setPayMethod] = useState('CASH');
   const [confirmModal, setConfirmModal] = useState<'checkin' | 'checkout' | null>(null);
   const [showIdScan,   setShowIdScan]   = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
 
   const checkInMutation = useMutation({
     mutationFn: () => bookingsApi.checkIn(booking!.id),
@@ -483,7 +541,9 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
   const isCheckedOut = booking.status === 'CHECKED_OUT';
   const isConfirmed  = booking.status === 'CONFIRMED';
 
-  return (
+  if (!isMounted) return null;
+
+  const sheetContent = (
     <>
       <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm" onClick={onClose} />
       <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white dark:bg-gray-900 shadow-2xl">
@@ -495,7 +555,19 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
             <p className="text-xs text-gray-400">Created {formatDate(booking.createdAt)}</p>
           </div>
           <div className="flex items-center gap-2">
-            <StatusBadge status={booking.status} />
+            <span
+              style={{
+                display: 'inline-block',
+                borderRadius: '6px',
+                background: booking.status === 'CONFIRMED' ? '#dbeafe' : booking.status === 'CHECKED_IN' ? '#d1fae5' : booking.status === 'CHECKED_OUT' ? '#e5e7eb' : '#fef3c7',
+                color: booking.status === 'CONFIRMED' ? '#0c4a6e' : booking.status === 'CHECKED_IN' ? '#065f46' : booking.status === 'CHECKED_OUT' ? '#374151' : '#92400e',
+                fontSize: '12px',
+                fontWeight: 600,
+                padding: '4px 8px',
+              }}
+            >
+              {booking.status === 'CONFIRMED' ? 'Confirmed' : booking.status === 'CHECKED_IN' ? 'Checked In' : booking.status === 'CHECKED_OUT' ? 'Checked Out' : 'Pending'}
+            </span>
             <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
               <X className="h-5 w-5" />
             </button>
@@ -647,7 +719,19 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
                   <CreditCard className="h-4 w-4" /> Payment
                 </h3>
-                <StatusBadge status={booking.paymentStatus} />
+                <span
+                  style={{
+                    display: 'inline-block',
+                    borderRadius: '6px',
+                    background: booking.paymentStatus === 'PAID' ? '#d1fae5' : booking.paymentStatus === 'PARTIAL' ? '#fef3c7' : '#fee2e2',
+                    color: booking.paymentStatus === 'PAID' ? '#065f46' : booking.paymentStatus === 'PARTIAL' ? '#92400e' : '#991b1b',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    padding: '4px 8px',
+                  }}
+                >
+                  {booking.paymentStatus === 'PAID' ? 'Paid' : booking.paymentStatus === 'PARTIAL' ? 'Partial' : 'Unpaid'}
+                </span>
               </div>
 
               <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4 space-y-3">
@@ -712,7 +796,22 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="mb-1 block text-xs text-gray-600">Amount</label>
-                      <Input value={payAmount} onChange={e => setPayAmount(e.target.value)} type="number" step="0.01" />
+                      <input
+                        value={payAmount}
+                        onChange={e => setPayAmount(e.target.value)}
+                        type="number"
+                        step="0.01"
+                        style={{
+                          width: '100%',
+                          borderRadius: '8px',
+                          border: '1px solid rgba(0,0,0,0.05)',
+                          background: 'var(--rp-surface-3)',
+                          padding: '9px 12px',
+                          fontSize: '13px',
+                          color: 'var(--rp-text)',
+                          outline: 'none',
+                        }}
+                      />
                     </div>
                     <div>
                       <label className="mb-1 block text-xs text-gray-600">Method</label>
@@ -726,10 +825,44 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" loading={addPayment.isPending} onClick={() => addPayment.mutate()} disabled={!payAmount}>
+                    <button
+                      onClick={() => addPayment.mutate()}
+                      disabled={!payAmount || addPayment.isPending}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: 'var(--rp-btn-accent)',
+                        color: 'var(--rp-btn-accent-text)',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        padding: '6px 10px',
+                        cursor: 'pointer',
+                        opacity: !payAmount || addPayment.isPending ? 0.6 : 1,
+                      }}
+                    >
                       Save
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => setShowPayment(false)}>Cancel</Button>
+                    </button>
+                    <button
+                      onClick={() => setShowPayment(false)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(0,0,0,0.08)',
+                        background: 'transparent',
+                        color: 'var(--rp-text-subtle)',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        padding: '6px 10px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Cancel
+                    </button>
                   </div>
                 </div>
               )}
@@ -769,14 +902,28 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
             </button>
           )}
           {['PENDING', 'CONFIRMED'].includes(booking.status) && (
-            <Button
-              variant="outline"
-              className="w-full gap-2 text-red-600 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-900/20"
+            <button
               onClick={() => cancel.mutate()}
-              loading={cancel.isPending}
+              disabled={cancel.isPending}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                borderRadius: '9px',
+                border: '1px solid #fee2e2',
+                background: 'transparent',
+                color: '#dc2626',
+                fontSize: '13px',
+                fontWeight: 500,
+                padding: '9px 12px',
+                cursor: 'pointer',
+                opacity: cancel.isPending ? 0.6 : 1,
+              }}
             >
               <XCircle className="h-4 w-4" /> Cancel Booking
-            </Button>
+            </button>
           )}
           {isCheckedOut && (
             <div className="flex items-center justify-center gap-2 text-sm text-emerald-600">
@@ -786,13 +933,26 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
           )}
           {(isCheckedIn || isCheckedOut) && (
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                className="flex-1 gap-2 text-resort-600 border-resort-200 hover:bg-resort-50 dark:border-resort-900 dark:hover:bg-resort-900/20"
+              <button
                 onClick={() => { onClose(); router.push(`/dashboard/bookings/${booking.id}/invoice`); }}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  borderRadius: '9px',
+                  border: '1px solid #d1e5e0',
+                  background: 'transparent',
+                  color: '#1a6b5e',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  padding: '9px 12px',
+                  cursor: 'pointer',
+                }}
               >
                 <FileText className="h-4 w-4" /> View Invoice
-              </Button>
+              </button>
               <PrintReceiptButton bookingId={booking.id} />
             </div>
           )}
@@ -811,4 +971,6 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
       )}
     </>
   );
+
+  return createPortal(sheetContent, document.body);
 }

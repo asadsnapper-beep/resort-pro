@@ -105,14 +105,14 @@ export function ConfigThemeRenderer({ data, config: rawConfig }: ConfigThemeProp
         || hexLum(config.colors.background) > 0.75
 
   const navBg     = isSolid ? primary : scrolled ? 'rgba(255,255,255,0.97)' : 'transparent'
-  const navColor  = isSolid ? '#ffffff'
+  const navColor  = isSolid ? 'var(--rp-surface)'
     : scrolled         ? '#111827'
     : needsDarkNav     ? '#1a1a2e'
     : 'rgba(255,255,255,0.95)'
-  const logoColor = isSolid ? '#ffffff'
+  const logoColor = isSolid ? 'var(--rp-surface)'
     : scrolled         ? primary
     : needsDarkNav     ? primary
-    : '#ffffff'
+    : 'var(--rp-surface)'
   const navShadow = scrolled && !isSolid ? '0 2px 16px rgba(0,0,0,0.10)' : 'none'
   const showScrim = !isSolid && !scrolled && !needsDarkNav  // only add scrim when white text is used
 

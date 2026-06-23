@@ -13,8 +13,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Camera, CameraOff, RefreshCw, X, RotateCcw, Check, Upload, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { guestsApi } from '@/lib/api';
 
@@ -46,6 +46,7 @@ export function DocumentScannerModal({ guestId, guestName, onClose, onUploaded }
   const canvasRef  = useRef<HTMLCanvasElement>(null);
   const streamRef  = useRef<MediaStream | null>(null);
 
+  const [isMounted, setIsMounted] = useState(false);
   const [step, setStep]               = useState<Step>('preview');
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
   const [capturedUrl, setCapturedUrl]   = useState<string | null>(null);
@@ -92,10 +93,13 @@ export function DocumentScannerModal({ guestId, guestName, onClose, onUploaded }
 
   // Start camera on mount
   useEffect(() => {
+    setIsMounted(true);
+    document.body.style.overflow = 'hidden';
     startCamera(facingMode);
     return () => {
       streamRef.current?.getTracks().forEach(t => t.stop());
       if (capturedUrl) URL.revokeObjectURL(capturedUrl);
+      document.body.style.overflow = '';
     };
   }, []);
 
@@ -168,7 +172,9 @@ export function DocumentScannerModal({ guestId, guestName, onClose, onUploaded }
   };
 
   // ── Render ──────────────────────────────────────────────────────────────────
-  return (
+  if (!isMounted) return null;
+
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
       <div className="w-full max-w-lg rounded-2xl bg-gray-950 text-white overflow-hidden shadow-2xl">
 
@@ -218,10 +224,24 @@ export function DocumentScannerModal({ guestId, guestName, onClose, onUploaded }
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
                   <CameraOff className="h-10 w-10 text-white/30" />
                   <p className="text-sm text-white/50">{cameraError}</p>
-                  <Button variant="outline" size="sm" onClick={() => startCamera(facingMode)}
-                    className="border-white/20 text-white hover:bg-white/10">
-                    <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Try again
-                  </Button>
+                  <button
+                    onClick={() => startCamera(facingMode)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      borderRadius: '9px',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      background: 'transparent',
+                      color: 'var(--rp-surface)',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      padding: '9px 12px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" /> Try again
+                  </button>
                 </div>
               ) : (
                 <video
@@ -300,19 +320,46 @@ export function DocumentScannerModal({ guestId, guestName, onClose, onUploaded }
 
           {step === 'captured' && (
             <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1 border-white/20 text-white hover:bg-white/10"
+              <button
                 onClick={retake}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  borderRadius: '9px',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  background: 'transparent',
+                  color: 'var(--rp-surface)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  padding: '9px 12px',
+                  cursor: 'pointer',
+                }}
               >
-                <RotateCcw className="h-4 w-4 mr-1.5" /> Retake
-              </Button>
-              <Button
-                className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white"
+                <RotateCcw className="h-4 w-4" /> Retake
+              </button>
+              <button
                 onClick={upload}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  borderRadius: '9px',
+                  border: 'none',
+                  background: '#059669',
+                  color: 'var(--rp-surface)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  padding: '9px 12px',
+                  cursor: 'pointer',
+                }}
               >
-                <Upload className="h-4 w-4 mr-1.5" /> Use This
-              </Button>
+                <Upload className="h-4 w-4" /> Use This
+              </button>
             </div>
           )}
 
@@ -324,15 +371,30 @@ export function DocumentScannerModal({ guestId, guestName, onClose, onUploaded }
           )}
 
           {step === 'done' && (
-            <Button
-              className="w-full bg-resort-600 hover:bg-resort-500 text-white"
+            <button
               onClick={onClose}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                borderRadius: '9px',
+                border: 'none',
+                background: '#1a6b5e',
+                color: 'var(--rp-surface)',
+                fontSize: '13px',
+                fontWeight: 500,
+                padding: '9px 12px',
+                cursor: 'pointer',
+              }}
             >
-              <Check className="h-4 w-4 mr-1.5" /> Done
-            </Button>
+              <Check className="h-4 w-4" /> Done
+            </button>
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

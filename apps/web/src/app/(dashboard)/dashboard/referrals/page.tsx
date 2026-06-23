@@ -5,55 +5,55 @@ import { useQuery } from '@tanstack/react-query';
 import { tenantApi } from '@/lib/api';
 import {
   Gift, Link2, Copy, Check, Users, Clock, Award,
-  Share2, MessageCircle, Mail, ExternalLink, Loader2,
-  ChevronRight, Sparkles, CreditCard,
+  Share2, MessageCircle, Mail, ExternalLink, Loader2, Sparkles, CreditCard,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
-/* ── Types ─────────────────────────────────────────────────────────────────── */
 interface ReferralEntry {
   id: string;
   status: 'PENDING' | 'REWARDED' | 'NO_REWARD';
-  rewardType: string | null;
-  rewardAmount: number | null;
-  rewardPlan: string | null;
-  rewardMonths: number | null;
-  rewardNote: string | null;
-  rewardedAt: string | null;
+  rewardType: string | null; rewardAmount: number | null;
+  rewardPlan: string | null; rewardMonths: number | null;
+  rewardNote: string | null; rewardedAt: string | null;
   createdAt: string;
-  referred: {
-    name: string;
-    slug: string;
-    plan: string;
-    planStatus: string;
-    createdAt: string;
-  };
+  referred: { name: string; slug: string; plan: string; planStatus: string; createdAt: string };
 }
 
 interface ReferralData {
-  referralCode: string | null;
-  referralLink: string | null;
-  accountCredit: number;
-  freeUntil: string | null;
+  referralCode: string | null; referralLink: string | null;
+  accountCredit: number; freeUntil: string | null;
   stats: { total: number; rewarded: number; pending: number };
   referrals: ReferralEntry[];
 }
 
-/* ── Helpers ───────────────────────────────────────────────────────────────── */
-function statusBadge(status: ReferralEntry['status']) {
-  if (status === 'REWARDED')   return <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20">Rewarded</span>;
-  if (status === 'NO_REWARD')  return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-700/50 text-gray-500 border border-gray-700">No reward</span>;
-  return <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1"><Clock className="h-3 w-3" /> Pending</span>;
+function StatusPill({ status }: { status: ReferralEntry['status'] }) {
+  if (status === 'REWARDED') return (
+    <span className="inline-flex items-center gap-1 rounded-[7px] border px-[8px] py-[3px] text-[11px] font-semibold"
+      style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+      <Award className="h-3 w-3" /> Rewarded
+    </span>
+  );
+  if (status === 'NO_REWARD') return (
+    <span className="inline-flex items-center gap-1 rounded-[7px] border px-[8px] py-[3px] text-[11px] font-semibold"
+      style={{ background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-muted)' }}>
+      No reward
+    </span>
+  );
+  return (
+    <span className="inline-flex items-center gap-1 rounded-[7px] border px-[8px] py-[3px] text-[11px] font-semibold"
+      style={{ background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.2)', color: '#b89040' }}>
+      <Clock className="h-3 w-3" /> Pending
+    </span>
+  );
 }
 
 function rewardDescription(r: ReferralEntry) {
   if (!r.rewardType || r.rewardType === 'NONE') return '—';
-  if (r.rewardType === 'CREDIT') return `৳${r.rewardAmount?.toLocaleString()} account credit`;
+  if (r.rewardType === 'CREDIT')    return `৳${r.rewardAmount?.toLocaleString()} account credit`;
   if (r.rewardType === 'FREE_PLAN') return `${r.rewardMonths} months ${r.rewardPlan} free`;
   return '—';
 }
 
-/* ══════════════════════════════════════════════════════════════════════════ */
 export default function ReferralsPage() {
   const [copied, setCopied] = useState(false);
 
@@ -79,52 +79,61 @@ export default function ReferralsPage() {
   };
 
   const shareEmail = () => {
-    const sub = encodeURIComponent('ResortPro-তে যোগ দিন');
-    const body = encodeURIComponent(`আমি ResortPro ব্যবহার করছি এবং আপনাকেও সুপারিশ করতে চাই। আমার referral link দিয়ে signup করলে আপনি বিশেষ সুবিধা পেতে পারেন:\n\n${link}`);
+    const sub  = encodeURIComponent('ResortPro-তে যোগ দিন');
+    const body = encodeURIComponent(
+      `আমি ResortPro ব্যবহার করছি এবং আপনাকেও সুপারিশ করতে চাই। আমার referral link দিয়ে signup করলে আপনি বিশেষ সুবিধা পেতে পারেন:\n\n${link}`
+    );
     window.open(`mailto:?subject=${sub}&body=${body}`);
   };
 
   if (isLoading) return (
-    <div className="flex items-center justify-center h-64">
-      <Loader2 className="h-8 w-8 animate-spin text-resort-500" />
+    <div className="flex h-64 items-center justify-center">
+      <Loader2 className="h-7 w-7 animate-spin" style={{ color: '#9bbdb7' }} />
     </div>
   );
 
   return (
-    <div className="max-w-3xl space-y-6">
-
+    <div className="max-w-3xl space-y-6 animate-fade-up">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-          <Gift className="h-6 w-6 text-resort-600" /> Referral Program
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Share your link — যে resort signup করবে তার জন্য admin reward দেবে।
-        </p>
+      <div className="flex items-center gap-3">
+        <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px]" style={{ background: 'var(--rp-teal-bg)' }}>
+          <Gift className="h-4 w-4" style={{ color: '#23766a' }} />
+        </div>
+        <div>
+          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f] dark:text-[#dfd9d0]">
+            Referral Program
+          </h1>
+          <p className="text-[13px] text-[#7a9890] dark:text-[#94b8b0]">
+            Share your link — যে resort signup করবে তার জন্য admin reward দেবে।
+          </p>
+        </div>
       </div>
 
-      {/* Account credit / free plan banner */}
+      {/* Reward banners */}
       {(d?.accountCredit ?? 0) > 0 && (
-        <div className="flex items-center gap-3 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 rounded-2xl px-5 py-4">
-          <CreditCard className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
+        <div className="flex items-center gap-3 rounded-[12px] border px-5 py-4"
+          style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)' }}>
+          <CreditCard className="h-5 w-5 shrink-0" style={{ color: '#23766a' }} />
           <div>
-            <p className="font-semibold text-green-700 dark:text-green-300">
+            <p className="text-[13px] font-semibold" style={{ color: '#1b342f' }}>
               Account Credit: ৳{d!.accountCredit.toLocaleString()}
             </p>
-            <p className="text-xs text-green-600 dark:text-green-500 mt-0.5">
+            <p className="text-[12px] mt-0.5 text-[#4a6e66] dark:text-[#6d9990]">
               পরের invoice থেকে automatically deduct হবে।
             </p>
           </div>
         </div>
       )}
+
       {d?.freeUntil && new Date(d.freeUntil) > new Date() && (
-        <div className="flex items-center gap-3 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 rounded-2xl px-5 py-4">
-          <Sparkles className="h-5 w-5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+        <div className="flex items-center gap-3 rounded-[12px] border px-5 py-4"
+          style={{ background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.2)' }}>
+          <Sparkles className="h-5 w-5 shrink-0" style={{ color: '#b89040' }} />
           <div>
-            <p className="font-semibold text-indigo-700 dark:text-indigo-300">
+            <p className="text-[13px] font-semibold" style={{ color: '#7a5a1a' }}>
               Free Plan Active — until {new Date(d.freeUntil).toLocaleDateString('en-GB', { dateStyle: 'long' })}
             </p>
-            <p className="text-xs text-indigo-600 dark:text-indigo-500 mt-0.5">
+            <p className="text-[12px] mt-0.5" style={{ color: '#9a7830' }}>
               Referral reward হিসেবে আপনার plan free করা হয়েছে।
             </p>
           </div>
@@ -134,114 +143,125 @@ export default function ReferralsPage() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Total Referrals', value: d?.stats.total ?? 0, icon: Users, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10' },
-          { label: 'Pending Reward', value: d?.stats.pending ?? 0, icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-500/10' },
-          { label: 'Rewarded',       value: d?.stats.rewarded ?? 0, icon: Award, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-500/10' },
-        ].map(({ label, value, icon: Icon, color, bg }) => (
-          <div key={label} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 text-center">
-            <div className={`inline-flex items-center justify-center h-10 w-10 rounded-xl ${bg} mb-3`}>
-              <Icon className={`h-5 w-5 ${color}`} />
+          { label: 'Total Referrals', value: d?.stats.total ?? 0,   Icon: Users, bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text)', iconColor: 'var(--rp-text-muted)' },
+          { label: 'Pending Reward',  value: d?.stats.pending ?? 0, Icon: Clock, bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040', iconColor: '#b89040' },
+          { label: 'Rewarded',        value: d?.stats.rewarded ?? 0,Icon: Award, bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a', iconColor: '#23766a' },
+        ].map(({ label, value, Icon, bg, border, text, iconColor }) => (
+          <div key={label} className="rounded-[14px] border p-5 text-center"
+            style={{ background: bg, borderColor: border }}>
+            <div className="flex justify-center mb-3">
+              <Icon className="h-5 w-5" style={{ color: iconColor }} />
             </div>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
-            <p className="text-xs text-gray-500 mt-0.5">{label}</p>
+            <p className="text-[26px] font-bold" style={{ color: text }}>{value}</p>
+            <p className="text-[12px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">{label}</p>
           </div>
         ))}
       </div>
 
-      {/* Referral Link */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 space-y-4">
-        <div className="flex items-center gap-2 mb-1">
-          <Link2 className="h-4 w-4 text-resort-600" />
-          <h2 className="font-semibold text-gray-900 dark:text-white">Your Referral Link</h2>
+      {/* Referral link card */}
+      <div className="rounded-[14px] border bg-white p-6 space-y-4"
+        style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+        <div className="flex items-center gap-2">
+          <Link2 className="h-4 w-4" style={{ color: '#23766a' }} />
+          <h2 className="text-[14px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">Your Referral Link</h2>
         </div>
 
         {link ? (
           <>
             <div className="flex items-center gap-2">
-              <div className="flex-1 flex items-center gap-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 overflow-hidden">
-                <ExternalLink className="h-4 w-4 text-gray-400 shrink-0" />
-                <span className="text-sm text-gray-700 dark:text-gray-300 truncate font-mono">{link}</span>
+              <div className="flex flex-1 items-center gap-2 overflow-hidden rounded-[10px] border bg-[#f4f1eb] px-4 py-2.5"
+                style={{ borderColor: 'var(--rp-border)' }}>
+                <ExternalLink className="h-4 w-4 shrink-0 text-[#c5bdb4] dark:text-[#6e8580]" />
+                <span className="truncate font-mono text-[12.5px] text-[#6b8880] dark:text-[#94b8b0]">{link}</span>
               </div>
               <button onClick={copyLink}
-                className="flex items-center gap-2 px-4 py-2.5 bg-resort-600 hover:bg-resort-700 text-white text-sm font-semibold rounded-xl transition-colors shrink-0">
+                className="flex shrink-0 items-center gap-2 rounded-[9px] px-4 py-2.5 text-[13px] font-semibold hover:opacity-90"
+                style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
                 {copied ? <><Check className="h-4 w-4" /> Copied!</> : <><Copy className="h-4 w-4" /> Copy</>}
               </button>
             </div>
 
-            {/* Share buttons */}
             <div className="flex gap-2 pt-1">
               <button onClick={shareWhatsApp}
-                className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-xl transition-colors">
+                className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium hover:opacity-90"
+                style={{ background: '#25d366', color: 'var(--rp-surface)' }}>
                 <MessageCircle className="h-4 w-4" /> WhatsApp
               </button>
               <button onClick={shareEmail}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-xl transition-colors border border-gray-200 dark:border-gray-700">
+                className="flex items-center gap-2 rounded-[9px] border px-4 py-2 text-[13px] font-medium transition-colors hover:bg-[#f4f1eb]"
+                style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
                 <Mail className="h-4 w-4" /> Email
               </button>
             </div>
 
-            <p className="text-xs text-gray-500 pt-1">
+            <p className="text-[12px] pt-1 text-[#8aa29a] dark:text-[#94b8b0]">
               কেউ এই link দিয়ে signup করলে admin আপনাকে reward করবে — account credit অথবা plan upgrade।
             </p>
           </>
         ) : (
-          <p className="text-sm text-gray-400">Referral link generate হয়নি। Support-এ যোগাযোগ করুন।</p>
+          <p className="text-[13px] text-[#c5bdb4] dark:text-[#6e8580]">
+            Referral link generate হয়নি। Support-এ যোগাযোগ করুন।
+          </p>
         )}
       </div>
 
       {/* How it works */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
-        <h2 className="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-          <Share2 className="h-4 w-4 text-resort-600" /> কীভাবে কাজ করে?
+      <div className="rounded-[14px] border bg-white p-6"
+        style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+        <h2 className="flex items-center gap-2 text-[14px] font-semibold mb-4 text-[#18231f] dark:text-[#dfd9d0]">
+          <Share2 className="h-4 w-4" style={{ color: '#23766a' }} /> কীভাবে কাজ করে?
         </h2>
         <div className="space-y-3">
           {[
-            { step: '1', text: 'আপনার referral link copy করুন' },
-            { step: '2', text: 'অন্য resort owner-দের সাথে share করুন — WhatsApp বা Email দিয়ে' },
-            { step: '3', text: 'তারা আপনার link দিয়ে signup করলে আমরা automatically track করব' },
-            { step: '4', text: 'Admin review করে আপনাকে reward দেবে — ৳ credit অথবা 2 months PROFESSIONAL free' },
-          ].map(({ step, text }) => (
-            <div key={step} className="flex items-start gap-3">
-              <span className="h-6 w-6 rounded-full bg-resort-100 dark:bg-resort-500/20 text-resort-700 dark:text-resort-300 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                {step}
+            'আপনার referral link copy করুন',
+            'অন্য resort owner-দের সাথে share করুন — WhatsApp বা Email দিয়ে',
+            'তারা আপনার link দিয়ে signup করলে আমরা automatically track করব',
+            'Admin review করে আপনাকে reward দেবে — ৳ credit অথবা 2 months PROFESSIONAL free',
+          ].map((text, i) => (
+            <div key={i} className="flex items-start gap-3">
+              <span className="flex h-6 w-6 shrink-0 mt-0.5 items-center justify-center rounded-full text-[11px] font-bold"
+                style={{ background: 'var(--rp-teal-bg)', color: '#23766a' }}>
+                {i + 1}
               </span>
-              <p className="text-sm text-gray-600 dark:text-gray-400">{text}</p>
+              <p className="text-[13px] text-[#4a6e66] dark:text-[#6d9990]">{text}</p>
             </div>
           ))}
         </div>
       </div>
 
       {/* Referral history */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-          <h2 className="font-semibold text-gray-900 dark:text-white">Referral History</h2>
+      <div className="rounded-[14px] border bg-white overflow-hidden"
+        style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+        <div className="px-5 py-4" style={{ background: 'var(--rp-surface-2)', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+          <h2 className="text-[13.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">Referral History</h2>
         </div>
-
         {!d?.referrals.length ? (
-          <div className="text-center py-12">
-            <Users className="h-10 w-10 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
-            <p className="text-sm text-gray-400">এখনো কোনো referral নেই।</p>
-            <p className="text-xs text-gray-400 mt-1">আপনার link share করুন।</p>
+          <div className="flex flex-col items-center gap-2 py-14 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'var(--rp-surface-3)' }}>
+              <Users className="h-7 w-7 text-[#c5bdb4] dark:text-[#6e8580]" />
+            </div>
+            <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">এখনো কোনো referral নেই।</p>
+            <p className="text-[12px] text-[#c5bdb4] dark:text-[#6e8580]">আপনার link share করুন।</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+          <div>
             {d.referrals.map(r => (
-              <div key={r.id} className="flex items-center gap-4 px-6 py-4">
-                <div className="h-9 w-9 rounded-xl bg-resort-100 dark:bg-resort-500/20 flex items-center justify-center shrink-0">
-                  <Users className="h-4 w-4 text-resort-600 dark:text-resort-400" />
+              <div key={r.id} className="flex items-center gap-4 px-5 py-4 hover:bg-[#fafaf8] transition-colors"
+                style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
+                <div className="flex h-9 w-9 items-center justify-center rounded-[9px] shrink-0"
+                  style={{ background: 'var(--rp-teal-bg)' }}>
+                  <Users className="h-4 w-4" style={{ color: '#23766a' }} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900 dark:text-white truncate">{r.referred.name}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="text-[13.5px] font-medium truncate text-[#18231f] dark:text-[#dfd9d0]">{r.referred.name}</p>
+                  <p className="text-[12px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">
                     Signed up {new Date(r.createdAt).toLocaleDateString('en-GB', { dateStyle: 'medium' })}
                     {r.rewardType && r.rewardType !== 'NONE' && (
-                      <span className="ml-2 text-green-600 dark:text-green-400">
-                        · Reward: {rewardDescription(r)}
-                      </span>
+                      <span className="ml-2" style={{ color: '#23766a' }}>· Reward: {rewardDescription(r)}</span>
                     )}
                   </p>
                 </div>
-                <div className="shrink-0">{statusBadge(r.status)}</div>
+                <div className="shrink-0"><StatusPill status={r.status} /></div>
               </div>
             ))}
           </div>

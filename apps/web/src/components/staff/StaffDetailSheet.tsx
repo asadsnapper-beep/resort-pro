@@ -1,7 +1,8 @@
 'use client';
 
-import { X, Mail, Phone, Briefcase, Building2, Calendar, Pencil, UserX, Shield, Clock } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { X, Mail, Phone, Briefcase, Building2, Calendar, Pencil, UserX, Shield, Clock, CheckCircle2 } from 'lucide-react';
 import { formatDate, getInitials } from '@/lib/utils';
 
 interface Staff {
@@ -29,13 +30,24 @@ interface Props {
   onReactivate: (staff: Staff) => void;
 }
 
-const DEPT_COLORS: Record<string, string> = {
-  FRONT_DESK: 'bg-blue-100 text-blue-700',
-  HOUSEKEEPING: 'bg-green-100 text-green-700',
-  RESTAURANT: 'bg-orange-100 text-orange-700',
-  MAINTENANCE: 'bg-yellow-100 text-yellow-700',
-  SECURITY: 'bg-red-100 text-red-700',
-  MANAGEMENT: 'bg-purple-100 text-purple-700',
+const DEPT_META: Record<string, { bg: string; border: string; text: string }> = {
+  FRONT_DESK:   { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a' },
+  HOUSEKEEPING: { bg: 'var(--rp-teal-soft)', border: 'rgba(35,118,106,0.15)', text: 'var(--rp-text-accent)' },
+  RESTAURANT:   { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a' },
+  MAINTENANCE:  { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
+  SECURITY:     { bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)', text: '#c43c3c' },
+  MANAGEMENT:   { bg: '#1b342f', border: 'rgba(27,52,47,0.4)',    text: '#dfd9d0' },
+};
+
+const ROLE_META: Record<string, { bg: string; border: string; text: string }> = {
+  OWNER:        { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
+  MANAGER:      { bg: '#1b342f', border: 'rgba(27,52,47,0.4)',    text: '#dfd9d0' },
+  RECEPTIONIST: { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)', text: '#23766a' },
+  CHEF:         { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a' },
+  MARKETER:     { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.15)', text: '#b8724a' },
+  DEVELOPER:    { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-subtle)' },
+  SHAREHOLDER:  { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
+  STAFF:        { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)' },
 };
 
 function formatDept(d: string) {
@@ -51,128 +63,141 @@ function getDaysEmployed(hireDate: string) {
   return m > 0 ? `${y}y ${m}mo` : `${y}y`;
 }
 
-const ROLE_COLORS: Record<string, string> = {
-  OWNER:        'bg-yellow-100 text-yellow-800',
-  MANAGER:      'bg-purple-100 text-purple-700',
-  RECEPTIONIST: 'bg-blue-100 text-blue-700',
-  MARKETER:     'bg-pink-100 text-pink-700',
-  DEVELOPER:    'bg-indigo-100 text-indigo-700',
-  SHAREHOLDER:  'bg-amber-100 text-amber-700',
-  STAFF:        'bg-gray-100 text-gray-600',
-};
-
 export function StaffDetailSheet({ staff, onClose, onEdit, onDeactivate, onReactivate }: Props) {
-  if (!staff) return null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    if (staff) document.body.style.overflow = 'hidden';
+    else document.body.style.overflow = '';
+    return () => { document.body.style.overflow = ''; };
+  }, [staff]);
 
-  const initials = getInitials(staff.user.firstName, staff.user.lastName);
-  const deptColor = DEPT_COLORS[staff.department] ?? 'bg-gray-100 text-gray-700';
-  const tenure = getDaysEmployed(staff.hireDate);
+  if (!staff || !mounted) return null;
 
-  return (
+  const initials  = getInitials(staff.user.firstName, staff.user.lastName);
+  const deptMeta  = DEPT_META[staff.department] ?? { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)', text: 'var(--rp-text-muted)' };
+  const roleMeta  = ROLE_META[staff.user.role ?? 'STAFF'] ?? ROLE_META.STAFF;
+  const tenure    = getDaysEmployed(staff.hireDate);
+
+  const sheet = (
     <>
-      <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white shadow-2xl">
+      <div className="fixed inset-0 z-40" style={{ background: 'rgba(27,52,47,0.3)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
+      <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white shadow-2xl"
+        style={{ boxShadow: '-8px 0 40px rgba(27,52,47,0.18)' }}>
+
         {/* Header */}
-        <div className="flex items-center justify-between border-b px-6 py-4">
+        <div className="flex items-center justify-between px-6 py-4 shrink-0"
+          style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
           <div className="flex items-center gap-3">
             <div className="relative">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-resort-100 text-lg font-bold text-resort-700">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full text-[15px] font-bold"
+                style={{ background: 'var(--rp-teal-bg)', color: '#23766a', border: `2px solid ${deptMeta.border}` }}>
                 {initials}
               </div>
-              <span className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white ${staff.isActive ? 'bg-green-500' : 'bg-gray-400'}`} />
+              <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white"
+                style={{ background: staff.isActive ? '#4ade80' : 'var(--rp-text-faint)' }} />
             </div>
             <div>
-              <h2 className="font-bold text-gray-900">{staff.user.firstName} {staff.user.lastName}</h2>
-              <p className="text-xs text-muted-foreground">{staff.position}</p>
+              <h2 className="text-[15px] font-semibold" style={{ color: 'var(--rp-text)' }}>
+                {staff.user.firstName} {staff.user.lastName}
+              </h2>
+              <p className="text-[12.5px]" style={{ color: 'var(--rp-text-muted)' }}>{staff.position}</p>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 transition-colors">
-            <X className="h-5 w-5" />
+          <button onClick={onClose}
+            className="flex h-[30px] w-[30px] items-center justify-center rounded-full transition-colors hover:bg-[#f4f1eb]"
+            style={{ color: 'var(--rp-text-muted)' }}>
+            <X className="h-4 w-4" />
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          <div className="p-6 space-y-6">
+          <div className="p-6 space-y-5">
 
-            {/* Status + Department */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${deptColor}`}>
-                <Building2 className="mr-1.5 h-3 w-3" />
-                {formatDept(staff.department)}
+            {/* Dept + Status pills */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 rounded-[7px] border px-[10px] py-[4px] text-[11.5px] font-semibold"
+                style={{ background: deptMeta.bg, borderColor: deptMeta.border, color: deptMeta.text }}>
+                <Building2 className="h-3 w-3" /> {formatDept(staff.department)}
               </span>
-              <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${staff.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                <Shield className="mr-1.5 h-3 w-3" />
-                {staff.isActive ? 'Active' : 'Inactive'}
+              <span className="inline-flex items-center gap-1.5 rounded-[7px] border px-[10px] py-[4px] text-[11.5px] font-semibold"
+                style={staff.isActive
+                  ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }
+                  : { background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-muted)' }}>
+                <CheckCircle2 className="h-3 w-3" /> {staff.isActive ? 'Active' : 'Inactive'}
               </span>
             </div>
 
-            {/* Tenure Stats */}
-            <div className="grid grid-cols-3 gap-3">
+            {/* Stats */}
+            <div className="grid grid-cols-3 gap-2.5">
               {[
                 { label: 'Tenure', value: tenure },
                 { label: 'Hired', value: formatDate(staff.hireDate) },
                 { label: 'Last Login', value: staff.user.lastLoginAt ? formatDate(staff.user.lastLoginAt) : 'Never' },
               ].map(({ label, value }) => (
-                <div key={label} className="rounded-xl bg-gray-50 p-3 text-center">
-                  <p className="text-xs text-muted-foreground">{label}</p>
-                  <p className="mt-0.5 text-sm font-semibold truncate">{value}</p>
+                <div key={label} className="rounded-[10px] p-3 text-center"
+                  style={{ background: 'var(--rp-surface-3)' }}>
+                  <p className="text-[10.5px]" style={{ color: 'var(--rp-text-muted)' }}>{label}</p>
+                  <p className="mt-0.5 text-[12.5px] font-semibold truncate" style={{ color: 'var(--rp-text)' }}>{value}</p>
                 </div>
               ))}
             </div>
 
-            {/* Contact Info */}
+            {/* Contact */}
             <div>
-              <h3 className="mb-3 text-sm font-semibold text-gray-700">Contact Details</h3>
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] mb-3" style={{ color: 'var(--rp-text-muted)' }}>Contact</p>
               <div className="space-y-2.5">
                 {[
-                  { key: 'email', icon: Mail, label: staff.user.email },
-                  { key: 'phone', icon: Phone, label: staff.phone ?? '—' },
-                ].map(({ key, icon: Icon, label }) => (
-                  <div key={key} className="flex items-center gap-3 text-sm">
-                    <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    <span className={label === '—' ? 'text-muted-foreground' : 'text-gray-900'}>{label}</span>
+                  { key: 'email', icon: Mail,  value: staff.user.email },
+                  { key: 'phone', icon: Phone, value: staff.phone ?? '—' },
+                ].map(({ key, icon: Icon, value }) => (
+                  <div key={key} className="flex items-center gap-3 text-[13px]">
+                    <Icon className="h-4 w-4 shrink-0" style={{ color: '#9bbdb7' }} />
+                    <span style={{ color: value === '—' ? 'var(--rp-text-faint)' : 'var(--rp-text)' }}>{value}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Employment Details */}
+            {/* Employment */}
             <div>
-              <h3 className="mb-3 text-sm font-semibold text-gray-700">Employment Details</h3>
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] mb-3" style={{ color: 'var(--rp-text-muted)' }}>Employment</p>
               <div className="space-y-2.5">
                 {[
-                  { icon: Briefcase, label: 'Position', value: staff.position },
+                  { icon: Briefcase, label: 'Position',   value: staff.position },
                   { icon: Building2, label: 'Department', value: formatDept(staff.department) },
-                  { icon: Calendar, label: 'Hire Date', value: formatDate(staff.hireDate) },
-                  { icon: Clock, label: 'Tenure', value: tenure },
+                  { icon: Calendar,  label: 'Hire Date',  value: formatDate(staff.hireDate) },
+                  { icon: Clock,     label: 'Tenure',     value: tenure },
                 ].map(({ icon: Icon, label, value }) => (
-                  <div key={label} className="flex items-center gap-3 text-sm">
-                    <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    <span className="text-muted-foreground w-24 flex-shrink-0">{label}</span>
-                    <span className="text-gray-900 font-medium">{value}</span>
+                  <div key={label} className="flex items-center gap-3 text-[13px]">
+                    <Icon className="h-4 w-4 shrink-0" style={{ color: '#9bbdb7' }} />
+                    <span className="w-24 shrink-0" style={{ color: 'var(--rp-text-muted)' }}>{label}</span>
+                    <span className="font-medium" style={{ color: 'var(--rp-text)' }}>{value}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Account Access */}
-            <div className="rounded-xl border border-gray-200 p-4 space-y-2">
-              <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-                <Shield className="h-4 w-4" /> System Access
-              </h3>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Login Email</span>
-                <span className="font-medium">{staff.user.email}</span>
+            {/* System Access */}
+            <div className="rounded-[12px] border p-4 space-y-2.5"
+              style={{ background: 'var(--rp-surface-2)', borderColor: 'var(--rp-border)' }}>
+              <p className="flex items-center gap-1.5 text-[12px] font-semibold" style={{ color: 'var(--rp-text)' }}>
+                <Shield className="h-3.5 w-3.5" style={{ color: '#9bbdb7' }} /> System Access
+              </p>
+              <div className="flex items-center justify-between text-[12.5px]">
+                <span style={{ color: 'var(--rp-text-muted)' }}>Login Email</span>
+                <span className="font-medium" style={{ color: 'var(--rp-text)' }}>{staff.user.email}</span>
               </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Role</span>
-                <span className={`text-xs px-2 py-0.5 rounded font-semibold ${ROLE_COLORS[staff.user.role ?? 'STAFF'] ?? ROLE_COLORS.STAFF}`}>
+              <div className="flex items-center justify-between text-[12.5px]">
+                <span style={{ color: 'var(--rp-text-muted)' }}>Role</span>
+                <span className="rounded-[6px] border px-[8px] py-[3px] text-[11px] font-semibold"
+                  style={{ background: roleMeta.bg, borderColor: roleMeta.border, color: roleMeta.text }}>
                   {staff.user.role ?? 'STAFF'}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Account Status</span>
-                <span className={`font-medium ${staff.user.isActive ? 'text-green-600' : 'text-red-500'}`}>
+              <div className="flex items-center justify-between text-[12.5px]">
+                <span style={{ color: 'var(--rp-text-muted)' }}>Account</span>
+                <span className="font-medium" style={{ color: staff.user.isActive ? '#23766a' : '#c43c3c' }}>
                   {staff.user.isActive ? 'Active' : 'Deactivated'}
                 </span>
               </div>
@@ -181,21 +206,29 @@ export function StaffDetailSheet({ staff, onClose, onEdit, onDeactivate, onReact
         </div>
 
         {/* Footer */}
-        <div className="flex gap-3 border-t px-6 py-4">
-          <Button variant="outline" className="flex-1 gap-2" onClick={() => onEdit(staff)}>
+        <div className="flex gap-3 px-6 py-4 shrink-0" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+          <button className="flex flex-1 items-center justify-center gap-2 rounded-[9px] border py-2 text-[13px] font-medium transition-colors hover:bg-[#f4f1eb]"
+            style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}
+            onClick={() => onEdit(staff)}>
             <Pencil className="h-4 w-4" /> Edit
-          </Button>
+          </button>
           {staff.isActive ? (
-            <Button variant="destructive" className="gap-2" onClick={() => onDeactivate(staff)}>
+            <button className="flex items-center gap-2 rounded-[9px] border px-4 py-2 text-[13px] font-medium transition-colors hover:opacity-80"
+              style={{ background: 'var(--rp-red-bg)', borderColor: 'rgba(200,60,60,0.2)', color: '#c43c3c' }}
+              onClick={() => onDeactivate(staff)}>
               <UserX className="h-4 w-4" /> Deactivate
-            </Button>
+            </button>
           ) : (
-            <Button variant="outline" className="gap-2 border-green-300 text-green-700 hover:bg-green-50" onClick={() => onReactivate(staff)}>
+            <button className="flex items-center gap-2 rounded-[9px] border px-4 py-2 text-[13px] font-medium transition-colors hover:opacity-80"
+              style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}
+              onClick={() => onReactivate(staff)}>
               <Shield className="h-4 w-4" /> Reactivate
-            </Button>
+            </button>
           )}
         </div>
       </div>
     </>
   );
+
+  return createPortal(sheet, document.body);
 }

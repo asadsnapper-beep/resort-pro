@@ -1,5 +1,6 @@
 'use client';
 
+import { useTheme } from 'next-themes';
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { foodOrdersApi, menuApi, guestsApi } from '@/lib/api';
@@ -153,9 +154,9 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
         </div>
         <div>
           <label className={labelCls}>Menu Items</label>
-          <div className="max-h-48 overflow-y-auto rounded-[10px] border divide-y" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
+          <div className="max-h-48 overflow-y-auto rounded-[10px] border divide-y" style={{ borderColor: 'var(--rp-border)' }}>
             {menuItems.map((item: MenuItem) => (
-              <div key={item.id} className="flex items-center justify-between px-3 py-2 hover:bg-[#faf9f7]">
+              <div key={item.id} className="flex items-center justify-between px-3 py-2 hover:bg-[#faf9f7] dark:hover:bg-white/5">
                 <div>
                   <span className="text-[13px] font-medium text-[#18231f]">{item.name}</span>
                   <span className="ml-2 text-[11.5px] text-[#8aa29a]">{item.category}</span>
@@ -164,7 +165,7 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
                   <span className="text-[13px] font-semibold text-[#23766a]">{formatCurrency(Number(item.price))}</span>
                   <button type="button" onClick={() => addToCart(item)}
                     className="rounded-[7px] border px-[9px] py-[4px] text-[11.5px] font-medium transition-colors"
-                    style={{ background: '#e3f2ef', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                    style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
                     + Add
                   </button>
                 </div>
@@ -174,9 +175,9 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
           </div>
         </div>
         {cart.length > 0 && (
-          <div className="rounded-[10px] border overflow-hidden" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
+          <div className="rounded-[10px] border overflow-hidden" style={{ borderColor: 'var(--rp-border)' }}>
             <div className="px-3 py-2 border-b text-[10.5px] font-semibold uppercase tracking-[0.07em] text-[#8aa29a]"
-              style={{ borderColor: 'rgba(0,0,0,0.05)', background: '#faf9f7' }}>Order Summary</div>
+              style={{ borderColor: 'var(--rp-border)', background: 'var(--rp-surface-2)' }}>Order Summary</div>
             <div className="divide-y" style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
               {cart.map(item => (
                 <div key={item.menuItemId} className="flex items-center gap-3 px-3 py-2">
@@ -184,11 +185,11 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
                   <div className="flex items-center gap-1">
                     <button type="button" onClick={() => updateQty(item.menuItemId, item.quantity - 1)}
                       className="flex h-6 w-6 items-center justify-center rounded-[6px] border text-[12px] hover:bg-[#f4f1eb]"
-                      style={{ borderColor: 'rgba(0,0,0,0.09)' }}>−</button>
+                      style={{ borderColor: 'var(--rp-border-md)' }}>−</button>
                     <span className="w-6 text-center text-[13px] font-medium text-[#18231f]">{item.quantity}</span>
                     <button type="button" onClick={() => updateQty(item.menuItemId, item.quantity + 1)}
                       className="flex h-6 w-6 items-center justify-center rounded-[6px] border text-[12px] hover:bg-[#f4f1eb]"
-                      style={{ borderColor: 'rgba(0,0,0,0.09)' }}>+</button>
+                      style={{ borderColor: 'var(--rp-border-md)' }}>+</button>
                   </div>
                   <span className="w-16 text-right text-[13px] font-semibold text-[#18231f]">{formatCurrency(item.price * item.quantity)}</span>
                   <button type="button" onClick={() => updateQty(item.menuItemId, 0)} className="text-[#c5bdb4] hover:text-[#c43c3c]">
@@ -197,7 +198,7 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
                 </div>
               ))}
             </div>
-            <div className="flex items-center justify-between px-3 py-2 border-t" style={{ borderColor: 'rgba(0,0,0,0.05)', background: '#faf9f7' }}>
+            <div className="flex items-center justify-between px-3 py-2 border-t" style={{ borderColor: 'var(--rp-border)', background: 'var(--rp-surface-2)' }}>
               <span className="text-[13px] font-semibold text-[#18231f]">Total</span>
               <span className="text-[13px] font-bold text-[#23766a]">{formatCurrency(total)}</span>
             </div>
@@ -207,15 +208,15 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
           <label className={labelCls}>Order Notes</label>
           <input className={inputCls} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Allergies, preferences…" />
         </div>
-        <div className="flex gap-3 justify-end pt-2 border-t" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
+        <div className="flex gap-3 justify-end pt-2 border-t" style={{ borderColor: 'var(--rp-border)' }}>
           <button type="button" onClick={onClose}
             className="rounded-[9px] border px-4 py-[8px] text-[13px] font-medium text-[#6b8880] hover:bg-[#f4f1eb]"
-            style={{ borderColor: 'rgba(0,0,0,0.09)' }}>
+            style={{ borderColor: 'var(--rp-border-md)' }}>
             Cancel
           </button>
           <button type="submit" disabled={loading || cart.length === 0}
             className="rounded-[9px] px-4 py-[8px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80 disabled:opacity-40"
-            style={{ background: '#1b342f' }}>
+            style={{ background: 'var(--rp-btn-accent)' }}>
             {loading ? 'Placing…' : `Place Order (${cart.length} item${cart.length !== 1 ? 's' : ''} · ${formatCurrency(total)})`}
           </button>
         </div>
@@ -225,11 +226,11 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
 }
 
 const ORDER_STATUS_PILL: Record<string, { bg: string; border: string; text: string; label: string }> = {
-  PENDING:   { bg: '#f4ecda', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'Pending' },
-  PREPARING: { bg: '#fceee4', border: 'rgba(184,114,74,0.2)',  text: '#b8724a', label: 'Preparing' },
-  READY:     { bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Ready' },
-  DELIVERED: { bg: '#e3f2ef', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Delivered' },
-  CANCELLED: { bg: '#f5f4f1', border: 'rgba(0,0,0,0.08)',      text: '#8aa29a', label: 'Cancelled' },
+  PENDING:   { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'Pending' },
+  PREPARING: { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a', label: 'Preparing' },
+  READY:     { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Ready' },
+  DELIVERED: { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Delivered' },
+  CANCELLED: { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)', label: 'Cancelled' },
 };
 
 // ── Standard order card (non-chef) ───────────────────────────────────────────
@@ -251,7 +252,7 @@ function OrderCard({ order, expanded, onToggleExpand }: {
 
   return (
     <div className="rounded-[14px] border bg-white overflow-hidden transition-shadow hover:shadow-sm"
-      style={{ borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+      style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
       <div className="p-4">
         <div className="flex items-center gap-4">
           <div className="flex-1 min-w-0">
@@ -267,7 +268,7 @@ function OrderCard({ order, expanded, onToggleExpand }: {
               )}
               {order.tableNumber && (
                 <span className="rounded-[6px] border px-[8px] py-[3px] text-[11.5px] text-[#6b8880]"
-                  style={{ background: '#f4f1eb', borderColor: 'rgba(0,0,0,0.07)' }}>
+                  style={{ background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border)' }}>
                   📍 {order.tableNumber}
                 </span>
               )}
@@ -286,7 +287,7 @@ function OrderCard({ order, expanded, onToggleExpand }: {
                 onClick={() => statusMutation.mutate({ id: order.id, status: nextStatus })}
                 disabled={statusMutation.isPending}
                 className="rounded-[8px] border px-[12px] py-[6px] text-[12px] font-medium transition-colors"
-                style={{ background: '#1b342f', borderColor: '#1b342f', color: '#dfd9d0' }}>
+                style={{ background: 'var(--rp-btn-accent)', borderColor: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
                 {STATUS_LABEL[order.status]}
               </button>
             )}
@@ -295,14 +296,14 @@ function OrderCard({ order, expanded, onToggleExpand }: {
                 onClick={() => statusMutation.mutate({ id: order.id, status: 'CANCELLED' })}
                 disabled={statusMutation.isPending}
                 className="rounded-[8px] border p-[6px] transition-colors"
-                style={{ background: '#fef2f2', borderColor: 'rgba(200,60,60,0.18)', color: '#c43c3c' }}>
+                style={{ background: 'var(--rp-red-bg)', borderColor: 'rgba(200,60,60,0.18)', color: '#c43c3c' }}>
                 <XCircle className="h-[14px] w-[14px]" />
               </button>
             )}
           </div>
         </div>
         {expanded && (
-          <div className="mt-3 pt-3 border-t space-y-1.5" style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
+          <div className="mt-3 pt-3 border-t space-y-1.5" style={{ borderColor: 'var(--rp-border)' }}>
             {order.items.map(item => (
               <div key={item.id} className="flex items-center justify-between">
                 <span className="text-[13px] text-[#18231f]">{item.quantity}× {item.menuItem.name}</span>
@@ -576,6 +577,8 @@ function KitchenDisplay() {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function OrdersPage() {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   const { user } = useAuthStore();
   const isChef = user?.role === 'CHEF';
 
@@ -628,7 +631,7 @@ export default function OrdersPage() {
         <button
           onClick={() => setAddOpen(true)}
           className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
-          style={{ background: '#1b342f' }}>
+          style={{ background: 'var(--rp-btn-accent)' }}>
           <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} /> New Order
         </button>
       </div>
@@ -636,13 +639,12 @@ export default function OrdersPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          { label: 'Total Orders', value: total,                icon: ShoppingBag, bg: '#e3f2ef', color: '#23766a' },
-          { label: 'Pending',      value: stats.pending   ?? 0, icon: Clock,       bg: '#f4ecda', color: '#b89040' },
-          { label: 'Preparing',    value: stats.preparing ?? 0, icon: ChefHat,     bg: '#fceee4', color: '#b8724a' },
-          { label: 'Ready',        value: stats.ready     ?? 0, icon: CheckCircle2,bg: '#e3f2ef', color: '#23766a' },
+          { label: 'Total Orders', value: total,                icon: ShoppingBag, bg: 'var(--rp-teal-bg)', color: '#23766a' },
+          { label: 'Pending',      value: stats.pending   ?? 0, icon: Clock,       bg: 'var(--rp-amber-bg)', color: '#b89040' },
+          { label: 'Preparing',    value: stats.preparing ?? 0, icon: ChefHat,     bg: 'var(--rp-coral-bg)', color: '#b8724a' },
+          { label: 'Ready',        value: stats.ready     ?? 0, icon: CheckCircle2,bg: 'var(--rp-teal-bg)', color: '#23766a' },
         ].map(({ label, value, icon: Icon, bg, color }) => (
-          <div key={label} className="flex items-center gap-[11px] rounded-[12px] border px-[18px] py-[15px]"
-            style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.045)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+          <div key={label} className="flex items-center gap-[11px] rounded-[12px] border px-[18px] py-[15px] bg-white dark:bg-white/5" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
             <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px]" style={{ background: bg }}>
               <Icon className="h-[14px] w-[14px]" strokeWidth={2} style={{ color }} />
             </div>
@@ -660,8 +662,8 @@ export default function OrdersPage() {
           <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
             className="rounded-[8px] border px-[12px] py-[7px] text-[12px] font-medium transition-colors"
             style={statusFilter === s
-              ? { background: '#1b342f', color: '#dfd9d0', borderColor: '#1b342f' }
-              : { background: '#fff', color: '#6b8880', borderColor: 'rgba(0,0,0,0.09)' }}>
+              ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', borderColor: '#1b342f' }
+              : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', color: isDark ? '#94b8b0' : 'var(--rp-text-subtle)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)' }}>
             {s ? ORDER_STATUS_PILL[s]?.label ?? s : 'All'}
           </button>
         ))}
@@ -671,11 +673,11 @@ export default function OrdersPage() {
       <div className="space-y-3">
         {isLoading ? (
           [...Array(5)].map((_, i) => (
-            <div key={i} className="h-20 animate-pulse rounded-[14px]" style={{ background: '#f5f4f1' }} />
+            <div key={i} className="h-20 animate-pulse rounded-[14px]" style={{ background: 'var(--rp-surface-3)' }} />
           ))
         ) : orders.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-20 text-center rounded-[14px] border-2 border-dashed"
-            style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
+            style={{ borderColor: 'var(--rp-border)' }}>
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#f5f4f1]">
               <ShoppingBag className="h-7 w-7 text-[#c5bdb4]" />
             </div>
@@ -691,7 +693,7 @@ export default function OrdersPage() {
               <button
                 onClick={() => setAddOpen(true)}
                 className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0]"
-                style={{ background: '#1b342f' }}>
+                style={{ background: 'var(--rp-btn-accent)' }}>
                 <Plus className="h-[13px] w-[13px]" /> New Order
               </button>
             )}
@@ -711,12 +713,12 @@ export default function OrdersPage() {
           <div className="flex items-center gap-1.5">
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
               className="flex h-8 items-center gap-1 rounded-[8px] border px-3 text-[12.5px] font-medium disabled:opacity-40"
-              style={{ borderColor: 'rgba(0,0,0,0.09)', color: '#18231f' }}>
+              style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text)' }}>
               <ChevronLeft className="h-3.5 w-3.5" /> Previous
             </button>
             <button onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))} disabled={page >= pagination.totalPages}
               className="flex h-8 items-center gap-1 rounded-[8px] border px-3 text-[12.5px] font-medium disabled:opacity-40"
-              style={{ background: '#1b342f', borderColor: '#1b342f', color: '#dfd9d0' }}>
+              style={{ background: 'var(--rp-btn-accent)', borderColor: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
               Next <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>

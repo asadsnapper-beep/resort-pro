@@ -1,5 +1,6 @@
 'use client';
 
+import { createPortal } from 'react-dom';
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
@@ -539,7 +540,7 @@ export default function InvoiceDetailPage() {
       </div>
 
       {/* ── Record Payment Modal ──────────────────────────────────────────── */}
-      {showPayment && (
+      {showPayment && createPortal((
         <>
           <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={() => setShowPayment(false)} />
           <div className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-50 max-w-md mx-auto bg-white rounded-2xl shadow-xl p-6 space-y-4">
@@ -604,7 +605,7 @@ export default function InvoiceDetailPage() {
             </div>
           </div>
         </>
-      )}
+      ), document.body)}
     </div>
   );
 }

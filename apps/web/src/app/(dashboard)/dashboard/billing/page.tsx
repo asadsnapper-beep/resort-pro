@@ -1,211 +1,149 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTheme } from 'next-themes';
 import { useSearchParams } from 'next/navigation';
 import { billingApi } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
 import {
-  CreditCard,
-  CheckCircle2,
-  AlertTriangle,
-  Clock,
-  Zap,
-  Shield,
-  Building2,
-  ExternalLink,
-  Receipt,
-  Loader2,
-  Star,
-  ArrowRight,
+  CreditCard, CheckCircle2, AlertTriangle, Clock, Zap,
+  Shield, Building2, ExternalLink, Receipt, Loader2, Star, ArrowRight,
 } from 'lucide-react';
 
-// ── Types ──────────────────────────────────────────────────────────────────────
 type PlanKey = 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';
 
 type PlanDef = {
-  name: string;
-  price: number;
-  currency: string;
-  features: string[];
-  roomLimit: number;
+  name: string; price: number; currency: string;
+  features: string[]; roomLimit: number;
 };
 
 type BillingStatus = {
-  plan: string;
-  planStatus: string;
-  trialDaysLeft: number;
-  isTrialing: boolean;
-  isActive: boolean;
-  isPastDue: boolean;
-  isCanceled: boolean;
-  currentPeriodEnd: string | null;
-  trialEndsAt: string | null;
-  hasStripeCustomer: boolean;
-  hasSubscription: boolean;
-  availablePlans: Record<PlanKey, PlanDef>;
+  plan: string; planStatus: string; trialDaysLeft: number;
+  isTrialing: boolean; isActive: boolean; isPastDue: boolean;
+  isCanceled: boolean; currentPeriodEnd: string | null;
+  trialEndsAt: string | null; hasStripeCustomer: boolean;
+  hasSubscription: boolean; availablePlans: Record<PlanKey, PlanDef>;
 };
 
 type Invoice = {
-  id: string;
-  number: string | null;
-  amount: string;
-  currency: string;
-  status: string;
-  date: string;
-  pdfUrl: string | null;
-  hostedUrl: string | null;
+  id: string; number: string | null; amount: string;
+  currency: string; status: string; date: string;
+  pdfUrl: string | null; hostedUrl: string | null;
 };
 
-// ── Status Badge ───────────────────────────────────────────────────────────────
-function StatusBadge({ status, trialDaysLeft }: { status: string; trialDaysLeft: number }) {
-  if (status === 'trialing') {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm font-medium border border-blue-200">
-        <Clock className="w-3.5 h-3.5" />
-        Trial — {trialDaysLeft} days left
-      </span>
-    );
-  }
-  if (status === 'active') {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 text-green-700 text-sm font-medium border border-green-200">
-        <CheckCircle2 className="w-3.5 h-3.5" />
-        Active
-      </span>
-    );
-  }
-  if (status === 'past_due') {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 text-red-700 text-sm font-medium border border-red-200">
-        <AlertTriangle className="w-3.5 h-3.5" />
-        Past Due
-      </span>
-    );
-  }
+function StatusPill({ status, trialDaysLeft }: { status: string; trialDaysLeft: number }) {
+  if (status === 'trialing') return (
+    <span className="inline-flex items-center gap-1.5 rounded-[7px] border px-[9px] py-[3px] text-[11.5px] font-semibold"
+      style={{ background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.2)', color: '#b89040' }}>
+      <Clock className="h-3 w-3" /> Trial — {trialDaysLeft} days left
+    </span>
+  );
+  if (status === 'active') return (
+    <span className="inline-flex items-center gap-1.5 rounded-[7px] border px-[9px] py-[3px] text-[11.5px] font-semibold"
+      style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+      <CheckCircle2 className="h-3 w-3" /> Active
+    </span>
+  );
+  if (status === 'past_due') return (
+    <span className="inline-flex items-center gap-1.5 rounded-[7px] border px-[9px] py-[3px] text-[11.5px] font-semibold"
+      style={{ background: 'var(--rp-red-bg)', borderColor: 'rgba(200,60,60,0.15)', color: '#c43c3c' }}>
+      <AlertTriangle className="h-3 w-3" /> Past Due
+    </span>
+  );
   return (
-    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100 text-gray-600 text-sm font-medium border border-gray-200">
+    <span className="inline-flex items-center gap-1.5 rounded-[7px] border px-[9px] py-[3px] text-[11.5px] font-semibold"
+      style={{ background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-muted)' }}>
       {status}
     </span>
   );
 }
 
-// ── Plan Card ──────────────────────────────────────────────────────────────────
-function PlanCard({
-  planKey,
-  plan,
-  currentPlan,
-  onSelect,
-  loading,
-}: {
-  planKey: PlanKey;
-  plan: PlanDef;
-  currentPlan: string;
-  onSelect: (key: PlanKey) => void;
-  loading: string | null;
+function PlanCard({ planKey, plan, currentPlan, onSelect, loading }: {
+  planKey: PlanKey; plan: PlanDef; currentPlan: string;
+  onSelect: (key: PlanKey) => void; loading: string | null;
 }) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   const isCurrent = currentPlan.toUpperCase() === planKey;
   const isPro = planKey === 'PROFESSIONAL';
   const icons: Record<PlanKey, React.ReactNode> = {
-    STARTER: <Zap className="w-5 h-5" />,
-    PROFESSIONAL: <Star className="w-5 h-5" />,
-    ENTERPRISE: <Shield className="w-5 h-5" />,
+    STARTER:      <Zap className="h-5 w-5" />,
+    PROFESSIONAL: <Star className="h-5 w-5" />,
+    ENTERPRISE:   <Shield className="h-5 w-5" />,
   };
 
   return (
-    <div
-      className={`relative rounded-2xl border-2 p-6 flex flex-col gap-4 transition-all ${
-        isPro
-          ? 'border-[#1a6b5e] shadow-lg shadow-[#1a6b5e]/10'
-          : isCurrent
-          ? 'border-[#d4a853] bg-amber-50/30'
-          : 'border-gray-200 hover:border-gray-300'
-      }`}
-    >
+    <div className="relative flex flex-col gap-4 rounded-[16px] border-2 p-6 transition-all"
+      style={isPro
+        ? { borderColor: '#23766a', boxShadow: '0 4px 24px rgba(35,118,106,0.12)' }
+        : isCurrent
+        ? { borderColor: 'rgba(184,144,64,0.4)', background: '#fffdf6' }
+        : { borderColor: 'var(--rp-border-md)' }}>
       {isPro && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-          <span className="bg-[#1a6b5e] text-white text-xs font-bold px-3 py-1 rounded-full">
-            MOST POPULAR
-          </span>
+        <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+          <span className="rounded-full px-3 py-1 text-[11px] font-bold"
+            style={{ background: '#23766a', color: 'var(--rp-btn-accent-text)' }}>MOST POPULAR</span>
         </div>
       )}
       {isCurrent && (
-        <div className="absolute -top-3 right-4">
-          <span className="bg-[#d4a853] text-white text-xs font-bold px-3 py-1 rounded-full">
-            CURRENT PLAN
-          </span>
+        <div className="absolute -top-3.5 right-4">
+          <span className="rounded-full px-3 py-1 text-[11px] font-bold"
+            style={{ background: '#b89040', color: 'var(--rp-surface)' }}>CURRENT PLAN</span>
         </div>
       )}
-
       <div className="flex items-center gap-3">
-        <div
-          className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-            isPro ? 'bg-[#1a6b5e] text-white' : 'bg-gray-100 text-gray-600'
-          }`}
-        >
+        <div className="flex h-10 w-10 items-center justify-center rounded-[10px]"
+          style={isPro ? { background: '#23766a', color: 'var(--rp-btn-accent-text)' } : { background: 'var(--rp-surface-3)', color: 'var(--rp-text-muted)' }}>
           {icons[planKey]}
         </div>
         <div>
-          <h3 className="font-bold text-gray-900">{plan.name}</h3>
-          <p className="text-sm text-gray-500">
+          <h3 className="font-bold text-[15px] text-[#18231f] dark:text-[#dfd9d0]">{plan.name}</h3>
+          <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">
             {plan.roomLimit === -1 ? 'Unlimited rooms' : `Up to ${plan.roomLimit} rooms`}
           </p>
         </div>
       </div>
-
       <div>
-        <span className="text-4xl font-bold text-gray-900">${plan.price}</span>
-        <span className="text-gray-500">/month</span>
+        <span className="text-[36px] font-bold text-[#18231f] dark:text-[#dfd9d0]">${plan.price}</span>
+        <span className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">/month</span>
       </div>
-
-      <ul className="flex flex-col gap-2 flex-1">
-        {plan.features.map((f) => (
-          <li key={f} className="flex items-center gap-2 text-sm text-gray-600">
-            <CheckCircle2 className="w-4 h-4 text-[#1a6b5e] flex-shrink-0" />
+      <ul className="flex flex-1 flex-col gap-2">
+        {plan.features.map(f => (
+          <li key={f} className="flex items-center gap-2 text-[13px] text-[#4a6e66] dark:text-[#6d9990]">
+            <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: '#23766a' }} />
             {f}
           </li>
         ))}
       </ul>
-
-      <Button
-        onClick={() => onSelect(planKey)}
-        disabled={isCurrent || loading !== null}
-        className={`w-full ${
-          isPro
-            ? 'bg-[#1a6b5e] hover:bg-[#145a4f] text-white'
-            : isCurrent
-            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-            : 'bg-white border-2 border-[#1a6b5e] text-[#1a6b5e] hover:bg-[#f0faf8]'
-        }`}
-      >
-        {loading === planKey ? (
-          <Loader2 className="w-4 h-4 animate-spin mr-2" />
-        ) : (
-          <ArrowRight className="w-4 h-4 mr-2" />
-        )}
+      <button onClick={() => onSelect(planKey)} disabled={isCurrent || loading !== null}
+        className="flex w-full items-center justify-center gap-2 rounded-[9px] py-2 text-[13px] font-medium transition-colors disabled:opacity-60 hover:opacity-90"
+        style={isPro
+          ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }
+          : isCurrent
+          ? { background: 'var(--rp-surface-3)', color: 'var(--rp-text-faint)', cursor: 'not-allowed' }
+          : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', border: isDark ? '2px solid #3a9a8b' : '2px solid #23766a', color: isDark ? '#5bbfb0' : '#23766a' }}>
+        {loading === planKey
+          ? <Loader2 className="h-4 w-4 animate-spin" />
+          : <ArrowRight className="h-4 w-4" />}
         {isCurrent ? 'Current Plan' : `Upgrade to ${plan.name}`}
-      </Button>
+      </button>
     </div>
   );
 }
 
-// ── Main Page ──────────────────────────────────────────────────────────────────
 export default function BillingPage() {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   const searchParams = useSearchParams();
-  const [billing, setBilling] = useState<BillingStatus | null>(null);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [billing, setBilling]           = useState<BillingStatus | null>(null);
+  const [invoices, setInvoices]         = useState<Invoice[]>([]);
+  const [loadingPlan, setLoadingPlan]   = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
-  const [pageLoading, setPageLoading] = useState(true);
+  const [pageLoading, setPageLoading]   = useState(true);
 
   useEffect(() => {
-    // Handle return from Stripe
-    if (searchParams.get('success') === '1') {
-      toast({ title: '🎉 Subscription activated!', description: 'Your plan has been upgraded successfully.' });
-    }
-    if (searchParams.get('canceled') === '1') {
-      toast({ title: 'Checkout cancelled', description: 'No changes were made.', variant: 'destructive' });
-    }
+    if (searchParams.get('success') === '1')  toast({ title: '🎉 Subscription activated!', description: 'Your plan has been upgraded successfully.' });
+    if (searchParams.get('canceled') === '1') toast({ title: 'Checkout cancelled', description: 'No changes were made.', variant: 'destructive' });
   }, [searchParams]);
 
   useEffect(() => {
@@ -222,10 +160,9 @@ export default function BillingPage() {
     setLoadingPlan(planKey);
     try {
       const res = await billingApi.createCheckout(planKey);
-      const { url } = res.data.data;
-      window.location.href = url;
-    } catch (err: any) {
-      const msg = err?.response?.data?.error || 'Failed to start checkout';
+      window.location.href = res.data.data.url;
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to start checkout';
       toast({ title: 'Error', description: msg, variant: 'destructive' });
       setLoadingPlan(null);
     }
@@ -236,99 +173,90 @@ export default function BillingPage() {
     try {
       const res = await billingApi.createPortal();
       window.location.href = res.data.data.url;
-    } catch (err: any) {
-      const msg = err?.response?.data?.error || 'Failed to open billing portal';
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to open billing portal';
       toast({ title: 'Error', description: msg, variant: 'destructive' });
       setPortalLoading(false);
     }
   };
 
-  if (pageLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-[#1a6b5e]" />
-      </div>
-    );
-  }
+  if (pageLoading) return (
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin" style={{ color: '#23766a' }} />
+    </div>
+  );
 
   const currentPlan = billing?.plan || 'FREE';
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+    <div className="max-w-5xl space-y-8 animate-fade-up">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Billing & Subscription</h1>
-        <p className="text-gray-500 mt-1">Manage your plan and payment details</p>
+        <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f] dark:text-[#dfd9d0]">
+          Billing & Subscription
+        </h1>
+        <p className="mt-[4px] text-[13px] text-[#7a9890] dark:text-[#94b8b0]">Manage your plan and payment details</p>
       </div>
 
-      {/* Current Plan Status */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+      {/* Current plan card */}
+      <div className="rounded-[14px] border bg-white p-6"
+        style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-[#f0faf8] flex items-center justify-center">
-              <Building2 className="w-6 h-6 text-[#1a6b5e]" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-[10px]" style={{ background: 'var(--rp-teal-bg)' }}>
+              <Building2 className="h-6 w-6" style={{ color: '#23766a' }} />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-lg font-semibold text-gray-900 capitalize">
+                <h2 className="text-[17px] font-semibold capitalize text-[#18231f] dark:text-[#dfd9d0]">
                   {currentPlan.toLowerCase()} Plan
                 </h2>
-                {billing && (
-                  <StatusBadge status={billing.planStatus} trialDaysLeft={billing.trialDaysLeft} />
-                )}
+                {billing && <StatusPill status={billing.planStatus} trialDaysLeft={billing.trialDaysLeft} />}
               </div>
               {billing?.currentPeriodEnd && billing.isActive && (
-                <p className="text-sm text-gray-500 mt-0.5">
+                <p className="text-[12.5px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">
                   Renews on {new Date(billing.currentPeriodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                 </p>
               )}
               {billing?.isTrialing && billing.trialEndsAt && (
-                <p className="text-sm text-gray-500 mt-0.5">
+                <p className="text-[12.5px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">
                   Trial ends {new Date(billing.trialEndsAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                 </p>
               )}
             </div>
           </div>
-
           {billing?.hasSubscription && (
-            <Button
-              onClick={handlePortal}
-              disabled={portalLoading}
-              variant="outline"
-              className="border-gray-200 text-gray-700 hover:bg-gray-50"
-            >
-              {portalLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              ) : (
-                <ExternalLink className="w-4 h-4 mr-2" />
-              )}
+            <button onClick={handlePortal} disabled={portalLoading}
+              className="flex items-center gap-2 rounded-[9px] border px-4 py-2 text-[13px] font-medium transition-colors hover:bg-[#f4f1eb] disabled:opacity-60"
+              style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
+              {portalLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
               Manage Subscription
-            </Button>
+            </button>
           )}
         </div>
 
-        {/* Trial warning */}
         {billing?.isTrialing && billing.trialDaysLeft <= 7 && (
-          <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="mt-5 flex items-start gap-3 rounded-[10px] border p-4"
+            style={{ background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.25)' }}>
+            <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" style={{ color: '#b89040' }} />
             <div>
-              <p className="text-sm font-medium text-amber-800">
-                Your trial ends in {billing.trialDaysLeft} day{billing.trialDaysLeft !== 1 ? 's' : ''}
+              <p className="text-[13px] font-semibold" style={{ color: '#8a6820' }}>
+                Trial ends in {billing.trialDaysLeft} day{billing.trialDaysLeft !== 1 ? 's' : ''}
               </p>
-              <p className="text-sm text-amber-700 mt-0.5">
+              <p className="text-[12.5px] mt-0.5" style={{ color: '#a07830' }}>
                 Upgrade now to keep access to all features after your trial.
               </p>
             </div>
           </div>
         )}
 
-        {/* Past due warning */}
         {billing?.isPastDue && (
-          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="mt-5 flex items-start gap-3 rounded-[10px] border p-4"
+            style={{ background: 'var(--rp-red-bg)', borderColor: 'rgba(200,60,60,0.2)' }}>
+            <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" style={{ color: '#c43c3c' }} />
             <div>
-              <p className="text-sm font-medium text-red-800">Payment failed</p>
-              <p className="text-sm text-red-700 mt-0.5">
+              <p className="text-[13px] font-semibold" style={{ color: '#c43c3c' }}>Payment failed</p>
+              <p className="text-[12.5px] mt-0.5" style={{ color: '#a84040' }}>
                 Please update your payment method to avoid service interruption.
               </p>
             </div>
@@ -336,85 +264,74 @@ export default function BillingPage() {
         )}
       </div>
 
-      {/* Test Mode Notice */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
-        <CreditCard className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+      {/* Test mode notice */}
+      <div className="flex items-start gap-3 rounded-[10px] border p-4"
+        style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)' }}>
+        <CreditCard className="h-5 w-5 shrink-0 mt-0.5" style={{ color: '#23766a' }} />
         <div>
-          <p className="text-sm font-semibold text-blue-800">Test Mode Active</p>
-          <p className="text-sm text-blue-700 mt-0.5">
-            Use test card <strong>4242 4242 4242 4242</strong>, any future expiry date, any 3-digit CVC.
-            No real charges will be made.
+          <p className="text-[13px] font-semibold" style={{ color: '#1b342f' }}>Test Mode Active</p>
+          <p className="text-[12.5px] mt-0.5 text-[#4a6e66] dark:text-[#6d9990]">
+            Use test card <strong>4242 4242 4242 4242</strong>, any future expiry, any 3-digit CVC. No real charges will be made.
           </p>
         </div>
       </div>
 
       {/* Plans */}
       <div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Choose Your Plan</h2>
-        <p className="text-gray-500 mb-6">All plans include a 3-month free trial. Cancel anytime.</p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <h2 className="font-display text-[19px] font-semibold mb-1 text-[#18231f] dark:text-[#dfd9d0]">Choose Your Plan</h2>
+        <p className="text-[13px] mb-6 text-[#8aa29a] dark:text-[#94b8b0]">All plans include a 3-month free trial. Cancel anytime.</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {billing?.availablePlans &&
             (Object.entries(billing.availablePlans) as [PlanKey, PlanDef][]).map(([key, plan]) => (
-              <PlanCard
-                key={key}
-                planKey={key}
-                plan={plan}
-                currentPlan={currentPlan}
-                onSelect={handleUpgrade}
-                loading={loadingPlan}
-              />
+              <PlanCard key={key} planKey={key} plan={plan}
+                currentPlan={currentPlan} onSelect={handleUpgrade} loading={loadingPlan} />
             ))}
         </div>
       </div>
 
-      {/* Invoices */}
+      {/* Invoice history */}
       {invoices.length > 0 && (
         <div>
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Invoice History</h2>
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <h2 className="font-display text-[19px] font-semibold mb-4 text-[#18231f] dark:text-[#dfd9d0]">Invoice History</h2>
+          <div className="rounded-[14px] border bg-white overflow-hidden"
+            style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
             <table className="w-full">
               <thead>
-                <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-6 py-3">Invoice</th>
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-6 py-3">Date</th>
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-6 py-3">Amount</th>
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-6 py-3">Status</th>
-                  <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wide px-6 py-3">Download</th>
+                <tr style={{ background: 'var(--rp-surface-2)', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                  {['Invoice', 'Date', 'Amount', 'Status', ''].map(h => (
+                    <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] dark:text-[#94b8b0]">{h}</th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {invoices.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 text-sm font-mono text-gray-700">{inv.number || inv.id.slice(0, 8)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
+              <tbody>
+                {invoices.map(inv => (
+                  <tr key={inv.id} className="hover:bg-[#fafaf8] transition-colors"
+                    style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
+                    <td className="px-5 py-3.5 text-[12.5px] font-mono text-[#6b8880] dark:text-[#94b8b0]">
+                      {inv.number || inv.id.slice(0, 8)}
+                    </td>
+                    <td className="px-5 py-3.5 text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">
                       {new Date(inv.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </td>
-                    <td className="px-6 py-4 text-sm font-semibold text-gray-900">
+                    <td className="px-5 py-3.5 text-[13px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">
                       {inv.currency} {inv.amount}
                     </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                          inv.status === 'paid'
-                            ? 'bg-green-50 text-green-700'
-                            : inv.status === 'open'
-                            ? 'bg-amber-50 text-amber-700'
-                            : 'bg-gray-100 text-gray-600'
-                        }`}
-                      >
+                    <td className="px-5 py-3.5">
+                      <span className="inline-flex items-center rounded-[7px] border px-[8px] py-[3px] text-[11px] font-semibold capitalize"
+                        style={inv.status === 'paid'
+                          ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }
+                          : inv.status === 'open'
+                          ? { background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.2)', color: '#b89040' }
+                          : { background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-muted)' }}>
                         {inv.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-5 py-3.5 text-right">
                       {inv.pdfUrl && (
-                        <a
-                          href={inv.pdfUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-sm text-[#1a6b5e] hover:underline"
-                        >
-                          <Receipt className="w-3.5 h-3.5" />
-                          PDF
+                        <a href={inv.pdfUrl} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[12.5px] hover:underline"
+                          style={{ color: '#23766a' }}>
+                          <Receipt className="h-3.5 w-3.5" /> PDF
                         </a>
                       )}
                     </td>
@@ -426,11 +343,13 @@ export default function BillingPage() {
         </div>
       )}
 
-      {/* No invoices yet */}
       {invoices.length === 0 && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
-          <Receipt className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">No invoices yet. They will appear here after your first payment.</p>
+        <div className="flex flex-col items-center gap-2 rounded-[14px] border p-10 text-center"
+          style={{ background: 'var(--rp-surface-2)', borderColor: 'var(--rp-border)' }}>
+          <Receipt className="h-10 w-10" style={{ color: '#e0dbd3' }} />
+          <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">
+            No invoices yet. They will appear here after your first payment.
+          </p>
         </div>
       )}
     </div>

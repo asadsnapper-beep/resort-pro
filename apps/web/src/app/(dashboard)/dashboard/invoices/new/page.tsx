@@ -74,12 +74,12 @@ export default function NewInvoicePage() {
       <div className="flex items-center gap-3">
         <button
           onClick={() => router.back()}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 dark:border-white/10 text-gray-500 dark:text-[#94b8b0] hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">New Invoice</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-[#dfd9d0]">New Invoice</h1>
           <p className="text-sm text-muted-foreground">Create a manual invoice for a guest</p>
         </div>
       </div>
@@ -90,11 +90,11 @@ export default function NewInvoicePage() {
         <div className="bg-white rounded-2xl border p-6 space-y-4">
           <div className="flex items-center gap-2 mb-2">
             <User className="h-4 w-4 text-resort-600" />
-            <h2 className="font-semibold text-gray-800">Guest Information</h2>
+            <h2 className="font-semibold text-gray-800 dark:text-[#dfd9d0]">Guest Information</h2>
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">Guest Name <span className="text-red-500">*</span></label>
+            <label className="text-sm font-medium text-gray-700 dark:text-[#94b8b0]">Guest Name <span className="text-red-500">*</span></label>
             <Input
               value={form.guestName}
               onChange={set('guestName')}
@@ -106,7 +106,7 @@ export default function NewInvoicePage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
+              <label className="text-sm font-medium text-gray-700 dark:text-[#94b8b0] flex items-center gap-1">
                 <Mail className="h-3.5 w-3.5" /> Email
               </label>
               <Input
@@ -119,7 +119,7 @@ export default function NewInvoicePage() {
               {errors.guestEmail && <p className="text-xs text-red-500">{errors.guestEmail}</p>}
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
+              <label className="text-sm font-medium text-gray-700 dark:text-[#94b8b0] flex items-center gap-1">
                 <Phone className="h-3.5 w-3.5" /> Phone
               </label>
               <Input
@@ -135,12 +135,12 @@ export default function NewInvoicePage() {
         <div className="bg-white rounded-2xl border p-6 space-y-4">
           <div className="flex items-center gap-2 mb-2">
             <FileText className="h-4 w-4 text-resort-600" />
-            <h2 className="font-semibold text-gray-800">Invoice Settings</h2>
+            <h2 className="font-semibold text-gray-800 dark:text-[#dfd9d0]">Invoice Settings</h2>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
+              <label className="text-sm font-medium text-gray-700 dark:text-[#94b8b0] flex items-center gap-1">
                 <Calendar className="h-3.5 w-3.5" /> Due Date
               </label>
               <Input
@@ -150,7 +150,7 @@ export default function NewInvoicePage() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
+              <label className="text-sm font-medium text-gray-700 dark:text-[#94b8b0] flex items-center gap-1">
                 <Percent className="h-3.5 w-3.5" /> Tax Rate (%)
               </label>
               <Input
@@ -168,7 +168,7 @@ export default function NewInvoicePage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
+              <label className="text-sm font-medium text-gray-700 dark:text-[#94b8b0] flex items-center gap-1">
                 <Tag className="h-3.5 w-3.5" /> Discount Amount ({tenant?.currency ?? 'BDT'})
               </label>
               <Input
@@ -182,7 +182,7 @@ export default function NewInvoicePage() {
               {errors.discountAmt && <p className="text-xs text-red-500">{errors.discountAmt}</p>}
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">Discount Note</label>
+              <label className="text-sm font-medium text-gray-700 dark:text-[#94b8b0]">Discount Note</label>
               <Input
                 value={form.discountNote}
                 onChange={set('discountNote')}
@@ -196,14 +196,14 @@ export default function NewInvoicePage() {
         <div className="bg-white rounded-2xl border p-6 space-y-3">
           <div className="flex items-center gap-2">
             <StickyNote className="h-4 w-4 text-resort-600" />
-            <h2 className="font-semibold text-gray-800">Notes</h2>
+            <h2 className="font-semibold text-gray-800 dark:text-[#dfd9d0]">Notes</h2>
           </div>
           <textarea
             value={form.notes}
             onChange={set('notes')}
             placeholder="Internal notes or message for the guest..."
             rows={3}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-resort-500 resize-none"
+            className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
           />
         </div>
 

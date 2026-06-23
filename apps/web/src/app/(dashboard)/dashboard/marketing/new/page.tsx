@@ -1,73 +1,52 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTheme } from 'next-themes';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { marketingApi } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import {
-  Megaphone, ChevronRight, ChevronLeft, Phone, MessageSquare,
-  Users, Clock, Send, Loader2, Check, Info, Calendar,
+  Megaphone, ChevronRight, ChevronLeft, Users, Clock, Send,
+  Loader2, Check, Info, Calendar,
 } from 'lucide-react';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-type Channel = 'sms' | 'whatsapp' | 'both';
+type Channel      = 'sms' | 'whatsapp' | 'both';
 type AudienceType = 'all' | 'past' | 'upcoming' | 'date_range' | 'vip';
 
 interface WizardState {
-  name:         string;
-  channel:      Channel;
-  audienceType: AudienceType;
-  audienceFilter: {
-    days?:     number;
-    dateFrom?: string;
-    dateTo?:   string;
-    minStays?: number;
-  };
-  message:      string;
-  templateId?:  string;
-  scheduleMode: 'now' | 'later';
-  scheduledAt:  string;
+  name: string; channel: Channel; audienceType: AudienceType;
+  audienceFilter: { days?: number; dateFrom?: string; dateTo?: string; minStays?: number };
+  message: string; templateId?: string; scheduleMode: 'now' | 'later'; scheduledAt: string;
 }
 
 const STEPS = ['Channel', 'Audience', 'Message', 'Schedule', 'Review'];
-
 const CHAR_LIMIT = 160;
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30';
+const labelCls = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+
 export default function NewCampaignPage() {
   const router = useRouter();
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   const [step, setStep] = useState(0);
-  const [audienceCount, setAudienceCount] = useState<number | null>(null);
+  const [audienceCount,  setAudienceCount]  = useState<number | null>(null);
   const [loadingCount, setLoadingCount] = useState(false);
 
   const [form, setForm] = useState<WizardState>({
-    name:           '',
-    channel:        'sms',
-    audienceType:   'all',
-    audienceFilter: {},
-    message:        '',
-    scheduleMode:   'now',
-    scheduledAt:    '',
+    name: '', channel: 'sms', audienceType: 'all',
+    audienceFilter: {}, message: '', scheduleMode: 'now', scheduledAt: '',
   });
-
   const set = (patch: Partial<WizardState>) => setForm(p => ({ ...p, ...patch }));
 
-  // Fetch templates for message step
-  const { data: tplData } = useQuery({
-    queryKey: ['marketing-templates'],
-    queryFn: () => marketingApi.listTemplates(),
-  });
+  const { data: tplData } = useQuery({ queryKey: ['marketing-templates'], queryFn: () => marketingApi.listTemplates() });
   const templates = tplData?.data?.data ?? [];
 
-  // Audience preview whenever audienceType/filter changes
   useEffect(() => {
     if (step !== 1) return;
     let cancelled = false;
-    setLoadingCount(true);
-    setAudienceCount(null);
+    setLoadingCount(true); setAudienceCount(null);
     marketingApi.audiencePreview({ audienceType: form.audienceType, audienceFilter: form.audienceFilter })
       .then(r => { if (!cancelled) setAudienceCount(r.data?.data?.count ?? 0); })
       .catch(() => { if (!cancelled) setAudienceCount(null); })
@@ -76,110 +55,104 @@ export default function NewCampaignPage() {
   }, [step, form.audienceType, form.audienceFilter]);
 
   const createMut = useMutation({
-    mutationFn: (data: any) => marketingApi.createCampaign(data),
+    mutationFn: (data: Record<string, unknown>) => marketingApi.createCampaign(data),
     onSuccess: async (res, vars) => {
       const id = res.data?.data?.id;
       if (vars.sendNow && id) {
         await marketingApi.sendCampaign(id);
         toast({ title: '🚀 Campaign sent!', description: 'Messages are being delivered.' });
       } else {
-        toast({ title: '✓ Campaign saved', description: vars.sendNow ? 'Sending...' : 'Scheduled successfully.' });
+        toast({ title: '✓ Campaign saved', description: 'Scheduled successfully.' });
       }
       router.push('/dashboard/marketing');
     },
-    onError: (e: any) => toast({ title: 'Error', description: e?.response?.data?.error ?? 'Could not create campaign', variant: 'destructive' }),
+    onError: (e: { response?: { data?: { error?: string } } }) =>
+      toast({ title: 'Error', description: e?.response?.data?.error ?? 'Could not create campaign', variant: 'destructive' }),
   });
 
-  // ── Step validation ──────────────────────────────────────────────────────────
   const canNext = () => {
     if (step === 0) return form.name.trim().length > 0;
-    if (step === 1) return true;
     if (step === 2) return form.message.trim().length > 0;
     if (step === 3) return form.scheduleMode === 'now' || form.scheduledAt !== '';
     return true;
   };
-
   const next = () => { if (canNext()) setStep(s => Math.min(s + 1, STEPS.length - 1)); };
   const back = () => setStep(s => Math.max(s - 1, 0));
 
   const handleSubmit = (sendNow: boolean) => {
-    const payload: any = {
-      name:           form.name,
-      channel:        form.channel,
-      audienceType:   form.audienceType,
-      audienceFilter: form.audienceFilter,
-      message:        form.message,
-      sendNow,
+    const payload: Record<string, unknown> = {
+      name: form.name, channel: form.channel,
+      audienceType: form.audienceType, audienceFilter: form.audienceFilter,
+      message: form.message, sendNow,
     };
-    if (!sendNow && form.scheduledAt) {
-      payload.scheduledAt = new Date(form.scheduledAt).toISOString();
-    }
+    if (!sendNow && form.scheduledAt) payload.scheduledAt = new Date(form.scheduledAt).toISOString();
     createMut.mutate({ ...payload, sendNow });
   };
 
   const smsCount = Math.ceil(form.message.length / CHAR_LIMIT) || 1;
 
-  // ── Render steps ─────────────────────────────────────────────────────────────
+  const stepDotCls = (i: number) => {
+    if (i < step)   return { background: '#23766a', color: 'var(--rp-btn-accent-text)' };
+    if (i === step) return { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', boxShadow: '0 0 0 4px rgba(35,118,106,0.18)' };
+    return { background: '#e8e5e0', color: 'var(--rp-text-muted)' };
+  };
 
   return (
-    <div className="p-6 max-w-2xl">
+    <div className="max-w-2xl space-y-6 animate-fade-up">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <Megaphone className="h-6 w-6 text-resort-600" /> New Campaign
+      <div>
+        <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] flex items-center gap-3 text-[#18231f] dark:text-[#dfd9d0]">
+          <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px]" style={{ background: 'var(--rp-teal-bg)' }}>
+            <Megaphone className="h-4 w-4" style={{ color: '#23766a' }} />
+          </div>
+          New Campaign
         </h1>
-        <p className="text-gray-500 text-sm mt-1">Guests-দের SMS বা WhatsApp পাঠাও</p>
+        <p className="mt-[4px] text-[13px] text-[#7a9890] dark:text-[#94b8b0]">Send SMS or WhatsApp to guests</p>
       </div>
 
       {/* Step progress */}
-      <div className="flex items-center gap-2 mb-8">
+      <div className="flex items-center gap-2">
         {STEPS.map((label, i) => (
           <div key={i} className="flex items-center gap-2">
-            <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold transition-colors ${
-              i < step ? 'bg-resort-600 text-white' :
-              i === step ? 'bg-resort-600 text-white ring-4 ring-resort-100' :
-              'bg-gray-100 text-gray-400'
-            }`}>
+            <div className="flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-bold transition-all"
+              style={stepDotCls(i)}>
               {i < step ? <Check className="h-3.5 w-3.5" /> : i + 1}
             </div>
-            <span className={`text-xs font-medium hidden sm:block ${i === step ? 'text-resort-700' : 'text-gray-400'}`}>{label}</span>
-            {i < STEPS.length - 1 && <div className={`h-0.5 w-6 rounded ${i < step ? 'bg-resort-400' : 'bg-gray-200'}`} />}
+            <span className="text-[12px] font-medium hidden sm:block"
+              style={{ color: i === step ? '#23766a' : 'var(--rp-text-faint)' }}>{label}</span>
+            {i < STEPS.length - 1 && (
+              <div className="h-0.5 w-6 rounded"
+                style={{ background: i < step ? '#23766a' : '#e8e5e0' }} />
+            )}
           </div>
         ))}
       </div>
 
-      {/* ── Step 0: Channel + Name ──────────────────────────────────────────── */}
+      {/* ── Step 0: Channel + Name ─────────────────────────────────────────── */}
       {step === 0 && (
-        <div className="space-y-6">
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-gray-700">Campaign Name *</label>
-            <Input
-              value={form.name}
-              onChange={e => set({ name: e.target.value })}
-              placeholder="e.g. Eid Special Offer 2026"
-              className="text-base"
-              autoFocus
-            />
+        <div className="space-y-5">
+          <div>
+            <label className={labelCls}>Campaign Name *</label>
+            <input value={form.name} onChange={e => set({ name: e.target.value })}
+              placeholder="e.g. Eid Special Offer 2026" autoFocus className={inputCls} />
           </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-gray-700">Channel</label>
-            <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className={labelCls}>Channel</label>
+            <div className="grid grid-cols-3 gap-3 mt-1">
               {[
-                { val: 'sms',       label: 'SMS',            icon: '📱', desc: 'সব ফোনে কাজ করে' },
-                { val: 'whatsapp',  label: 'WhatsApp',       icon: '💬', desc: 'শহরের guests এর জন্য ভালো' },
-                { val: 'both',      label: 'SMS + WhatsApp', icon: '📡', desc: 'সব channel, বেশি reach' },
+                { val: 'sms',      label: 'SMS',            icon: '📱', desc: 'Works on all phones' },
+                { val: 'whatsapp', label: 'WhatsApp',       icon: '💬', desc: 'Great for urban guests' },
+                { val: 'both',     label: 'SMS + WhatsApp', icon: '📡', desc: 'Max reach' },
               ].map(opt => (
                 <button key={opt.val} type="button"
                   onClick={() => set({ channel: opt.val as Channel })}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all text-center ${
-                    form.channel === opt.val
-                      ? 'border-resort-500 bg-resort-50 shadow-sm'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}>
+                  className="flex flex-col items-center gap-2 rounded-[12px] border-2 p-4 text-center transition-all"
+                  style={form.channel === opt.val
+                    ? { borderColor: '#23766a', background: 'var(--rp-teal-soft)', boxShadow: '0 0 0 3px rgba(35,118,106,0.1)' }
+                    : { borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)', background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)' }}>
                   <span className="text-2xl">{opt.icon}</span>
-                  <p className="text-sm font-semibold text-gray-800">{opt.label}</p>
-                  <p className="text-xs text-gray-500">{opt.desc}</p>
+                  <p className="text-[12.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">{opt.label}</p>
+                  <p className="text-[11px] text-[#8aa29a] dark:text-[#94b8b0]">{opt.desc}</p>
                 </button>
               ))}
             </div>
@@ -187,47 +160,45 @@ export default function NewCampaignPage() {
         </div>
       )}
 
-      {/* ── Step 1: Audience ────────────────────────────────────────────────── */}
+      {/* ── Step 1: Audience ──────────────────────────────────────────────── */}
       {step === 1 && (
         <div className="space-y-4">
-          <p className="text-sm font-semibold text-gray-700">কাদের পাঠাবে?</p>
-
+          <p className={labelCls}>Who will receive this message?</p>
           <div className="space-y-2">
             {[
-              { val: 'all',        label: 'All Guests',            desc: 'সব guests যাদের phone number আছে',         icon: '👥' },
-              { val: 'past',       label: 'Past Guests',           desc: 'যারা কমপক্ষে একবার check-out করেছে',       icon: '🏨' },
-              { val: 'upcoming',   label: 'Upcoming Guests',       desc: 'আগামী কিছুদিনে check-in আছে এমন guests',   icon: '📅' },
-              { val: 'date_range', label: 'Guests by Date Range',  desc: 'নির্দিষ্ট সময়ে যারা এসেছিল',              icon: '📆' },
-              { val: 'vip',        label: 'VIP / Repeat Guests',   desc: '২+ বার এসেছে এমন loyal guests',            icon: '⭐' },
+              { val: 'all',        label: 'All Guests',           desc: 'All guests with a phone number', icon: '👥' },
+              { val: 'past',       label: 'Past Guests',          desc: 'Guests who have checked out at least once', icon: '🏨' },
+              { val: 'upcoming',   label: 'Upcoming Guests',      desc: 'Guests checking in soon', icon: '📅' },
+              { val: 'date_range', label: 'Guests by Date Range', desc: 'Guests from a specific time period', icon: '📆' },
+              { val: 'vip',        label: 'VIP / Repeat Guests',  desc: 'Loyal guests with 2+ stays', icon: '⭐' },
             ].map(opt => (
               <label key={opt.val}
-                className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                  form.audienceType === opt.val
-                    ? 'border-resort-500 bg-resort-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}>
-                <input type="radio" className="mt-0.5 accent-resort-600"
+                className="flex items-start gap-3 rounded-[12px] border-2 p-4 cursor-pointer transition-all"
+                style={form.audienceType === opt.val
+                  ? { borderColor: '#23766a', background: 'var(--rp-teal-soft)' }
+                  : { borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)', background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)' }}>
+                <input type="radio" className="mt-0.5" style={{ accentColor: '#23766a' }}
                   checked={form.audienceType === opt.val}
                   onChange={() => set({ audienceType: opt.val as AudienceType, audienceFilter: {} })} />
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">{opt.icon} {opt.label}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{opt.desc}</p>
+                  <p className="text-[13px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">{opt.icon} {opt.label}</p>
+                  <p className="text-[12px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">{opt.desc}</p>
                 </div>
               </label>
             ))}
           </div>
 
-          {/* Extra filter fields */}
           {form.audienceType === 'upcoming' && (
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-2">
-              <label className="text-sm font-medium text-gray-700">আগামী কত দিনের মধ্যে check-in?</label>
+            <div className="rounded-[12px] border p-4 space-y-2"
+              style={{ background: 'var(--rp-teal-soft)', borderColor: 'rgba(35,118,106,0.2)' }}>
+              <label className={labelCls}>Check-in within how many days?</label>
               <div className="flex gap-2 flex-wrap">
                 {[3, 7, 14, 30].map(d => (
-                  <button key={d} type="button"
-                    onClick={() => set({ audienceFilter: { days: d } })}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                      form.audienceFilter.days === d ? 'bg-resort-600 text-white border-resort-600' : 'bg-white border-gray-200 text-gray-700'
-                    }`}>
+                  <button key={d} type="button" onClick={() => set({ audienceFilter: { days: d } })}
+                    className="rounded-[8px] border px-3 py-1.5 text-[12.5px] font-medium transition-colors"
+                    style={form.audienceFilter.days === d
+                      ? { background: 'var(--rp-btn-accent)', borderColor: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }
+                      : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)', color: isDark ? '#94b8b0' : 'var(--rp-text-subtle)' }}>
                     {d} days
                   </button>
                 ))}
@@ -236,33 +207,37 @@ export default function NewCampaignPage() {
           )}
 
           {form.audienceType === 'date_range' && (
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-3">
-              <p className="text-sm font-medium text-gray-700">Date range (check-in date)</p>
+            <div className="rounded-[12px] border p-4 space-y-3"
+              style={{ background: 'var(--rp-teal-soft)', borderColor: 'rgba(35,118,106,0.2)' }}>
+              <p className={labelCls}>Date range (check-in date)</p>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs text-gray-500">From</label>
-                  <Input type="date" value={form.audienceFilter.dateFrom ?? ''}
-                    onChange={e => set({ audienceFilter: { ...form.audienceFilter, dateFrom: e.target.value } })} />
+                <div>
+                  <label className={labelCls}>From</label>
+                  <input type="date" value={form.audienceFilter.dateFrom ?? ''}
+                    onChange={e => set({ audienceFilter: { ...form.audienceFilter, dateFrom: e.target.value } })}
+                    className={inputCls} />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-gray-500">To</label>
-                  <Input type="date" value={form.audienceFilter.dateTo ?? ''}
-                    onChange={e => set({ audienceFilter: { ...form.audienceFilter, dateTo: e.target.value } })} />
+                <div>
+                  <label className={labelCls}>To</label>
+                  <input type="date" value={form.audienceFilter.dateTo ?? ''}
+                    onChange={e => set({ audienceFilter: { ...form.audienceFilter, dateTo: e.target.value } })}
+                    className={inputCls} />
                 </div>
               </div>
             </div>
           )}
 
           {form.audienceType === 'vip' && (
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-2">
-              <label className="text-sm font-medium text-gray-700">Minimum stays</label>
+            <div className="rounded-[12px] border p-4 space-y-2"
+              style={{ background: 'var(--rp-teal-soft)', borderColor: 'rgba(35,118,106,0.2)' }}>
+              <label className={labelCls}>Minimum stays</label>
               <div className="flex gap-2">
                 {[2, 3, 5].map(n => (
-                  <button key={n} type="button"
-                    onClick={() => set({ audienceFilter: { minStays: n } })}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                      form.audienceFilter.minStays === n ? 'bg-resort-600 text-white border-resort-600' : 'bg-white border-gray-200 text-gray-700'
-                    }`}>
+                  <button key={n} type="button" onClick={() => set({ audienceFilter: { minStays: n } })}
+                    className="rounded-[8px] border px-3 py-1.5 text-[12.5px] font-medium transition-colors"
+                    style={form.audienceFilter.minStays === n
+                      ? { background: 'var(--rp-btn-accent)', borderColor: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }
+                      : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)', color: isDark ? '#94b8b0' : 'var(--rp-text-subtle)' }}>
                     {n}+ stays
                   </button>
                 ))}
@@ -270,146 +245,145 @@ export default function NewCampaignPage() {
             </div>
           )}
 
-          {/* Count preview */}
-          <div className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium ${
-            audienceCount === 0 ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-green-50 text-green-700 border border-green-100'
-          }`}>
-            {loadingCount ? (
-              <><Loader2 className="h-4 w-4 animate-spin" /> Counting...</>
-            ) : audienceCount === null ? (
-              <><Users className="h-4 w-4" /> Calculating...</>
-            ) : (
-              <><Users className="h-4 w-4" /> <strong>{audienceCount}</strong> guests will receive this message</>
-            )}
+          <div className="flex items-center gap-2 rounded-[10px] border px-4 py-3 text-[13px] font-medium"
+            style={audienceCount === 0
+              ? { background: 'var(--rp-red-bg)', borderColor: 'rgba(200,60,60,0.15)', color: '#c43c3c' }
+              : { background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+            {loadingCount
+              ? <><Loader2 className="h-4 w-4 animate-spin" /> Counting…</>
+              : audienceCount === null
+              ? <><Users className="h-4 w-4" /> Calculating…</>
+              : <><Users className="h-4 w-4" /> <strong>{audienceCount}</strong> guests will receive this message</>}
           </div>
         </div>
       )}
 
-      {/* ── Step 2: Message ─────────────────────────────────────────────────── */}
+      {/* ── Step 2: Message ───────────────────────────────────────────────── */}
       {step === 2 && (
         <div className="space-y-4">
-          {/* Template picker */}
           {templates.length > 0 && (
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-gray-700">Use a template (optional)</label>
+              <label className={labelCls}>Use a template (optional)</label>
               <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
                 {templates
-                  .filter((t: any) => t.channel === 'both' || t.channel === form.channel)
-                  .map((t: any) => (
+                  .filter((t: { channel: string }) => t.channel === 'both' || t.channel === form.channel)
+                  .map((t: { id: string; name: string; message: string }) => (
                     <button key={t.id} type="button"
                       onClick={() => set({ message: t.message, templateId: t.id })}
-                      className="w-full text-left p-3 rounded-xl border hover:border-resort-300 hover:bg-resort-50 transition-colors">
-                      <p className="text-sm font-medium text-gray-800">{t.name}</p>
-                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{t.message}</p>
+                      className="w-full text-left rounded-[10px] border p-3 transition-colors hover:bg-[#f5faf9]"
+                      style={{ borderColor: 'var(--rp-border-md)' }}>
+                      <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{t.name}</p>
+                      <p className="text-[12px] mt-0.5 line-clamp-1 text-[#8aa29a] dark:text-[#94b8b0]">{t.message}</p>
                     </button>
                   ))}
               </div>
-              <div className="h-px bg-gray-100" />
+              <div className="h-px" style={{ background: 'var(--rp-border)' }} />
             </div>
           )}
-
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-gray-700">Message *</label>
-            <textarea
-              value={form.message}
-              onChange={e => set({ message: e.target.value })}
-              rows={5}
-              placeholder={`e.g. Palm Paradise Resort: এই ঈদে বিশেষ অফার! 2 রাত বুক করলে 20% ছাড়। বুক করুন: palmparadise.com/eid`}
-              className="w-full rounded-xl border border-gray-200 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-resort-400 focus:border-transparent"
-            />
-            <div className="flex items-center justify-between text-xs text-gray-400">
-              <span>Available tokens: <code className="bg-gray-100 px-1 rounded">{'{guest_name}'}</code> <code className="bg-gray-100 px-1 rounded">{'{resort_name}'}</code></span>
-              <span className={form.message.length > CHAR_LIMIT ? 'text-amber-600 font-medium' : ''}>
-                {form.message.length} chars
-                {form.channel !== 'whatsapp' && ` · ${smsCount} SMS`}
+          <div>
+            <label className={labelCls}>Message *</label>
+            <textarea value={form.message} onChange={e => set({ message: e.target.value })}
+              rows={5} placeholder="e.g. Palm Paradise Resort: Special offer this weekend — 20% off 2+ night stays. Book: yourresort.com/offer"
+              className={inputCls + ' resize-none'} />
+            <div className="flex items-center justify-between mt-1 text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+              <span>
+                Available tokens:{' '}
+                <code className="rounded-[4px] px-1 py-0.5 text-[10.5px]" style={{ background: 'var(--rp-surface-3)', color: 'var(--rp-text-subtle)' }}>{'{guest_name}'}</code>
+                {' '}
+                <code className="rounded-[4px] px-1 py-0.5 text-[10.5px]" style={{ background: 'var(--rp-surface-3)', color: 'var(--rp-text-subtle)' }}>{'{resort_name}'}</code>
+              </span>
+              <span style={{ color: form.message.length > CHAR_LIMIT ? '#b89040' : 'var(--rp-text-muted)' }}>
+                {form.message.length} chars{form.channel !== 'whatsapp' && ` · ${smsCount} SMS`}
               </span>
             </div>
           </div>
-
           {form.channel !== 'whatsapp' && smsCount > 1 && (
-            <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-xl p-3 text-sm text-amber-700">
+            <div className="flex items-start gap-2 rounded-[10px] border p-3 text-[12.5px]"
+              style={{ background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.2)', color: '#b89040' }}>
               <Info className="h-4 w-4 mt-0.5 shrink-0" />
-              <p>This message is {smsCount} SMS parts. Each part costs separately. Try to keep it under 160 characters.</p>
+              <p>This message is {smsCount} SMS parts. Each part costs separately. Keep it under 160 characters.</p>
             </div>
           )}
         </div>
       )}
 
-      {/* ── Step 3: Schedule ────────────────────────────────────────────────── */}
+      {/* ── Step 3: Schedule ──────────────────────────────────────────────── */}
       {step === 3 && (
         <div className="space-y-4">
-          <p className="text-sm font-semibold text-gray-700">কখন পাঠাবে?</p>
-
+          <p className={labelCls}>When to send?</p>
           <div className="space-y-2">
             {[
-              { val: 'now',   label: 'এখনই পাঠাও',   desc: 'Submit করার সাথে সাথে send শুরু হবে', icon: '🚀' },
-              { val: 'later', label: 'Schedule করো',  desc: 'নির্দিষ্ট দিন ও সময়ে পাঠাবে',        icon: '⏰' },
+              { val: 'now',   label: 'Send Now',    desc: 'Starts sending immediately after submit', icon: '🚀' },
+              { val: 'later', label: 'Schedule',    desc: 'Send on a specific date and time',        icon: '⏰' },
             ].map(opt => (
               <label key={opt.val}
-                className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                  form.scheduleMode === opt.val
-                    ? 'border-resort-500 bg-resort-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}>
-                <input type="radio" className="mt-0.5 accent-resort-600"
+                className="flex items-start gap-3 rounded-[12px] border-2 p-4 cursor-pointer transition-all"
+                style={form.scheduleMode === opt.val
+                  ? { borderColor: '#23766a', background: 'var(--rp-teal-soft)' }
+                  : { borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)', background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)' }}>
+                <input type="radio" className="mt-0.5" style={{ accentColor: '#23766a' }}
                   checked={form.scheduleMode === opt.val}
                   onChange={() => set({ scheduleMode: opt.val as 'now' | 'later' })} />
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">{opt.icon} {opt.label}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{opt.desc}</p>
+                  <p className="text-[13px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">{opt.icon} {opt.label}</p>
+                  <p className="text-[12px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">{opt.desc}</p>
                 </div>
               </label>
             ))}
           </div>
-
           {form.scheduleMode === 'later' && (
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Date & Time</label>
-              <Input
-                type="datetime-local"
-                value={form.scheduledAt}
+              <label className={labelCls}>Date & Time</label>
+              <input type="datetime-local" value={form.scheduledAt}
                 onChange={e => set({ scheduledAt: e.target.value })}
                 min={new Date().toISOString().slice(0, 16)}
-              />
-              <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs text-amber-700">
+                className={inputCls} />
+              <div className="flex items-start gap-2 rounded-[10px] border p-3 text-[12px]"
+                style={{ background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.2)', color: '#b89040' }}>
                 <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                <p>Marketing SMS/WhatsApp রাত 10টা থেকে সকাল 8টার মধ্যে পাঠানো যাবে না (BTRC guideline)</p>
+                <p>Marketing SMS/WhatsApp should not be sent between 10pm and 8am (BTRC guideline)</p>
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* ── Step 4: Review & Send ───────────────────────────────────────────── */}
+      {/* ── Step 4: Review ────────────────────────────────────────────────── */}
       {step === 4 && (
         <div className="space-y-4">
-          <p className="text-sm font-semibold text-gray-700">Campaign Summary</p>
-
-          <div className="bg-white rounded-2xl border divide-y">
+          <p className={labelCls}>Campaign Summary</p>
+          <div className="rounded-[14px] border overflow-hidden"
+            style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
             {[
               { label: 'Campaign Name', value: form.name },
               { label: 'Channel',       value: form.channel === 'sms' ? '📱 SMS' : form.channel === 'whatsapp' ? '💬 WhatsApp' : '📱💬 SMS + WhatsApp' },
-              { label: 'Audience',      value: `${form.audienceType === 'all' ? 'All Guests' : form.audienceType === 'past' ? 'Past Guests' : form.audienceType === 'upcoming' ? `Upcoming (${form.audienceFilter.days ?? 7} days)` : form.audienceType === 'vip' ? `VIP (${form.audienceFilter.minStays ?? 2}+ stays)` : 'Date Range'} · ${audienceCount ?? '?'} recipients` },
+              { label: 'Audience',      value: `${
+                form.audienceType === 'all'        ? 'All Guests' :
+                form.audienceType === 'past'       ? 'Past Guests' :
+                form.audienceType === 'upcoming'   ? `Upcoming (${form.audienceFilter.days ?? 7} days)` :
+                form.audienceType === 'vip'        ? `VIP (${form.audienceFilter.minStays ?? 2}+ stays)` : 'Date Range'
+              } · ${audienceCount ?? '?'} recipients` },
               { label: 'Send Time',     value: form.scheduleMode === 'now' ? '🚀 Immediately' : `⏰ ${form.scheduledAt ? new Date(form.scheduledAt).toLocaleString('en-GB') : '—'}` },
-            ].map(({ label, value }) => (
-              <div key={label} className="flex items-start justify-between px-4 py-3 text-sm">
-                <span className="text-gray-500 w-32 shrink-0">{label}</span>
-                <span className="text-gray-900 font-medium text-right">{value}</span>
+            ].map(({ label, value }, i, arr) => (
+              <div key={label} className="flex items-start justify-between px-4 py-3 text-[13px]"
+                style={{ borderBottom: i < arr.length - 1 ? '1px solid rgba(0,0,0,0.05)' : undefined }}>
+                <span className="w-32 shrink-0 text-[#8aa29a] dark:text-[#94b8b0]">{label}</span>
+                <span className="font-medium text-right text-[#18231f] dark:text-[#dfd9d0]">{value}</span>
               </div>
             ))}
           </div>
 
-          {/* Message preview */}
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-gray-700">Message Preview</p>
-            <div className="bg-gray-50 border rounded-xl p-4 text-sm text-gray-800 whitespace-pre-wrap font-mono">
+          <div>
+            <p className={labelCls}>Message Preview</p>
+            <div className="rounded-[12px] border p-4 text-[13px] whitespace-pre-wrap font-mono"
+              style={{ background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border)', color: 'var(--rp-text)' }}>
               {form.message || '(empty)'}
             </div>
           </div>
 
-          {/* Warning if no recipients */}
           {audienceCount === 0 && (
-            <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl p-3 text-sm text-red-700">
+            <div className="flex items-start gap-2 rounded-[10px] border p-3 text-[12.5px]"
+              style={{ background: 'var(--rp-red-bg)', borderColor: 'rgba(200,60,60,0.15)', color: '#c43c3c' }}>
               <Info className="h-4 w-4 mt-0.5 shrink-0" />
               No recipients found. Go back and change the audience filter.
             </div>
@@ -417,34 +391,38 @@ export default function NewCampaignPage() {
         </div>
       )}
 
-      {/* ── Navigation buttons ───────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between mt-8 pt-6 border-t">
-        <Button variant="outline" onClick={back} disabled={step === 0} className="gap-2">
+      {/* Navigation */}
+      <div className="flex items-center justify-between pt-6" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+        <button onClick={back} disabled={step === 0}
+          className="flex items-center gap-2 rounded-[9px] border px-4 py-2 text-[13px] font-medium transition-colors disabled:opacity-40 hover:bg-[#f4f1eb]"
+          style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
           <ChevronLeft className="h-4 w-4" /> Back
-        </Button>
+        </button>
 
         {step < STEPS.length - 1 ? (
-          <Button onClick={next} disabled={!canNext()} className="gap-2 bg-resort-600 hover:bg-resort-700">
+          <button onClick={next} disabled={!canNext()}
+            className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium disabled:opacity-40 hover:opacity-90"
+            style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
             Next <ChevronRight className="h-4 w-4" />
-          </Button>
+          </button>
         ) : (
           <div className="flex gap-3">
-            <Button variant="outline"
-              onClick={() => handleSubmit(false)}
-              loading={createMut.isPending}
-              disabled={audienceCount === 0}
-              className="gap-2">
+            <button onClick={() => handleSubmit(false)}
+              disabled={createMut.isPending || audienceCount === 0}
+              className="flex items-center gap-2 rounded-[9px] border px-4 py-2 text-[13px] font-medium disabled:opacity-40 hover:bg-[#f4f1eb]"
+              style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
+              {createMut.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               <Clock className="h-4 w-4" />
               {form.scheduleMode === 'later' ? 'Schedule' : 'Save as Draft'}
-            </Button>
+            </button>
             {form.scheduleMode === 'now' && (
-              <Button
-                onClick={() => handleSubmit(true)}
-                loading={createMut.isPending}
-                disabled={audienceCount === 0}
-                className="gap-2 bg-resort-600 hover:bg-resort-700">
+              <button onClick={() => handleSubmit(true)}
+                disabled={createMut.isPending || audienceCount === 0}
+                className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium disabled:opacity-40 hover:opacity-90"
+                style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+                {createMut.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                 <Send className="h-4 w-4" /> Send Campaign
-              </Button>
+              </button>
             )}
           </div>
         )}

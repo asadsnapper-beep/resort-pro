@@ -1,5 +1,6 @@
 'use client';
 
+import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bookingsApi } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -69,7 +70,7 @@ function AddExtraModal({ bookingId, onClose }: { bookingId: string; onClose: () 
     onError: () => toast({ title: 'Failed to add charge', variant: 'destructive' }),
   });
 
-  return (
+  return createPortal((
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm p-6">
         <h3 className="text-lg font-bold mb-4">Add Extra Charge</h3>
@@ -121,7 +122,7 @@ function AddExtraModal({ bookingId, onClose }: { bookingId: string; onClose: () 
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 export default function InvoicePage() {
