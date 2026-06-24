@@ -3,6 +3,7 @@ import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { prisma } from '@resort-pro/database';
+import { checkStaffLimit } from '../utils/entitlement';
 import { requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams } from '../utils/response';
 import { sendEmail } from '../services/email';
@@ -66,6 +67,17 @@ export async function staffRoutes(app: FastifyInstance) {
       const { db } = request;
       const { tenantId } = request.user as JwtPayload;
       const body = createStaffSchema.parse(request.body);
+
+      // Plan limit check
+      const limitCheck = await checkStaffLimit(tenantId);
+      if (!limitCheck.allowed) {
+        return reply.status(403).send({
+          success: false,
+          error: `Staff limit reached. Your plan allows ${limitCheck.limit} staff seats. Upgrade to add more.`,
+          code: 'STAFF_LIMIT_REACHED',
+          data: { limit: limitCheck.limit, current: limitCheck.current },
+        });
+      }
 
       // user.findFirst scoped by db — checks within this tenant
       const existing = await db.user.findFirst({ where: { email: body.email } });

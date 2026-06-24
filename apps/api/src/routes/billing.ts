@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import Stripe from 'stripe';
 import { prisma } from '@resort-pro/database';
 import { createAdminNotification } from '../utils/notifications';
+import { applyPlanFlagsToTenant, resolveTenantEntitlement, getPlanConfigs } from '../utils/entitlement';
 
 // ── Stripe client ──────────────────────────────────────────────────────────
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
@@ -83,6 +84,11 @@ export async function billingRoutes(app: FastifyInstance) {
     const isPastDue = tenant.planStatus === 'past_due';
     const isCanceled = tenant.planStatus === 'canceled';
 
+    const [entitlement, planConfigs] = await Promise.all([
+      resolveTenantEntitlement(tenantId),
+      getPlanConfigs(),
+    ]);
+
     return reply.send({
       success: true,
       data: {
@@ -99,6 +105,13 @@ export async function billingRoutes(app: FastifyInstance) {
         hasStripeCustomer: !!tenant.stripeCustomerId,
         hasSubscription: !!tenant.stripeSubscriptionId,
         availablePlans: PLANS,
+        entitlement: {
+          roomLimit: entitlement.roomLimit,
+          staffLimit: entitlement.staffLimit,
+          aiMonthlyTokenCap: entitlement.aiMonthlyTokenCap,
+          flags: entitlement.flags,
+        },
+        planConfigs,
       },
     });
   });
@@ -393,18 +406,22 @@ async function handleSubscriptionCheckout(session: Stripe.Checkout.Session) {
     ? await stripe.subscriptions.retrieve(session.subscription as string)
     : null;
 
+  const newPlan = planMap[planKey] || 'STARTER';
   await prisma.tenant.update({
     where: { id: tenantId },
     data: {
       stripeCustomerId: session.customer as string,
       stripeSubscriptionId: session.subscription as string,
-      plan: planMap[planKey] || 'STARTER',
+      plan: newPlan,
       planStatus: sub?.status || 'active',
       currentPeriodEnd: sub?.current_period_end
         ? new Date(sub.current_period_end * 1000)
         : undefined,
     },
   });
+
+  // Auto-apply plan feature flags
+  await applyPlanFlagsToTenant(tenantId, newPlan);
 }
 
 async function updateSubscriptionInDb(sub: Stripe.Subscription) {

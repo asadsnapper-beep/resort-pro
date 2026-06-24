@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams } from '../utils/response';
+import { checkRoomLimit } from '../utils/entitlement';
 
 const roomSchema = z.object({
   number:       z.string().min(1).max(10),
@@ -158,6 +159,18 @@ export async function roomRoutes(app: FastifyInstance) {
 
       const existing = await db.room.findFirst({ where: { number: body.number } });
       if (existing) return reply.status(409).send({ success: false, error: 'Room number already exists' });
+
+      // Plan limit check
+      const { tenantId } = request.user as { tenantId: string };
+      const limitCheck = await checkRoomLimit(tenantId);
+      if (!limitCheck.allowed) {
+        return reply.status(403).send({
+          success: false,
+          error: `Room limit reached. Your plan allows ${limitCheck.limit} rooms. Upgrade to add more.`,
+          code: 'ROOM_LIMIT_REACHED',
+          data: { limit: limitCheck.limit, current: limitCheck.current } as unknown,
+        });
+      }
 
       const room = await db.room.create({ data: body });
       return reply.status(201).send(ok(room, 'Room created'));

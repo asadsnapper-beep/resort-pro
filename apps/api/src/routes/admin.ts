@@ -13,6 +13,7 @@ import { ok } from '../utils/response';
 import { createAdminNotification } from '../utils/notifications';
 import { computeChurnRisk } from '../utils/churn';
 import { FLAG_REGISTRY, FLAG_MAP } from '../utils/feature-flags';
+import { applyPlanFlagsToTenant, getPlanConfigs } from '../utils/entitlement';
 import { anonymizeTenant, collectTenantExport, getPendingErasures } from '../utils/gdpr';
 import { metrics } from '../utils/metrics';
 import { getStorageConfig, invalidateStorageCache, uploadToStorage, deleteFromStorage, type StorageConfig } from '../services/storage';
@@ -351,8 +352,14 @@ export async function adminRoutes(app: FastifyInstance) {
 
     const updated = await prisma.tenant.update({ where: { id }, data });
 
+    // Auto-apply plan flags when plan changes
+    const isPlanChange = plan && before?.plan !== plan;
+    if (isPlanChange) {
+      await applyPlanFlagsToTenant(id, plan);
+    }
+
     const adminUser = request.user as any;
-    const action = plan && before?.plan !== plan ? 'plan_change'
+    const action = isPlanChange ? 'plan_change'
       : isActive === true ? 'reactivate'
       : isActive === false ? 'suspend'
       : 'tenant_update';

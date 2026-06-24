@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import { useAuthStore } from '@/store/auth';
 import { api } from '@/lib/api';
-import { Loader2, Sparkles, ChevronRight } from 'lucide-react';
+import { Loader2, Sparkles, ChevronRight, Languages } from 'lucide-react';
 
 // ─── Role definitions ─────────────────────────────────────────────────────────
 const ROLES = [
@@ -109,8 +110,16 @@ const ROLES = [
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function DemoPage() {
   const router = useRouter();
+  const locale = useLocale();
+  const isBn = locale === 'bn';
   const { setAuth, clearAuth } = useAuthStore();
-  const [loading, setLoading] = useState<string | null>(null); // which role is loading
+  const [loading, setLoading] = useState<string | null>(null);
+
+  const switchLocale = useCallback(() => {
+    const next = isBn ? 'en' : 'bn';
+    document.cookie = `locale=${next}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+    router.refresh();
+  }, [isBn, router]);
 
   const handleRoleSelect = async (role: string) => {
     setLoading(role);
@@ -131,7 +140,7 @@ export default function DemoPage() {
     } catch (err: unknown) {
       setLoading(null);
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      alert(`Demo login failed: ${msg ?? 'API server may be down. Please try again.'}`);
+      alert(`Demo login failed: ${msg ?? (isBn ? 'API server বন্ধ থাকতে পারে। আবার চেষ্টা করুন।' : 'API server may be down. Please try again.')}`);
     }
   };
 
@@ -145,9 +154,18 @@ export default function DemoPage() {
           </div>
           <span className="font-semibold text-white text-lg">ResortPro</span>
         </div>
-        <a href="/" className="text-sm text-white/50 hover:text-white transition-colors">
-          ← Back to Home
-        </a>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={switchLocale}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 hover:text-white hover:bg-white/10 transition-all"
+          >
+            <Languages className="h-4 w-4" />
+            <span>{isBn ? 'English' : 'বাংলা'}</span>
+          </button>
+          <a href="/" className="text-sm text-white/50 hover:text-white transition-colors">
+            {isBn ? '← হোমে ফিরুন' : '← Back to Home'}
+          </a>
+        </div>
       </div>
 
       {/* Content */}
@@ -157,13 +175,13 @@ export default function DemoPage() {
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 rounded-full bg-gold-500/15 border border-gold-500/30 px-4 py-1.5 text-gold-400 text-sm font-medium mb-5">
             <Sparkles className="h-3.5 w-3.5" />
-            Interactive Demo — No sign-up required
+            {isBn ? 'ইন্টারেক্টিভ ডেমো — সাইনআপ লাগবে না' : 'Interactive Demo — No sign-up required'}
           </div>
           <h1 className="text-4xl font-bold text-white mb-3">
-            কোন role-এ demo দেখতে চান?
+            {isBn ? 'কোন role-এ demo দেখতে চান?' : 'Which role would you like to explore?'}
           </h1>
           <p className="text-white/50 text-lg">
-            Choose your role to explore ResortPro from that perspective
+            {isBn ? 'আপনার role বেছে নিন এবং ResortPro explore করুন' : 'Choose your role to explore ResortPro from that perspective'}
           </p>
         </div>
 
@@ -182,7 +200,7 @@ export default function DemoPage() {
                 <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/40 backdrop-blur-sm">
                   <div className="flex items-center gap-2 text-white font-medium">
                     <Loader2 className="h-5 w-5 animate-spin" />
-                    Logging in...
+                    {isBn ? 'লগইন হচ্ছে...' : 'Logging in...'}
                   </div>
                 </div>
               )}
@@ -192,8 +210,7 @@ export default function DemoPage() {
                 <div className="flex items-center gap-3">
                   <span className="text-4xl">{r.emoji}</span>
                   <div>
-                    <p className="font-bold text-white text-lg leading-tight">{r.title}</p>
-                    <p className="text-white/40 text-sm">{r.titleBn}</p>
+                    <p className="font-bold text-white text-lg leading-tight">{isBn ? r.titleBn : r.title}</p>
                   </div>
                 </div>
                 <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${r.badgeColor}`}>
@@ -202,8 +219,7 @@ export default function DemoPage() {
               </div>
 
               {/* Description */}
-              <p className="text-white/60 text-sm mb-1">{r.description}</p>
-              <p className="text-white/35 text-xs mb-5">{r.descBn}</p>
+              <p className="text-white/60 text-sm mb-5">{isBn ? r.descBn : r.description}</p>
 
               {/* Feature list */}
               <ul className="space-y-1.5">
@@ -218,10 +234,10 @@ export default function DemoPage() {
               {/* CTA arrow */}
               <div className="mt-5 flex items-center gap-1 text-sm font-semibold text-white/70 group-hover:text-white transition-colors">
                 {loading === r.role ? (
-                  <span>Setting up your demo...</span>
+                  <span>{isBn ? 'লগইন হচ্ছে...' : 'Setting up your demo...'}</span>
                 ) : (
                   <>
-                    <span>Explore as {r.title}</span>
+                    <span>{isBn ? `${r.titleBn} হিসেবে দেখুন` : `Explore as ${r.title}`}</span>
                     <ChevronRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
                   </>
                 )}
@@ -232,9 +248,10 @@ export default function DemoPage() {
 
         {/* Footer note */}
         <p className="text-center text-white/30 text-sm mt-10">
-          🔒 This is a sandboxed demo environment — no real data, no account needed.
-          <br />
-          Demo session expires after 90 minutes.
+          {isBn
+            ? <>🔒 এটি একটি sandbox demo — কোনো real data বা account দরকার নেই।<br />Demo session ৯০ মিনিট পর শেষ হয়।</>
+            : <>🔒 This is a sandboxed demo environment — no real data, no account needed.<br />Demo session expires after 90 minutes.</>
+          }
         </p>
       </div>
     </div>
