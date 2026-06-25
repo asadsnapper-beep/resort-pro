@@ -10,11 +10,12 @@ import {
   Shield, Building2, ExternalLink, Receipt, Loader2, Star, ArrowRight,
 } from 'lucide-react';
 
-type PlanKey = 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';
+type PlanKey = 'FREE' | 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';
 
-type PlanDef = {
-  name: string; price: number; currency: string;
-  features: string[]; roomLimit: number;
+type PlanConfig = {
+  key: string; name: string; price: number; annualPrice?: number;
+  roomLimit: number; staffLimit: number; aiMonthlyTokenCap: number;
+  flags: string[]; features: string[];
 };
 
 type BillingStatus = {
@@ -22,7 +23,9 @@ type BillingStatus = {
   isTrialing: boolean; isActive: boolean; isPastDue: boolean;
   isCanceled: boolean; currentPeriodEnd: string | null;
   trialEndsAt: string | null; hasStripeCustomer: boolean;
-  hasSubscription: boolean; availablePlans: Record<PlanKey, PlanDef>;
+  hasSubscription: boolean;
+  planConfigs?: PlanConfig[];
+  entitlement?: { roomLimit: number; staffLimit: number; aiMonthlyTokenCap: number; flags: Record<string, boolean> };
 };
 
 type Invoice = {
@@ -58,15 +61,17 @@ function StatusPill({ status, trialDaysLeft }: { status: string; trialDaysLeft: 
   );
 }
 
-function PlanCard({ planKey, plan, currentPlan, onSelect, loading }: {
-  planKey: PlanKey; plan: PlanDef; currentPlan: string;
+function PlanCard({ plan, currentPlan, onSelect, loading }: {
+  plan: PlanConfig; currentPlan: string;
   onSelect: (key: PlanKey) => void; loading: string | null;
 }) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
+  const planKey = plan.key as PlanKey;
   const isCurrent = currentPlan.toUpperCase() === planKey;
   const isPro = planKey === 'PROFESSIONAL';
-  const icons: Record<PlanKey, React.ReactNode> = {
+  const iconMap: Record<string, React.ReactNode> = {
+    FREE:         <Zap className="h-5 w-5" />,
     STARTER:      <Zap className="h-5 w-5" />,
     PROFESSIONAL: <Star className="h-5 w-5" />,
     ENTERPRISE:   <Shield className="h-5 w-5" />,
@@ -77,7 +82,7 @@ function PlanCard({ planKey, plan, currentPlan, onSelect, loading }: {
       style={isPro
         ? { borderColor: '#23766a', boxShadow: '0 4px 24px rgba(35,118,106,0.12)' }
         : isCurrent
-        ? { borderColor: 'rgba(184,144,64,0.4)', background: '#fffdf6' }
+        ? { borderColor: 'rgba(184,144,64,0.4)', background: isDark ? 'rgba(184,144,64,0.05)' : '#fffdf6' }
         : { borderColor: 'var(--rp-border-md)' }}>
       {isPro && (
         <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
@@ -88,13 +93,13 @@ function PlanCard({ planKey, plan, currentPlan, onSelect, loading }: {
       {isCurrent && (
         <div className="absolute -top-3.5 right-4">
           <span className="rounded-full px-3 py-1 text-[11px] font-bold"
-            style={{ background: '#b89040', color: 'var(--rp-surface)' }}>CURRENT PLAN</span>
+            style={{ background: '#b89040', color: '#fff' }}>CURRENT PLAN</span>
         </div>
       )}
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-[10px]"
           style={isPro ? { background: '#23766a', color: 'var(--rp-btn-accent-text)' } : { background: 'var(--rp-surface-3)', color: 'var(--rp-text-muted)' }}>
-          {icons[planKey]}
+          {iconMap[planKey] ?? <Zap className="h-5 w-5" />}
         </div>
         <div>
           <h3 className="font-bold text-[15px] text-[#18231f] dark:text-[#dfd9d0]">{plan.name}</h3>
@@ -103,9 +108,11 @@ function PlanCard({ planKey, plan, currentPlan, onSelect, loading }: {
           </p>
         </div>
       </div>
-      <div>
-        <span className="text-[36px] font-bold text-[#18231f] dark:text-[#dfd9d0]">${plan.price}</span>
-        <span className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">/month</span>
+      <div className="flex items-end gap-1">
+        <span className="text-[36px] font-bold leading-none text-[#18231f] dark:text-[#dfd9d0]">
+          {plan.price === 0 ? 'Free' : `$${plan.price}`}
+        </span>
+        {plan.price > 0 && <span className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0] mb-1">/month</span>}
       </div>
       <ul className="flex flex-1 flex-col gap-2">
         {plan.features.map(f => (
@@ -115,18 +122,20 @@ function PlanCard({ planKey, plan, currentPlan, onSelect, loading }: {
           </li>
         ))}
       </ul>
-      <button onClick={() => onSelect(planKey)} disabled={isCurrent || loading !== null}
-        className="flex w-full items-center justify-center gap-2 rounded-[9px] py-2 text-[13px] font-medium transition-colors disabled:opacity-60 hover:opacity-90"
-        style={isPro
-          ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }
-          : isCurrent
-          ? { background: 'var(--rp-surface-3)', color: 'var(--rp-text-faint)', cursor: 'not-allowed' }
-          : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', border: isDark ? '2px solid #3a9a8b' : '2px solid #23766a', color: isDark ? '#5bbfb0' : '#23766a' }}>
-        {loading === planKey
-          ? <Loader2 className="h-4 w-4 animate-spin" />
-          : <ArrowRight className="h-4 w-4" />}
-        {isCurrent ? 'Current Plan' : `Upgrade to ${plan.name}`}
-      </button>
+      {planKey !== 'FREE' && (
+        <button onClick={() => onSelect(planKey)} disabled={isCurrent || loading !== null}
+          className="flex w-full items-center justify-center gap-2 rounded-[9px] py-2 text-[13px] font-medium transition-colors disabled:opacity-60 hover:opacity-90"
+          style={isPro
+            ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }
+            : isCurrent
+            ? { background: 'var(--rp-surface-3)', color: 'var(--rp-text-faint)', cursor: 'not-allowed' }
+            : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', border: isDark ? '2px solid #3a9a8b' : '2px solid #23766a', color: isDark ? '#5bbfb0' : '#23766a' }}>
+          {loading === planKey
+            ? <Loader2 className="h-4 w-4 animate-spin" />
+            : <ArrowRight className="h-4 w-4" />}
+          {isCurrent ? 'Current Plan' : `Upgrade to ${plan.name}`}
+        </button>
+      )}
     </div>
   );
 }
@@ -281,9 +290,10 @@ export default function BillingPage() {
         <h2 className="font-display text-[19px] font-semibold mb-1 text-[#18231f] dark:text-[#dfd9d0]">Choose Your Plan</h2>
         <p className="text-[13px] mb-6 text-[#8aa29a] dark:text-[#94b8b0]">All plans include a 3-month free trial. Cancel anytime.</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {billing?.availablePlans &&
-            (Object.entries(billing.availablePlans) as [PlanKey, PlanDef][]).map(([key, plan]) => (
-              <PlanCard key={key} planKey={key} plan={plan}
+          {(billing?.planConfigs ?? [])
+            .filter(p => p.key !== 'FREE')
+            .map(plan => (
+              <PlanCard key={plan.key} plan={plan}
                 currentPlan={currentPlan} onSelect={handleUpgrade} loading={loadingPlan} />
             ))}
         </div>

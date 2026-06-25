@@ -7,6 +7,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { X, Plus, Film, Loader2, BedDouble, Zap, Crown, Home, Leaf, Waves } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { propertyApi } from '@/lib/api';
+import { useRoomTypeLabels } from '@/hooks/use-room-type-labels';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 import type { Room } from '@resort-pro/types';
 
@@ -36,7 +39,7 @@ type FormData = z.infer<typeof schema>;
 interface Props {
   open: boolean;
   onClose: () => void;
-  onSubmit: (data: FormData & { amenities: string[]; images: string[]; videos: string[] }) => void;
+  onSubmit: (data: FormData & { amenities: string[]; images: string[]; videos: string[]; propertyId?: string | null }) => void;
   loading: boolean;
   room?: Room | null;
 }
@@ -57,6 +60,7 @@ const err = 'mt-1 text-[11.5px] text-[#c43c3c]';
 export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
+  const { getLabel: getRoomTypeLabel } = useRoomTypeLabels();
   const [mounted, setMounted] = useState(false);
   const [amenities,    setAmenities]    = useState<string[]>([]);
   const [amenityInput, setAmenityInput] = useState('');
@@ -65,6 +69,15 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
   const [videoInput,   setVideoInput]   = useState('');
   const [videoError,   setVideoError]   = useState('');
   const [selectedType, setSelectedType] = useState<typeof ROOM_TYPES[number]>('STANDARD');
+  const [propertyId,   setPropertyId]   = useState<string>('');
+
+  const { data: propertiesRes } = useQuery({
+    queryKey: ['properties'],
+    queryFn: () => propertyApi.list({ limit: 50 }).then(r => r.data),
+    retry: false,
+    enabled: open,
+  });
+  const properties: { id: string; name: string }[] = propertiesRes?.data ?? [];
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -88,10 +101,12 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
       setAmenities(room.amenities ?? []);
       setImages(room.images ?? []);
       setVideos(room.videos ?? []);
+      setPropertyId((room as Room & { propertyId?: string | null }).propertyId ?? '');
     } else {
       reset({ type: 'STANDARD', maxOccupancy: 2, basePrice: 100 });
       setSelectedType('STANDARD');
       setAmenities([]); setImages([]); setVideos([]);
+      setPropertyId('');
     }
     setAmenityInput(''); setVideoInput(''); setVideoError('');
   }, [room, reset, open]);
@@ -119,7 +134,7 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
     setVideos(p => [...p, t]); setVideoInput(''); setVideoError('');
   };
 
-  const submit = (data: FormData) => onSubmit({ ...data, amenities, images, videos });
+  const submit = (data: FormData) => onSubmit({ ...data, amenities, images, videos, propertyId: propertyId || null });
 
   if (!mounted || !open) return null;
 
@@ -224,13 +239,30 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', borderRadius: '7px', background: active ? 'rgba(255,255,255,0.6)' : 'var(--rp-surface-4)' }}>
                           <m.Icon style={{ width: '14px', height: '14px', color: active ? m.text : 'var(--rp-text-faint)' }} />
                         </div>
-                        <span style={{ fontSize: '11px', fontWeight: 600, color: active ? m.text : 'var(--rp-text-muted)' }}>{m.label}</span>
+                        <span style={{ fontSize: '11px', fontWeight: 600, color: active ? m.text : 'var(--rp-text-muted)' }}>{getRoomTypeLabel(t)}</span>
                       </button>
                     );
                   })}
                 </div>
                 <input type="hidden" {...register('type')} value={selectedType} />
               </div>
+
+              {/* Property (only shown if multi-property is enabled) */}
+              {properties.length > 0 && (
+                <div>
+                  <label className={lbl}>Property</label>
+                  <select
+                    value={propertyId}
+                    onChange={e => setPropertyId(e.target.value)}
+                    className={inp}
+                  >
+                    <option value="">— No property (main resort) —</option>
+                    {properties.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Description */}
               <div>

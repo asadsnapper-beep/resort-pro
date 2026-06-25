@@ -115,6 +115,7 @@ export const DEFAULT_PLAN_CONFIGS: PlanConfig[] = [
       'advanced_reports',
       'beta_analytics',
       'revenue_forecast',
+      'multi_property',
     ],
     features: [
       'Unlimited rooms & staff',

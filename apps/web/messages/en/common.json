@@ -29,7 +29,8 @@
     "channels": "Channels",
     "referrals": "Referrals",
     "roles": "Roles",
-    "orders": "F&B Orders"
+    "orders": "F&B Orders",
+    "properties": "Properties"
   },
   "groups": {
     "overview": "Overview",

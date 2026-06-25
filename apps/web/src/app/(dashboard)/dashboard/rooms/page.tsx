@@ -12,6 +12,7 @@ import { formatCurrency } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { Plus, BedDouble, Users, DollarSign, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Room } from '@resort-pro/types';
+import { useRoomTypeLabels } from '@/hooks/use-room-type-labels';
 
 interface RoomWithBooking extends Room {
   currentBooking?: {
@@ -59,6 +60,7 @@ const stats_default = { total: 0, available: 0, occupied: 0, cleaning: 0, mainte
 export default function RoomsPage() {
   const queryClient = useQueryClient();
   const { resolvedTheme } = useTheme();
+  const { getLabel: getRoomTypeLabel } = useRoomTypeLabels();
   const isDark = resolvedTheme === 'dark';
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter,   setTypeFilter]   = useState('');
@@ -201,7 +203,7 @@ export default function RoomsPage() {
               style={typeFilter === t
                 ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', borderColor: '#1b342f' }
                 : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', color: isDark ? '#94b8b0' : 'var(--rp-text-subtle)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)' }}>
-              {t ? ROOM_TYPE_LABELS[t] : 'All'}
+              {t ? getRoomTypeLabel(t) : 'All'}
             </button>
           ))}
         </div>
@@ -270,7 +272,7 @@ export default function RoomsPage() {
                           <span className="font-mono text-[11px] font-bold text-[#8aa29a]">#{room.number}</span>
                           <span className="rounded-[6px] px-[8px] py-[3px] text-[11px] font-semibold"
                             style={{ background: typeStyle.bg, color: typeStyle.text }}>
-                            {ROOM_TYPE_LABELS[room.type]}
+                            {getRoomTypeLabel(room.type)}
                           </span>
                         </div>
                         <p className="text-[14px] font-semibold text-[#18231f]">{room.name}</p>

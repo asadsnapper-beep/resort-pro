@@ -15,6 +15,7 @@ import {
   CreditCard, Eye, EyeOff, ChevronDown, ChevronRight, Bell, LayoutGrid,
 } from 'lucide-react'
 import { paymentGatewayApi } from '@/lib/api';
+import { RoomTypeSettings } from '@/components/settings/RoomTypeSettings';
 
 const CURRENCIES = [
   { code: 'BDT', label: 'BDT — Bangladeshi Taka (৳)' },
@@ -1946,6 +1947,9 @@ function ModulesTab() {
           })}
         </CardContent>
       </Card>
+
+      {/* Room Type Names */}
+      <RoomTypeSettings />
     </div>
   );
 }

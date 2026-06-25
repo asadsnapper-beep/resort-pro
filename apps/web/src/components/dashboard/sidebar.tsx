@@ -7,7 +7,7 @@ import {
   Sparkles, ClipboardList, UtensilsCrossed, ShoppingBag,
   Package, Ticket, Globe, Bell, Settings, LogOut, Mail,
   CreditCard, BarChart2, LayoutGrid, Tags, Wrench, FileBarChart2,
-  Gift, UsersRound, Star, Link2, Receipt, ChevronDown, LifeBuoy, FileText, Megaphone,
+  Gift, UsersRound, Star, Link2, Receipt, ChevronDown, LifeBuoy, FileText, Megaphone, Building2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
@@ -69,6 +69,8 @@ const NAV_ITEMS: NavItem[] = [
     roles: ['OWNER', 'MANAGER'] },
 
   // ── Rooms & Bookings ──────────────────────────────────────
+  { href: '/dashboard/properties',      labelKey: 'nav.properties',    labelFallback: 'Properties',       icon: Building2,     group: 'Rooms & Bookings', groupKey: 'groups.rooms',
+    roles: ['OWNER', 'MANAGER'] },
   { href: '/dashboard/rooms',          labelKey: 'nav.rooms',         labelFallback: 'Rooms & Villas',   icon: BedDouble,     group: 'Rooms & Bookings', groupKey: 'groups.rooms',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
   { href: '/dashboard/rate-plans',     labelKey: 'nav.ratePlans',     labelFallback: 'Rate Plans',       icon: Tags,          group: 'Rooms & Bookings', groupKey: 'groups.rooms',

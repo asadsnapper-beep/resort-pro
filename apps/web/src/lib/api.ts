@@ -262,6 +262,10 @@ export const tenantApi = {
   changeMemberRole: (userId: string, role: string) => api.patch(`/tenant/team/${userId}/role`, { role }),
   removeMember: (userId: string) => api.delete(`/tenant/team/${userId}`),
   cancelInvite: (inviteId: string) => api.delete(`/tenant/team/invite/${inviteId}`),
+  // Room type labels
+  getRoomTypeLabels: () => api.get('/tenant/room-types'),
+  updateRoomTypeLabels: (labels: Record<string, string>) => api.patch('/tenant/room-types', labels),
+  resetRoomTypeLabel: (type: string) => api.delete(`/tenant/room-types/${type}`),
 };
 
 
@@ -344,6 +348,16 @@ export const reportsApi = {
   }) => api.put('/reports/dispatch', data),
   testDispatch: (channel: 'telegram' | 'whatsapp') =>
     api.post('/reports/dispatch/test', { channel }),
+};
+
+// ── Properties ────────────────────────────────────────────────────────────────
+export const propertyApi = {
+  list:   (params?: { page?: number; limit?: number }) => api.get('/properties', { params }),
+  get:    (id: string) => api.get(`/properties/${id}`),
+  create: (data: { name: string; slug: string; address?: string; phone?: string; email?: string; timezone?: string; checkInTime?: string; checkOutTime?: string }) => api.post('/properties', data),
+  update: (id: string, data: Partial<Parameters<typeof propertyApi.create>[0]>) => api.patch(`/properties/${id}`, data),
+  delete: (id: string) => api.delete(`/properties/${id}`),
+  getRooms: (id: string) => api.get(`/properties/${id}/rooms`),
 };
 
 // ── Billing ───────────────────────────────────────────────────────────────────

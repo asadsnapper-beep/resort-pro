@@ -821,4 +821,75 @@ export async function tenantRoutes(app: FastifyInstance) {
       return ok({ id: inviteId }, 'Invite cancelled');
     },
   });
+
+  // ── Room Type Labels ────────────────────────────────────────────────────────
+
+  const VALID_ROOM_TYPES = ['STANDARD', 'DELUXE', 'SUITE', 'VILLA', 'COTTAGE', 'BUNGALOW'] as const;
+  const DEFAULT_ROOM_TYPE_LABELS: Record<string, string> = {
+    STANDARD: 'Standard', DELUXE: 'Deluxe', SUITE: 'Suite',
+    VILLA: 'Villa', COTTAGE: 'Cottage', BUNGALOW: 'Bungalow',
+  };
+
+  // GET /api/tenant/room-types — current labels merged with defaults
+  app.get('/room-types', {
+    schema: { tags: ['tenants'], summary: 'Get room type display labels', security: [{ bearerAuth: [] }] },
+    preHandler: requireAuth,
+    handler: async (request) => {
+      const { tenantId } = request.user as JwtPayload;
+      const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { roomTypeLabels: true } });
+      const saved = (tenant?.roomTypeLabels ?? {}) as Record<string, string>;
+      const labels = { ...DEFAULT_ROOM_TYPE_LABELS, ...saved };
+      return ok({ labels, defaults: DEFAULT_ROOM_TYPE_LABELS });
+    },
+  });
+
+  // PATCH /api/tenant/room-types — update one or more labels
+  app.patch('/room-types', {
+    schema: { tags: ['tenants'], summary: 'Update room type display labels', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER', 'MANAGER'),
+    handler: async (request, reply) => {
+      const { tenantId } = request.user as JwtPayload;
+
+      const body = z.record(z.string().min(1).max(50)).parse(request.body);
+
+      const invalidKeys = Object.keys(body).filter(k => !VALID_ROOM_TYPES.includes(k as typeof VALID_ROOM_TYPES[number]));
+      if (invalidKeys.length > 0) {
+        return reply.status(400).send({ success: false, error: `Invalid room type keys: ${invalidKeys.join(', ')}` });
+      }
+
+      const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { roomTypeLabels: true } });
+      const current = (tenant?.roomTypeLabels ?? {}) as Record<string, string>;
+
+      const merged = { ...current, ...body };
+      for (const [k, v] of Object.entries(merged)) {
+        if (v === DEFAULT_ROOM_TYPE_LABELS[k]) delete merged[k];
+      }
+
+      await prisma.tenant.update({ where: { id: tenantId }, data: { roomTypeLabels: merged } });
+      const labels = { ...DEFAULT_ROOM_TYPE_LABELS, ...merged };
+      return ok({ labels, defaults: DEFAULT_ROOM_TYPE_LABELS }, 'Room type labels updated');
+    },
+  });
+
+  // DELETE /api/tenant/room-types/:type — reset a single type to default
+  app.delete('/room-types/:type', {
+    schema: { tags: ['tenants'], summary: 'Reset a room type label to default', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER', 'MANAGER'),
+    handler: async (request, reply) => {
+      const { tenantId } = request.user as JwtPayload;
+      const { type } = request.params as { type: string };
+
+      if (!VALID_ROOM_TYPES.includes(type as typeof VALID_ROOM_TYPES[number])) {
+        return reply.status(400).send({ success: false, error: `Invalid room type: ${type}` });
+      }
+
+      const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { roomTypeLabels: true } });
+      const current = { ...(tenant?.roomTypeLabels ?? {}) } as Record<string, string>;
+      delete current[type];
+      await prisma.tenant.update({ where: { id: tenantId }, data: { roomTypeLabels: current } });
+
+      const labels = { ...DEFAULT_ROOM_TYPE_LABELS, ...current };
+      return ok({ labels, defaults: DEFAULT_ROOM_TYPE_LABELS }, 'Reset to default');
+    },
+  });
 }

@@ -34,74 +34,80 @@ export function tenantPrisma(tenantId: string) {
     query: {
       $allModels: {
         // ── Reads: inject tenantId into where clause ──────────────────────
-        async findMany({ args, query }) {
-          args.where = { tenantId, ...args.where };
+        async findMany({ model, args, query }) {
+          if (model !== 'Tenant') args.where = { tenantId, ...args.where };
           return query(args);
         },
-        async findFirst({ args, query }) {
-          args.where = { tenantId, ...args.where };
+        async findFirst({ model, args, query }) {
+          if (model !== 'Tenant') args.where = { tenantId, ...args.where };
           return query(args);
         },
-        async findFirstOrThrow({ args, query }) {
-          args.where = { tenantId, ...args.where };
+        async findFirstOrThrow({ model, args, query }) {
+          if (model !== 'Tenant') args.where = { tenantId, ...args.where };
           return query(args);
         },
-        async count({ args, query }) {
-          args.where = { tenantId, ...args.where };
+        async count({ model, args, query }) {
+          if (model !== 'Tenant') args.where = { tenantId, ...args.where };
           return query(args);
         },
-        async aggregate({ args, query }) {
-          (args as { where?: Record<string, unknown> }).where = {
-            tenantId,
-            ...(args as { where?: Record<string, unknown> }).where,
-          };
+        async aggregate({ model, args, query }) {
+          if (model !== 'Tenant') {
+            (args as { where?: Record<string, unknown> }).where = {
+              tenantId,
+              ...(args as { where?: Record<string, unknown> }).where,
+            };
+          }
           return query(args);
         },
 
         // ── Writes: inject tenantId into data / where ─────────────────────
-        async create({ args, query }) {
-          args.data = { tenantId, ...args.data } as typeof args.data;
+        async create({ model, args, query }) {
+          if (model !== 'Tenant') args.data = { tenantId, ...args.data } as typeof args.data;
           return query(args);
         },
-        async createMany({ args, query }) {
-          const data = Array.isArray(args.data) ? args.data : [args.data];
-          args.data = data.map((d) => ({ tenantId, ...d })) as typeof args.data;
+        async createMany({ model, args, query }) {
+          if (model !== 'Tenant') {
+            const data = Array.isArray(args.data) ? args.data : [args.data];
+            args.data = data.map((d) => ({ tenantId, ...d })) as typeof args.data;
+          }
           return query(args);
         },
-        async update({ args, query }) {
-          args.where = { tenantId, ...args.where };
+        async update({ model, args, query }) {
+          if (model !== 'Tenant') args.where = { tenantId, ...args.where };
           return query(args);
         },
-        async updateMany({ args, query }) {
-          args.where = { tenantId, ...args.where };
+        async updateMany({ model, args, query }) {
+          if (model !== 'Tenant') args.where = { tenantId, ...args.where };
           return query(args);
         },
-        async delete({ args, query }) {
-          args.where = { tenantId, ...args.where };
+        async delete({ model, args, query }) {
+          if (model !== 'Tenant') args.where = { tenantId, ...args.where };
           return query(args);
         },
-        async deleteMany({ args, query }) {
-          args.where = { tenantId, ...args.where };
+        async deleteMany({ model, args, query }) {
+          if (model !== 'Tenant') args.where = { tenantId, ...args.where };
           return query(args);
         },
-        async upsert({ args, query }) {
-          args.where = { tenantId, ...args.where };
-          args.create = { tenantId, ...args.create } as typeof args.create;
+        async upsert({ model, args, query }) {
+          if (model !== 'Tenant') {
+            args.where = { tenantId, ...args.where };
+            args.create = { tenantId, ...args.create } as typeof args.create;
+          }
           return query(args);
         },
 
         // ── findUnique: can't add tenantId to unique lookup directly,
         //    but we verify after fetch to prevent cross-tenant reads. ──────
-        async findUnique({ args, query }) {
+        async findUnique({ model, args, query }) {
           const result = await query(args);
-          if (result && (result as { tenantId?: string }).tenantId !== tenantId) {
+          if (model !== 'Tenant' && result && (result as { tenantId?: string }).tenantId !== tenantId) {
             return null;
           }
           return result;
         },
-        async findUniqueOrThrow({ args, query }) {
+        async findUniqueOrThrow({ model, args, query }) {
           const result = await query(args);
-          if ((result as { tenantId?: string }).tenantId !== tenantId) {
+          if (model !== 'Tenant' && (result as { tenantId?: string }).tenantId !== tenantId) {
             throw new Error('Record not found');
           }
           return result;
