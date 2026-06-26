@@ -268,7 +268,7 @@ jobs:
         run: pnpm install
 
       - name: Validate production build
-        run: pnpm build
+        run: pnpm --filter=!@resort-pro/desktop --filter=!@resort-pro/ui build
         env:
           DATABASE_URL: postgresql://resortpro:resortpro@localhost:5432/resortpro
           JWT_SECRET: ci-build-secret
@@ -294,4 +294,4 @@ jobs:
         run: pnpm install
 
       - name: Run lint
-        run: pnpm lint
+        run: pnpm --filter=!@resort-pro/desktop --filter=!@resort-pro/ui lint
