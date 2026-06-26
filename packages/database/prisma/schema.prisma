@@ -620,6 +620,7 @@ model Room {
   @@unique([tenantId, number])
   @@index([tenantId])
   @@index([status])
+  @@index([propertyId])
   @@map("rooms")
 }
 
