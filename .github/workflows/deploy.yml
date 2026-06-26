@@ -87,7 +87,9 @@ jobs:
           node-version: '20'
 
       - name: Install pnpm
-        run: corepack enable && corepack prepare pnpm@latest --activate
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -107,17 +109,11 @@ jobs:
       url: https://resortpro.site
 
     steps:
-      - name: Trigger Coolify deploy — API
-        run: |
-          curl -s -o /dev/null -w "%{http_code}" \
-            -X GET "${{ secrets.COOLIFY_WEBHOOK_API }}" \
-          | grep -qE '^2' || { echo "Coolify API deploy failed"; exit 1; }
-
-      - name: Trigger Coolify deploy — Web
+      - name: Trigger Coolify deploy
         run: |
           curl -s -o /dev/null -w "%{http_code}" \
             -X GET "${{ secrets.COOLIFY_WEBHOOK_WEB }}" \
-          | grep -qE '^2' || { echo "Coolify Web deploy failed"; exit 1; }
+          | grep -qE '^2' || { echo "Coolify deploy failed"; exit 1; }
 
       - name: Wait for health check — API
         run: |
