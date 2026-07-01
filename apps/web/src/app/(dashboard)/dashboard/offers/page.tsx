@@ -5,7 +5,7 @@ import { ModalShell } from '@/components/ui/modal-shell';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, isPast, isFuture } from 'date-fns';
 import {
-  Plus, Pencil, Trash2, BarChart2, Tag, Percent, DollarSign,
+  Plus, Pencil, Trash2, BarChart2, Tag, Percent, Banknote,
   MoonStar, CalendarDays, Users, CheckCircle2, XCircle, Clock,
   AlertTriangle, Loader2,
 } from 'lucide-react';
@@ -40,7 +40,7 @@ const STATUS_META = {
 
 const TYPE_META: Record<OfferType, { label: string; Icon: React.ElementType; bg: string; border: string; text: string }> = {
   PERCENTAGE: { label: '% Off',      Icon: Percent,    bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a' },
-  FIXED:      { label: 'Fixed Amt',  Icon: DollarSign, bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
+  FIXED:      { label: 'Fixed Amt',  Icon: Banknote, bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
   FREE_NIGHT: { label: 'Free Night', Icon: MoonStar,   bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.15)', text: '#b8724a' },
 };
 

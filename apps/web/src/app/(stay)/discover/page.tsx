@@ -317,7 +317,7 @@ function EmptyState({ hasFilters, onClear }: { hasFilters: boolean; onClear: () 
         </button>
       ) : (
         <a
-          href="https://resortpro.com"
+          href="https://resortpro.site"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1a6b5e] text-white text-sm font-semibold hover:bg-[#145a4f] transition-colors">

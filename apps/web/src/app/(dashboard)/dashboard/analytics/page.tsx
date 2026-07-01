@@ -5,7 +5,7 @@ import { dashboardApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { formatCurrency } from '@/lib/utils';
 import {
-  DollarSign, TrendingUp, TrendingDown, BedDouble, Users,
+  Banknote, TrendingUp, TrendingDown, BedDouble, Users,
   CalendarCheck, BarChart2, ArrowUp, ArrowDown, Loader2,
   Globe, Star, Clock, Receipt, PiggyBank,
 } from 'lucide-react';
@@ -185,7 +185,7 @@ export default function AnalyticsPage() {
       <div>
         <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] mb-3">Revenue & Operations</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          <KpiCard icon={DollarSign} color="#23766a"
+          <KpiCard icon={Banknote} color="#23766a"
             label="Revenue YTD" value={formatCurrency(kpis.ytdRevenue, currency)}
             sub={`${formatCurrency(kpis.mtdRevenue, currency)} this month`} change={kpis.revenueGrowth} />
           <KpiCard icon={BedDouble} color="#1b342f"

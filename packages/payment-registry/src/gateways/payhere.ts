@@ -68,7 +68,7 @@ export class PayHereGateway extends BaseGateway {
       amount,
       first_name:   input.customerName.split(' ')[0] || input.customerName,
       last_name:    input.customerName.split(' ').slice(1).join(' ') || 'Guest',
-      email:        input.customerEmail || 'guest@resortpro.app',
+      email:        input.customerEmail || 'guest@resortpro.site',
       phone:        input.customerPhone || '0700000000',
       address:      'N/A',
       city:         'Colombo',

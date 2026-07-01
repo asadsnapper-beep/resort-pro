@@ -2,7 +2,7 @@
  * ResortPro Embed SDK — entry point
  *
  * Drop a single <script> tag on any website:
- *   <script src="https://cdn.resortpro.app/embed.js" defer></script>
+ *   <script src="https://cdn.resortpro.site/embed.js" defer></script>
  *
  * Then add one or more mount points:
  *   <div data-resortpro="booking"   data-slug="palm-paradise"></div>

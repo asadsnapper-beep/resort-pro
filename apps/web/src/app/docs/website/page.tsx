@@ -154,7 +154,7 @@ export default function WebsitePage() {
       {/* ── 6. Custom domain ──────────────────────────────────────────── */}
       <h2 id="custom-domain">6. Connecting a custom domain</h2>
       <p>
-        By default, your website is available at a resortpro.app subdomain (e.g. <code>yourresort.resortpro.app</code>).
+        By default, your website is available at a resortpro.site subdomain (e.g. <code>yourresort.resortpro.site</code>).
         You can connect your own custom domain (e.g. <code>www.yourresort.com</code>) for a more
         professional appearance.
       </p>
@@ -171,7 +171,7 @@ export default function WebsitePage() {
       </ol>
       <blockquote>
         <strong>Note:</strong> Custom domain support is available on the Standard plan and above.
-        If you're on the Starter plan, your site will be on the resortpro.app subdomain.
+        If you're on the Starter plan, your site will be on the resortpro.site subdomain.
       </blockquote>
 
       {/* ── 7. FAQ ───────────────────────────────────────────────────── */}

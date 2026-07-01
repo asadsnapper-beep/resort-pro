@@ -26,7 +26,7 @@ const updateTenantSchema = z.object({
 
 export async function tenantRoutes(app: FastifyInstance) {
   // Our own app domain — used for CNAME target instructions
-  const APP_DOMAIN = process.env.APP_DOMAIN || 'resortpro.app';
+  const APP_DOMAIN = process.env.APP_DOMAIN || 'resortpro.site';
   const APP_IP     = process.env.APP_IP     || '';   // set in production
 
   app.get('/', {
@@ -214,7 +214,7 @@ export async function tenantRoutes(app: FastifyInstance) {
       });
       if (!tenant) return reply.status(404).send({ success: false, error: 'Not found' });
 
-      const APP_DOMAIN = process.env.APP_DOMAIN || 'resortpro.app';
+      const APP_DOMAIN = process.env.APP_DOMAIN || 'resortpro.site';
       const APP_IP = process.env.APP_IP || '';
 
       return ok({

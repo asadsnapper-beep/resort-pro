@@ -69,7 +69,7 @@ export class SSLCommerzGateway extends BaseGateway {
       cancel_url:     input.returnUrl + '?status=cancelled',
       ipn_url:        input.callbackUrl,
       cus_name:       input.customerName,
-      cus_email:      input.customerEmail || 'guest@resortpro.app',
+      cus_email:      input.customerEmail || 'guest@resortpro.site',
       cus_phone:      input.customerPhone || '01700000000',
       cus_add1:       'N/A',
       cus_city:       'Dhaka',

@@ -66,7 +66,7 @@ export default function StayLayout({ children }: { children: React.ReactNode }) 
               Blog
             </a>
             <a
-              href="https://resortpro.com"
+              href="https://resortpro.site"
               target="_blank"
               rel="noopener noreferrer"
               className="ml-2 px-3 py-1.5 rounded-lg border border-[#1a6b5e] text-[#1a6b5e] text-xs font-semibold hover:bg-[#f0faf8] transition-colors">
@@ -81,11 +81,11 @@ export default function StayLayout({ children }: { children: React.ReactNode }) 
       {/* Footer */}
       <footer className="mt-16 border-t border-gray-100 bg-white">
         <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-400">
-          <span>© {new Date().getFullYear()} stay.resortpro.site — Powered by <a href="https://resortpro.com" className="text-[#1a6b5e] hover:underline">ResortPro</a></span>
+          <span>© {new Date().getFullYear()} stay.resortpro.site — Powered by <a href="https://resortpro.site" className="text-[#1a6b5e] hover:underline">ResortPro</a></span>
           <div className="flex gap-4">
             <a href="/discover" className="hover:text-gray-600">Discover</a>
             <a href="/blog"     className="hover:text-gray-600">Blog</a>
-            <a href="https://resortpro.com" className="hover:text-gray-600">For Owners</a>
+            <a href="https://resortpro.site" className="hover:text-gray-600">For Owners</a>
           </div>
         </div>
       </footer>

@@ -61,7 +61,7 @@ export class KhaltiGateway extends BaseGateway {
         },
         body: JSON.stringify({
           return_url:  input.returnUrl,
-          website_url: 'https://resortpro.app',
+          website_url: 'https://resortpro.site',
           amount:      input.amount,          // already in paisa
           purchase_order_id:   input.orderId,
           purchase_order_name: input.description || 'Hotel Booking',

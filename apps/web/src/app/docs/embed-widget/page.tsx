@@ -33,7 +33,7 @@ export default function EmbedWidgetPage() {
         your website <strong>once</strong>. After that, you drop simple HTML tags wherever you want a
         widget to appear — and the widgets load automatically, connected live to your ResortPro account.
       </p>
-      <pre>{`Your website  →  <script src="cdn.resortpro.app/embed.js">
+      <pre>{`Your website  →  <script src="cdn.resortpro.site/embed.js">
                       ↓
                  Reads your data from ResortPro
                       ↓
@@ -65,7 +65,7 @@ export default function EmbedWidgetPage() {
         This is the <strong>only technical step</strong>. You need to add one line of code to your
         website — once — and all widgets will work.
       </p>
-      <pre>{`<script src="https://cdn.resortpro.app/embed.js" defer></script>`}</pre>
+      <pre>{`<script src="https://cdn.resortpro.site/embed.js" defer></script>`}</pre>
       <p><strong>Where to put it:</strong></p>
       <table>
         <thead><tr><th>Website Builder</th><th>How to add it</th></tr></thead>
@@ -288,7 +288,7 @@ export default function EmbedWidgetPage() {
       <p>Copy any snippet below. Replace <code>YOUR_SLUG</code> with your actual resort slug.</p>
 
       <h3>Script tag (add once to every page)</h3>
-      <pre>{`<script src="https://cdn.resortpro.app/embed.js" defer></script>`}</pre>
+      <pre>{`<script src="https://cdn.resortpro.site/embed.js" defer></script>`}</pre>
 
       <h3>All widgets</h3>
       <pre>{`<!-- Booking Form -->

@@ -3,7 +3,7 @@
  * All calls go to the ResortPro public API — no auth needed.
  */
 
-const API_BASE = (window as any).__RESORTPRO_API__ || 'https://api.resortpro.app'
+const API_BASE = (window as any).__RESORTPRO_API__ || 'https://api.resortpro.site'
 
 export interface EmbedConfig {
   tenantId: string

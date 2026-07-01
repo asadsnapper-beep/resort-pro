@@ -12,7 +12,7 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
 import {
   BedDouble, CalendarCheck, CalendarX, TrendingUp, Users,
-  Ticket, DollarSign, Sparkles, ArrowUp, ArrowDown, UtensilsCrossed,
+  Ticket, Sparkles, ArrowUp, ArrowDown, UtensilsCrossed,
   LogIn, LogOut, CheckCircle2, Clock, Wrench, Globe, Tag, AlertCircle, Banknote,
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';

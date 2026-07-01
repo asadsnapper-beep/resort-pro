@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  X, BedDouble, Users, DollarSign, Building2, Pencil, Trash2,
+  X, BedDouble, Users, Tag, Building2, Pencil, Trash2,
   CheckCircle2, Wrench, Lock, Film, User, CalendarDays, ExternalLink, Sparkles,
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -156,7 +156,7 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
             {/* Stats */}
             <div className="grid grid-cols-3 gap-2.5">
               {[
-                { Icon: DollarSign, label: 'Per Night',   value: formatCurrency(Number(room.basePrice)) },
+                { Icon: Tag, label: 'Per Night',   value: formatCurrency(Number(room.basePrice)) },
                 { Icon: Users,      label: 'Max Guests',  value: `${room.maxOccupancy} guests` },
                 { Icon: Building2,  label: 'Floor',       value: room.floor ? `Floor ${room.floor}` : '—' },
               ].map(({ Icon, label, value }) => (

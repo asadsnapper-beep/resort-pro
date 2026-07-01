@@ -2,7 +2,7 @@ import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder');
 
-const FROM = process.env.EMAIL_FROM || 'ResortPro <noreply@resortpro.app>';
+const FROM = process.env.EMAIL_FROM || 'ResortPro <noreply@resortpro.site>';
 
 /* ── Template variable replacer ─────────────────────────────────────────────── */
 export function renderTemplate(html: string, vars: Record<string, string>): string {

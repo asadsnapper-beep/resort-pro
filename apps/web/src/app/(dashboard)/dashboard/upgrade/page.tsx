@@ -119,7 +119,7 @@ export default function UpgradePage() {
           {[
             { icon: Shield, text: '30-day money-back' },
             { icon: Headphones, text: 'Cancel anytime' },
-            { icon: Users, text: 'Trusted by 500+ resorts' },
+            { icon: Users, text: 'Built for resorts in Bangladesh' },
             { icon: BarChart3, text: 'All data preserved' },
           ].map(({ icon: Icon, text }) => (
             <div key={text} className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
@@ -204,7 +204,7 @@ export default function UpgradePage() {
         <div className="text-center">
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Questions?{' '}
-            <a href="mailto:support@resortpro.app" className="text-emerald-600 hover:underline font-medium">
+            <a href="mailto:support@resortpro.site" className="text-emerald-600 hover:underline font-medium">
               Contact our team
             </a>
             {' '}— we respond within 24 hours.

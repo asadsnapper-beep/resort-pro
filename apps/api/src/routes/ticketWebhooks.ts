@@ -114,7 +114,7 @@ export async function ticketWebhookRoutes(app: FastifyInstance) {
       })
 
       // Register our webhook URL with Telegram
-      const webhookUrl = `${process.env.API_BASE_URL ?? 'https://api.resortpro.app'}/api/ticket-webhooks/telegram/${tenantId}`
+      const webhookUrl = `${process.env.API_BASE_URL ?? 'https://api.resortpro.site'}/api/ticket-webhooks/telegram/${tenantId}`
       const webhookResult = await setTelegramWebhook(botToken, webhookUrl)
 
       return ok({
@@ -139,7 +139,7 @@ export async function ticketWebhookRoutes(app: FastifyInstance) {
       })
       const configured = !!tenant?.telegramBotToken
       const webhookUrl = configured
-        ? `${process.env.API_BASE_URL ?? 'https://api.resortpro.app'}/api/ticket-webhooks/telegram/${tenantId}`
+        ? `${process.env.API_BASE_URL ?? 'https://api.resortpro.site'}/api/ticket-webhooks/telegram/${tenantId}`
         : null
 
       // Mask token for display
@@ -177,7 +177,7 @@ export async function ticketWebhookRoutes(app: FastifyInstance) {
         where: { id: tenantId },
         select: { waEnabled: true, waPhoneNumberId: true, waBusinessAccId: true },
       })
-      const webhookUrl = `${process.env.API_BASE_URL ?? 'https://api.resortpro.app'}/api/ticket-webhooks/whatsapp/${tenantId}`
+      const webhookUrl = `${process.env.API_BASE_URL ?? 'https://api.resortpro.site'}/api/ticket-webhooks/whatsapp/${tenantId}`
       const verifyToken = `wa_${tenantId.replace(/-/g, '').slice(0, 16)}`
       return ok({
         configured: !!(tenant?.waEnabled && tenant?.waPhoneNumberId),

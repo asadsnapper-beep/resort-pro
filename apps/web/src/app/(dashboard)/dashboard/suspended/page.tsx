@@ -34,7 +34,7 @@ export default function SuspendedPage() {
             please reach out to our support team.
           </p>
           <a
-            href={`mailto:support@resortpro.app?subject=Account Suspended - ${tenant?.name}&body=Hi, my account "${tenant?.name}" (slug: ${tenant?.slug}) has been suspended. I'd like to resolve this.`}
+            href={`mailto:support@resortpro.site?subject=Account Suspended - ${tenant?.name}&body=Hi, my account "${tenant?.name}" (slug: ${tenant?.slug}) has been suspended. I'd like to resolve this.`}
             className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition-colors"
           >
             <Mail className="w-4 h-4" />

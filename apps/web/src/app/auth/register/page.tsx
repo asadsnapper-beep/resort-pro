@@ -154,7 +154,7 @@ function RegisterForm() {
             <div>
               <label className="mb-1.5 block text-sm font-medium text-white/80">
                 Resort URL slug
-                <span className="ml-2 text-white/40 font-normal text-xs">your-resort.resortpro.com</span>
+                <span className="ml-2 text-white/40 font-normal text-xs">your-resort.resortpro.site</span>
               </label>
               <Input
                 {...register('slug')}
@@ -193,6 +193,12 @@ function RegisterForm() {
             <Button type="submit" variant="gold" size="lg" className="w-full mt-2" loading={loading}>
               Create my resort
             </Button>
+            <p className="mt-3 text-center text-xs leading-relaxed text-white/40">
+              By creating an account you agree to our{' '}
+              <Link href="/terms" className="text-white/60 underline hover:text-white/80">Terms</Link>{' '}
+              and{' '}
+              <Link href="/privacy" className="text-white/60 underline hover:text-white/80">Privacy Policy</Link>.
+            </p>
           </form>
           <p className="mt-6 text-center text-sm text-white/50">
             Already have an account?{' '}

@@ -15,7 +15,7 @@ import { prisma } from '@resort-pro/database';
 import { sendEmail } from './email';
 
 const APP_URL = process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:3000';
-const SUPPORT_EMAIL = 'support@resortpro.app';
+const SUPPORT_EMAIL = 'support@resortpro.site';
 
 // ── Template helpers ────────────────────────────────────────────────────────
 

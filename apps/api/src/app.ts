@@ -115,7 +115,7 @@ export async function buildApp() {
         title: 'ResortPro API',
         description: 'All-in-one SaaS API for resort management',
         version: '1.0.0',
-        contact: { name: 'ResortPro Support', email: 'support@resortpro.com' },
+        contact: { name: 'ResortPro Support', email: 'support@resortpro.site' },
       },
       servers: [{ url: process.env.APP_URL || 'http://localhost:4000', description: 'API Server' }],
       components: {

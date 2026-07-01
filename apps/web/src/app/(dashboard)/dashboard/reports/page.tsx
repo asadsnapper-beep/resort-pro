@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   FileBarChart2, Calendar, Mail, Printer, TrendingUp,
   LogIn, LogOut, AlertTriangle, Sparkles, Wrench,
-  DollarSign, Banknote, CreditCard, Building2, ArrowRight,
+  Banknote, CreditCard, Building2, ArrowRight,
   Send, MessageCircle, Bell, BellOff, Clock, CheckCircle2,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
@@ -401,7 +401,7 @@ export default function ReportsPage() {
               <KpiCard label="Occupancy" value={`${report.occupancy.rate}%`}
                 sub={`${report.occupancy.occupied} / ${report.occupancy.totalRooms} rooms`} icon={TrendingUp} color="#23766a" />
               <KpiCard label="Total Revenue" value={formatCurrency(report.revenue.total)}
-                sub="Rooms + F&B + Extras" icon={DollarSign} color="#1b342f" />
+                sub="Rooms + F&B + Extras" icon={Banknote} color="#1b342f" />
               <KpiCard label="Arrivals" value={report.arrivals.length}
                 sub={`${report.arrivals.filter((a: any) => a.status === 'CHECKED_IN').length} checked in`} icon={LogIn} color="#b89040" />
               <KpiCard label="Departures" value={report.departures.length}
@@ -413,7 +413,7 @@ export default function ReportsPage() {
               {/* Revenue breakdown */}
               <div className="rounded-[14px] border bg-white p-5"
                 style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
-                <div className="pb-3"><SectionHeader icon={DollarSign} title="Revenue Breakdown" /></div>
+                <div className="pb-3"><SectionHeader icon={Banknote} title="Revenue Breakdown" /></div>
                 <div className="space-y-3">
                   {[
                     { label: 'Room Revenue', amount: report.revenue.rooms, color: '#23766a' },
@@ -449,7 +449,7 @@ export default function ReportsPage() {
                     { label: 'Cash', icon: Banknote, amount: report.payments.cash, accent: '#23766a', accentBg: 'var(--rp-teal-bg)' },
                     { label: 'Card / Online', icon: CreditCard, amount: report.payments.card, accent: '#1b342f', accentBg: 'var(--rp-teal-bg)' },
                     { label: 'Bank Transfer', icon: Building2, amount: report.payments.bankTransfer, accent: '#b89040', accentBg: 'var(--rp-amber-bg)' },
-                    { label: 'Other', icon: DollarSign, amount: report.payments.other, accent: 'var(--rp-text-muted)', accentBg: 'var(--rp-surface-3)' },
+                    { label: 'Other', icon: Banknote, amount: report.payments.other, accent: 'var(--rp-text-muted)', accentBg: 'var(--rp-surface-3)' },
                   ].map(({ label, icon: Icon, amount, accent, accentBg }) => (
                     <div key={label} className="flex items-center justify-between rounded-[9px] p-3"
                       style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'var(--rp-surface-2)' }}>

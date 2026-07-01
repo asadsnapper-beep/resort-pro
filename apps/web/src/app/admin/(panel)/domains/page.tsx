@@ -346,7 +346,7 @@ export default function DomainsPage() {
           <div>
             <p className="text-gray-400 font-semibold mb-1">Option A — CNAME (recommended)</p>
             <code className="block bg-gray-800 rounded-lg p-2 text-gray-300 font-mono">
-              {'{your-domain}'} CNAME {'{slug}'}.resortpro.app
+              {'{your-domain}'} CNAME {'{slug}'}.resortpro.site
             </code>
             <p className="mt-1">Works for subdomains (e.g. www.resort.com, booking.resort.com)</p>
           </div>

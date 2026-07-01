@@ -10,7 +10,7 @@ import { RoomModal } from '@/components/rooms/RoomModal';
 import { RoomDetailSheet } from '@/components/rooms/RoomDetailSheet';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
-import { Plus, BedDouble, Users, DollarSign, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, BedDouble, Users, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Room } from '@resort-pro/types';
 import { useRoomTypeLabels } from '@/hooks/use-room-type-labels';
 
@@ -288,7 +288,7 @@ export default function RoomsPage() {
                         <Users className="h-3.5 w-3.5" /> {room.maxOccupancy}
                       </span>
                       <span className="flex items-center gap-1">
-                        <DollarSign className="h-3.5 w-3.5" /> {formatCurrency(Number(room.basePrice))}/night
+                        {formatCurrency(Number(room.basePrice))}/night
                       </span>
                     </div>
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Tag, ChevronLeft, ChevronRight, MoonStar, Percent, DollarSign, Clock, X } from 'lucide-react';
+import { Tag, ChevronLeft, ChevronRight, MoonStar, Percent, Banknote, Clock, X } from 'lucide-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -125,7 +125,7 @@ export function AnnouncementBar({
 // ── OffersSection ─────────────────────────────────────────────────────────────
 const TYPE_ICON: Record<OfferType, React.ElementType> = {
   PERCENTAGE: Percent,
-  FIXED:      DollarSign,
+  FIXED:      Banknote,
   FREE_NIGHT: MoonStar,
 };
 

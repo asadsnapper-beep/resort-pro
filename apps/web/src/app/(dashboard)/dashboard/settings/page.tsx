@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { useAuthStore } from '@/store/auth';
 import {
-  Building2, Globe, Phone, Mail, MapPin, Clock, DollarSign, Save, Info,
+  Building2, Globe, Phone, Mail, MapPin, Clock, Banknote, Save, Info,
   ExternalLink, CheckCircle, XCircle, AlertTriangle, Copy, RefreshCw, Trash2, ShieldCheck, Star,
   FileText, Palette, Lock, CheckCircle2, Circle, Loader2, Shield, Send, ToggleLeft, ToggleRight,
   CreditCard, Eye, EyeOff, ChevronDown, ChevronRight, Bell, LayoutGrid,
@@ -413,7 +413,7 @@ export default function SettingsPage() {
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">URL Slug</label>
                 <div className="flex rounded-lg border border-input overflow-hidden">
-                  <span className="flex items-center px-3 bg-gray-50 text-sm text-muted-foreground border-r">resortpro.com/</span>
+                  <span className="flex items-center px-3 bg-gray-50 text-sm text-muted-foreground border-r">resortpro.site/</span>
                   <Input value={form.slug} onChange={e => set('slug', e.target.value)} className="rounded-none border-0 flex-1 focus:ring-0" placeholder="palm-paradise" />
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">Used for your public URL and guest portal</p>
@@ -497,7 +497,7 @@ export default function SettingsPage() {
 
           <Card>
             <CardContent className="p-6 space-y-4">
-              <h3 className="font-semibold text-gray-900 flex items-center gap-2"><DollarSign className="h-4 w-4 text-resort-600" /> Locale & Currency</h3>
+              <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Banknote className="h-4 w-4 text-resort-600" /> Locale & Currency</h3>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">Currency</label>
                 <select value={form.currency} onChange={e => set('currency', e.target.value)}
@@ -775,7 +775,7 @@ export default function SettingsPage() {
                             {domainStatus.customDomain?.replace(/\.(com|net|org|io|app|co\.\w+)$/, '') ?? 'www'}
                           </td>
                           <td className="py-2 font-mono text-xs text-gray-700">
-                            {domainStatus.cnameTarget ?? `${tenantData?.slug}.resortpro.app`}
+                            {domainStatus.cnameTarget ?? `${tenantData?.slug}.resortpro.site`}
                           </td>
                           <td className="py-2">
                             <button onClick={() => copyToClipboard(domainStatus.cnameTarget ?? '')}
@@ -795,7 +795,7 @@ export default function SettingsPage() {
                   {[
                     { n: 1, text: 'Log in to your domain registrar (GoDaddy, Namecheap, Cloudflare…)' },
                     { n: 2, text: 'Go to DNS Management / DNS Records' },
-                    { n: 3, text: `Add a CNAME record pointing to: ${domainStatus.cnameTarget ?? `${tenantData?.slug}.resortpro.app`}` },
+                    { n: 3, text: `Add a CNAME record pointing to: ${domainStatus.cnameTarget ?? `${tenantData?.slug}.resortpro.site`}` },
                     { n: 4, text: 'Save changes — DNS propagation takes 15 min to 48 hours' },
                     { n: 5, text: 'Come back here and click "Verify Domain"' },
                   ].map(({ n, text }) => (
@@ -1414,7 +1414,7 @@ function GdprTab() {
         <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
         <p className="text-xs text-blue-700 leading-relaxed">
           For questions about data processing or to exercise other GDPR rights, contact us at{' '}
-          <a href="mailto:privacy@resortpro.com" className="underline font-medium">privacy@resortpro.com</a>.
+          <a href="mailto:privacy@resortpro.site" className="underline font-medium">privacy@resortpro.site</a>.
           We respond within 72 hours.
         </p>
       </div>
@@ -1486,7 +1486,7 @@ function EnterpriseTab() {
           <p className="text-gray-800 font-semibold">Enterprise features</p>
           <p className="text-gray-500 text-sm mt-1 max-w-sm">
             SLA agreements, SSO, and white-label branding are available on the Enterprise plan.
-            Contact <a href="mailto:sales@resortpro.com" className="text-indigo-600 underline">sales@resortpro.com</a> to upgrade.
+            Contact <a href="mailto:sales@resortpro.site" className="text-indigo-600 underline">sales@resortpro.site</a> to upgrade.
           </p>
         </div>
       </div>
@@ -1633,7 +1633,7 @@ function EnterpriseTab() {
                 </p>
               )}
               <p className="text-xs text-gray-500 mt-2">
-                SSO callback URL: <code className="font-mono">https://app.resortpro.com/auth/sso/callback</code>
+                SSO callback URL: <code className="font-mono">https://app.resortpro.site/auth/sso/callback</code>
               </p>
             </div>
           ) : (
@@ -1646,7 +1646,7 @@ function EnterpriseTab() {
         <Info className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
         <p className="text-xs text-indigo-700 leading-relaxed">
           Enterprise settings are managed by your ResortPro account manager.
-          Contact <a href="mailto:enterprise@resortpro.com" className="underline font-medium">enterprise@resortpro.com</a> for changes.
+          Contact <a href="mailto:enterprise@resortpro.site" className="underline font-medium">enterprise@resortpro.site</a> for changes.
         </p>
       </div>
     </div>
@@ -1659,7 +1659,7 @@ function EnterpriseTab() {
 function EmbedTab() {
   const { tenant } = useAuthStore()
   const slug = tenant?.slug || ''
-  const cdnBase = 'https://cdn.resortpro.app'
+  const cdnBase = 'https://cdn.resortpro.site'
   const [copied, setCopied] = useState<string | null>(null)
 
   const copy = async (text: string, key: string) => {

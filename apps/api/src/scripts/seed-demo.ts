@@ -53,9 +53,9 @@ async function main() {
   const passwordHash = await bcrypt.hash('Demo@ResortPro2026!', 12);
 
   const demoOwner = await prisma.user.upsert({
-    where: { tenantId_email: { tenantId: demo.id, email: 'demo@resortpro.app' } },
+    where: { tenantId_email: { tenantId: demo.id, email: 'demo@resortpro.site' } },
     update: {},
-    create: { tenantId: demo.id, email: 'demo@resortpro.app', passwordHash, firstName: 'Demo', lastName: 'User', role: UserRole.OWNER },
+    create: { tenantId: demo.id, email: 'demo@resortpro.site', passwordHash, firstName: 'Demo', lastName: 'User', role: UserRole.OWNER },
   });
 
   const demoManager = await prisma.user.upsert({

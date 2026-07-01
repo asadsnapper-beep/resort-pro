@@ -58,7 +58,7 @@ export default function AdminLoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@resortpro.com"
+                placeholder="admin@resortpro.site"
                 required
                 className="w-full h-10 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white placeholder:text-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />

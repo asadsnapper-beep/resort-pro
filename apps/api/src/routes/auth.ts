@@ -601,7 +601,7 @@ export async function authRoutes(app: FastifyInstance) {
 
     // Role → email map (matching seed-demo.ts users)
     const roleEmailMap: Record<string, string> = {
-      OWNER:        'demo@resortpro.app',
+      OWNER:        'demo@resortpro.site',
       MANAGER:      'manager@coralbay.demo',
       SHAREHOLDER:  'partner@coralbay.demo',
       RECEPTIONIST: 'reception@coralbay.demo',

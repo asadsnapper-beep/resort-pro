@@ -249,7 +249,7 @@ function DashboardMockup() {
         <span className="h-3 w-3 rounded-full bg-yellow-400/80" />
         <span className="h-3 w-3 rounded-full bg-green-400/80" />
         <div className="ml-3 flex-1 rounded-md bg-resort-700 px-3 py-1 text-xs text-resort-400">
-          app.resortpro.io/dashboard
+          app.resortpro.site/dashboard
         </div>
       </div>
       {/* App body */}
@@ -669,7 +669,7 @@ export default function BanglaHomePage() {
                   <p className="ml-4 text-purple-400">{'  data-theme="light"'}</p>
                   <p className="text-gray-400">{'></div>'}</p>
                   <p className="mt-4 text-gray-400">{'<script'}</p>
-                  <p className="ml-4 text-yellow-300">{'  src="https://cdn.resortpro.io/embed.js"'}</p>
+                  <p className="ml-4 text-yellow-300">{'  src="https://cdn.resortpro.site/embed.js"'}</p>
                   <p className="text-gray-400">{'></script>'}</p>
                   <p className="mt-4 text-gray-600">{'// ব্যস। বুকিং ফর্ম চালু।'}</p>
                 </div>

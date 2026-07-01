@@ -10,8 +10,6 @@ const PLATFORM_DOMAINS = new Set([
   'app.resortpro.site',   // dashboard app
   'api.resortpro.site',   // API
   'stay.resortpro.site',  // public discovery (handled separately below)
-  'resortpro.app',
-  'www.resortpro.app',
 ]);
 
 /* ── ResortPro subdomain root ───────────────────────────────────────────────

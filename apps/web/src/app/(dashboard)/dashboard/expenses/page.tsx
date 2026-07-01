@@ -9,7 +9,7 @@ import { useAuthStore } from '@/store/auth';
 import { toast } from '@/hooks/use-toast';
 import {
   Receipt, Plus, Pencil, Trash2, TrendingUp, TrendingDown,
-  DollarSign, BarChart2, Loader2, X, ChevronLeft, ChevronRight,
+  Banknote, BarChart2, Loader2, X, ChevronLeft, ChevronRight,
   ArrowUp, ArrowDown, AlertCircle,
 } from 'lucide-react';
 import {
@@ -387,7 +387,7 @@ export default function ExpensesPage() {
           <KpiCard icon={Receipt} color="#c43c3c"
             label="Total Expenses" value={formatCurrency(summary.totalExpenses, currency)}
             sub={monthLabel(currentMonth)} change={summary.expenseGrowth} />
-          <KpiCard icon={DollarSign} color="#23766a"
+          <KpiCard icon={Banknote} color="#23766a"
             label="Revenue" value={formatCurrency(summary.totalRevenue, currency)}
             sub="Paid payments this month" />
           <KpiCard icon={summary.profit >= 0 ? TrendingUp : TrendingDown}

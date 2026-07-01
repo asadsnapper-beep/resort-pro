@@ -383,7 +383,7 @@ export default function DocsLandingPage() {
       <footer className="mt-8 border-t border-gray-200 bg-white py-8 text-center text-xs text-gray-400">
         <p>© {new Date().getFullYear()} ResortPro · All-in-one resort management platform</p>
         <p className="mt-1">
-          <a href="mailto:support@resortpro.app" className="hover:text-[#1a6b5e]">support@resortpro.app</a>
+          <a href="mailto:support@resortpro.site" className="hover:text-[#1a6b5e]">support@resortpro.site</a>
         </p>
       </footer>
     </>

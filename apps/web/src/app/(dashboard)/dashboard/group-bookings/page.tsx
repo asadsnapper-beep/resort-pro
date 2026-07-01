@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import {
   UsersRound, Plus, X, ChevronRight, LogIn, LogOut, Search,
-  Phone, Mail, Calendar, BedDouble, DollarSign, Pencil,
+  Phone, Mail, Calendar, BedDouble, Banknote, Pencil,
   CheckCircle2, Tag, Loader2,
 } from 'lucide-react';
 
@@ -713,7 +713,7 @@ export default function GroupBookingsPage() {
         {[
           { label: 'Active Groups',      value: activeGroups,               icon: UsersRound, color: '#23766a', bg: 'var(--rp-teal-bg)' },
           { label: 'Total Rooms Booked', value: totalRooms,                 icon: BedDouble,  color: '#1b342f', bg: 'var(--rp-teal-bg)' },
-          { label: 'Group Revenue',      value: formatCurrency(totalRevenue), icon: DollarSign, color: '#b89040', bg: 'var(--rp-amber-bg)' },
+          { label: 'Group Revenue',      value: formatCurrency(totalRevenue), icon: Banknote, color: '#b89040', bg: 'var(--rp-amber-bg)' },
         ].map(({ label, value, icon: Icon, color, bg }) => (
           <div key={label} className="flex items-center gap-4 rounded-[14px] border bg-white dark:bg-white/5 p-5"
             style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>

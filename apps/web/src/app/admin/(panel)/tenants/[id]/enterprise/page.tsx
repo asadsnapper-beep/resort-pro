@@ -605,7 +605,7 @@ export default function TenantEnterprisePage({ params }: { params: { id: string 
           <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/15">
             <p className="text-xs text-amber-400/80 leading-relaxed">
               SSO login requires the tenant's identity provider to be configured with callback URL:
-              <code className="block mt-1 font-mono text-amber-300">https://app.resortpro.com/auth/sso/callback</code>
+              <code className="block mt-1 font-mono text-amber-300">https://app.resortpro.site/auth/sso/callback</code>
             </p>
           </div>
 

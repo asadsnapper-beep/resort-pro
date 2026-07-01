@@ -140,23 +140,23 @@ const PLANS = [
 ];
 
 const STATS = [
-  { stat: '500+', label: 'rooms managed' },
-  { stat: '৳2.4Cr+', label: 'processed' },
-  { stat: '99.9%', label: 'uptime' },
+  { stat: '10 min', label: 'to set up' },
+  { stat: '14-day', label: 'free trial' },
+  { stat: '24/7', label: 'access anywhere' },
 ];
 
-const TESTIMONIALS = [
+const BENEFITS = [
   {
-    quote: 'We closed our three booking spreadsheets the first week. Double-bookings just stopped, and our reception team finally breathes during peak season.',
-    initials: 'TR', name: 'Tanvir Rahman', role: "GM, Bay Breeze · Cox's Bazar",
+    title: 'Close the spreadsheets',
+    text: 'Three booking sheets become one live calendar. Double-bookings stop, and your reception team finally breathes during peak season.',
   },
   {
-    quote: 'bKash and Stripe in one place changed everything. No more chasing payment screenshots on WhatsApp — guests pay the deposit before they even arrive.',
-    initials: 'FK', name: 'Farhana Karim', role: 'Owner, Tea Valley · Sreemangal',
+    title: 'Get paid before arrival',
+    text: 'bKash, SSLCommerz and Stripe in one place. No more chasing payment screenshots on WhatsApp — guests pay the deposit before they even arrive.',
   },
   {
-    quote: 'I run two properties from my phone now. Occupancy and revenue update live, so I can drop rates on a slow weekend before it costs me.',
-    initials: 'SA', name: 'Shahriar Ahmed', role: 'Director, Hilltop Retreat · Sylhet',
+    title: 'Run it from your phone',
+    text: 'Occupancy and revenue update live across every property, so you can drop rates on a slow weekend before it costs you.',
   },
 ];
 
@@ -170,14 +170,13 @@ const FAQS = [
 ];
 
 const TRUST_BRANDS = [
-  { text: 'Bay Breeze', cls: 'font-display text-[19px] font-semibold' },
-  { text: 'TEA VALLEY', cls: 'text-[18px] font-semibold tracking-[0.08em]' },
-  { text: 'Coral Coast', cls: 'font-display italic text-[19px]' },
-  { text: 'SUNDARBAN STAY', cls: 'text-[17px] font-semibold tracking-[0.12em]' },
-  { text: 'Hilltop Retreat', cls: 'font-display text-[19px] font-semibold' },
+  { text: 'bKash', cls: 'font-display text-[19px] font-semibold' },
+  { text: 'SSLCommerz', cls: 'text-[18px] font-semibold tracking-[0.04em]' },
+  { text: 'Stripe', cls: 'font-display text-[19px] font-semibold' },
+  { text: 'Bank Transfer', cls: 'text-[17px] font-semibold tracking-[0.04em]' },
 ];
 
-const EMBED_CODE = `<script src="https://cdn.resortpro.io/embed.js"
+const EMBED_CODE = `<script src="https://cdn.resortpro.site/embed.js"
         data-property="bay-breeze"
         data-widget="booking"></script>`;
 
@@ -293,7 +292,7 @@ function DashboardMockup() {
         <span className="h-[11px] w-[11px] rounded-full bg-[#e8ddd0]" />
         <span className="h-[11px] w-[11px] rounded-full bg-[#e8ddd0]" />
         <span className="h-[11px] w-[11px] rounded-full bg-[#e8ddd0]" />
-        <span className="ml-[14px] text-xs text-[#9aa19d]">app.resortpro.io / dashboard</span>
+        <span className="ml-[14px] text-xs text-[#9aa19d]">app.resortpro.site / dashboard</span>
       </div>
 
       <div className="flex min-h-[420px]">
@@ -319,7 +318,7 @@ function DashboardMockup() {
         <div className="flex-1 bg-[#faf9f6] p-[26px_28px]" style={{ padding: '26px 28px' }}>
           <div className="mb-[22px] flex items-center justify-between">
             <div>
-              <div className="font-display text-xl font-semibold text-resort-900">Good morning, Bay Breeze</div>
+              <div className="font-display text-xl font-semibold text-resort-900">Good morning 👋</div>
               <div className="mt-0.5 text-[12.5px] text-[#8a918d]">Saturday, 20 June · 24 rooms</div>
             </div>
             <span className="rounded-full bg-resort-600 px-[15px] py-2 text-xs font-semibold text-white">+ New booking</span>
@@ -517,7 +516,7 @@ export default function HomePage() {
       <section className="px-7 py-2">
         <div className="mx-auto max-w-[1040px] border-y border-[rgba(25,64,59,0.1)] py-[30px]">
           <p className="mb-[22px] text-center text-[13px] tracking-[0.04em] text-[#8a918d]">
-            Trusted by resorts across Cox&apos;s Bazar, Sylhet &amp; Sreemangal
+            Payments built in — bKash, cards, and bank transfer, secured end-to-end
           </p>
           <div className="flex flex-wrap items-center justify-center gap-x-[clamp(28px,5vw,64px)] gap-y-5 opacity-50">
             {TRUST_BRANDS.map((b) => (
@@ -736,7 +735,7 @@ export default function HomePage() {
       <section className="bg-resort-900 px-7 py-[110px]">
         <div className="mx-auto max-w-[1180px]">
           <Reveal className="mx-auto max-w-[680px] text-center">
-            <Eyebrow label="Loved by resort owners" centered dark />
+            <Eyebrow label="Built for how resorts work" centered dark />
             <h2 className="mt-[18px] font-display text-[clamp(2rem,4vw,3.1rem)] font-medium leading-[1.1] tracking-[-0.02em] text-white">
               Why teams switch to ResortPro — and stay.
             </h2>
@@ -756,20 +755,11 @@ export default function HomePage() {
           </Reveal>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            {TESTIMONIALS.map((t, i) => (
-              <Reveal key={t.name} delay={i * 80}>
+            {BENEFITS.map((b, i) => (
+              <Reveal key={b.title} delay={i * 80}>
                 <div className="h-full rounded-[18px] border border-white/10 bg-white/[0.04] p-8">
-                  <div className="h-[34px] font-display text-[56px] leading-[0.6] text-gold-500">&ldquo;</div>
-                  <p className="mb-6 text-[16px] leading-[1.65] text-[#eef3f1]">{t.quote}</p>
-                  <div className="flex items-center gap-[13px]">
-                    <span className="flex h-[42px] w-[42px] items-center justify-center rounded-full bg-gold-500 text-[15px] font-bold text-resort-900">
-                      {t.initials}
-                    </span>
-                    <div>
-                      <div className="text-[14.5px] font-semibold text-white">{t.name}</div>
-                      <div className="text-[13px] text-[#a9bcb6]">{t.role}</div>
-                    </div>
-                  </div>
+                  <div className="text-[15px] font-semibold text-gold-500">{b.title}</div>
+                  <p className="mt-3 text-[16px] leading-[1.65] text-[#eef3f1]">{b.text}</p>
                 </div>
               </Reveal>
             ))}
@@ -861,7 +851,7 @@ export default function HomePage() {
               { title: 'Product', links: [['Features', '#features'], ['Pricing', '#pricing'], ['Embed SDK', '#'], ['Changelog', '#']] },
               { title: 'Company', links: [['About', '#'], ['Careers', '#'], ['Blog', '#']] },
               { title: 'Resources', links: [['Docs', '#'], ['Help center', '#faq'], ['Status', '#']] },
-              { title: 'Legal', links: [['Privacy', '#'], ['Terms', '#']] },
+              { title: 'Legal', links: [['Privacy', '/privacy'], ['Terms', '/terms'], ['Refund', '/refund']] },
             ].map((col) => (
               <div key={col.title}>
                 <div className="mb-4 text-xs font-semibold uppercase tracking-[0.12em] text-[#7f938e]">{col.title}</div>
