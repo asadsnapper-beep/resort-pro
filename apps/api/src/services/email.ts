@@ -1,8 +1,18 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder');
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+// Email is "configured" only when a real Resend key is present. Without it we
+// skip sending gracefully instead of throwing cryptic runtime errors.
+const EMAIL_ENABLED = RESEND_API_KEY.startsWith('re_') && !RESEND_API_KEY.includes('placeholder') && RESEND_API_KEY !== 're_your_resend_api_key';
+
+const resend = new Resend(RESEND_API_KEY || 're_placeholder');
 
 const FROM = process.env.EMAIL_FROM || 'ResortPro <noreply@resortpro.site>';
+
+if (!EMAIL_ENABLED) {
+  // Logged once at startup so misconfiguration is obvious in dev and prod.
+  console.warn('[email] RESEND_API_KEY not configured — outgoing emails are DISABLED. Set RESEND_API_KEY and verify your domain in Resend to enable password reset, receipts, and lifecycle emails.');
+}
 
 /* ── Template variable replacer ─────────────────────────────────────────────── */
 export function renderTemplate(html: string, vars: Record<string, string>): string {
@@ -74,6 +84,10 @@ export async function sendEmail({
   replyTo?: string;
   attachments?: { filename: string; content: Buffer; contentType: string }[];
 }): Promise<{ id: string | null; error: string | null }> {
+  if (!EMAIL_ENABLED) {
+    console.warn(`[email] skipped (email disabled): "${subject}" → ${to}`);
+    return { id: null, error: 'email_disabled' };
+  }
   try {
     const { data, error } = await resend.emails.send({
       from: FROM,
