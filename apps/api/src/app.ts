@@ -72,8 +72,19 @@ export async function buildApp() {
 
   await app.register(cookie, { secret: process.env.COOKIE_SECRET || process.env.JWT_SECRET || 'cookie-secret' });
 
+  // CORS: always allow resortpro.site + all subdomains (apex landing hosts /try,
+  // tenant sites live on <slug>.resortpro.site) plus anything in CORS_ORIGIN.
+  const envOrigins = (process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000'])
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const RESORTPRO_ORIGIN = /^https?:\/\/([a-z0-9-]+\.)*resortpro\.site$/i;
   await app.register(cors, {
-    origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000'],
+    origin: (origin, cb) => {
+      // No Origin header = same-origin / server-to-server (curl, health checks)
+      if (!origin) return cb(null, true);
+      if (RESORTPRO_ORIGIN.test(origin) || envOrigins.includes(origin)) return cb(null, true);
+      return cb(null, false);
+    },
     credentials: true,
   });
 
