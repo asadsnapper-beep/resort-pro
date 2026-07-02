@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "dev:worker": "tsx watch src/worker.ts",
+    "seed:demo": "tsx src/scripts/seed-demo.ts",
     "build": "tsup",
     "start": "node dist/index.js",
     "start:worker": "node dist/worker.js",

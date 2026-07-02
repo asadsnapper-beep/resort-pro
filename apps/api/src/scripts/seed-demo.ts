@@ -23,6 +23,20 @@ const d = (offsetDays: number, h = 12) => {
 async function main() {
   console.log('🎭 Seeding full demo tenant...\n');
 
+  // ── Idempotency guard ─────────────────────────────────────────────────────────
+  // Operational data below uses create() (not upsert), so re-running would
+  // duplicate bookings/payments/etc. Skip if the demo tenant is already seeded.
+  // This makes the script safe to run on every deploy.
+  const existing = await prisma.tenant.findUnique({ where: { slug: 'demo' }, select: { id: true } });
+  if (existing) {
+    const bookingCount = await prisma.booking.count({ where: { tenantId: existing.id } });
+    if (bookingCount > 0) {
+      console.log(`✅ Demo tenant already seeded (${bookingCount} bookings). Skipping to avoid duplicates.`);
+      await prisma.$disconnect();
+      return;
+    }
+  }
+
   // ── Demo Tenant ─────────────────────────────────────────────────────────────
   const demo = await prisma.tenant.upsert({
     where: { slug: 'demo' },

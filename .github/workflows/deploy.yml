@@ -97,6 +97,14 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
 
+      - name: Generate Prisma client
+        run: pnpm --filter @resort-pro/database generate
+
+      - name: Seed demo tenant (idempotent — skips if already seeded)
+        run: pnpm --filter @resort-pro/api seed:demo
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+
   # ─── Step 3: Deploy via Coolify webhook ───────────────────────────────────
   deploy:
     name: Deploy via Coolify
