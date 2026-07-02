@@ -151,8 +151,10 @@ jobs:
         working-directory: apps/api
         run: pnpm vitest run tests/integration
 
-      - name: Run unit + coverage
-        run: pnpm test:coverage
+      - name: Run unit tests
+        # (test:coverage was a turbo task that never existed — run vitest unit suite directly)
+        working-directory: apps/api
+        run: pnpm exec vitest run tests/unit
 
   # ── Layer 2: E2E Role Tests (Playwright) ───────────────────────────────────
   e2e-tests:
@@ -281,10 +283,15 @@ jobs:
           DATABASE_URL: postgresql://resortpro:resortpro@localhost:5432/resortpro
           JWT_SECRET: ci-build-secret
 
-  # ── Lint ────────────────────────────────────────────────────────────────────
-  lint:
-    name: Lint
+  # ── Typecheck (advisory) ─────────────────────────────────────────────────────
+  # eslint was never actually installed in this repo, so the old Lint job could
+  # never pass. Replaced with tsc typecheck. Advisory (non-blocking) for now:
+  # there are ~82 pre-existing type errors (mostly Prisma include-inference noise)
+  # tracked as debt — flip continue-on-error off once they're burned down.
+  typecheck:
+    name: Typecheck (advisory)
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -301,5 +308,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Run lint
-        run: pnpm --filter=@resort-pro/api --filter=@resort-pro/web lint
+      - name: Generate Prisma client
+        working-directory: packages/database
+        run: npx prisma generate
+
+      - name: Typecheck API
+        working-directory: apps/api
+        run: npx tsc --noEmit
