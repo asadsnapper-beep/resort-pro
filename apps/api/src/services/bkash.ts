@@ -10,7 +10,9 @@
  *  5. executePayment(idToken, paymentID) → trxID → CONFIRMED
  */
 
-const BKASH_BASE = 'https://checkout.pay.bka.sh/v1.2.0-beta'
+// Production base by default; override with BKASH_BASE_URL for sandbox testing
+// (sandbox: https://tokenized.sandbox.bka.sh/v1.2.0-beta).
+const BKASH_BASE = process.env.BKASH_BASE_URL || 'https://checkout.pay.bka.sh/v1.2.0-beta'
 
 export interface BkashConfig {
   appKey: string

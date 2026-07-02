@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { prisma } from '@resort-pro/database';
 import { createAdminNotification } from '../utils/notifications';
 import { applyPlanFlagsToTenant, resolveTenantEntitlement, getPlanConfigs } from '../utils/entitlement';
+import { bkashGrantToken, bkashCreatePayment, bkashExecutePayment, type BkashConfig } from '../services/bkash';
 
 // ── Stripe client ──────────────────────────────────────────────────────────
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
@@ -39,6 +40,23 @@ export const PLANS = {
     roomLimit: -1,
   },
 } as const;
+
+// ── bKash subscription pricing (BDT) ───────────────────────────────────────
+// Local-payment prices for owners who pay via bKash. Env-overridable so you can
+// tune without a deploy. These are the amounts YOU charge for the platform.
+const BKASH_PLAN_BDT: Record<'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE', number> = {
+  STARTER: Number(process.env.BKASH_PRICE_STARTER) || 4900,
+  PROFESSIONAL: Number(process.env.BKASH_PRICE_PRO) || 9900,
+  ENTERPRISE: Number(process.env.BKASH_PRICE_ENTERPRISE) || 19900,
+};
+
+// Platform bKash merchant account (money comes to YOU). Returns null if unset,
+// so the endpoint can degrade gracefully instead of crashing.
+function getPlatformBkash(): BkashConfig | null {
+  const { BKASH_APP_KEY, BKASH_APP_SECRET, BKASH_USERNAME, BKASH_PASSWORD } = process.env;
+  if (!BKASH_APP_KEY || !BKASH_APP_SECRET || !BKASH_USERNAME || !BKASH_PASSWORD) return null;
+  return { appKey: BKASH_APP_KEY, appSecret: BKASH_APP_SECRET, username: BKASH_USERNAME, password: BKASH_PASSWORD };
+}
 
 // ── Auth helper ────────────────────────────────────────────────────────────
 async function requireAuth(request: any, reply: any) {
@@ -105,6 +123,8 @@ export async function billingRoutes(app: FastifyInstance) {
         hasStripeCustomer: !!tenant.stripeCustomerId,
         hasSubscription: !!tenant.stripeSubscriptionId,
         availablePlans: PLANS,
+        bkashEnabled: !!getPlatformBkash(),
+        bkashPricesBdt: BKASH_PLAN_BDT,
         entitlement: {
           roomLimit: entitlement.roomLimit,
           staffLimit: entitlement.staffLimit,
@@ -200,6 +220,98 @@ export async function billingRoutes(app: FastifyInstance) {
 
     return reply.send({ success: true, data: { url: session.url } });
   });
+
+  // POST /billing/checkout/bkash — start a bKash subscription payment (BDT)
+  app.post<{ Body: { planKey: 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE'; interval?: 'month' | 'year' } }>(
+    '/checkout/bkash',
+    async (request, reply) => {
+      await requireAuth(request, reply);
+      const { tenantId } = request.user as any;
+      const { planKey, interval = 'month' } = request.body;
+
+      if (!PLANS[planKey]) return reply.status(400).send({ success: false, error: 'Invalid plan' });
+
+      const cfg = getPlatformBkash();
+      if (!cfg) {
+        return reply.status(503).send({ success: false, error: 'bKash payments are not available yet. Please contact support.' });
+      }
+
+      const monthly = BKASH_PLAN_BDT[planKey];
+      const amountNum = interval === 'year' ? Math.round(monthly * 12 * 0.8) : monthly; // 20% off annual
+      const amount = amountNum.toFixed(2);
+
+      const apiUrl = process.env.API_BASE_URL || process.env.APP_URL || 'http://localhost:4000';
+      const invoice = `SUB${Date.now().toString(36).toUpperCase()}`;
+      // Metadata is carried on the callback URL and re-verified (amount + execute) on return.
+      const callbackURL =
+        `${apiUrl}/api/billing/bkash/callback` +
+        `?tenantId=${encodeURIComponent(tenantId)}&planKey=${planKey}&interval=${interval}&amt=${amountNum}`;
+
+      try {
+        const idToken = await bkashGrantToken(cfg);
+        const created = await bkashCreatePayment(cfg, idToken, {
+          amount,
+          currency: 'BDT',
+          merchantInvoiceNumber: invoice,
+          callbackURL,
+        });
+        return reply.send({ success: true, data: { url: created.bkashURL, paymentID: created.paymentID } });
+      } catch (err: any) {
+        request.log.error({ err }, 'bKash subscription create failed');
+        return reply.status(502).send({ success: false, error: 'Could not start bKash payment. Please try again.' });
+      }
+    }
+  );
+
+  // GET /billing/bkash/callback — bKash redirects here after payment (no auth)
+  app.get<{ Querystring: { paymentID?: string; status?: string; tenantId?: string; planKey?: string; interval?: string; amt?: string } }>(
+    '/bkash/callback',
+    async (request, reply) => {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const { paymentID, status, tenantId, planKey, interval = 'month', amt } = request.query;
+      const fail = (reason: string) => reply.redirect(`${appUrl}/dashboard/billing?canceled=1&reason=${encodeURIComponent(reason)}`);
+
+      if (!paymentID || status !== 'success' || !tenantId || !planKey) return fail('cancelled');
+      if (!PLANS[planKey as keyof typeof PLANS]) return fail('invalid_plan');
+
+      const cfg = getPlatformBkash();
+      if (!cfg) return fail('not_configured');
+
+      try {
+        const idToken = await bkashGrantToken(cfg);
+        const exec = await bkashExecutePayment(cfg, idToken, paymentID);
+        if (exec.transactionStatus !== 'Completed') return fail('payment_incomplete');
+
+        // Re-verify the paid amount against what we expected (guards tampered callback params)
+        const expected = Number(amt);
+        if (expected && Math.abs(Number(exec.amount) - expected) > 0.5) return fail('amount_mismatch');
+
+        const plan = planKey as 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';
+        const days = interval === 'year' ? 365 : 30;
+        const periodEnd = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+
+        await prisma.tenant.update({
+          where: { id: tenantId },
+          data: { plan, planStatus: 'active', currentPeriodEnd: periodEnd },
+        });
+        await applyPlanFlagsToTenant(tenantId, plan);
+
+        const t = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true, slug: true } });
+        await createAdminNotification({
+          type: 'subscription_paid',
+          title: 'Subscription paid (bKash)',
+          message: `${t?.name ?? tenantId} paid ৳${exec.amount} for ${plan} (${interval}) via bKash. trxID ${exec.trxID}.`,
+          metadata: { tenantId, plan, interval, trxID: exec.trxID, amount: exec.amount, method: 'bkash' },
+          linkPath: '/admin/billing',
+        });
+
+        return reply.redirect(`${appUrl}/dashboard/billing?success=1&plan=${plan}&method=bkash`);
+      } catch (err: any) {
+        request.log.error({ err }, 'bKash subscription callback failed');
+        return fail('execute_failed');
+      }
+    }
+  );
 
   // GET /billing/invoices — list recent invoices
   app.get('/invoices', async (request, reply) => {

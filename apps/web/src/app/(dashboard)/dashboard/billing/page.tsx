@@ -24,6 +24,8 @@ type BillingStatus = {
   isCanceled: boolean; currentPeriodEnd: string | null;
   trialEndsAt: string | null; hasStripeCustomer: boolean;
   hasSubscription: boolean;
+  bkashEnabled?: boolean;
+  bkashPricesBdt?: Record<string, number>;
   planConfigs?: PlanConfig[];
   entitlement?: { roomLimit: number; staffLimit: number; aiMonthlyTokenCap: number; flags: Record<string, boolean> };
 };
@@ -61,9 +63,13 @@ function StatusPill({ status, trialDaysLeft }: { status: string; trialDaysLeft: 
   );
 }
 
-function PlanCard({ plan, currentPlan, onSelect, loading }: {
+function PlanCard({ plan, currentPlan, onSelect, onBkash, loading, bkashEnabled, bkashPriceBdt }: {
   plan: PlanConfig; currentPlan: string;
-  onSelect: (key: PlanKey) => void; loading: string | null;
+  onSelect: (key: PlanKey) => void;
+  onBkash: (key: PlanKey) => void;
+  loading: string | null;
+  bkashEnabled?: boolean;
+  bkashPriceBdt?: number;
 }) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
@@ -136,6 +142,16 @@ function PlanCard({ plan, currentPlan, onSelect, loading }: {
           {isCurrent ? 'Current Plan' : `Upgrade to ${plan.name}`}
         </button>
       )}
+      {planKey !== 'FREE' && !isCurrent && bkashEnabled && (
+        <button onClick={() => onBkash(planKey)} disabled={loading !== null}
+          className="flex w-full items-center justify-center gap-2 rounded-[9px] py-2 text-[13px] font-semibold transition-colors disabled:opacity-60 hover:opacity-90"
+          style={{ background: '#e2136e', color: '#fff' }}>
+          {loading === `bkash-${planKey}`
+            ? <Loader2 className="h-4 w-4 animate-spin" />
+            : null}
+          Pay with bKash{bkashPriceBdt ? ` — ৳${bkashPriceBdt.toLocaleString()}/mo` : ''}
+        </button>
+      )}
     </div>
   );
 }
@@ -172,6 +188,18 @@ export default function BillingPage() {
       window.location.href = res.data.data.url;
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to start checkout';
+      toast({ title: 'Error', description: msg, variant: 'destructive' });
+      setLoadingPlan(null);
+    }
+  };
+
+  const handleBkash = async (planKey: PlanKey) => {
+    setLoadingPlan(`bkash-${planKey}`);
+    try {
+      const res = await billingApi.createBkashCheckout(planKey, 'month');
+      window.location.href = res.data.data.url;
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Could not start bKash payment';
       toast({ title: 'Error', description: msg, variant: 'destructive' });
       setLoadingPlan(null);
     }
@@ -294,7 +322,8 @@ export default function BillingPage() {
             .filter(p => p.key !== 'FREE')
             .map(plan => (
               <PlanCard key={plan.key} plan={plan}
-                currentPlan={currentPlan} onSelect={handleUpgrade} loading={loadingPlan} />
+                currentPlan={currentPlan} onSelect={handleUpgrade} onBkash={handleBkash} loading={loadingPlan}
+                bkashEnabled={billing?.bkashEnabled} bkashPriceBdt={billing?.bkashPricesBdt?.[plan.key]} />
             ))}
         </div>
       </div>

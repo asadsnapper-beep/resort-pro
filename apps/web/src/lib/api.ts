@@ -365,6 +365,8 @@ export const billingApi = {
   getStatus: () => api.get('/billing/status'),
   getInvoices: () => api.get('/billing/invoices'),
   createCheckout: (planKey: string) => api.post('/billing/checkout', { planKey }),
+  createBkashCheckout: (planKey: string, interval: 'month' | 'year' = 'month') =>
+    api.post('/billing/checkout/bkash', { planKey, interval }),
   createPortal: () => api.post('/billing/portal'),
 };
 
