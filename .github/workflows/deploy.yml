@@ -86,10 +86,14 @@ jobs:
 
     steps:
       - name: Trigger Coolify deploy
+        # Coolify's deploy webhook requires an API token (Keys & Tokens → API tokens)
         run: |
-          curl -s -o /dev/null -w "%{http_code}" \
-            -X GET "${{ secrets.COOLIFY_WEBHOOK_WEB }}" \
-          | grep -qE '^2' || { echo "Coolify deploy failed"; exit 1; }
+          STATUS=$(curl -s -o /tmp/coolify-resp.txt -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}" \
+            -X GET "${{ secrets.COOLIFY_WEBHOOK_WEB }}")
+          echo "Coolify responded: HTTP $STATUS"
+          cat /tmp/coolify-resp.txt || true
+          echo "$STATUS" | grep -qE '^2' || { echo "Coolify deploy failed (HTTP $STATUS)"; exit 1; }
 
       - name: Wait for health check — API
         run: |
