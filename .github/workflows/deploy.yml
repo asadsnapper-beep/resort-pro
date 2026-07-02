@@ -70,48 +70,16 @@ jobs:
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
 
-  # ─── Step 2: Run DB migrations on production ──────────────────────────────
-  migrate:
-    name: Run DB Migrations
-    runs-on: ubuntu-latest
-    needs: build
-    environment: production
+  # NOTE: DB migrations + demo seed run INSIDE the API container at startup
+  # (see apps/api/Dockerfile CMD: prisma migrate deploy + seed-demo.js).
+  # The production DB is not reachable from GitHub runners (docker-internal
+  # host `postgres`), so a runner-side migrate job can never work.
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      # pnpm must be installed BEFORE setup-node: setup-node@v5 auto-detects
-      # the packageManager field and needs the pnpm binary for its cache.
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Run Prisma migrations
-        run: pnpm --filter @resort-pro/database migrate:deploy
-        env:
-          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
-
-      - name: Generate Prisma client
-        run: pnpm --filter @resort-pro/database generate
-
-      - name: Seed demo tenant (idempotent — skips if already seeded)
-        run: pnpm --filter @resort-pro/api seed:demo
-        env:
-          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
-
-  # ─── Step 3: Deploy via Coolify webhook ───────────────────────────────────
+  # ─── Step 2: Deploy via Coolify webhook ───────────────────────────────────
   deploy:
     name: Deploy via Coolify
     runs-on: ubuntu-latest
-    needs: [build, migrate]
+    needs: build
     environment:
       name: production
       url: https://resortpro.site
