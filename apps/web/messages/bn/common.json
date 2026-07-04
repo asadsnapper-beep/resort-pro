@@ -30,7 +30,9 @@
     "referrals": "রেফারেল",
     "roles": "ভূমিকা",
     "orders": "F&B অর্ডার",
-    "properties": "প্রপার্টি"
+    "properties": "প্রপার্টি",
+    "tables": "টেবিল",
+    "aiContent": "AI Content"
   },
   "groups": {
     "overview": "সারসংক্ষেপ",

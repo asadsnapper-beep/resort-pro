@@ -10,6 +10,7 @@ import { PlatformBanner } from '@/components/dashboard/PlatformBanner';
 import { DemoBanner } from '@/components/dashboard/DemoBanner';
 import { ImpersonationBanner } from '@/components/dashboard/ImpersonationBanner';
 import { OfflineBar } from '@/components/dashboard/OfflineBar';
+import { MobileMoreSheet } from '@/components/dashboard/MobileMoreSheet';
 import { billingApi } from '@/lib/api';
 
 // Pages that should always render regardless of billing status
@@ -22,6 +23,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
   const [mounted, setMounted] = useState(false);
   const [statusChecked, setStatusChecked] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -147,13 +149,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </a>
           );
         })}
-        <a href="/dashboard/calendar" className="flex flex-col items-center gap-1 px-4 py-2">
-          <svg className={`h-5 w-5 ${pathname.startsWith('/dashboard/calendar') ? 'text-gold-400' : 'text-[#8fa8a1]'}`} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" />
+        <button onClick={() => setMoreOpen(true)} className="flex flex-col items-center gap-1 px-4 py-2" aria-label="Open full menu">
+          <svg className={`h-5 w-5 ${moreOpen ? 'text-gold-400' : 'text-[#8fa8a1]'}`} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
-          <span className={`text-[10px] font-medium ${pathname.startsWith('/dashboard/calendar') ? 'text-gold-400' : 'text-[#8fa8a1]'}`}>More</span>
-        </a>
+          <span className={`text-[10px] font-medium ${moreOpen ? 'text-gold-400' : 'text-[#8fa8a1]'}`}>More</span>
+        </button>
       </nav>
+
+      {/* Full mobile menu — every page the role can access */}
+      <MobileMoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />
     </div>
   );
 }

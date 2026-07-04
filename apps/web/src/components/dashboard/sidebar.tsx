@@ -45,7 +45,7 @@ const ROLE_LABELS: Record<Role, { label: string; color: string }> = {
 // roles: undefined = visible to ALL roles
 // roles: [...] = ONLY these roles can see it
 // ─────────────────────────────────────────────────────────────────
-type NavItem = {
+export type NavItem = {
   href: string;
   labelKey: string;         // translation key
   labelFallback: string;    // English fallback
@@ -56,7 +56,7 @@ type NavItem = {
   aiFeature?: 'ai_content' | 'ai_chatbot' | 'ai_business_insights'; // hide unless this AI feature is live
 };
 
-const NAV_ITEMS: NavItem[] = [
+export const NAV_ITEMS: NavItem[] = [
   // ── Overview ──────────────────────────────────────────────
   { href: '/dashboard',            labelKey: 'nav.dashboard',    labelFallback: 'Dashboard',       icon: LayoutDashboard, group: 'Overview',         groupKey: 'groups.overview' },
   { href: '/dashboard/analytics',  labelKey: 'nav.analytics',    labelFallback: 'Analytics',       icon: BarChart2,       group: 'Overview',         groupKey: 'groups.overview',
@@ -138,7 +138,7 @@ const NAV_ITEMS: NavItem[] = [
 // ─────────────────────────────────────────────────────────────────
 // Filter items by role
 // ─────────────────────────────────────────────────────────────────
-function getVisibleItems(role: Role): NavItem[] {
+export function getVisibleItems(role: Role): NavItem[] {
   return NAV_ITEMS.filter((item) => {
     if (!item.roles) return true; // no restriction = visible to all
     return item.roles.includes(role);
@@ -148,7 +148,7 @@ function getVisibleItems(role: Role): NavItem[] {
 // ─────────────────────────────────────────────────────────────────
 // Group items
 // ─────────────────────────────────────────────────────────────────
-function groupItems(items: NavItem[]) {
+export function groupItems(items: NavItem[]) {
   const groups: Record<string, NavItem[]> = {};
   for (const item of items) {
     const g = item.group ?? 'Other';
@@ -253,7 +253,10 @@ export function Sidebar() {
               {!isCollapsed && (
                 <ul className="space-y-0.5 px-2 pb-1">
                   {items.map(({ href, labelKey, labelFallback, icon: Icon }) => {
-                    const label: string = t(labelKey) ?? labelFallback;
+                    // next-intl returns the namespaced key itself when missing —
+                    // detect that and fall back to the English label instead.
+                    const translated: string = t(labelKey);
+                    const label: string = translated.endsWith(labelKey) ? labelFallback : translated;
                     const active =
                       pathname === href ||
                       (href !== '/dashboard' && pathname.startsWith(href));

@@ -350,8 +350,8 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Settings layout: left sidebar + content */}
-      <div className="flex gap-6 items-start">
+      {/* Settings layout: stacked on mobile (selector above content), sidebar + content on md+ */}
+      <div className="flex flex-col gap-4 md:flex-row md:gap-6 md:items-start">
 
         {/* ── Left sidebar nav ───────────────────────────────────────────── */}
         <aside className="hidden md:flex flex-col gap-5 w-48 flex-shrink-0 sticky top-4">

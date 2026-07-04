@@ -30,7 +30,9 @@
     "referrals": "Referrals",
     "roles": "Roles",
     "orders": "F&B Orders",
-    "properties": "Properties"
+    "properties": "Properties",
+    "tables": "Tables",
+    "aiContent": "AI Content"
   },
   "groups": {
     "overview": "Overview",
