@@ -1,8 +1,11 @@
 'use client'
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Menu, X } from 'lucide-react'
 
 import type { ThemeProps, ResortRoom } from '../types'
+import { orderSections } from '../_utils/sections'
+
+const LUXE_SECTION_ORDER = ['about', 'rooms', 'menu', 'gallery', 'testimonials', 'availability', 'booking', 'contact'] as const
 import { AvailabilityCalendar, BookingForm, MenuWidget, ContactForm } from '../_widgets'
 import { WhatsAppButton } from '../_widgets/SocialLinks'
 import {
@@ -126,94 +129,94 @@ export function LuxeTheme({ data }: ThemeProps) {
         )}
       </nav>
 
-      {/* ── Sections ──────────────────────────────────────── */}
+      {/* ── Sections (owner-orderable via website.sectionOrder) ── */}
+      <HeroSection data={data} scrollTo={scrollTo} />
       {(() => {
         const h = new Set(website.hiddenSections ?? [])
         const show = (id: string) => !h.has(id)
-        return (
-          <>
-            <HeroSection data={data} scrollTo={scrollTo} />
-            {show('about') && <AboutSection data={data} />}
-            <RoomsSection data={data} onViewRoom={setSelectedRoom} onBookRoom={setBookingRoom} />
-            {show('menu') && (
-              <MenuWidget slug={tenant.slug} primaryColor={primary} accentColor={accent} currency={tenant.currency} />
-            )}
-            {show('gallery') && <GallerySection data={data} />}
-            {show('testimonials') && <TestimonialsSection data={data} />}
-          </>
-        )
+        const nodes: Record<string, React.ReactNode> = {
+          about: show('about') && <AboutSection data={data} />,
+          rooms: <RoomsSection data={data} onViewRoom={setSelectedRoom} onBookRoom={setBookingRoom} />,
+          menu: show('menu') && (
+            <MenuWidget slug={tenant.slug} primaryColor={primary} accentColor={accent} currency={tenant.currency} />
+          ),
+          gallery: show('gallery') && <GallerySection data={data} />,
+          testimonials: show('testimonials') && <TestimonialsSection data={data} />,
+          availability: show('availability') && (
+            <section id="availability" className="py-20 bg-stone-50">
+              <div className="max-w-4xl mx-auto px-6">
+                <div className="text-center mb-10">
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] mb-3" style={{ color: accent }}>
+                    Availability
+                  </p>
+                  <h2 className="text-4xl font-bold text-gray-900">Check Availability</h2>
+                  <p className="mt-3 text-gray-500">Select your dates to see available rooms</p>
+                </div>
+                <AvailabilityCalendar
+                  slug={tenant.slug}
+                  primaryColor={primary}
+                  accentColor={accent}
+                  currency={tenant.currency}
+                  onRoomSelect={(room, checkIn, checkOut) => {
+                    setCalendarCheckIn(checkIn.toISOString().split('T')[0])
+                    setCalendarCheckOut(checkOut.toISOString().split('T')[0])
+                    setCalendarRoomId(room.id)
+                    document.getElementById('booking')?.scrollIntoView({ behavior: 'smooth' })
+                  }}
+                />
+              </div>
+            </section>
+          ),
+          booking: (
+            <section id="booking" className="py-24 bg-gray-50">
+              <div className="max-w-4xl mx-auto px-6">
+                <div className="text-center mb-12">
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] mb-3" style={{ color: accent }}>
+                    Reserve
+                  </p>
+                  <h2 className="text-4xl font-bold text-gray-900">Book Your Stay</h2>
+                  <p className="mt-3 text-gray-500">
+                    Check-in: {tenant.checkInTime} · Check-out: {tenant.checkOutTime}
+                  </p>
+                </div>
+                <BookingForm
+                  slug={tenant.slug}
+                  primaryColor={primary}
+                  accentColor={accent}
+                  currency={tenant.currency}
+                  rooms={data.rooms}
+                  checkInTime={tenant.checkInTime}
+                  checkOutTime={tenant.checkOutTime}
+                  initialCheckIn={calendarCheckIn   || undefined}
+                  initialCheckOut={calendarCheckOut || undefined}
+                  initialRoomId={calendarRoomId     || undefined}
+                />
+              </div>
+            </section>
+          ),
+          contact: show('contact') && (
+            <section id="feedback" className="py-24 bg-white">
+              <div className="max-w-2xl mx-auto px-6">
+                <div className="text-center mb-12">
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] mb-3" style={{ color: accent }}>
+                    We Listen
+                  </p>
+                  <h2 className="text-4xl font-bold text-gray-900">Share Your Thoughts</h2>
+                  <p className="mt-3 text-gray-500">Your feedback helps us create exceptional experiences</p>
+                </div>
+                <ContactForm
+                  slug={tenant.slug}
+                  primaryColor={primary}
+                  accentColor={accent}
+                  currency={tenant.currency}
+                />
+              </div>
+            </section>
+          ),
+        }
+        const order = orderSections(LUXE_SECTION_ORDER, website.sectionOrder)
+        return order.map(id => <React.Fragment key={id}>{nodes[id]}</React.Fragment>)
       })()}
-
-      {/* Availability Calendar */}
-      {!(website.hiddenSections ?? []).includes('availability') && <section id="availability" className="py-20 bg-stone-50">
-        <div className="max-w-4xl mx-auto px-6">
-          <div className="text-center mb-10">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] mb-3" style={{ color: accent }}>
-              Availability
-            </p>
-            <h2 className="text-4xl font-bold text-gray-900">Check Availability</h2>
-            <p className="mt-3 text-gray-500">Select your dates to see available rooms</p>
-          </div>
-          <AvailabilityCalendar
-            slug={tenant.slug}
-            primaryColor={primary}
-            accentColor={accent}
-            currency={tenant.currency}
-            onRoomSelect={(room, checkIn, checkOut) => {
-              setCalendarCheckIn(checkIn.toISOString().split('T')[0])
-              setCalendarCheckOut(checkOut.toISOString().split('T')[0])
-              setCalendarRoomId(room.id)
-              document.getElementById('booking')?.scrollIntoView({ behavior: 'smooth' })
-            }}
-          />
-        </div>
-      </section>}
-
-      {/* Booking Form */}
-      <section id="booking" className="py-24 bg-gray-50">
-        <div className="max-w-4xl mx-auto px-6">
-          <div className="text-center mb-12">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] mb-3" style={{ color: accent }}>
-              Reserve
-            </p>
-            <h2 className="text-4xl font-bold text-gray-900">Book Your Stay</h2>
-            <p className="mt-3 text-gray-500">
-              Check-in: {tenant.checkInTime} · Check-out: {tenant.checkOutTime}
-            </p>
-          </div>
-          <BookingForm
-            slug={tenant.slug}
-            primaryColor={primary}
-            accentColor={accent}
-            currency={tenant.currency}
-            rooms={data.rooms}
-            checkInTime={tenant.checkInTime}
-            checkOutTime={tenant.checkOutTime}
-            initialCheckIn={calendarCheckIn   || undefined}
-            initialCheckOut={calendarCheckOut || undefined}
-            initialRoomId={calendarRoomId     || undefined}
-          />
-        </div>
-      </section>
-
-      {/* Feedback / Contact */}
-      {!(website.hiddenSections ?? []).includes('contact') && <section id="feedback" className="py-24 bg-white">
-        <div className="max-w-2xl mx-auto px-6">
-          <div className="text-center mb-12">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] mb-3" style={{ color: accent }}>
-              We Listen
-            </p>
-            <h2 className="text-4xl font-bold text-gray-900">Share Your Thoughts</h2>
-            <p className="mt-3 text-gray-500">Your feedback helps us create exceptional experiences</p>
-          </div>
-          <ContactForm
-            slug={tenant.slug}
-            primaryColor={primary}
-            accentColor={accent}
-            currency={tenant.currency}
-          />
-        </div>
-      </section>}
 
       <FooterSection data={data} scrollTo={scrollTo} />
 

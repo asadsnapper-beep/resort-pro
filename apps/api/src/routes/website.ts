@@ -7,14 +7,21 @@ import type { JwtPayload } from '@resort-pro/types';
 import { resolveRate } from './ratePlans';
 import { sendWebBookingEmails } from '../utils/guest-emails';
 
+// Accept absolute http(s) URLs OR site-relative upload paths (/uploads/…) —
+// the app's own ImageUpload produces relative paths, so strict .url() broke saves.
+const imageRef = z.string().refine(
+  (v) => v === '' || v.startsWith('/') || /^https?:\/\//i.test(v),
+  'Must be an http(s) URL or a site-relative path',
+);
+
 const websiteSchema = z.object({
   heroTitle: z.string().optional().default('Welcome'),
   heroSubtitle: z.string().optional(),
-  heroImage: z.string().url().optional(),
+  heroImage: imageRef.optional(),
   aboutTitle: z.string().optional(),
   aboutText: z.string().optional(),
-  aboutImage: z.string().url().optional(),
-  galleryImages: z.array(z.string().url()).optional(),
+  aboutImage: imageRef.optional(),
+  galleryImages: z.array(imageRef).optional(),
   seoTitle: z.string().optional(),
   seoDescription: z.string().optional(),
   primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
@@ -27,6 +34,7 @@ const websiteSchema = z.object({
   })).optional(),
   templateId: z.string().optional(),
   hiddenSections: z.array(z.string()).optional(),
+  sectionOrder: z.array(z.string()).optional(),
   // Social media
   facebookUrl: z.string().url().optional().or(z.literal('')),
   instagramUrl: z.string().url().optional().or(z.literal('')),
@@ -45,8 +53,11 @@ export async function websiteRoutes(app: FastifyInstance) {
     preHandler: requireRole('OWNER', 'MANAGER', 'MARKETER', 'DEVELOPER'),
     handler: async (request) => {
       const { db } = request;
-      // Return existing content or an empty shell — never 404, so the dashboard form always loads
-      const content = await db.websiteContent.findUnique({ where: {} as any });
+      const { tenantId } = request.user as JwtPayload;
+      // Return existing content or an empty shell — never 404, so the dashboard form always loads.
+      // tenantId is @unique on WebsiteContent; the tenant-scoped client does NOT
+      // inject it into findUnique, so it must be passed explicitly.
+      const content = await db.websiteContent.findUnique({ where: { tenantId } });
       return ok(content ?? { heroTitle: '', galleryImages: [], testimonials: [], hiddenSections: [] });
     },
   });

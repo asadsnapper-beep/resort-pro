@@ -9,10 +9,11 @@ import {
   Globe, Image, FileText, Palette, Star, Plus, Trash2, Save,
   Layout, LayoutGrid, ExternalLink, Share2, Link2, CheckCircle2,
   AlertTriangle, Loader2, PanelRight, PanelRightClose, RefreshCw,
-  Monitor, Smartphone,
+  Monitor, Smartphone, Copy, Check, ChevronUp, ChevronDown,
 } from 'lucide-react';
 import { ThemePicker } from '@/components/dashboard/website/ThemePicker';
 import { ImageUpload } from '@/components/ui/ImageUpload';
+import { ModalShell } from '@/components/ui/modal-shell';
 
 const PREVIEW_STORAGE_KEY = 'rp-website-preview';
 
@@ -38,18 +39,34 @@ interface WebsiteContent {
   whatsappNumber?: string;
   tripadvisorUrl?: string;
   hiddenSections?: string[];
+  sectionOrder?: string[];
   googleAnalyticsId?: string;
 }
 
-const TOGGLEABLE_SECTIONS = [
+// Orderable site sections. `fixed: true` = always visible (no hide toggle),
+// but still reorderable. Order here is the default page order.
+const SITE_SECTIONS = [
   { id: 'about',        label: 'About / Our Story',     desc: 'Resort story, about image' },
   { id: 'amenities',    label: 'Amenities',              desc: 'Pool, spa, gym etc. (Coastal theme)' },
+  { id: 'rooms',        label: 'Rooms & Villas',         desc: 'Room cards with prices & booking', fixed: true },
   { id: 'menu',         label: 'Restaurant Menu',        desc: 'Food menu with in-room ordering' },
   { id: 'gallery',      label: 'Photo Gallery',          desc: 'Image gallery grid' },
   { id: 'testimonials', label: 'Testimonials',           desc: 'Guest reviews & ratings' },
   { id: 'availability', label: 'Availability Calendar',  desc: 'Date picker to check open rooms' },
+  { id: 'booking',      label: 'Booking Form',           desc: 'Direct reservation form', fixed: true },
   { id: 'contact',      label: 'Contact / Feedback',     desc: 'Contact form and map' },
 ] as const;
+
+const DEFAULT_SECTION_ORDER = SITE_SECTIONS.map(s => s.id);
+
+/** Resolve saved order → full valid order (unknown ids dropped, missing appended). */
+function resolveSectionOrder(saved?: string[]): string[] {
+  if (!saved || saved.length === 0) return [...DEFAULT_SECTION_ORDER];
+  const known = new Set<string>(DEFAULT_SECTION_ORDER);
+  const out = saved.filter(id => known.has(id));
+  for (const id of DEFAULT_SECTION_ORDER) if (!out.includes(id)) out.push(id);
+  return out;
+}
 
 const TABS = [
   { id: 'template',     label: 'Template',      icon: Layout     },
@@ -69,14 +86,24 @@ const labelCls = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
 const cardCls  = 'rounded-[14px] border bg-white p-5 space-y-4';
 const cardStyle = { borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' };
 
-function SaveBtn({ loading, onClick }: { loading: boolean; onClick: () => void }) {
+function SaveBtn({ loading, dirty, onClick }: { loading: boolean; dirty?: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick} disabled={loading}
-      className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors disabled:opacity-60 hover:opacity-90"
-      style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
-      {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-      {loading ? 'Saving…' : 'Save & Publish'}
-    </button>
+    <div className="flex items-center gap-2.5">
+      {dirty && !loading && (
+        <span className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+          style={{ background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.25)', color: '#b89040' }}>
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#b89040' }} />
+          Unsaved changes
+        </span>
+      )}
+      <button onClick={onClick} disabled={loading || !dirty}
+        title={dirty ? 'Review & publish your changes' : 'No changes to publish'}
+        className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors disabled:opacity-60 hover:opacity-90"
+        style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+        {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+        {loading ? 'Publishing…' : 'Save & Publish'}
+      </button>
+    </div>
   );
 }
 
@@ -86,7 +113,10 @@ export default function WebsitePage() {
   const [tab, setTab] = useState<Tab>('template');
   const [showPreview, setShowPreview] = useState(true);
   const [previewKey,  setPreviewKey]  = useState(0);
+  const [urlCopied,   setUrlCopied]   = useState(false);
   const [mobileView,  setMobileView]  = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const [form, setForm] = useState<WebsiteContent>({
@@ -97,7 +127,7 @@ export default function WebsitePage() {
     testimonials: [], templateId: 'luxe',
     facebookUrl: '', instagramUrl: '', twitterUrl: '',
     tiktokUrl: '', youtubeUrl: '', whatsappNumber: '',
-    tripadvisorUrl: '', hiddenSections: [], googleAnalyticsId: '',
+    tripadvisorUrl: '', hiddenSections: [], sectionOrder: [], googleAnalyticsId: '',
   });
 
   const { data, isLoading } = useQuery({ queryKey: ['website'], queryFn: () => websiteApi.get() });
@@ -105,7 +135,7 @@ export default function WebsitePage() {
   useEffect(() => {
     const content = data?.data?.data;
     if (content) {
-      setForm({
+      const loaded: WebsiteContent = {
         heroTitle:        content.heroTitle        ?? '',
         heroSubtitle:     content.heroSubtitle     ?? '',
         heroImage:        content.heroImage        ?? '',
@@ -127,10 +157,22 @@ export default function WebsitePage() {
         whatsappNumber:   content.whatsappNumber   ?? '',
         tripadvisorUrl:   content.tripadvisorUrl   ?? '',
         hiddenSections:   content.hiddenSections   ?? [],
+        sectionOrder:     content.sectionOrder     ?? [],
         googleAnalyticsId: content.googleAnalyticsId ?? '',
-      });
+      };
+      setForm(loaded);
+      setSavedSnapshot(JSON.stringify(loaded));
     }
   }, [data]);
+
+  // Unsaved-changes tracking + tab-close guard
+  const dirty = savedSnapshot !== null && JSON.stringify(form) !== savedSnapshot;
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
 
   const sendPreviewUpdate = useCallback((payload: WebsiteContent) => {
     try { sessionStorage.setItem(PREVIEW_STORAGE_KEY, JSON.stringify(payload)); } catch {}
@@ -148,7 +190,9 @@ export default function WebsitePage() {
     mutationFn: () => websiteApi.update(form),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['website'] });
-      toast({ title: 'Website updated!', description: 'Your changes are live.' });
+      setSavedSnapshot(JSON.stringify(form));
+      setConfirmOpen(false);
+      toast({ title: '🎉 Published!', description: `Your website is live at ${tenant?.slug}.resortpro.site` });
       setPreviewKey(k => k + 1);
     },
     onError: (err: { response?: { data?: { error?: string } } }) =>
@@ -164,6 +208,18 @@ export default function WebsitePage() {
 
   const publicUrl  = tenant?.slug ? `/${tenant.slug}` : null;
   const previewUrl = tenant?.slug ? `/${tenant.slug}?preview=${form.templateId ?? 'luxe'}` : null;
+
+  /* ── Setup checklist — drives owners to a complete, publishable site ────── */
+  const checklist: { label: string; done: boolean; tab: Tab }[] = [
+    { label: 'Add a hero photo',            done: !!form.heroImage,                          tab: 'hero' },
+    { label: 'Write your resort story',     done: (form.aboutText ?? '').trim().length >= 40, tab: 'hero' },
+    { label: 'Add at least 3 gallery photos', done: (form.galleryImages ?? []).length >= 3,  tab: 'gallery' },
+    { label: 'Add a guest testimonial',     done: (form.testimonials ?? []).length >= 1,     tab: 'testimonials' },
+    { label: 'Set your SEO title',          done: !!(form.seoTitle ?? '').trim(),            tab: 'seo' },
+    { label: 'Add your WhatsApp number',    done: !!(form.whatsappNumber ?? '').trim(),      tab: 'social' },
+  ];
+  const checklistDone = checklist.filter(c => c.done).length;
+  const checklistPct  = Math.round((checklistDone / checklist.length) * 100);
 
   /* ── Custom domain ──────────────────────────────────────────────────────── */
   const [domainInput, setDomainInput] = useState('');
@@ -261,7 +317,7 @@ export default function WebsitePage() {
             </button>
           )}
 
-          <SaveBtn loading={saveMutation.isPending} onClick={() => saveMutation.mutate()} />
+          <SaveBtn loading={saveMutation.isPending} dirty={dirty} onClick={() => setConfirmOpen(true)} />
         </div>
       </div>
 
@@ -271,8 +327,8 @@ export default function WebsitePage() {
         {/* ── LEFT editor panel ──────────────────────────────────────────────── */}
         <div className="flex flex-col min-h-0" style={{ borderRight: '1px solid rgba(0,0,0,0.07)' }}>
 
-          {/* Tab bar */}
-          <div className="flex gap-0 overflow-x-auto flex-shrink-0 px-3"
+          {/* Tab bar — wraps so ALL tabs stay visible (no hidden horizontal scroll) */}
+          <div className="flex flex-wrap gap-0 flex-shrink-0 px-3"
             style={{ borderBottom: '1px solid rgba(0,0,0,0.07)', background: 'var(--rp-surface-2)' }}>
             {TABS.map(({ id, label, icon: Icon }) => (
               <button key={id} onClick={() => setTab(id)}
@@ -288,15 +344,69 @@ export default function WebsitePage() {
           {/* Scrollable content */}
           <div className="flex-1 overflow-y-auto p-4 space-y-5" style={{ background: '#f7f5f0' }}>
 
-            {/* Live URL banner */}
-            {publicUrl && (
+            {/* Live URL banner — canonical public address + copy */}
+            {publicUrl && tenant?.slug && (
               <div className="flex items-center gap-2 rounded-[10px] border px-3 py-2"
                 style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)' }}>
                 <Globe className="h-3.5 w-3.5 shrink-0" style={{ color: '#23766a' }} />
                 <a href={publicUrl} target="_blank" rel="noopener noreferrer"
                   className="text-[12px] font-semibold truncate hover:underline" style={{ color: '#23766a' }}>
-                  {typeof window !== 'undefined' ? window.location.host : ''}{publicUrl}
+                  {tenant.slug}.resortpro.site
                 </a>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`https://${tenant.slug}.resortpro.site`);
+                    setUrlCopied(true);
+                    setTimeout(() => setUrlCopied(false), 1500);
+                  }}
+                  title="Copy site address"
+                  className="ml-auto flex shrink-0 items-center gap-1 rounded-[7px] border px-2 py-1 text-[11px] font-semibold transition-colors hover:bg-white/60"
+                  style={{ borderColor: 'rgba(35,118,106,0.25)', color: '#23766a' }}>
+                  {urlCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                  {urlCopied ? 'Copied' : 'Copy'}
+                </button>
+                <button
+                  onClick={() => window.open(publicUrl, '_blank')}
+                  title="Open site"
+                  className="flex shrink-0 items-center gap-1 rounded-[7px] border px-2 py-1 text-[11px] font-semibold transition-colors hover:bg-white/60"
+                  style={{ borderColor: 'rgba(35,118,106,0.25)', color: '#23766a' }}>
+                  <ExternalLink className="h-3 w-3" /> Open
+                </button>
+              </div>
+            )}
+
+            {/* Setup checklist — hidden once everything is done */}
+            {checklistPct < 100 && (
+              <div className={cardCls} style={cardStyle}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-[13.5px] font-bold text-[#18231f]">Your site is {checklistPct}% ready</h3>
+                    <p className="text-[11.5px] text-[#8aa29a]">Finish these to make a great first impression</p>
+                  </div>
+                  <span className="text-[12px] font-bold" style={{ color: '#23766a' }}>{checklistDone}/{checklist.length}</span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full" style={{ background: 'var(--rp-surface-3)' }}>
+                  <div className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${checklistPct}%`, background: '#23766a' }} />
+                </div>
+                <ul className="space-y-1.5">
+                  {checklist.map(item => (
+                    <li key={item.label}>
+                      <button
+                        onClick={() => !item.done && setTab(item.tab)}
+                        disabled={item.done}
+                        className="flex w-full items-center gap-2 rounded-[8px] px-2 py-1.5 text-left text-[12.5px] transition-colors disabled:cursor-default enabled:hover:bg-black/[0.03]">
+                        {item.done
+                          ? <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: '#23766a' }} />
+                          : <span className="h-4 w-4 shrink-0 rounded-full border-2" style={{ borderColor: 'rgba(0,0,0,0.15)' }} />}
+                        <span style={item.done ? { color: '#8aa29a', textDecoration: 'line-through' } : { color: '#18231f' }}>
+                          {item.label}
+                        </span>
+                        {!item.done && <span className="ml-auto text-[11px] font-semibold" style={{ color: '#23766a' }}>Fix →</span>}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
 
@@ -551,50 +661,87 @@ export default function WebsitePage() {
             )}
 
             {/* ── Sections visibility tab ───────────────────────────────────── */}
-            {tab === 'sections' && (
-              <div className={cardCls} style={cardStyle}>
-                <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-[7px]" style={{ background: 'var(--rp-teal-bg)' }}>
-                    <LayoutGrid className="h-3.5 w-3.5" style={{ color: '#23766a' }} />
-                  </div>
-                  Section Visibility
-                </h3>
-                <p className="text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">
-                  Hidden sections won't appear on your resort website.
-                </p>
-                <div className="space-y-2.5">
-                  {TOGGLEABLE_SECTIONS.map(sec => {
-                    const isHidden = (form.hiddenSections ?? []).includes(sec.id);
-                    const toggle = () => set('hiddenSections',
-                      isHidden
-                        ? (form.hiddenSections ?? []).filter(s => s !== sec.id)
-                        : [...(form.hiddenSections ?? []), sec.id]
-                    );
-                    return (
-                      <div key={sec.id}
-                        className="flex items-center justify-between rounded-[10px] border p-3.5 cursor-pointer transition-all"
-                        style={isHidden
-                          ? { background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border)', opacity: 0.65 }
-                          : { background: 'var(--rp-teal-soft)', borderColor: 'rgba(35,118,106,0.18)' }}
-                        onClick={toggle}>
-                        <div>
-                          <p className="text-[13px] font-medium" style={{ color: isHidden ? 'var(--rp-text-muted)' : 'var(--rp-text)', textDecoration: isHidden ? 'line-through' : undefined }}>
-                            {sec.label}
-                          </p>
-                          <p className="text-[11.5px] mt-0.5 text-[#c5bdb4] dark:text-[#6e8580]">{sec.desc}</p>
+            {tab === 'sections' && (() => {
+              const order = resolveSectionOrder(form.sectionOrder);
+              const move = (id: string, dir: -1 | 1) => {
+                const idx = order.indexOf(id);
+                const to  = idx + dir;
+                if (to < 0 || to >= order.length) return;
+                const next = [...order];
+                [next[idx], next[to]] = [next[to], next[idx]];
+                set('sectionOrder', next);
+              };
+              const byId = Object.fromEntries(SITE_SECTIONS.map(s => [s.id, s]));
+              return (
+                <div className={cardCls} style={cardStyle}>
+                  <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-[7px]" style={{ background: 'var(--rp-teal-bg)' }}>
+                      <LayoutGrid className="h-3.5 w-3.5" style={{ color: '#23766a' }} />
+                    </div>
+                    Page Sections
+                  </h3>
+                  <p className="text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">
+                    Use the arrows to change the order sections appear on your website. Toggle to show or hide a section.
+                  </p>
+                  <div className="space-y-2.5">
+                    {order.map((id, idx) => {
+                      const sec = byId[id];
+                      if (!sec) return null;
+                      const isHidden = !sec.fixed && (form.hiddenSections ?? []).includes(sec.id);
+                      const toggle = () => !sec.fixed && set('hiddenSections',
+                        isHidden
+                          ? (form.hiddenSections ?? []).filter(s => s !== sec.id)
+                          : [...(form.hiddenSections ?? []), sec.id]
+                      );
+                      return (
+                        <div key={sec.id}
+                          className="flex items-center gap-3 rounded-[10px] border p-3 transition-all"
+                          style={isHidden
+                            ? { background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border)', opacity: 0.65 }
+                            : { background: 'var(--rp-teal-soft)', borderColor: 'rgba(35,118,106,0.18)' }}>
+                          {/* Reorder arrows */}
+                          <div className="flex flex-col">
+                            <button type="button" onClick={() => move(sec.id, -1)} disabled={idx === 0}
+                              title="Move up"
+                              className="flex h-5 w-6 items-center justify-center rounded-[5px] transition-colors disabled:opacity-25 enabled:hover:bg-black/[0.06]">
+                              <ChevronUp className="h-3.5 w-3.5" style={{ color: '#23766a' }} />
+                            </button>
+                            <button type="button" onClick={() => move(sec.id, 1)} disabled={idx === order.length - 1}
+                              title="Move down"
+                              className="flex h-5 w-6 items-center justify-center rounded-[5px] transition-colors disabled:opacity-25 enabled:hover:bg-black/[0.06]">
+                              <ChevronDown className="h-3.5 w-3.5" style={{ color: '#23766a' }} />
+                            </button>
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-[13px] font-medium" style={{ color: isHidden ? 'var(--rp-text-muted)' : 'var(--rp-text)', textDecoration: isHidden ? 'line-through' : undefined }}>
+                              {sec.label}
+                            </p>
+                            <p className="text-[11.5px] mt-0.5 text-[#c5bdb4] dark:text-[#6e8580]">{sec.desc}</p>
+                          </div>
+                          {sec.fixed ? (
+                            <span className="shrink-0 rounded-full border px-2 py-0.5 text-[10.5px] font-semibold"
+                              style={{ borderColor: 'rgba(35,118,106,0.25)', color: '#23766a' }}>
+                              Always shown
+                            </span>
+                          ) : (
+                            <button type="button" onClick={e => { e.stopPropagation(); toggle(); }}
+                              className="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors"
+                              style={{ background: isHidden ? '#d6d0c8' : '#23766a' }}>
+                              <span className="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
+                                style={{ transform: isHidden ? 'translateX(4px)' : 'translateX(24px)' }} />
+                            </button>
+                          )}
                         </div>
-                        <button type="button" onClick={e => { e.stopPropagation(); toggle(); }}
-                          className="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors"
-                          style={{ background: isHidden ? '#d6d0c8' : '#23766a' }}>
-                          <span className="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
-                            style={{ transform: isHidden ? 'translateX(4px)' : 'translateX(24px)' }} />
-                        </button>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
+                  <button type="button" onClick={() => set('sectionOrder', [])}
+                    className="text-[12px] font-medium underline-offset-2 hover:underline" style={{ color: '#8aa29a' }}>
+                    Reset to default order
+                  </button>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* ── Social Media tab ─────────────────────────────────────────── */}
             {tab === 'social' && (
@@ -810,7 +957,7 @@ export default function WebsitePage() {
             {/* Save button at bottom of editor (all tabs except domain) */}
             {tab !== 'domain' && (
               <div className="flex justify-end pt-2 pb-4">
-                <SaveBtn loading={saveMutation.isPending} onClick={() => saveMutation.mutate()} />
+                <SaveBtn loading={saveMutation.isPending} dirty={dirty} onClick={() => setConfirmOpen(true)} />
               </div>
             )}
 
@@ -879,6 +1026,46 @@ export default function WebsitePage() {
         )}
 
       </div>
+
+      {/* Publish confirmation */}
+      <ModalShell
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Publish your website?"
+        description="Your changes will be live for guests immediately"
+        footer={
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+            <button onClick={() => setConfirmOpen(false)}
+              className="rounded-[9px] border px-4 py-2 text-[13px] font-medium transition-colors hover:bg-black/[0.03]"
+              style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-muted)' }}>
+              Keep editing
+            </button>
+            <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}
+              className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors disabled:opacity-60 hover:opacity-90"
+              style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+              {saveMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+              {saveMutation.isPending ? 'Publishing…' : 'Publish now'}
+            </button>
+          </div>
+        }>
+        <div className="space-y-3">
+          <p className="text-[13px] leading-relaxed" style={{ color: 'var(--rp-text-muted)' }}>
+            Guests will see the updated site at{' '}
+            <span className="font-semibold" style={{ color: '#23766a' }}>{tenant?.slug}.resortpro.site</span>{' '}
+            as soon as you publish.
+          </p>
+          {checklistPct < 100 && (
+            <div className="flex items-start gap-2 rounded-[10px] border px-3 py-2.5"
+              style={{ background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.25)' }}>
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: '#b89040' }} />
+              <p className="text-[12.5px] leading-relaxed" style={{ color: '#8a6d30' }}>
+                Your site is {checklistPct}% complete — you can publish now and finish the remaining{' '}
+                {checklist.length - checklistDone} checklist item{checklist.length - checklistDone !== 1 ? 's' : ''} later.
+              </p>
+            </div>
+          )}
+        </div>
+      </ModalShell>
     </div>
   );
 }

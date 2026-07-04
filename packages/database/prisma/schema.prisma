@@ -1581,6 +1581,7 @@ model WebsiteContent {
   whatsappNumber String? // phone number only e.g. "+8801XXXXXXXXX"
   tripadvisorUrl String?
   hiddenSections    String[] @default([]) // sections owner has toggled off e.g. ["menu","gallery"]
+  sectionOrder      String[] @default([]) // owner's custom section order; empty = theme default
   googleAnalyticsId String?  // GA4 Measurement ID e.g. "G-XXXXXXXXXX"
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt

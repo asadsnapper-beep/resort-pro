@@ -1,7 +1,8 @@
 'use client'
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Menu, X } from 'lucide-react'
 
+import { orderSections } from '../_utils/sections'
 import type { ThemeProps, ResortRoom } from '../types'
 import {
   HeroSection, AboutSection, RoomsSection, GallerySection,
@@ -178,51 +179,58 @@ export function TeaGardenEcoResortTheme({ data }: ThemeProps) {
         </header>
       </div>{/* end sticky shell */}
 
-      {/* ── Sections ────────────────────────────── */}
+      {/* ── Sections (owner-orderable via website.sectionOrder) ── */}
       <HeroSection data={data} scrollTo={scrollTo} />
 
-      {show('about')        && <AboutSection data={data} />}
-
-      <RoomsSection
-        data={data}
-        offers={offers}
-        onViewRoom={handleBookRoom}
-        onBookRoom={handleBookRoom}
-      />
-
-      {show('menu') && (
-        <MenuWidget
-          slug={tenant.slug}
-          primaryColor={primary}
-          accentColor={accent}
-          currency={tenant.currency}
-        />
-      )}
-
-      {show('availability') && (
-        <AvailabilitySection data={data} onRoomSelect={handleRoomSelect} />
-      )}
-
-      {show('offers') && (
-        <OffersSection
-          slug={tenant.slug}
-          primaryColor={primary}
-          accentColor={accent}
-          onApplyCode={handleApplyCode}
-        />
-      )}
-
-      <BookingSection
-        data={data}
-        initialCheckIn={calendarCheckIn}
-        initialCheckOut={calendarCheckOut}
-        initialRoomId={calendarRoomId}
-        initialPromoCode={promoCode}
-      />
-
-      {show('gallery')      && <GallerySection data={data} />}
-      {show('testimonials') && <TestimonialsSection data={data} />}
-      {show('contact')      && <ContactSection data={data} />}
+      {(() => {
+        const nodes: Record<string, React.ReactNode> = {
+          about: show('about') && <AboutSection data={data} />,
+          rooms: (
+            <RoomsSection
+              data={data}
+              offers={offers}
+              onViewRoom={handleBookRoom}
+              onBookRoom={handleBookRoom}
+            />
+          ),
+          menu: show('menu') && (
+            <MenuWidget
+              slug={tenant.slug}
+              primaryColor={primary}
+              accentColor={accent}
+              currency={tenant.currency}
+            />
+          ),
+          availability: show('availability') && (
+            <AvailabilitySection data={data} onRoomSelect={handleRoomSelect} />
+          ),
+          offers: show('offers') && (
+            <OffersSection
+              slug={tenant.slug}
+              primaryColor={primary}
+              accentColor={accent}
+              onApplyCode={handleApplyCode}
+            />
+          ),
+          booking: (
+            <BookingSection
+              data={data}
+              initialCheckIn={calendarCheckIn}
+              initialCheckOut={calendarCheckOut}
+              initialRoomId={calendarRoomId}
+              initialPromoCode={promoCode}
+            />
+          ),
+          gallery:      show('gallery')      && <GallerySection data={data} />,
+          testimonials: show('testimonials') && <TestimonialsSection data={data} />,
+          contact:      show('contact')      && <ContactSection data={data} />,
+        }
+        const order = orderSections(
+          ['about', 'rooms', 'menu', 'availability', 'offers', 'booking', 'gallery', 'testimonials', 'contact'],
+          website.sectionOrder,
+        )
+        return order.map(id => <React.Fragment key={id}>{nodes[id]}</React.Fragment>)
+      })()}
 
       <FooterSection data={data} scrollTo={scrollTo} />
       <WhatsAppButton whatsappNumber={website.whatsappNumber} />

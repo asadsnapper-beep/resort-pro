@@ -40,6 +40,7 @@ export interface ResortWebsite {
   whatsappNumber?: string
   tripadvisorUrl?: string
   hiddenSections?: string[]
+  sectionOrder?: string[]
   googleAnalyticsId?: string
 }
 

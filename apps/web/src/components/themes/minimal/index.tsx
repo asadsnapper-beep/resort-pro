@@ -1,8 +1,9 @@
 'use client'
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Menu, X } from 'lucide-react'
 
 import type { ThemeProps, ResortRoom } from '../types'
+import { orderSections } from '../_utils/sections'
 import {
   HeroSection, AboutSection, RoomsSection,
   AvailabilitySection, BookingSection,
@@ -122,21 +123,25 @@ export function MinimalTheme({ data }: ThemeProps) {
         )}
       </header>
 
-      {/* ── Sections ────────────────────────── */}
+      {/* ── Sections (owner-orderable via website.sectionOrder) ── */}
       <main>
         {(() => {
           const h = new Set(website.hiddenSections ?? [])
           const show = (id: string) => !h.has(id)
+          const nodes: Record<string, React.ReactNode> = {
+            about:        show('about')        && <AboutSection  data={data} />,
+            rooms:        <RoomsSection  data={data} onBookRoom={handleBookRoom} />,
+            menu:         show('menu')         && <MenuWidget slug={tenant.slug} primaryColor={primary} accentColor={website.accentColor || '#3b82f6'} currency={tenant.currency} />,
+            availability: show('availability') && <AvailabilitySection data={data} onRoomSelect={handleRoomSelect} />,
+            booking:      <BookingSection data={data} initialCheckIn={calendarCheckIn} initialCheckOut={calendarCheckOut} initialRoomId={calendarRoomId} />,
+            contact:      show('contact')      && <ContactSection data={data} />,
+          }
+          const order = orderSections(['about', 'rooms', 'menu', 'availability', 'booking', 'contact'], website.sectionOrder)
           return (
             <>
-              <HeroSection   data={data} scrollTo={scrollTo} />
-              {show('about')        && <AboutSection  data={data} />}
-              <RoomsSection  data={data} onBookRoom={handleBookRoom} />
-              {show('menu')         && <MenuWidget slug={tenant.slug} primaryColor={primary} accentColor={website.accentColor || '#3b82f6'} currency={tenant.currency} />}
-              {show('availability') && <AvailabilitySection data={data} onRoomSelect={handleRoomSelect} />}
-              <BookingSection data={data} initialCheckIn={calendarCheckIn} initialCheckOut={calendarCheckOut} initialRoomId={calendarRoomId} />
-              {show('contact')      && <ContactSection data={data} />}
-              <FooterSection  data={data} scrollTo={scrollTo} />
+              <HeroSection data={data} scrollTo={scrollTo} />
+              {order.map(id => <React.Fragment key={id}>{nodes[id]}</React.Fragment>)}
+              <FooterSection data={data} scrollTo={scrollTo} />
             </>
           )
         })()}

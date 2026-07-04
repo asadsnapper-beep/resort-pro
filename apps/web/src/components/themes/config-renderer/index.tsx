@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { orderSections } from '../_utils/sections'
+import React, { useState, useEffect } from 'react'
 import { Menu, X } from 'lucide-react'
 import type { ResortData, ResortRoom } from '../types'
 import type { ThemeConfig } from './config-types'
@@ -232,51 +233,58 @@ export function ConfigThemeRenderer({ data, config: rawConfig }: ConfigThemeProp
         </header>
       </div>
 
-      {/* ── Sections ────────────────────────────────────────────────────── */}
+      {/* ── Sections (owner-orderable via website.sectionOrder) ── */}
       <ConfigHero data={data} config={config} scrollTo={scrollTo} showScrim={showScrim} />
 
-      {show('about') && <ConfigAbout data={data} config={config} />}
-
-      <ConfigRooms
-        data={data}
-        config={config}
-        onBookRoom={room => { setCalendarRoomId(room.id); scrollTo('booking') }}
-      />
-
-      {show('menu') && (
-        <MenuWidget
-          slug={tenant.slug}
-          primaryColor={primary}
-          accentColor={accent}
-          currency={tenant.currency}
-        />
-      )}
-
-      {show('availability') && (
-        <ConfigAvailability data={data} config={config} onRoomSelect={handleRoomSelect} />
-      )}
-
-      {show('offers') && (
-        <OffersSection
-          slug={tenant.slug}
-          primaryColor={primary}
-          accentColor={accent}
-          onApplyCode={handleApplyCode}
-        />
-      )}
-
-      <ConfigBooking
-        data={data}
-        config={config}
-        initialCheckIn={calendarCheckIn}
-        initialCheckOut={calendarCheckOut}
-        initialRoomId={calendarRoomId}
-        initialPromoCode={promoCode}
-      />
-
-      {show('gallery')      && <ConfigGallery      data={data} config={config} />}
-      {show('testimonials') && <ConfigTestimonials  data={data} config={config} />}
-      {show('contact')      && <ConfigContact       data={data} config={config} />}
+      {(() => {
+        const nodes: Record<string, React.ReactNode> = {
+          about: show('about') && <ConfigAbout data={data} config={config} />,
+          rooms: (
+            <ConfigRooms
+              data={data}
+              config={config}
+              onBookRoom={room => { setCalendarRoomId(room.id); scrollTo('booking') }}
+            />
+          ),
+          menu: show('menu') && (
+            <MenuWidget
+              slug={tenant.slug}
+              primaryColor={primary}
+              accentColor={accent}
+              currency={tenant.currency}
+            />
+          ),
+          availability: show('availability') && (
+            <ConfigAvailability data={data} config={config} onRoomSelect={handleRoomSelect} />
+          ),
+          offers: show('offers') && (
+            <OffersSection
+              slug={tenant.slug}
+              primaryColor={primary}
+              accentColor={accent}
+              onApplyCode={handleApplyCode}
+            />
+          ),
+          booking: (
+            <ConfigBooking
+              data={data}
+              config={config}
+              initialCheckIn={calendarCheckIn}
+              initialCheckOut={calendarCheckOut}
+              initialRoomId={calendarRoomId}
+              initialPromoCode={promoCode}
+            />
+          ),
+          gallery:      show('gallery')      && <ConfigGallery      data={data} config={config} />,
+          testimonials: show('testimonials') && <ConfigTestimonials  data={data} config={config} />,
+          contact:      show('contact')      && <ConfigContact       data={data} config={config} />,
+        }
+        const order = orderSections(
+          ['about', 'rooms', 'menu', 'availability', 'offers', 'booking', 'gallery', 'testimonials', 'contact'],
+          website.sectionOrder,
+        )
+        return order.map(id => <React.Fragment key={id}>{nodes[id]}</React.Fragment>)
+      })()}
 
       <ConfigFooter data={data} config={config} scrollTo={scrollTo} />
       <WhatsAppButton whatsappNumber={website.whatsappNumber} />

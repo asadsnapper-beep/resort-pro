@@ -156,12 +156,29 @@ export function ThemePicker({ currentTheme, slug, onSelect }: ThemePickerProps) 
                   : 'border-gray-200 dark:border-gray-700 hover:border-resort-300 hover:shadow-md cursor-pointer'
               }`}>
 
-              {/* Preview image */}
+              {/* Preview image — falls back to a live scaled render of the actual theme */}
               <div className="relative h-44 overflow-hidden bg-gray-100 dark:bg-gray-800">
                 {theme.previewImage
                   ? <img src={theme.previewImage} alt={theme.name}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                  : <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">No preview</div>
+                  : (
+                    <div className="absolute inset-0 overflow-hidden">
+                      <iframe
+                        src={`/${slug}?preview=${theme.key}`}
+                        title={`${theme.name} preview`}
+                        loading="lazy"
+                        tabIndex={-1}
+                        aria-hidden="true"
+                        className="pointer-events-none select-none border-0"
+                        style={{
+                          width: '400%',
+                          height: '400%',
+                          transform: 'scale(0.25)',
+                          transformOrigin: 'top left',
+                        }}
+                      />
+                    </div>
+                  )
                 }
 
                 {/* Hover overlay with Preview button */}
