@@ -103,12 +103,19 @@ function localDir(): string {
     ?? join(process.cwd(), 'uploads');
 }
 
-function localBaseUrl(): string {
-  return (process.env.APP_URL ?? 'http://localhost:4000').replace(/\/$/, '');
+// `requestOrigin` (e.g. "https://api.resortpro.site", derived from the actual
+// incoming request) is the correct base whenever APP_URL isn't explicitly
+// set — this is what prevented every upload from returning an unreachable
+// http://localhost:4000/... URL when APP_URL was missing in production.
+function localBaseUrl(requestOrigin?: string): string {
+  // Multiple env names have been used across this codebase for "the API's
+  // public URL" (APP_URL, API_URL, API_BASE_URL) — accept any of them before
+  // falling back to the derived request origin, then localhost.
+  return (process.env.APP_URL ?? process.env.API_URL ?? process.env.API_BASE_URL ?? requestOrigin ?? 'http://localhost:4000').replace(/\/$/, '');
 }
 
 async function uploadLocal(
-  buffer: Buffer, mimetype: string, folder: string, tenantId: string,
+  buffer: Buffer, mimetype: string, folder: string, tenantId: string, requestOrigin?: string,
 ): Promise<UploadResult> {
   const filename = `${randomBytes(12).toString('hex')}.${ext(mimetype)}`;
   const subdir   = join(localDir(), tenantId, folder);
@@ -119,7 +126,7 @@ async function uploadLocal(
   writeFileSync(filepath, buffer);
 
   return {
-    url:  `${localBaseUrl()}/uploads/${key}`,
+    url:  `${localBaseUrl(requestOrigin)}/uploads/${key}`,
     key,
     size: buffer.byteLength,
   };
@@ -175,12 +182,13 @@ export async function uploadToStorage(
   mimetype: string,
   folder:   string,
   tenantId: string,
+  requestOrigin?: string,
 ): Promise<UploadResult> {
   validate(buffer, mimetype);
   const cfg = await getStorageConfig();
   return cfg.driver === 's3'
     ? uploadS3(buffer, mimetype, folder, tenantId, cfg)
-    : uploadLocal(buffer, mimetype, folder, tenantId);
+    : uploadLocal(buffer, mimetype, folder, tenantId, requestOrigin);
 }
 
 export async function deleteFromStorage(key: string): Promise<void> {

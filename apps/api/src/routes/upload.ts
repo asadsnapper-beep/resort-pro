@@ -43,7 +43,8 @@ export async function uploadRoutes(app: FastifyInstance) {
       }
 
       try {
-        const result = await uploadToStorage(buffer, data.mimetype, folder, tenantId);
+        const requestOrigin = `${request.protocol}://${request.hostname}`;
+        const result = await uploadToStorage(buffer, data.mimetype, folder, tenantId, requestOrigin);
         return reply.status(201).send({ success: true, data: result });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Upload failed';
