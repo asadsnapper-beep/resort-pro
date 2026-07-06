@@ -47,7 +47,7 @@ async function processSequenceEnrollments() {
     const wc     = await prisma.websiteContent.findUnique({ where: { tenantId: enrollment.tenantId }, select: { primaryColor: true, accentColor: true } });
     const primary = wc?.primaryColor ?? '#1a6b5e';
     const accent  = wc?.accentColor  ?? '#d4a853';
-    const apiUrl  = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+    const apiUrl  = process.env.WEB_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
     const slug    = tenant?.slug ?? '';
     const tenantName = tenant?.name ?? 'Resort';
 

@@ -159,7 +159,7 @@ export async function billingRoutes(app: FastifyInstance) {
       });
       if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
 
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const appUrl = process.env.WEB_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
       // Get or create Stripe customer
       let customerId = tenant.stripeCustomerId;
@@ -211,7 +211,7 @@ export async function billingRoutes(app: FastifyInstance) {
       });
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const appUrl = process.env.WEB_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
     const session = await stripe.billingPortal.sessions.create({
       customer: tenant.stripeCustomerId,
@@ -240,7 +240,12 @@ export async function billingRoutes(app: FastifyInstance) {
       const amountNum = interval === 'year' ? Math.round(monthly * 12 * 0.8) : monthly; // 20% off annual
       const amount = amountNum.toFixed(2);
 
-      const apiUrl = process.env.API_BASE_URL || process.env.APP_URL || 'http://localhost:4000';
+      // Same class of bug as file uploads: APP_URL/API_BASE_URL are often unset
+      // or misnamed in production, which would silently send bKash a
+      // localhost callback URL. Fall back to the actual incoming request's
+      // origin (this request IS hitting the real public API domain).
+      const apiUrl = process.env.API_BASE_URL || process.env.APP_URL || process.env.API_URL
+        || `${request.protocol}://${request.hostname}`;
       const invoice = `SUB${Date.now().toString(36).toUpperCase()}`;
       // Metadata is carried on the callback URL and re-verified (amount + execute) on return.
       const callbackURL =
@@ -267,7 +272,7 @@ export async function billingRoutes(app: FastifyInstance) {
   app.get<{ Querystring: { paymentID?: string; status?: string; tenantId?: string; planKey?: string; interval?: string; amt?: string } }>(
     '/bkash/callback',
     async (request, reply) => {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const appUrl = process.env.WEB_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
       const { paymentID, status, tenantId, planKey, interval = 'month', amt } = request.query;
       const fail = (reason: string) => reply.redirect(`${appUrl}/dashboard/billing?canceled=1&reason=${encodeURIComponent(reason)}`);
 
@@ -606,7 +611,7 @@ export async function createGuestPaymentLink(params: {
   currency: string;
 }) {
   const { booking, guest, roomName, currency } = params;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const appUrl = process.env.WEB_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
