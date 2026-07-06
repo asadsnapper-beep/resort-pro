@@ -205,6 +205,10 @@ jobs:
           pnpm --filter @resort-pro/types build
           pnpm --filter @resort-pro/database build
 
+      - name: Generate Prisma client
+        working-directory: packages/database
+        run: npx prisma generate
+
       - name: Run DB migrations
         working-directory: packages/database
         run: pnpm prisma migrate deploy
