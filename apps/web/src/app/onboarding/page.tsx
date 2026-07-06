@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -325,9 +326,16 @@ function Step3({ onNext, onBack, onSkip }: { onNext: () => void; onBack: () => v
 
 function DoneScreen({ onGo, slug, resortName }: { onGo: () => void; slug?: string; resortName?: string }) {
   const [copied, setCopied] = useState(false);
+  // Bangla only for Bangladesh visitors (locale is auto-set by middleware from
+  // CF-IPCountry, or by explicit user toggle) — everyone else sees English.
+  const locale = useLocale();
+  const isBn = locale === 'bn';
   const siteUrl = slug ? `https://${slug}.resortpro.site` : '';
+  const name = resortName ?? (isBn ? 'আমাদের রিসোর্ট' : 'our resort');
 
-  const shareMessage = `আসসালামু আলাইকুম! 🏨\n\n${resortName ?? 'আমাদের রিসোর্ট'}-এ এখন সরাসরি অনলাইনে বুকিং দিতে পারবেন — bKash-এ advance payment করে রুম কনফার্ম করুন:\n\n${siteUrl}`;
+  const shareMessage = isBn
+    ? `আসসালামু আলাইকুম! 🏨\n\n${name}-এ এখন সরাসরি অনলাইনে বুকিং দিতে পারবেন — bKash-এ advance payment করে রুম কনফার্ম করুন:\n\n${siteUrl}`
+    : `Hi! 🏨\n\nYou can now book directly with ${name} online — secure your room with an instant payment:\n\n${siteUrl}`;
   const whatsappHref = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
 
   const copyLink = () => {
@@ -341,9 +349,13 @@ function DoneScreen({ onGo, slug, resortName }: { onGo: () => void; slug?: strin
       <div className="w-20 h-20 bg-gradient-to-br from-[#1a6b5e] to-[#145a4f] rounded-full flex items-center justify-center mx-auto mb-5 shadow-lg">
         <CheckCircle className="w-10 h-10 text-white" />
       </div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-1.5">আপনার সাইট এখন LIVE! 🎉</h2>
+      <h2 className="text-2xl font-bold text-gray-900 mb-1.5">
+        {isBn ? <>আপনার সাইট এখন LIVE! 🎉</> : <>Your site is LIVE! 🎉</>}
+      </h2>
       <p className="text-gray-500 mb-6">
-        এখনই আপনার পুরনো গেস্টদের এই লিংক পাঠান — প্রথম অনলাইন বুকিংটাই সবচেয়ে গুরুত্বপূর্ণ।
+        {isBn
+          ? 'এখনই আপনার পুরনো গেস্টদের এই লিংক পাঠান — প্রথম অনলাইন বুকিংটাই সবচেয়ে গুরুত্বপূর্ণ।'
+          : 'Share this link with a guest right now — your first online booking is the one that counts.'}
       </p>
 
       {/* Live URL card */}
@@ -356,14 +368,14 @@ function DoneScreen({ onGo, slug, resortName }: { onGo: () => void; slug?: strin
             className="flex shrink-0 items-center gap-1 rounded-lg border border-[#a8d5cf] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#1a6b5e] transition-colors hover:bg-[#e7f5f2]"
           >
             {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-            {copied ? 'Copied' : 'Copy'}
+            {copied ? (isBn ? 'কপি হয়েছে' : 'Copied') : (isBn ? 'কপি' : 'Copy')}
           </button>
           <a
             href={siteUrl} target="_blank" rel="noopener noreferrer"
             title="Open site"
             className="flex shrink-0 items-center gap-1 rounded-lg border border-[#a8d5cf] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#1a6b5e] transition-colors hover:bg-[#e7f5f2]"
           >
-            <ExternalLink className="h-3.5 w-3.5" /> Open
+            <ExternalLink className="h-3.5 w-3.5" /> {isBn ? 'খুলুন' : 'Open'}
           </a>
         </div>
       )}
@@ -375,12 +387,16 @@ function DoneScreen({ onGo, slug, resortName }: { onGo: () => void; slug?: strin
         className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-[#25D366] px-6 py-3.5 text-base font-semibold text-white shadow-md transition-transform hover:scale-[1.01] hover:shadow-lg"
       >
         <MessageCircle className="h-5 w-5" />
-        WhatsApp-এ বুকিং লিংক শেয়ার করুন
+        {isBn ? 'WhatsApp-এ বুকিং লিংক শেয়ার করুন' : 'Share booking link on WhatsApp'}
       </a>
-      <p className="text-xs text-gray-400 mt-2 mb-6">আপনার guest group বা পরিচিতদের পাঠান — sign up ছাড়াই তারা বুক করতে পারবে</p>
+      <p className="text-xs text-gray-400 mt-2 mb-6">
+        {isBn
+          ? 'আপনার guest group বা পরিচিতদের পাঠান — sign up ছাড়াই তারা বুক করতে পারবে'
+          : 'Send it to your guest contacts or groups — no sign-up needed for them to book'}
+      </p>
 
       <button onClick={onGo} className="text-sm font-medium text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors">
-        Dashboard-এ যান
+        {isBn ? 'Dashboard-এ যান' : 'Go to Dashboard'}
       </button>
     </div>
   );
