@@ -72,7 +72,16 @@ export async function buildApp() {
   });
 
   // ── Plugins ──────────────────────────────────────────────────────────────
-  await app.register(helmet, { contentSecurityPolicy: false });
+  await app.register(helmet, {
+    contentSecurityPolicy: false,
+    // API and web app live on different origins in every environment
+    // (api.resortpro.site vs resortpro.site/app.resortpro.site, tenant custom
+    // domains, local :3000 vs :4000) — helmet's default same-origin CORP
+    // silently blocks the browser from rendering /uploads/* images (and any
+    // other response) fetched cross-origin. This was blocking every uploaded
+    // image even after its URL was fixed to point at the right domain.
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  });
 
   await app.register(cookie, { secret: process.env.COOKIE_SECRET || process.env.JWT_SECRET || 'cookie-secret' });
 
