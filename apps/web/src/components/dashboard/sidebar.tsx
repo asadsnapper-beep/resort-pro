@@ -302,8 +302,13 @@ export function Sidebar() {
       {/* User footer */}
       <div className="border-t border-white/[0.07] p-3">
         <div className="flex items-center gap-2.5">
-          <Link href="/dashboard/profile" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-resort-600 text-xs font-bold text-white transition-opacity hover:opacity-80">
-            {user ? `${user.firstName[0]}${user.lastName[0]}` : 'U'}
+          <Link href="/dashboard/profile" className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-resort-600 text-xs font-bold text-white transition-opacity hover:opacity-80">
+            {user?.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={user.avatarUrl} alt={`${user.firstName} ${user.lastName}`} className="h-full w-full object-cover" />
+            ) : (
+              user ? `${user.firstName[0]}${user.lastName[0]}` : 'U'
+            )}
           </Link>
           <Link href="/dashboard/profile" className="min-w-0 flex-1 group">
             <p className="truncate text-[13px] font-medium text-[#ece7df] group-hover:text-gold-400 transition-colors">
