@@ -12,7 +12,8 @@ import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import {
   Building2, Clock, BedDouble, ChevronRight, ChevronLeft,
-  CheckCircle, Loader2, ArrowRight, SkipForward,
+  CheckCircle, Loader2, ArrowRight, SkipForward, Copy, Check,
+  ExternalLink, MessageCircle,
 } from 'lucide-react';
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
@@ -316,21 +317,71 @@ function Step3({ onNext, onBack, onSkip }: { onNext: () => void; onBack: () => v
   );
 }
 
-// ── Done Screen ───────────────────────────────────────────────────────────────
+// ── Done Screen — the "aha" moment: live site + WhatsApp share ────────────────
+// This is the highest-leverage screen in the whole wizard: the owner's site is
+// ALREADY live (WebsiteContent is created at signup), so the job here isn't to
+// say "you're done" — it's to get them to share the link with a real guest in
+// the next 60 seconds. First real booking = the owner never churns.
 
-function DoneScreen({ onGo }: { onGo: () => void }) {
+function DoneScreen({ onGo, slug, resortName }: { onGo: () => void; slug?: string; resortName?: string }) {
+  const [copied, setCopied] = useState(false);
+  const siteUrl = slug ? `https://${slug}.resortpro.site` : '';
+
+  const shareMessage = `আসসালামু আলাইকুম! 🏨\n\n${resortName ?? 'আমাদের রিসোর্ট'}-এ এখন সরাসরি অনলাইনে বুকিং দিতে পারবেন — bKash-এ advance payment করে রুম কনফার্ম করুন:\n\n${siteUrl}`;
+  const whatsappHref = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(siteUrl).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
   return (
-    <div className="text-center py-4">
-      <div className="w-20 h-20 bg-gradient-to-br from-[#1a6b5e] to-[#145a4f] rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+    <div className="text-center py-2">
+      <div className="w-20 h-20 bg-gradient-to-br from-[#1a6b5e] to-[#145a4f] rounded-full flex items-center justify-center mx-auto mb-5 shadow-lg">
         <CheckCircle className="w-10 h-10 text-white" />
       </div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">You're all set! 🎉</h2>
-      <p className="text-gray-500 mb-8">
-        Your resort is ready. Start managing bookings, staff, and guests from your dashboard.
+      <h2 className="text-2xl font-bold text-gray-900 mb-1.5">আপনার সাইট এখন LIVE! 🎉</h2>
+      <p className="text-gray-500 mb-6">
+        এখনই আপনার পুরনো গেস্টদের এই লিংক পাঠান — প্রথম অনলাইন বুকিংটাই সবচেয়ে গুরুত্বপূর্ণ।
       </p>
-      <Button onClick={onGo} className="bg-[#1a6b5e] hover:bg-[#145a4f] text-white px-8 h-12 text-base gap-2">
-        Go to Dashboard <ArrowRight className="w-5 h-5" />
-      </Button>
+
+      {/* Live URL card */}
+      {siteUrl && (
+        <div className="flex items-center gap-2 rounded-xl border border-[#a8d5cf] bg-[#f0faf8] px-4 py-3 mb-4">
+          <span className="flex-1 truncate text-left text-sm font-semibold text-[#1a6b5e]">{siteUrl}</span>
+          <button
+            onClick={copyLink}
+            title="Copy link"
+            className="flex shrink-0 items-center gap-1 rounded-lg border border-[#a8d5cf] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#1a6b5e] transition-colors hover:bg-[#e7f5f2]"
+          >
+            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+          <a
+            href={siteUrl} target="_blank" rel="noopener noreferrer"
+            title="Open site"
+            className="flex shrink-0 items-center gap-1 rounded-lg border border-[#a8d5cf] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#1a6b5e] transition-colors hover:bg-[#e7f5f2]"
+          >
+            <ExternalLink className="h-3.5 w-3.5" /> Open
+          </a>
+        </div>
+      )}
+
+      {/* The main event: WhatsApp share */}
+      <a
+        href={whatsappHref}
+        target="_blank" rel="noopener noreferrer"
+        className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-[#25D366] px-6 py-3.5 text-base font-semibold text-white shadow-md transition-transform hover:scale-[1.01] hover:shadow-lg"
+      >
+        <MessageCircle className="h-5 w-5" />
+        WhatsApp-এ বুকিং লিংক শেয়ার করুন
+      </a>
+      <p className="text-xs text-gray-400 mt-2 mb-6">আপনার guest group বা পরিচিতদের পাঠান — sign up ছাড়াই তারা বুক করতে পারবে</p>
+
+      <button onClick={onGo} className="text-sm font-medium text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors">
+        Dashboard-এ যান
+      </button>
     </div>
   );
 }
@@ -380,7 +431,7 @@ export default function OnboardingPage() {
           {step === 0 && <Step1 onNext={goNext} />}
           {step === 1 && <Step2 onNext={goNext} onBack={goBack} />}
           {step === 2 && <Step3 onNext={goNext} onBack={goBack} onSkip={goNext} />}
-          {step === 3 && <DoneScreen onGo={goDashboard} />}
+          {step === 3 && <DoneScreen onGo={goDashboard} slug={tenant?.slug} resortName={tenant?.name} />}
         </div>
 
         {/* Footer skip */}
