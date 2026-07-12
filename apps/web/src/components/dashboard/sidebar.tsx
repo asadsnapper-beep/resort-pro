@@ -11,10 +11,10 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
-import { authApi, tenantApi } from '@/lib/api';
+import { authApi, tenantApi, dashboardApi } from '@/lib/api';
 import { useAiStatus } from '@/hooks/use-ai-status';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslations, useLocale } from 'next-intl';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
@@ -54,11 +54,12 @@ export type NavItem = {
   groupKey: string;         // translation key for group
   roles?: Role[];
   aiFeature?: 'ai_content' | 'ai_chatbot' | 'ai_business_insights'; // hide unless this AI feature is live
+  daily?: boolean; // always-visible top tier — the owner's everyday-use items
 };
 
 export const NAV_ITEMS: NavItem[] = [
   // ── Overview ──────────────────────────────────────────────
-  { href: '/dashboard',            labelKey: 'nav.dashboard',    labelFallback: 'Dashboard',       icon: LayoutDashboard, group: 'Overview',         groupKey: 'groups.overview' },
+  { href: '/dashboard',            labelKey: 'nav.dashboard',    labelFallback: 'Dashboard',       icon: LayoutDashboard, group: 'Overview',         groupKey: 'groups.overview', daily: true },
   { href: '/dashboard/analytics',  labelKey: 'nav.analytics',    labelFallback: 'Analytics',       icon: BarChart2,       group: 'Overview',         groupKey: 'groups.overview',
     roles: ['OWNER', 'MANAGER', 'SHAREHOLDER', 'MARKETER'] },
   { href: '/dashboard/invoices',   labelKey: 'nav.invoices',     labelFallback: 'Invoices',        icon: FileText,        group: 'Overview',         groupKey: 'groups.overview',
@@ -71,17 +72,17 @@ export const NAV_ITEMS: NavItem[] = [
   // ── Rooms & Bookings ──────────────────────────────────────
   { href: '/dashboard/properties',      labelKey: 'nav.properties',    labelFallback: 'Properties',       icon: Building2,     group: 'Rooms & Bookings', groupKey: 'groups.rooms',
     roles: ['OWNER', 'MANAGER'] },
-  { href: '/dashboard/rooms',          labelKey: 'nav.rooms',         labelFallback: 'Rooms & Villas',   icon: BedDouble,     group: 'Rooms & Bookings', groupKey: 'groups.rooms',
+  { href: '/dashboard/rooms',          labelKey: 'nav.rooms',         labelFallback: 'Rooms & Villas',   icon: BedDouble,     group: 'Rooms & Bookings', groupKey: 'groups.rooms', daily: true,
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
   { href: '/dashboard/rate-plans',     labelKey: 'nav.ratePlans',     labelFallback: 'Rate Plans',       icon: Tags,          group: 'Rooms & Bookings', groupKey: 'groups.rooms',
     roles: ['OWNER', 'MANAGER', 'MARKETER'] },
   { href: '/dashboard/packages',       labelKey: 'nav.packages',      labelFallback: 'Packages',         icon: Gift,          group: 'Rooms & Bookings', groupKey: 'groups.rooms',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'MARKETER'] },
-  { href: '/dashboard/front-desk',     labelKey: 'nav.frontDesk',     labelFallback: 'Front Desk',       icon: ClipboardList, group: 'Rooms & Bookings', groupKey: 'groups.rooms',
+  { href: '/dashboard/front-desk',     labelKey: 'nav.frontDesk',     labelFallback: 'Front Desk',       icon: ClipboardList, group: 'Rooms & Bookings', groupKey: 'groups.rooms', daily: true,
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
-  { href: '/dashboard/bookings',       labelKey: 'nav.bookings',      labelFallback: 'Bookings',         icon: CalendarDays,  group: 'Rooms & Bookings', groupKey: 'groups.rooms',
+  { href: '/dashboard/bookings',       labelKey: 'nav.bookings',      labelFallback: 'Bookings',         icon: CalendarDays,  group: 'Rooms & Bookings', groupKey: 'groups.rooms', daily: true,
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
-  { href: '/dashboard/calendar',       labelKey: 'nav.calendar',      labelFallback: 'Booking Calendar', icon: LayoutGrid,    group: 'Rooms & Bookings', groupKey: 'groups.rooms',
+  { href: '/dashboard/calendar',       labelKey: 'nav.calendar',      labelFallback: 'Booking Calendar', icon: LayoutGrid,    group: 'Rooms & Bookings', groupKey: 'groups.rooms', daily: true,
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
   { href: '/dashboard/group-bookings', labelKey: 'nav.groupBookings', labelFallback: 'Group Bookings',   icon: UsersRound,    group: 'Rooms & Bookings', groupKey: 'groups.rooms',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
@@ -161,20 +162,37 @@ export function groupItems(items: NavItem[]) {
 // ─────────────────────────────────────────────────────────────────
 // Sidebar Component
 // ─────────────────────────────────────────────────────────────────
+const EXPANDED_GROUPS_KEY = 'resort-pro-sidebar-expanded-groups';
+
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { tenant, user, clearAuth } = useAuthStore();
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  // Groups start collapsed by default; a group name here means the user chose to expand it.
+  const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const t = useTranslations('common') as (key: string, ...args: any[]) => string;
   const locale = useLocale() as Locale;
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(EXPANDED_GROUPS_KEY);
+      if (saved) setExpandedGroups(JSON.parse(saved));
+    } catch { /* ignore malformed/unavailable storage */ }
+  }, []);
 
   const { data: modulesRes } = useQuery({
     queryKey: ['tenant-modules'],
     queryFn: () => tenantApi.getModules(),
     staleTime: 5 * 60 * 1000,
   });
+
+  const { data: statsRes } = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: () => dashboardApi.getStats(),
+    refetchInterval: 60000,
+  });
+  const todayCheckIns: number = statsRes?.data?.data?.stats?.todayCheckIns ?? 0;
 
   const enabledModules: Record<string, boolean> = Object.fromEntries(
     ((modulesRes?.data?.data ?? []) as { flag: string; enabled: boolean }[])
@@ -195,7 +213,8 @@ export function Sidebar() {
     if (item.aiFeature && !aiStatus[item.aiFeature]) return false;
     return true;
   });
-  const grouped = groupItems(visibleItems);
+  const dailyItems = visibleItems.filter((item) => item.daily);
+  const grouped = groupItems(visibleItems.filter((item) => !item.daily));
 
   const handleLogout = async () => {
     const isDemo = !!tenant?.isDemo;
@@ -205,7 +224,11 @@ export function Sidebar() {
   };
 
   const toggleGroup = (group: string) => {
-    setCollapsed((prev) => ({ ...prev, [group]: !prev[group] }));
+    setExpandedGroups((prev) => {
+      const next = prev.includes(group) ? prev.filter((g) => g !== group) : [...prev, group];
+      try { localStorage.setItem(EXPANDED_GROUPS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
   };
 
   return (
@@ -227,8 +250,41 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-2 scrollbar-hide">
+        {/* Daily tier — always visible, no header, the owner's everyday-use items */}
+        <ul className="space-y-0.5 px-2 pb-2 mb-2 border-b border-white/[0.07]">
+          {dailyItems.map(({ href, labelKey, labelFallback, icon: Icon }) => {
+            const translated: string = t(labelKey);
+            const label: string = translated.endsWith(labelKey) ? labelFallback : translated;
+            const active =
+              pathname === href ||
+              (href !== '/dashboard' && pathname.startsWith(href));
+            const badge = href === '/dashboard/front-desk' && todayCheckIns > 0 ? todayCheckIns : undefined;
+            return (
+              <li key={href}>
+                <Link
+                  href={href}
+                  className={cn(
+                    'flex items-center gap-2.5 rounded-r-lg py-[7px] pl-3 pr-3 text-[13.5px] font-medium transition-colors',
+                    active
+                      ? 'border-l-2 border-gold-500 bg-white/[0.08] pl-[10px] text-[#ece7df] font-medium'
+                      : 'border-l-2 border-transparent text-[#9bbdb7] font-normal hover:bg-white/5 hover:text-[#ece7df]',
+                  )}
+                >
+                  <Icon className={`h-4 w-4 shrink-0 ${active ? 'text-[#ece7df]' : 'text-[#6a9990]'}`} />
+                  <span className="flex-1">{label}</span>
+                  {badge !== undefined && (
+                    <span className="rounded-full bg-gold-500/90 px-1.5 py-0.5 text-[10px] font-bold leading-none text-[#1b342f]">
+                      {badge}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+
         {Object.entries(grouped).map(([group, items]) => {
-          const isCollapsed = collapsed[group];
+          const isCollapsed = !expandedGroups.includes(group);
           const groupKey = items[0]?.groupKey;
           const groupLabel: string = groupKey ? t(groupKey) : group;
           return (

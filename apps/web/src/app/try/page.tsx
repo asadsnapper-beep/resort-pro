@@ -5,7 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { useAuthStore } from '@/store/auth';
 import { api } from '@/lib/api';
-import { Loader2, Sparkles, ChevronRight, Languages } from 'lucide-react';
+import {
+  Loader2, Sparkles, ChevronRight, Languages, Crown, Briefcase,
+  BarChart3, ConciergeBell, Megaphone, Code2, ChefHat,
+} from 'lucide-react';
 
 // ─── Role definitions ─────────────────────────────────────────────────────────
 const ROLES = [
@@ -13,96 +16,81 @@ const ROLES = [
     role:        'OWNER',
     title:       'Resort Owner',
     titleBn:     'রিসোর্ট মালিক',
-    emoji:       '👑',
+    icon:        Crown,
     description: 'See everything — revenue, analytics, settings, all operations.',
     descBn:      'সব কিছু দেখতে পাবেন — revenue, analytics, settings, সব',
-    border:      'border-resort-500',
     badge:       'Full Access',
-    badgeColor:  'bg-emerald-900/60 text-emerald-300',
+    primary:     true,
     features:    ['Dashboard & Analytics', 'All Bookings & Revenue', 'Staff & Settings', 'Billing & Plans', 'SMS Marketing'],
   },
   {
     role:        'MANAGER',
     title:       'General Manager',
     titleBn:     'জেনারেল ম্যানেজার',
-    emoji:       '👔',
+    icon:        Briefcase,
     description: 'Manage daily operations — bookings, guests, staff, housekeeping.',
     descBn:      'বুকিং, গেস্ট, স্টাফ, হাউসকিপিং ম্যানেজ করুন',
-    border:      'border-blue-500',
     badge:       'Operations',
-    badgeColor:  'bg-blue-900/60 text-blue-300',
     features:    ['Booking Management', 'Guest Profiles', 'Housekeeping', 'Support Tickets', 'Reports'],
   },
   {
     role:        'SHAREHOLDER',
     title:       'Shareholder',
     titleBn:     'শেয়ারহোল্ডার / বিনিয়োগকারী',
-    emoji:       '📊',
+    icon:        BarChart3,
     description: 'View analytics and revenue performance. Read-only financial overview.',
     descBn:      'Analytics এবং revenue দেখুন — শুধু পড়ার অ্যাক্সেস',
-    border:      'border-amber-500',
     badge:       'Read-Only',
-    badgeColor:  'bg-amber-900/60 text-amber-300',
     features:    ['Dashboard Stats', 'Revenue Analytics', 'Expense Overview', 'Monthly Reports'],
   },
   {
     role:        'RECEPTIONIST',
     title:       'Receptionist',
     titleBn:     'রিসেপশনিস্ট',
-    emoji:       '🛎️',
+    icon:        ConciergeBell,
     description: 'Handle check-ins, check-outs, new bookings and guest requests.',
     descBn:      'চেক-ইন, চেক-আউট এবং নতুন বুকিং handle করুন',
-    border:      'border-purple-500',
     badge:       'Front Desk',
-    badgeColor:  'bg-purple-900/60 text-purple-300',
     features:    ['Check-in / Check-out', 'Walk-in Bookings', 'Guest Requests', 'Room Status', 'Invoices'],
   },
   {
     role:        'MARKETER',
     title:       'Marketing Manager',
     titleBn:     'মার্কেটিং ম্যানেজার',
-    emoji:       '📣',
+    icon:        Megaphone,
     description: 'Manage website, CRM, email campaigns and SMS marketing.',
     descBn:      'ওয়েবসাইট, CRM, email ও SMS marketing ম্যানেজ করুন',
-    border:      'border-pink-500',
     badge:       'Marketing',
-    badgeColor:  'bg-pink-900/60 text-pink-300',
     features:    ['Website Management', 'CRM & Email', 'SMS Marketing', 'Guest Analytics', 'Campaigns'],
   },
   {
     role:        'DEVELOPER',
     title:       'Developer',
     titleBn:     'ডেভেলপার / IT স্টাফ',
-    emoji:       '💻',
+    icon:        Code2,
     description: 'Access embed widget settings, API keys and website integration.',
     descBn:      'Embed widget, API key এবং website integration দেখুন',
-    border:      'border-slate-500',
     badge:       'Technical',
-    badgeColor:  'bg-slate-700/60 text-slate-300',
     features:    ['Embed Widget SDK', 'Website Settings', 'API Configuration', 'Integration Docs'],
   },
   {
     role:        'STAFF',
     title:       'Housekeeping Staff',
     titleBn:     'হাউসকিপিং স্টাফ',
-    emoji:       '🧹',
+    icon:        Sparkles,
     description: 'View assigned cleaning tasks, update room status, log issues.',
     descBn:      'নিজের কাজের তালিকা দেখুন এবং রুম status update করুন',
-    border:      'border-amber-500',
     badge:       'Staff View',
-    badgeColor:  'bg-amber-900/60 text-amber-300',
     features:    ['Housekeeping Tasks', 'Room Status', 'Maintenance Logs', 'Food Orders'],
   },
   {
     role:        'CHEF',
     title:       'Chef',
     titleBn:     'শেফ',
-    emoji:       '👨‍🍳',
+    icon:        ChefHat,
     description: 'View incoming food orders and update order status in real-time.',
     descBn:      'F&B অর্ডার দেখুন এবং রান্নার status update করুন',
-    border:      'border-red-500',
     badge:       'Kitchen View',
-    badgeColor:  'bg-red-900/60 text-red-300',
     features:    ['F&B Orders', 'Order Status Update', 'Live Order Queue'],
   },
 ];
@@ -145,14 +133,14 @@ export default function DemoPage() {
   };
 
   return (
-    <div className="min-h-screen text-white" style={{ backgroundColor: '#0d1f1c' }}>
+    <div className="min-h-screen bg-gradient-to-br from-resort-900 to-resort-700 text-white">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-5 border-b border-white/10">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gold-500">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gold-500 font-display">
             <span className="font-bold text-resort-900 text-sm">R</span>
           </div>
-          <span className="font-semibold text-white text-lg">ResortPro</span>
+          <span className="font-display font-semibold text-white text-lg">ResortPro</span>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -177,7 +165,7 @@ export default function DemoPage() {
             <Sparkles className="h-3.5 w-3.5" />
             {isBn ? 'ইন্টারেক্টিভ ডেমো — সাইনআপ লাগবে না' : 'Interactive Demo — No sign-up required'}
           </div>
-          <h1 className="text-4xl font-bold text-white mb-3">
+          <h1 className="font-display text-4xl font-bold text-white mb-3">
             {isBn ? 'কোন role-এ demo দেখতে চান?' : 'Which role would you like to explore?'}
           </h1>
           <p className="text-white/50 text-lg">
@@ -187,13 +175,18 @@ export default function DemoPage() {
 
         {/* Role cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {ROLES.map((r) => (
+          {ROLES.map((r) => {
+            const Icon = r.icon;
+            return (
             <button
               key={r.role}
               onClick={() => handleRoleSelect(r.role)}
               disabled={loading !== null}
-              style={{ backgroundColor: 'rgba(255,255,255,0.04)' }}
-      className={`group relative text-left rounded-2xl border transition-all duration-200 p-6 ${r.border} hover:border-opacity-80 hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed`}
+              className={`group relative text-left rounded-2xl border transition-all duration-200 p-6 bg-white/[0.04] hover:bg-white/[0.06] hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed ${
+                r.primary
+                  ? 'border-gold-500/50 shadow-[0_0_0_1px_rgba(212,168,83,0.15),0_12px_32px_-8px_rgba(212,168,83,0.25)] hover:border-gold-500/80'
+                  : 'border-white/10 hover:border-gold-500/30 hover:shadow-xl'
+              }`}
             >
               {/* Loading overlay */}
               {loading === r.role && (
@@ -208,12 +201,14 @@ export default function DemoPage() {
               {/* Top row */}
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <span className="text-4xl">{r.emoji}</span>
+                  <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${r.primary ? 'bg-gold-500/15' : 'bg-white/[0.06]'}`}>
+                    <Icon className={`h-5 w-5 ${r.primary ? 'text-gold-400' : 'text-white/70'}`} />
+                  </span>
                   <div>
-                    <p className="font-bold text-white text-lg leading-tight">{isBn ? r.titleBn : r.title}</p>
+                    <p className="font-display font-bold text-white text-lg leading-tight">{isBn ? r.titleBn : r.title}</p>
                   </div>
                 </div>
-                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${r.badgeColor}`}>
+                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${r.primary ? 'bg-gold-500/15 text-gold-400' : 'bg-white/[0.08] text-white/60'}`}>
                   {r.badge}
                 </span>
               </div>
@@ -232,7 +227,7 @@ export default function DemoPage() {
               </ul>
 
               {/* CTA arrow */}
-              <div className="mt-5 flex items-center gap-1 text-sm font-semibold text-white/70 group-hover:text-white transition-colors">
+              <div className={`mt-5 flex items-center gap-1 text-sm font-semibold transition-colors ${r.primary ? 'text-gold-400 group-hover:text-gold-300' : 'text-white/70 group-hover:text-white'}`}>
                 {loading === r.role ? (
                   <span>{isBn ? 'লগইন হচ্ছে...' : 'Setting up your demo...'}</span>
                 ) : (
@@ -243,7 +238,8 @@ export default function DemoPage() {
                 )}
               </div>
             </button>
-          ))}
+            );
+          })}
         </div>
 
         {/* Footer note */}
