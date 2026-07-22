@@ -190,13 +190,15 @@ export default function DashboardPage() {
             {today}
           </p>
         </div>
-        <button
-          onClick={() => setNewBookingOpen(true)}
-          className="rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
-          style={{ background: 'var(--rp-btn-accent)' }}
-        >
-          + New Booking
-        </button>
+        {['OWNER', 'MANAGER', 'RECEPTIONIST'].includes(user?.role ?? '') && (
+          <button
+            onClick={() => setNewBookingOpen(true)}
+            className="rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
+            style={{ background: 'var(--rp-btn-accent)' }}
+          >
+            + New Booking
+          </button>
+        )}
       </div>
 
       {/* Stat Cards & Charts — hidden for housekeeping staff */}
@@ -219,7 +221,9 @@ export default function DashboardPage() {
         </div>
       )}
       {user?.role !== 'STAFF' && user?.role !== 'CHEF' && <>
-      {/* Quick Access — the 4 everyday-use pages, big and first thing seen after login */}
+      {/* Quick Access — the 4 everyday-use pages, big and first thing seen after login.
+          Only for roles that can actually reach these pages (matches sidebar nav roles). */}
+      {['OWNER', 'MANAGER', 'RECEPTIONIST'].includes(user?.role ?? '') && (
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 animate-fade-up [animation-delay:60ms]">
         {([
           { href: '/dashboard/rooms',      label: 'Rooms',      icon: BedDouble,     family: 'teal' as IconFamily },
@@ -243,6 +247,7 @@ export default function DashboardPage() {
           </Link>
         ))}
       </div>
+      )}
 
       {/* Primary stat cards — 4 hero */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 animate-fade-up [animation-delay:110ms]">
