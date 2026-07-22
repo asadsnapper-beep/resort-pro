@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
 import { dashboardApi, websiteApi, bookingsApi } from '@/lib/api';
@@ -14,6 +15,7 @@ import {
   BedDouble, CalendarCheck, CalendarX, TrendingUp, Users,
   Ticket, Sparkles, ArrowUp, ArrowDown, UtensilsCrossed,
   LogIn, LogOut, CheckCircle2, Clock, Wrench, Globe, Tag, AlertCircle, Banknote,
+  ClipboardList, CalendarDays, LayoutGrid, ChevronRight,
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
@@ -217,8 +219,33 @@ export default function DashboardPage() {
         </div>
       )}
       {user?.role !== 'STAFF' && user?.role !== 'CHEF' && <>
-      {/* Primary stat cards — 4 hero */}
+      {/* Quick Access — the 4 everyday-use pages, big and first thing seen after login */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 animate-fade-up [animation-delay:60ms]">
+        {([
+          { href: '/dashboard/rooms',      label: 'Rooms',      icon: BedDouble,     family: 'teal' as IconFamily },
+          { href: '/dashboard/front-desk', label: 'Front Desk', icon: ClipboardList, family: 'gold' as IconFamily },
+          { href: '/dashboard/bookings',   label: 'Bookings',   icon: CalendarDays,  family: 'coral' as IconFamily },
+          { href: '/dashboard/calendar',   label: 'Calendar',   icon: LayoutGrid,    family: 'teal' as IconFamily },
+        ]).map(({ href, label, icon: Icon, family }) => (
+          <Link
+            key={href}
+            href={href}
+            className="group flex items-center gap-3 rounded-[14px] border p-[18px] transition-transform hover:-translate-y-0.5"
+            style={{ background: cardBg, borderColor: cardBorder, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}
+          >
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px]"
+              style={{ background: isDark ? 'rgba(255,255,255,0.08)' : ICON_STYLES[family].bg }}>
+              <Icon className="h-5 w-5" strokeWidth={2.2} style={{ color: ICON_STYLES[family].color }} />
+            </div>
+            <span className="text-[15px] font-semibold" style={{ color: isDark ? '#dfd9d0' : 'var(--rp-text)' }}>{label}</span>
+            <ChevronRight className="ml-auto h-4 w-4 opacity-40 transition-transform group-hover:translate-x-0.5"
+              style={{ color: isDark ? '#94b8b0' : 'var(--rp-text-muted)' }} />
+          </Link>
+        ))}
+      </div>
+
+      {/* Primary stat cards — 4 hero */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 animate-fade-up [animation-delay:110ms]">
         <HeroStatCard
           title="Occupancy" value={stats?.occupancyRate || 0} unit="%"
           subtext={`${stats?.totalRooms || 0} rooms · ${Math.round(((stats?.occupancyRate || 0) / 100) * (stats?.totalRooms || 0))} occupied`}
@@ -250,7 +277,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Secondary compact cards — 5 */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 animate-fade-up [animation-delay:110ms]">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 animate-fade-up [animation-delay:160ms]">
         <CompactStatCard title="Active Bookings" value={stats?.activeBookings || 0} icon={Users} family="gold" />
         <CompactStatCard title="Total Rooms" value={stats?.totalRooms || 0} icon={BedDouble} family="teal" />
         <CompactStatCard title="Open Tickets" value={stats?.openTickets || 0} icon={AlertCircle} family="coral" />
@@ -259,7 +286,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Today's Arrivals & Departures */}
-      <div className="grid gap-3 lg:grid-cols-2 animate-fade-up [animation-delay:160ms]">
+      <div className="grid gap-3 lg:grid-cols-2 animate-fade-up [animation-delay:210ms]">
         {/* Arrivals */}
         <div className="rounded-[14px] border overflow-hidden" style={{ background: cardBg, borderColor: cardBorder, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           <div className="flex items-center justify-between border-b px-5 py-[15px]" style={{ borderColor: dividerColor }}>
@@ -342,7 +369,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Charts Row */}
-      <div className="grid gap-3 lg:grid-cols-2 animate-fade-up [animation-delay:210ms]">
+      <div className="grid gap-3 lg:grid-cols-2 animate-fade-up [animation-delay:260ms]">
         {/* Revenue Chart */}
         <div className="rounded-[14px] border px-[22px] py-[18px]"
           style={{ background: cardBg, borderColor: cardBorder, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
@@ -408,7 +435,7 @@ export default function DashboardPage() {
 
       {/* Website Visitors Widget */}
       {websiteStats && (websiteStats.total30d > 0 || true) && (
-        <div className="rounded-[14px] border px-[22px] py-[18px] animate-fade-up [animation-delay:250ms]"
+        <div className="rounded-[14px] border px-[22px] py-[18px] animate-fade-up [animation-delay:300ms]"
           style={{ background: cardBg, borderColor: cardBorder, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -458,7 +485,7 @@ export default function DashboardPage() {
       )}
 
       {/* Recent Bookings + Low Stock */}
-      <div className="grid gap-3 lg:grid-cols-3 animate-fade-up [animation-delay:290ms]">
+      <div className="grid gap-3 lg:grid-cols-3 animate-fade-up [animation-delay:340ms]">
         {/* Recent Bookings */}
         <div className="lg:col-span-2 rounded-[14px] border overflow-hidden"
           style={{ background: cardBg, borderColor: cardBorder, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
