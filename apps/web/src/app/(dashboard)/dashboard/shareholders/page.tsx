@@ -6,7 +6,7 @@ import { shareholdersApi, staffApi } from '@/lib/api';
 import { ModalShell } from '@/components/ui/modal-shell';
 import { toast } from '@/hooks/use-toast';
 import {
-  PieChart, Plus, Loader2, Users, Pencil, Banknote, Clock, X,
+  PieChart, Plus, Loader2, Users, Pencil, Banknote, Clock, X, History,
 } from 'lucide-react';
 
 interface Shareholder {
@@ -39,6 +39,7 @@ export default function ShareholdersPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [payoutTarget, setPayoutTarget] = useState<Shareholder | null>(null);
   const [editTarget, setEditTarget] = useState<Shareholder | null>(null);
+  const [historyTarget, setHistoryTarget] = useState<Shareholder | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['shareholders'],
@@ -163,6 +164,13 @@ export default function ShareholdersPage() {
               </div>
               <div className="flex shrink-0 gap-2">
                 <button
+                  onClick={() => setHistoryTarget(s)}
+                  className="flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12px] font-medium transition-colors hover:bg-[#f4f1eb]"
+                  style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}
+                >
+                  <History className="h-3.5 w-3.5" /> History
+                </button>
+                <button
                   onClick={() => setEditTarget(s)}
                   className="flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12px] font-medium transition-colors hover:bg-[#f4f1eb]"
                   style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}
@@ -204,6 +212,13 @@ export default function ShareholdersPage() {
           shareholder={payoutTarget}
           onClose={() => setPayoutTarget(null)}
           onDone={() => { setPayoutTarget(null); queryClient.invalidateQueries({ queryKey: ['shareholders'] }); }}
+        />
+      )}
+
+      {historyTarget && (
+        <PayoutHistoryModal
+          shareholder={historyTarget}
+          onClose={() => setHistoryTarget(null)}
         />
       )}
     </div>
@@ -391,6 +406,66 @@ function RecordPayoutModal({ shareholder, onClose, onDone }: { shareholder: Shar
           />
         </div>
       </div>
+    </ModalShell>
+  );
+}
+
+interface PayoutEntry {
+  id: string;
+  amount: number;
+  method: string;
+  paidAt: string;
+  note: string | null;
+}
+
+const METHOD_LABEL: Record<string, string> = {
+  BANK_TRANSFER: 'Bank Transfer', BKASH: 'bKash', CASH: 'Cash', OTHER: 'Other',
+};
+
+function PayoutHistoryModal({ shareholder, onClose }: { shareholder: Shareholder; onClose: () => void }) {
+  const { data, isLoading } = useQuery<PayoutEntry[]>({
+    queryKey: ['shareholder-payouts', shareholder.id],
+    queryFn: () => shareholdersApi.payouts(shareholder.id).then((r) => r.data.data),
+  });
+  const payouts = data ?? [];
+  const total = payouts.reduce((sum, p) => sum + p.amount, 0);
+
+  return (
+    <ModalShell
+      open
+      onClose={onClose}
+      title={`Payout History — ${shareholder.user.firstName} ${shareholder.user.lastName}`}
+      description={`${shareholder.ownershipPercent}% ownership · ৳${total.toLocaleString()} paid total`}
+      footer={
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} className="rounded-[9px] border px-4 py-[9px] text-[13px] font-medium" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>Close</button>
+        </div>
+      }
+    >
+      {isLoading ? (
+        <div className="flex h-24 items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin" style={{ color: '#9bbdb7' }} />
+        </div>
+      ) : payouts.length === 0 ? (
+        <p className="py-8 text-center text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">Ekhono kono payout record kora hoyni.</p>
+      ) : (
+        <div className="space-y-2">
+          {payouts.map((p) => (
+            <div key={p.id} className="flex items-center gap-3 rounded-[10px] border px-4 py-3" style={{ borderColor: 'var(--rp-border)' }}>
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px]" style={{ background: 'var(--rp-amber-bg)' }}>
+                <Banknote className="h-4 w-4" style={{ color: '#b89040' }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13.5px] font-medium text-[#18231f] dark:text-[#dfd9d0]">৳{p.amount.toLocaleString()}</p>
+                <p className="text-[12px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">
+                  {new Date(p.paidAt).toLocaleDateString('en-GB', { dateStyle: 'medium' })} · {METHOD_LABEL[p.method] ?? p.method}
+                  {p.note && <span> · {p.note}</span>}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </ModalShell>
   );
 }
