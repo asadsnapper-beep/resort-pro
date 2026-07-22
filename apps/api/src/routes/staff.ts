@@ -191,7 +191,27 @@ export async function staffRoutes(app: FastifyInstance) {
       const body = z.object({
         email: z.string().email(),
         role: z.enum(INVITE_ROLES).default('STAFF'),
+        ownershipPercent: z.number().min(0.01).max(100).optional(),
       }).parse(request.body);
+
+      if (body.role === 'SHAREHOLDER') {
+        if (body.ownershipPercent === undefined) {
+          return reply.status(400).send({ success: false, error: 'ownershipPercent is required for shareholder invites.' });
+        }
+        const allocated = await db.shareholderProfile.aggregate({
+          where: { tenantId },
+          _sum: { ownershipPercent: true },
+        });
+        const pendingInvites = await db.staffInvite.aggregate({
+          where: { tenantId, role: 'SHAREHOLDER', used: false, expiresAt: { gt: new Date() } },
+          _sum: { ownershipPercent: true },
+        });
+        const alreadyAllocated = (allocated._sum.ownershipPercent ?? 0) + (pendingInvites._sum.ownershipPercent ?? 0);
+        if (alreadyAllocated + body.ownershipPercent > 100) {
+          const remaining = Math.max(0, 100 - alreadyAllocated);
+          return reply.status(400).send({ success: false, error: `Only ${remaining.toFixed(2)}% ownership remaining.` });
+        }
+      }
 
       const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true, slug: true } });
       if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
@@ -210,7 +230,13 @@ export async function staffRoutes(app: FastifyInstance) {
 
       const token = randomBytes(32).toString('hex');
       await db.staffInvite.create({
-        data: { email: body.email, role: body.role, token, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
+        data: {
+          email: body.email,
+          role: body.role,
+          ownershipPercent: body.role === 'SHAREHOLDER' ? body.ownershipPercent : undefined,
+          token,
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        },
       });
 
       const webUrl = process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:3000';

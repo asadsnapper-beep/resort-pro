@@ -140,9 +140,22 @@ export const staffApi = {
   update:        (id: string, data: unknown) => api.patch(`/staff/${id}`, data),
   delete:        (id: string) => api.delete(`/staff/${id}`),
   reactivate:    (id: string) => api.patch(`/staff/${id}/reactivate`),
-  invite:        (data: { email: string; role: string }) => api.post('/staff/invite', data),
+  invite:        (data: { email: string; role: string; ownershipPercent?: number }) => api.post('/staff/invite', data),
   listInvites:   () => api.get('/staff/invites'),
   cancelInvite:  (id: string) => api.delete(`/staff/invites/${id}`),
+};
+
+// ── Shareholders ──────────────────────────────────────────────────────────────
+export const shareholdersApi = {
+  list:          () => api.get('/shareholders'),
+  summary:       () => api.get('/shareholders/summary'),
+  update:        (id: string, data: { ownershipPercent?: number; notes?: string }) => api.patch(`/shareholders/${id}`, data),
+  remove:        (id: string) => api.delete(`/shareholders/${id}`),
+  recordPayout:  (id: string, data: { amount: number; method: string; paidAt: string; note?: string }) =>
+    api.post(`/shareholders/${id}/payouts`, data),
+  payouts:       (id: string) => api.get(`/shareholders/${id}/payouts`),
+  me:            () => api.get('/shareholders/me'),
+  myPayouts:     () => api.get('/shareholders/me/payouts'),
 };
 
 // ── Housekeeping ──────────────────────────────────────────────────────────────

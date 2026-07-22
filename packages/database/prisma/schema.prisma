@@ -17,15 +17,15 @@ enum TenantPlan {
 }
 
 enum UserRole {
-  OWNER        // সব কিছু দেখতে ও করতে পারে
-  MANAGER      // Billing বাদে সব
-  SHAREHOLDER  // শুধু Dashboard, Analytics, Reports — read-only
+  OWNER // সব কিছু দেখতে ও করতে পারে
+  MANAGER // Billing বাদে সব
+  SHAREHOLDER // শুধু Dashboard, Analytics, Reports — read-only
   RECEPTIONIST // Bookings, Calendar, Rooms, Guests, Housekeeping, Support
-  MARKETER     // Analytics, Website, CRM & Email, Guests
-  DEVELOPER    // Settings (Embed), Website, Channel Sync
-  STAFF        // Housekeeping, Maintenance, Restaurant, Orders
-  CHEF         // Kitchen — Food Orders view & status update only
-  GUEST        // (external, not dashboard user)
+  MARKETER // Analytics, Website, CRM & Email, Guests
+  DEVELOPER // Settings (Embed), Website, Channel Sync
+  STAFF // Housekeeping, Maintenance, Restaurant, Orders
+  CHEF // Kitchen — Food Orders view & status update only
+  GUEST // (external, not dashboard user)
 }
 
 enum RoomType {
@@ -191,7 +191,7 @@ enum TicketCategory {
 enum ChatSenderType {
   GUEST
   STAFF
-  BOT   // system-generated / webhook-forwarded messages
+  BOT // system-generated / webhook-forwarded messages
 }
 
 enum AdminRole {
@@ -322,7 +322,7 @@ model Tenant {
   timezone                String     @default("Asia/Dhaka")
   checkInTime             String     @default("14:00")
   checkOutTime            String     @default("11:00")
-  roomTypeLabels          Json?      // { "STANDARD": "Garden Room", ... } — display-layer override
+  roomTypeLabels          Json? // { "STANDARD": "Garden Room", ... } — display-layer override
   // Stripe billing
   stripeCustomerId        String?    @unique
   stripeSubscriptionId    String?    @unique
@@ -369,8 +369,8 @@ model Tenant {
   waPhoneNumberId         String?
   waBusinessAccId         String?
   // Telegram support channel
-  telegramBotToken        String?   // bot token from BotFather
-  telegramNotifChatId     String?   // staff group/channel chat_id for new ticket alerts
+  telegramBotToken        String? // bot token from BotFather
+  telegramNotifChatId     String? // staff group/channel chat_id for new ticket alerts
   // Notification triggers
   notifBookingConfirm     Boolean    @default(true)
   notifPaymentReceived    Boolean    @default(true)
@@ -404,90 +404,93 @@ model Tenant {
   enterpriseNotes         String?
   // stay.resortpro.site — Public discovery map
   mapVisible              Boolean    @default(false) // show on public map
-  latitude                Float?     // e.g. 22.3569
-  longitude               Float?     // e.g. 91.7832
-  resortCategory          String?    // "eco" | "agro" | "beach" | "hill" | "city" | "heritage"
-  priceFrom               Float?     // starting price per night (display only)
-  shortDescription        String?    // 1-2 line blurb for map popup & list card
-  coverImageUrl           String?    // hero image for resort card on discovery page
+  latitude                Float? // e.g. 22.3569
+  longitude               Float? // e.g. 91.7832
+  resortCategory          String? // "eco" | "agro" | "beach" | "hill" | "city" | "heritage"
+  priceFrom               Float? // starting price per night (display only)
+  shortDescription        String? // 1-2 line blurb for map popup & list card
+  coverImageUrl           String? // hero image for resort card on discovery page
   // stay.resortpro.site — Revenue features
   isFeatured              Boolean    @default(false) // sponsored / featured listing
-  featuredUntil           DateTime?  // expiry of featured status
-  featuredBadge           String?    // "Sponsored" | "Top Pick" | "Editor's Choice"
-  affiliateUrl            String?    // booking.com / agoda / direct affiliate link
-  affiliateSource         String?    // "booking.com" | "agoda" | "direct" | "custom"
+  featuredUntil           DateTime? // expiry of featured status
+  featuredBadge           String? // "Sponsored" | "Top Pick" | "Editor's Choice"
+  affiliateUrl            String? // booking.com / agoda / direct affiliate link
+  affiliateSource         String? // "booking.com" | "agoda" | "direct" | "custom"
   discoveryTier           String     @default("free") // "free" | "basic" | "premium"
   // Gallery (premium feature — up to 6 extra images)
   galleryImages           String[]   @default([])
   // Profile extras (premium)
   amenitiesHighlights     String[]   @default([]) // e.g. ["Pool", "WiFi", "Restaurant"]
-  bookingPhone            String?    // WhatsApp / call button on discovery page
-  instagramHandle         String?    // @handle
+  bookingPhone            String? // WhatsApp / call button on discovery page
+  instagramHandle         String? // @handle
   createdAt               DateTime   @default(now())
   updatedAt               DateTime   @updatedAt
 
   // Relations
-  users               User[]
-  properties          Property[]
-  rooms               Room[]
-  guests              Guest[]
-  bookings            Booking[]
-  staff               Staff[]
-  housekeepingTasks   HousekeepingTask[]
-  menuItems           MenuItem[]
-  foodOrders          FoodOrder[]
-  inventoryItems      InventoryItem[]
-  inventoryMovements  InventoryMovement[]
-  supportTickets      SupportTicket[]
-  amenities           Amenity[]
-  websiteContent      WebsiteContent?
-  websitePageViews        WebsitePageView[]
-  reportDispatchSettings  ReportDispatchSettings?
-  notifications           Notification[]
-  payments            Payment[]
+  users                  User[]
+  properties             Property[]
+  rooms                  Room[]
+  guests                 Guest[]
+  bookings               Booking[]
+  staff                  Staff[]
+  housekeepingTasks      HousekeepingTask[]
+  menuItems              MenuItem[]
+  foodOrders             FoodOrder[]
+  inventoryItems         InventoryItem[]
+  inventoryMovements     InventoryMovement[]
+  supportTickets         SupportTicket[]
+  amenities              Amenity[]
+  websiteContent         WebsiteContent?
+  websitePageViews       WebsitePageView[]
+  reportDispatchSettings ReportDispatchSettings?
+  notifications          Notification[]
+  payments               Payment[]
   // CRM
-  guestTags           GuestTag[]
-  guestScores         GuestScore[]
-  emailConsents       EmailConsent[]
-  guestActivities     GuestActivity[]
-  emailTemplates      EmailTemplate[]
-  campaigns           Campaign[]
-  emailSends          EmailSend[]
-  sequences           Sequence[]
-  sequenceEnrollments SequenceEnrollment[]
-  staffInvites        StaffInvite[]
-  featureFlags        TenantFeatureFlag[]
-  slaAgreement        SlaAgreement?
-  invoiceExtras       InvoiceExtra[]
-  invoices            Invoice[]
-  invoicePayments     InvoicePayment[]
-  ratePlans           RatePlan[]
-  emailSettings       EmailSettings?
-  maintenanceTickets  MaintenanceTicket[]
-  packages            Package[]
-  groupBookings       GroupBooking[]
-  loyaltyProgram      LoyaltyProgram?
-  loyaltyAccounts     LoyaltyAccount[]
-  loyaltyTransactions LoyaltyTransaction[]
-  externalCalendars   ExternalCalendar[]
-  expenses            Expense[]
+  guestTags              GuestTag[]
+  guestScores            GuestScore[]
+  emailConsents          EmailConsent[]
+  guestActivities        GuestActivity[]
+  emailTemplates         EmailTemplate[]
+  campaigns              Campaign[]
+  emailSends             EmailSend[]
+  sequences              Sequence[]
+  sequenceEnrollments    SequenceEnrollment[]
+  staffInvites           StaffInvite[]
+  featureFlags           TenantFeatureFlag[]
+  slaAgreement           SlaAgreement?
+  invoiceExtras          InvoiceExtra[]
+  invoices               Invoice[]
+  invoicePayments        InvoicePayment[]
+  ratePlans              RatePlan[]
+  emailSettings          EmailSettings?
+  maintenanceTickets     MaintenanceTicket[]
+  packages               Package[]
+  groupBookings          GroupBooking[]
+  loyaltyProgram         LoyaltyProgram?
+  loyaltyAccounts        LoyaltyAccount[]
+  loyaltyTransactions    LoyaltyTransaction[]
+  externalCalendars      ExternalCalendar[]
+  expenses               Expense[]
   // SMS & WhatsApp Marketing
-  marketingCampaigns  MarketingCampaign[]
-  messageTemplates    MessageTemplate[]
-  offers              Offer[]
-  paymentConfig       TenantPaymentConfig?
-  discoveryClicks     DiscoveryClick[]
-  guestDocuments      GuestDocument[]
-  restaurantTables    RestaurantTable[]
+  marketingCampaigns     MarketingCampaign[]
+  messageTemplates       MessageTemplate[]
+  offers                 Offer[]
+  paymentConfig          TenantPaymentConfig?
+  discoveryClicks        DiscoveryClick[]
+  guestDocuments         GuestDocument[]
+  restaurantTables       RestaurantTable[]
   // AI (built behind flags — see plan/ai/ROLLOUT-STRATEGY.md)
-  aiKeys              AiKeys?
-  aiUsages            AiUsage[]
-  generatedContent    GeneratedContent[]
-  bookingLeads        BookingLead[]
-  guestChatSessions   GuestChatSession[]
-  aiAbuseLogs         AiAbuse[]
-  revenueSnapshots    RevenueSnapshot[]
-  aiInsights          AIInsight[]
+  aiKeys                 AiKeys?
+  aiUsages               AiUsage[]
+  generatedContent       GeneratedContent[]
+  bookingLeads           BookingLead[]
+  guestChatSessions      GuestChatSession[]
+  aiAbuseLogs            AiAbuse[]
+  revenueSnapshots       RevenueSnapshot[]
+  aiInsights             AIInsight[]
+  shareholderProfiles    ShareholderProfile[]
+  payouts                Payout[]
+  investorReports        InvestorReport[]
 
   @@map("tenants")
 }
@@ -515,6 +518,7 @@ model User {
   notifications       Notification[]
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
+  shareholderProfile  ShareholderProfile?
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -549,14 +553,15 @@ model PasswordResetToken {
 }
 
 model StaffInvite {
-  id        String   @id @default(uuid())
-  tenantId  String
-  email     String
-  role      UserRole @default(STAFF)
-  token     String   @unique
-  expiresAt DateTime
-  used      Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id               String   @id @default(uuid())
+  tenantId         String
+  email            String
+  role             UserRole @default(STAFF)
+  ownershipPercent Float? // only set when role = SHAREHOLDER
+  token            String   @unique
+  expiresAt        DateTime
+  used             Boolean  @default(false)
+  createdAt        DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -570,7 +575,7 @@ model Property {
   id           String   @id @default(uuid())
   tenantId     String
   name         String
-  slug         String   // e.g. "beach-villa", "mountain-lodge"
+  slug         String // e.g. "beach-villa", "mountain-lodge"
   address      String?
   phone        String?
   email        String?
@@ -643,7 +648,7 @@ model Amenity {
 // ─── Guests ───────────────────────────────────────────────────────────────────
 
 model Guest {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   tenantId    String
   firstName   String
   lastName    String
@@ -655,8 +660,8 @@ model Guest {
   address     String?
   notes       String?
   dateOfBirth DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   // Relations
   tenant         Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -681,11 +686,11 @@ model GuestDocument {
   id         String   @id @default(uuid())
   guestId    String
   tenantId   String
-  docType    String   // PASSPORT | NATIONAL_ID | DRIVERS_LICENSE | VISA | OTHER
+  docType    String // PASSPORT | NATIONAL_ID | DRIVERS_LICENSE | VISA | OTHER
   imageUrl   String
   notes      String?
   uploadedAt DateTime @default(now())
-  uploadedBy String?  // staff user ID
+  uploadedBy String? // staff user ID
 
   guest  Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -733,9 +738,9 @@ model Booking {
   gatewayPaymentId      String? // intermediate ID (bkash paymentID / ssl tran_id)
   paidAt                DateTime? // when payment was confirmed
   // Front desk
-  checkedInBy           String?       // staff userId who did check-in
-  checkedOutBy          String?       // staff userId who did check-out
-  roomNotes             String?       // front desk notes (key card, deposit note, etc.)
+  checkedInBy           String? // staff userId who did check-in
+  checkedOutBy          String? // staff userId who did check-out
+  roomNotes             String? // front desk notes (key card, deposit note, etc.)
   deposit               Decimal?      @db.Decimal(10, 2) // deposit collected at check-in
   walkIn                Boolean       @default(false) // true = walk-in, no prior booking
   // External calendar sync
@@ -765,32 +770,32 @@ model Booking {
 }
 
 model Offer {
-  id          String    @id @default(cuid())
-  tenantId    String
-  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   title       String
   description String?
   type        OfferType
-  value       Float                    // 30 = 30%, 500 = ৳500, 1 = 1 free night
-  promoCode   String?                  // null = auto-apply, no code needed
+  value       Float // 30 = 30%, 500 = ৳500, 1 = 1 free night
+  promoCode   String? // null = auto-apply, no code needed
   minStay     Int       @default(1)
 
-  validFrom   DateTime
-  validTo     DateTime
-  maxUses     Int?                     // null = unlimited
-  usedCount   Int       @default(0)
+  validFrom DateTime
+  validTo   DateTime
+  maxUses   Int? // null = unlimited
+  usedCount Int      @default(0)
 
-  roomIds     String[]  @default([])  // empty = all rooms
-  showOnBar   Boolean   @default(true)
-  showSection Boolean   @default(true)
-  showOnCards Boolean   @default(true)
-  priority    Int       @default(0)
-  isActive    Boolean   @default(true)
+  roomIds     String[] @default([]) // empty = all rooms
+  showOnBar   Boolean  @default(true)
+  showSection Boolean  @default(true)
+  showOnCards Boolean  @default(true)
+  priority    Int      @default(0)
+  isActive    Boolean  @default(true)
 
   bookingOffers BookingOffer[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   @@index([tenantId])
   @@index([tenantId, isActive])
@@ -807,7 +812,7 @@ model BookingOffer {
   id        String  @id @default(cuid())
   bookingId String
   offerId   String
-  discount  Float                      // actual amount saved
+  discount  Float // actual amount saved
   booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   offer     Offer   @relation(fields: [offerId], references: [id], onDelete: Cascade)
 
@@ -816,38 +821,38 @@ model BookingOffer {
 }
 
 model Payment {
-  id               String        @id @default(uuid())
-  tenantId         String
-  bookingId        String?       // nullable — advance deposit বা direct payment হতে পারে
+  id        String  @id @default(uuid())
+  tenantId  String
+  bookingId String? // nullable — advance deposit বা direct payment হতে পারে
 
   // Amount & currency
-  amount           Decimal       @db.Decimal(10, 2)
-  currency         String        @default("BDT")
+  amount   Decimal @db.Decimal(10, 2)
+  currency String  @default("BDT")
 
   // Payment method & gateway
   method           PaymentMethod @default(CASH)
-  gateway          String?       // 'bkash' | 'nagad' | 'sslcommerz' | 'razorpay' | 'stripe' | ...
-  gatewayPaymentId String?       // gateway-এর নিজস্ব payment ID
-  gatewayOrderId   String?       // razorpay order_id / stripe payment_intent id
-  gatewaySessionId String?       // SSLCommerz / bKash session token
+  gateway          String? // 'bkash' | 'nagad' | 'sslcommerz' | 'razorpay' | 'stripe' | ...
+  gatewayPaymentId String? // gateway-এর নিজস্ব payment ID
+  gatewayOrderId   String? // razorpay order_id / stripe payment_intent id
+  gatewaySessionId String? // SSLCommerz / bKash session token
 
-  status           PaymentStatus @default(PENDING)
+  status PaymentStatus @default(PENDING)
 
   // Payer info
-  payerName        String?
-  payerEmail       String?
-  payerPhone       String?
+  payerName  String?
+  payerEmail String?
+  payerPhone String?
 
   // Legacy / extra fields
-  reference        String?       // manual reference number
-  notes            String?
-  metadata         Json?         // gateway-specific extra data
-  webhookData      Json?         // raw webhook payload (debugging)
+  reference   String? // manual reference number
+  notes       String?
+  metadata    Json? // gateway-specific extra data
+  webhookData Json? // raw webhook payload (debugging)
 
-  processedAt      DateTime?
-  paidAt           DateTime?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  processedAt DateTime?
+  paidAt      DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   booking Booking? @relation(fields: [bookingId], references: [id])
@@ -864,16 +869,16 @@ model Payment {
 // Tenant-এর payment gateway configuration — credentials encrypted in production
 
 model TenantPaymentConfig {
-  id             String   @id @default(cuid())
-  tenantId       String   @unique
-  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id       String @id @default(cuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // Active gateway for online checkout
-  activeGateway  String   @default("manual") // 'bkash'|'nagad'|'sslcommerz'|'razorpay'|'payhere'|'esewa'|'khalti'|'stripe'|'manual'
+  activeGateway String @default("manual") // 'bkash'|'nagad'|'sslcommerz'|'razorpay'|'payhere'|'esewa'|'khalti'|'stripe'|'manual'
 
   // Gateway credentials stored as JSON (encrypted in production via AES-256)
   // Shape: { bkash: { appKey, appSecret, username, password }, stripe: { secretKey, publishableKey }, ... }
-  credentials    Json     @default("{}")
+  credentials Json @default("{}")
 
   // Which payment methods to show guests on checkout page
   // Values: 'mobile_banking' | 'card' | 'net_banking' | 'wallet' | 'manual'
@@ -883,10 +888,10 @@ model TenantPaymentConfig {
   manualInstructions String?
 
   // Test/sandbox mode toggle
-  testMode       Boolean  @default(true)
+  testMode Boolean @default(true)
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("tenant_payment_configs")
 }
@@ -1258,26 +1263,26 @@ model MenuItem {
 }
 
 model FoodOrder {
-  id                  String         @id @default(uuid())
-  tenantId            String
-  bookingId           String?
-  guestId             String?
-  tableNumber         String?
-  restaurantTableId   String?
-  status              OrderStatus    @default(PENDING)
-  paymentStatus       PaymentStatus  @default(PENDING)
-  paymentMethod       PaymentMethod?
-  gatewayPaymentId    String?
-  totalAmount         Decimal        @db.Decimal(10, 2)
-  notes               String?
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
+  id                String         @id @default(uuid())
+  tenantId          String
+  bookingId         String?
+  guestId           String?
+  tableNumber       String?
+  restaurantTableId String?
+  status            OrderStatus    @default(PENDING)
+  paymentStatus     PaymentStatus  @default(PENDING)
+  paymentMethod     PaymentMethod?
+  gatewayPaymentId  String?
+  totalAmount       Decimal        @db.Decimal(10, 2)
+  notes             String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
-  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  booking          Booking?         @relation(fields: [bookingId], references: [id])
-  guest            Guest?           @relation(fields: [guestId], references: [id])
-  restaurantTable  RestaurantTable? @relation(fields: [restaurantTableId], references: [id])
-  items            FoodOrderItem[]
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  booking         Booking?         @relation(fields: [bookingId], references: [id])
+  guest           Guest?           @relation(fields: [guestId], references: [id])
+  restaurantTable RestaurantTable? @relation(fields: [restaurantTableId], references: [id])
+  items           FoodOrderItem[]
 
   @@index([tenantId])
   @@index([status])
@@ -1288,13 +1293,13 @@ model FoodOrder {
 // ── Restaurant Tables ─────────────────────────────────────────────────────────
 
 model RestaurantTable {
-  id          String      @id @default(uuid())
+  id          String   @id @default(uuid())
   tenantId    String
   tableNumber Int
   label       String?
-  isActive    Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   foodOrders FoodOrder[]
@@ -1325,8 +1330,8 @@ model AiKeys {
   id           String   @id @default(uuid())
   tenantId     String   @unique
   mode         String   @default("platform") // "platform" | "byok"
-  dashboardKey String?  // encrypted (AES-256-GCM) — BYOK dashboard/owner key
-  guestKey     String?  // encrypted — BYOK guest chatbot key (optional)
+  dashboardKey String? // encrypted (AES-256-GCM) — BYOK dashboard/owner key
+  guestKey     String? // encrypted — BYOK guest chatbot key (optional)
   updatedAt    DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1354,12 +1359,12 @@ model AiUsage {
 model GeneratedContent {
   id          String   @id @default(uuid())
   tenantId    String
-  contentType String   // room_desc | promo_email | social_post | offer_copy | review_response | onboarding
+  contentType String // room_desc | promo_email | social_post | offer_copy | review_response | onboarding
   prompt      String
   content     String
   language    String   @default("en")
   status      String   @default("draft") // draft | applied | discarded
-  appliedTo   String?  // room:<id> | website | offer:<id>
+  appliedTo   String? // room:<id> | website | offer:<id>
   tokensUsed  Int?
   createdById String
   createdAt   DateTime @default(now())
@@ -1397,7 +1402,7 @@ model GuestChatSession {
   tenantId  String
   sessionId String   @unique // client-generated UUID
   turnCount Int      @default(0)
-  ipHash    String   // SHA-256 of IP — never plain IP
+  ipHash    String // SHA-256 of IP — never plain IP
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1413,7 +1418,7 @@ model AiAbuse {
   tenantId   String
   sessionId  String
   ipHash     String
-  flaggedMsg String   // trimmed to 500 chars
+  flaggedMsg String // trimmed to 500 chars
   reason     String
   createdAt  DateTime @default(now())
 
@@ -1425,23 +1430,23 @@ model AiAbuse {
 
 // Daily/weekly revenue snapshot powering business suggestions.
 model RevenueSnapshot {
-  id            String   @id @default(uuid())
-  tenantId      String
-  snapshotDate  DateTime
-  period        String   // daily | weekly | monthly
-  totalRooms    Int
+  id             String   @id @default(uuid())
+  tenantId       String
+  snapshotDate   DateTime
+  period         String // daily | weekly | monthly
+  totalRooms     Int
   availableRooms Int
-  roomsSold     Int
-  occupancyRate Float
-  adr           Float
-  revpar        Float
-  roomRevenue   Float
-  fbRevenue     Float?
-  totalRevenue  Float
-  cancellations Int      @default(0)
-  bySource      Json?
-  byRoomType    Json?
-  createdAt     DateTime @default(now())
+  roomsSold      Int
+  occupancyRate  Float
+  adr            Float
+  revpar         Float
+  roomRevenue    Float
+  fbRevenue      Float?
+  totalRevenue   Float
+  cancellations  Int      @default(0)
+  bySource       Json?
+  byRoomType     Json?
+  createdAt      DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -1454,11 +1459,11 @@ model RevenueSnapshot {
 model AIInsight {
   id        String   @id @default(uuid())
   tenantId  String
-  kind      String   // briefing | anomaly | suggestion
+  kind      String // briefing | anomaly | suggestion
   title     String
   body      String
   severity  String   @default("info") // info | warning | critical
-  status    String   @default("new")  // new | seen | dismissed | actioned
+  status    String   @default("new") // new | seen | dismissed | actioned
   createdAt DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1509,21 +1514,21 @@ model InventoryMovement {
 // ─── Support ──────────────────────────────────────────────────────────────────
 
 model SupportTicket {
-  id           String         @id @default(uuid())
-  tenantId     String
-  guestId      String?
-  assignedToId String?
-  bookingId    String?
-  title        String
-  description  String
-  category     TicketCategory @default(OTHER)
-  priority     TicketPriority @default(MEDIUM)
-  status       TicketStatus   @default(OPEN)
-  source       String         @default("WEB")  // "WEB" | "WHATSAPP" | "TELEGRAM"
-  externalChatId String?                        // telegram chat_id or WA phone number (for reply routing)
-  resolvedAt   DateTime?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id             String         @id @default(uuid())
+  tenantId       String
+  guestId        String?
+  assignedToId   String?
+  bookingId      String?
+  title          String
+  description    String
+  category       TicketCategory @default(OTHER)
+  priority       TicketPriority @default(MEDIUM)
+  status         TicketStatus   @default(OPEN)
+  source         String         @default("WEB") // "WEB" | "WHATSAPP" | "TELEGRAM"
+  externalChatId String? // telegram chat_id or WA phone number (for reply routing)
+  resolvedAt     DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   guest      Guest?        @relation(fields: [guestId], references: [id])
@@ -1544,7 +1549,7 @@ model ChatMessage {
   senderType    ChatSenderType
   message       String
   isRead        Boolean        @default(false)
-  externalMsgId String?        // Telegram message_id or WA message_id (dedup)
+  externalMsgId String? // Telegram message_id or WA message_id (dedup)
   createdAt     DateTime       @default(now())
 
   ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
@@ -1557,32 +1562,32 @@ model ChatMessage {
 // ─── Website ──────────────────────────────────────────────────────────────────
 
 model WebsiteContent {
-  id             String   @id @default(uuid())
-  tenantId       String   @unique
-  heroTitle      String
-  heroSubtitle   String?
-  heroImage      String?
-  aboutTitle     String?
-  aboutText      String?
-  aboutImage     String?
-  galleryImages  String[]
-  testimonials   Json     @default("[]")
-  seoTitle       String?
-  seoDescription String?
-  primaryColor   String   @default("#1a6b5e")
-  accentColor    String   @default("#d4a853")
-  templateId     String   @default("luxe")
+  id                String   @id @default(uuid())
+  tenantId          String   @unique
+  heroTitle         String
+  heroSubtitle      String?
+  heroImage         String?
+  aboutTitle        String?
+  aboutText         String?
+  aboutImage        String?
+  galleryImages     String[]
+  testimonials      Json     @default("[]")
+  seoTitle          String?
+  seoDescription    String?
+  primaryColor      String   @default("#1a6b5e")
+  accentColor       String   @default("#d4a853")
+  templateId        String   @default("luxe")
   // Social media links
-  facebookUrl    String?
-  instagramUrl   String?
-  twitterUrl     String?
-  tiktokUrl      String?
-  youtubeUrl     String?
-  whatsappNumber String? // phone number only e.g. "+8801XXXXXXXXX"
-  tripadvisorUrl String?
+  facebookUrl       String?
+  instagramUrl      String?
+  twitterUrl        String?
+  tiktokUrl         String?
+  youtubeUrl        String?
+  whatsappNumber    String? // phone number only e.g. "+8801XXXXXXXXX"
+  tripadvisorUrl    String?
   hiddenSections    String[] @default([]) // sections owner has toggled off e.g. ["menu","gallery"]
   sectionOrder      String[] @default([]) // owner's custom section order; empty = theme default
-  googleAnalyticsId String?  // GA4 Measurement ID e.g. "G-XXXXXXXXXX"
+  googleAnalyticsId String? // GA4 Measurement ID e.g. "G-XXXXXXXXXX"
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -1614,9 +1619,9 @@ model ReportDispatchSettings {
   dispatchTime String  @default("22:00") // "HH:MM" in tenant's local time
 
   // Telegram
-  telegramEnabled    Boolean @default(false)
-  telegramBotToken   String? // kept encrypted at rest in production
-  telegramChatId     String? // numeric chat/channel ID
+  telegramEnabled  Boolean @default(false)
+  telegramBotToken String? // kept encrypted at rest in production
+  telegramChatId   String? // numeric chat/channel ID
 
   // WhatsApp — phone number to send report to (owner's WA number)
   whatsappEnabled Boolean @default(false)
@@ -1624,7 +1629,7 @@ model ReportDispatchSettings {
 
   // Last dispatch tracking
   lastDispatchedAt DateTime?
-  lastDispatchDate String?   // "YYYY-MM-DD" of last report sent
+  lastDispatchDate String? // "YYYY-MM-DD" of last report sent
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1905,14 +1910,14 @@ model StripeWebhookEvent {
 
 // Singleton platform-level settings (one row)
 model PlatformSettings {
-  id            String   @id @default("singleton")
-  trialDays     Int      @default(14)
-  plans         Json     // Array of { key, name, price, features, roomLimit }
-  storageConfig Json?    // { driver, endpoint, region, bucket, publicUrl, accessKey, secretKey }
-  aiApiKey      String?  // Encrypted API key for AI theme generation (Claude/GPT)
-  aiProvider    String?  // "claude" | "gpt-4" — default provider
-  aiEnabledGlobal Boolean @default(false) // Master switch — all AI features off until super-admin flips this. See plan/ai/ROLLOUT-STRATEGY.md
-  updatedAt     DateTime @updatedAt
+  id              String   @id @default("singleton")
+  trialDays       Int      @default(14)
+  plans           Json // Array of { key, name, price, features, roomLimit }
+  storageConfig   Json? // { driver, endpoint, region, bucket, publicUrl, accessKey, secretKey }
+  aiApiKey        String? // Encrypted API key for AI theme generation (Claude/GPT)
+  aiProvider      String? // "claude" | "gpt-4" — default provider
+  aiEnabledGlobal Boolean  @default(false) // Master switch — all AI features off until super-admin flips this. See plan/ai/ROLLOUT-STRATEGY.md
+  updatedAt       DateTime @updatedAt
 
   @@map("platform_settings")
 }
@@ -2195,9 +2200,9 @@ model Referral {
 model DiscoveryClick {
   id        String   @id @default(cuid())
   tenantId  String
-  type      String   // "map_pin" | "list_card" | "affiliate" | "whatsapp" | "profile_view"
-  source    String?  // "map" | "list" | "blog" | "direct"
-  country   String?  // visitor country (from CF-IPCountry or IP)
+  type      String // "map_pin" | "list_card" | "affiliate" | "whatsapp" | "profile_view"
+  source    String? // "map" | "list" | "blog" | "direct"
+  country   String? // visitor country (from CF-IPCountry or IP)
   userAgent String?
   referrer  String?
   createdAt DateTime @default(now())
@@ -2212,43 +2217,43 @@ model DiscoveryClick {
 // ─── Themes ───────────────────────────────────────────────────────────────────
 
 enum ThemeType {
-  HARDCODED    // built-in themes (luxe, minimal, coastal) — rendered by React component
-  UPLOADED     // admin uploaded a config JSON/ZIP package
+  HARDCODED // built-in themes (luxe, minimal, coastal) — rendered by React component
+  UPLOADED // admin uploaded a config JSON/ZIP package
   AI_GENERATED // generated via Claude/GPT API
 }
 
 enum ThemeStatus {
-  DRAFT      // saved, not visible to tenants
-  PREVIEW    // previewable by admin only
-  PUBLISHED  // live — tenants can select it
+  DRAFT // saved, not visible to tenants
+  PREVIEW // previewable by admin only
+  PUBLISHED // live — tenants can select it
 }
 
 model Theme {
-  id           String      @id @default(uuid())
-  key          String      @unique // "luxe", "minimal", "coastal", "mountain-escape"
-  name         String      // "Luxe Gold"
+  id           String   @id @default(uuid())
+  key          String   @unique // "luxe", "minimal", "coastal", "mountain-escape"
+  name         String // "Luxe Gold"
   description  String?
   previewImage String?
-  screenshots  String[]    @default([]) // additional preview images
-  author       String      @default("ResortPro Team")
-  version      String      @default("1.0.0")
-  tags         String[]    @default([]) // ["Luxury", "Gold Accents"]
-  isActive     Boolean     @default(true)
-  isDefault    Boolean     @default(false)
-  isPremium    Boolean     @default(false)
-  requiredPlan String      @default("STARTER") // STARTER | PROFESSIONAL | ENTERPRISE
-  sortOrder    Int         @default(0)
+  screenshots  String[] @default([]) // additional preview images
+  author       String   @default("ResortPro Team")
+  version      String   @default("1.0.0")
+  tags         String[] @default([]) // ["Luxury", "Gold Accents"]
+  isActive     Boolean  @default(true)
+  isDefault    Boolean  @default(false)
+  isPremium    Boolean  @default(false)
+  requiredPlan String   @default("STARTER") // STARTER | PROFESSIONAL | ENTERPRISE
+  sortOrder    Int      @default(0)
 
   // Dynamic theme fields (Option A & B)
-  themeType    ThemeType   @default(HARDCODED)
-  themeStatus  ThemeStatus @default(PUBLISHED) // HARDCODED themes default to PUBLISHED
-  configJson   Json?       // ThemeConfig JSON — only for UPLOADED and AI_GENERATED
-  aiPrompt     String?     // original prompt used for AI generation
-  aiProvider   String?     // "claude", "gpt-4", etc.
-  uploadedBy   String?     // super admin user id who uploaded/generated
+  themeType   ThemeType   @default(HARDCODED)
+  themeStatus ThemeStatus @default(PUBLISHED) // HARDCODED themes default to PUBLISHED
+  configJson  Json? // ThemeConfig JSON — only for UPLOADED and AI_GENERATED
+  aiPrompt    String? // original prompt used for AI generation
+  aiProvider  String? // "claude", "gpt-4", etc.
+  uploadedBy  String? // super admin user id who uploaded/generated
 
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @default(now()) @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
   @@map("themes")
 }
@@ -2330,10 +2335,70 @@ model MessageTemplate {
 model CampaignLink {
   id        String   @id @default(cuid())
   code      String   @unique // e.g. "RAKIB2024" — used in ?ref=CODE
-  label     String   // e.g. "Rakib - BD Sales"
-  createdBy String   // admin email who created this
+  label     String // e.g. "Rakib - BD Sales"
+  createdBy String // admin email who created this
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
   @@map("campaign_links")
+}
+
+// ─── Shareholder Portal (see plan/shareholder-portal.md) ──────────────────────
+model ShareholderProfile {
+  id       String @id @default(uuid())
+  userId   String @unique
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  ownershipPercent Float // 0–100
+  investedAmount   Float? // optional reference — how much they invested
+  joinedAt         DateTime @default(now())
+  notes            String? // owner-only internal note
+
+  payouts Payout[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("shareholder_profiles")
+}
+
+model Payout {
+  id                   String             @id @default(uuid())
+  tenantId             String
+  tenant               Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  shareholderProfileId String
+  shareholderProfile   ShareholderProfile @relation(fields: [shareholderProfileId], references: [id], onDelete: Cascade)
+
+  amount     Float
+  method     String // BANK_TRANSFER | BKASH | CASH | OTHER
+  paidAt     DateTime
+  note       String?
+  recordedBy String // owner's User id
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([shareholderProfileId])
+  @@map("payouts")
+}
+
+model InvestorReport {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  month    String // "2026-06"
+
+  netProfit     Float
+  occupancyRate Float
+  ownerNote     String? // context note owner adds before sending
+
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([tenantId, month])
+  @@index([tenantId])
+  @@map("investor_reports")
 }

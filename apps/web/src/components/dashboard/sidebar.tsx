@@ -8,6 +8,7 @@ import {
   Package, Ticket, Globe, Bell, Settings, LogOut, Mail,
   CreditCard, BarChart2, LayoutGrid, Tags, Wrench, FileBarChart2,
   Gift, UsersRound, Star, Link2, Receipt, ChevronDown, LifeBuoy, FileText, Megaphone, Building2,
+  PieChart, TrendingUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
@@ -132,6 +133,10 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['OWNER'] },
   { href: '/dashboard/referrals', labelKey: 'nav.referrals', labelFallback: 'Referrals',            icon: Gift,        group: 'Account', groupKey: 'groups.account',
     roles: ['OWNER'] },
+  { href: '/dashboard/shareholders', labelKey: 'nav.shareholders', labelFallback: 'Shareholders',   icon: PieChart,    group: 'Account', groupKey: 'groups.account',
+    roles: ['OWNER'] },
+  { href: '/dashboard/my-shares', labelKey: 'nav.myShares', labelFallback: 'My Shares',             icon: TrendingUp,  group: 'Overview', groupKey: 'groups.overview',
+    roles: ['SHAREHOLDER'] },
   { href: '/dashboard/settings',  labelKey: 'nav.settings',  labelFallback: 'Settings',             icon: Settings,    group: 'Account', groupKey: 'groups.account',
     roles: ['OWNER', 'MANAGER', 'DEVELOPER'] },
 ];

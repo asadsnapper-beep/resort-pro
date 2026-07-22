@@ -549,6 +549,16 @@ export async function authRoutes(app: FastifyInstance) {
         },
       });
 
+      if (invite.role === 'SHAREHOLDER' && invite.ownershipPercent) {
+        await prisma.shareholderProfile.create({
+          data: {
+            userId: user.id,
+            tenantId: invite.tenantId,
+            ownershipPercent: invite.ownershipPercent,
+          },
+        });
+      }
+
       await prisma.staffInvite.update({ where: { id: invite.id }, data: { used: true } });
 
       const tenant = await prisma.tenant.findUnique({ where: { id: invite.tenantId }, select: { slug: true, name: true } });
