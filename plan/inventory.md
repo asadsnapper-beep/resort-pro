@@ -88,11 +88,11 @@ apps/web/src/lib/api.ts  ← inventoryApi.stats() added
 
 ## উন্নতির সুযোগ (Future)
 
+- [x] Movement history per item (log of all IN/OUT/ADJUSTMENT entries)
+- [x] Purchase order workflow (reorder when low stock) — see [inventory-vendor-po.md](./inventory-vendor-po.md)
+- [x] Supplier contact management (Vendor model) — see [inventory-vendor-po.md](./inventory-vendor-po.md)
+- [x] Bulk import via CSV — see [inventory-vendor-po.md](./inventory-vendor-po.md)
+- [x] Low-stock notification to manager (bell icon) — see [inventory-vendor-po.md](./inventory-vendor-po.md)
 - [ ] Delete / archive inventory items
-- [ ] Movement history per item (log of all IN/OUT/ADJUSTMENT entries)
 - [ ] Auto-deduct stock on food order placement (F&B items)
 - [ ] Auto-deduct on housekeeping task completion (linen, toiletries)
-- [ ] Purchase order workflow (reorder when low stock)
-- [ ] Supplier contact management
-- [ ] Bulk import via CSV
-- [ ] Low-stock email / push notification to manager

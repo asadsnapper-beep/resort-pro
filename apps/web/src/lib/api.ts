@@ -231,6 +231,25 @@ export const inventoryApi = {
   update: (id: string, data: unknown) => api.patch(`/inventory/${id}`, data),
   addMovement: (id: string, data: unknown) => api.post(`/inventory/${id}/movement`, data),
   getMovements: (id: string) => api.get(`/inventory/${id}/movements`),
+  exportCsv: () => api.get('/inventory/export', { responseType: 'blob' }),
+  importCsv: (rows: unknown[]) => api.post('/inventory/import', { rows }),
+};
+
+// ── Vendors ───────────────────────────────────────────────────────────────────
+export const vendorsApi = {
+  list: () => api.get('/vendors'),
+  create: (data: unknown) => api.post('/vendors', data),
+  update: (id: string, data: unknown) => api.patch(`/vendors/${id}`, data),
+};
+
+// ── Purchase Orders ──────────────────────────────────────────────────────────
+export const purchaseOrdersApi = {
+  list: (params?: Record<string, unknown>) => api.get('/purchase-orders', { params }),
+  get: (id: string) => api.get(`/purchase-orders/${id}`),
+  create: (data: unknown) => api.post('/purchase-orders', data),
+  send: (id: string) => api.patch(`/purchase-orders/${id}/send`),
+  receive: (id: string, data: unknown) => api.post(`/purchase-orders/${id}/receive`, data),
+  cancel: (id: string) => api.patch(`/purchase-orders/${id}/cancel`),
 };
 
 // ── Tickets ───────────────────────────────────────────────────────────────────

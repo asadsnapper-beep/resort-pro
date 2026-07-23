@@ -26,6 +26,8 @@ import { housekeepingRoutes } from './routes/housekeeping';
 import { menuRoutes } from './routes/menu';
 import { foodOrderRoutes } from './routes/foodOrders';
 import { inventoryRoutes } from './routes/inventory';
+import { vendorRoutes } from './routes/vendors';
+import { purchaseOrderRoutes } from './routes/purchaseOrders';
 import { ticketRoutes } from './routes/tickets';
 import { ticketWebhookRoutes } from './routes/ticketWebhooks';
 import { websiteRoutes, publicWebsiteRoutes } from './routes/website';
@@ -214,6 +216,8 @@ export async function buildApp() {
   await app.register(menuRoutes, { prefix: '/api/menu' });
   await app.register(foodOrderRoutes, { prefix: '/api/food-orders' });
   await app.register(inventoryRoutes, { prefix: '/api/inventory' });
+  await app.register(vendorRoutes, { prefix: '/api/vendors' });
+  await app.register(purchaseOrderRoutes, { prefix: '/api/purchase-orders' });
   await app.register(ticketRoutes, { prefix: '/api/tickets' });
   await app.register(ticketWebhookRoutes, { prefix: '/api/ticket-webhooks' });
   await app.register(chatRoutes, { prefix: '/api/chat' });

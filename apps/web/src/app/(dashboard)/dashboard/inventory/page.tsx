@@ -1,15 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { inventoryApi } from '@/lib/api';
+import { inventoryApi, vendorsApi, purchaseOrdersApi } from '@/lib/api';
 import { Modal } from '@/components/ui/modal';
+import { ModalShell } from '@/components/ui/modal-shell';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import {
   Plus, Search, Package, AlertTriangle, TrendingDown, TrendingUp,
   Pencil, ArrowUpDown, ChevronLeft, ChevronRight, History, Clock, Loader2,
+  Download, Upload, Truck, ClipboardList,
 } from 'lucide-react';
 
 interface InventoryItem {
@@ -21,6 +23,10 @@ interface InventoryItem {
   minimumStock: number;
   unitCost: number;
   supplier?: string;
+  vendorId?: string | null;
+  vendor?: { id: string; name: string } | null;
+  avgDailyUsage?: number;
+  daysUntilStockout?: number | null;
 }
 
 interface Movement {
@@ -28,6 +34,31 @@ interface Movement {
   type: 'IN' | 'OUT' | 'ADJUSTMENT';
   quantity: number;
   reason?: string;
+  createdAt: string;
+}
+
+interface Vendor {
+  id: string;
+  name: string;
+  contactName?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  notes?: string;
+  isActive: boolean;
+  _count?: { items: number; purchaseOrders: number };
+}
+
+interface PurchaseOrder {
+  id: string;
+  poNumber: string;
+  status: 'DRAFT' | 'SENT' | 'RECEIVED' | 'CANCELLED';
+  vendorName: string;
+  itemCount: number;
+  totalCost: number;
+  notes?: string;
+  sentAt?: string;
+  receivedAt?: string;
   createdAt: string;
 }
 
@@ -49,17 +80,25 @@ const MOVEMENT_META = {
   ADJUSTMENT: { label: 'Adjustment', Icon: ArrowUpDown,  bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
 };
 
+const PO_STATUS_META: Record<string, { bg: string; text: string }> = {
+  DRAFT:     { bg: 'var(--rp-surface-3)', text: 'var(--rp-text-muted)' },
+  SENT:      { bg: 'var(--rp-amber-bg)', text: '#b89040' },
+  RECEIVED:  { bg: 'var(--rp-teal-bg)', text: '#23766a' },
+  CANCELLED: { bg: 'var(--rp-red-bg)', text: '#c43c3c' },
+};
+
 const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30';
 const labelCls = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
 
 // ── Item Modal ────────────────────────────────────────────────────────────────
-function ItemModal({ open, onClose, loading, onSubmit, item }: {
+function ItemModal({ open, onClose, loading, onSubmit, item, vendors }: {
   open: boolean; onClose: () => void; loading: boolean;
   onSubmit: (data: Record<string, unknown>) => void;
   item?: InventoryItem | null;
+  vendors: Vendor[];
 }) {
   const [form, setForm] = useState({
-    name: '', category: '', unit: '', currentStock: '0', minimumStock: '0', unitCost: '0', supplier: '',
+    name: '', category: '', unit: '', currentStock: '0', minimumStock: '0', unitCost: '0', supplier: '', vendorId: '',
   });
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
@@ -73,6 +112,7 @@ function ItemModal({ open, onClose, loading, onSubmit, item }: {
         minimumStock: item?.minimumStock?.toString() ?? '0',
         unitCost:     item?.unitCost?.toString() ?? '0',
         supplier:     item?.supplier ?? '',
+        vendorId:     item?.vendorId ?? '',
       });
     }
   }, [open, item]);
@@ -88,6 +128,7 @@ function ItemModal({ open, onClose, loading, onSubmit, item }: {
       minimumStock: parseFloat(form.minimumStock) || 0,
       unitCost:     parseFloat(form.unitCost) || 0,
       supplier:     form.supplier || undefined,
+      vendorId:     form.vendorId || null,
     });
   };
 
@@ -130,7 +171,14 @@ function ItemModal({ open, onClose, loading, onSubmit, item }: {
           </div>
         </div>
         <div>
-          <label className={labelCls}>Supplier <span style={{ color: 'var(--rp-text-faint)' }}>(optional)</span></label>
+          <label className={labelCls}>Vendor <span style={{ color: 'var(--rp-text-faint)' }}>(optional)</span></label>
+          <select value={form.vendorId} onChange={e => set('vendorId', e.target.value)} className={inputCls + ' cursor-pointer'}>
+            <option value="">No vendor linked</option>
+            {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className={labelCls}>Supplier note <span style={{ color: 'var(--rp-text-faint)' }}>(optional, free text)</span></label>
           <input value={form.supplier} onChange={e => set('supplier', e.target.value)} placeholder="Supplier name or contact" className={inputCls} />
         </div>
         <div className="flex gap-3 justify-end pt-2" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
@@ -293,11 +341,470 @@ function HistoryModal({ open, onClose, item }: {
   );
 }
 
+// ── Vendor Modal ──────────────────────────────────────────────────────────────
+function VendorModal({ open, onClose, loading, onSubmit, vendor }: {
+  open: boolean; onClose: () => void; loading: boolean;
+  onSubmit: (data: Record<string, unknown>) => void;
+  vendor?: Vendor | null;
+}) {
+  const [form, setForm] = useState({ name: '', contactName: '', phone: '', email: '', address: '', notes: '' });
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  useEffect(() => {
+    if (open) {
+      setForm({
+        name: vendor?.name ?? '', contactName: vendor?.contactName ?? '', phone: vendor?.phone ?? '',
+        email: vendor?.email ?? '', address: vendor?.address ?? '', notes: vendor?.notes ?? '',
+      });
+    }
+  }, [open, vendor]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name) { toast({ title: 'Vendor name is required', variant: 'destructive' }); return; }
+    onSubmit({ ...form, contactName: form.contactName || undefined, phone: form.phone || undefined, email: form.email || undefined, address: form.address || undefined, notes: form.notes || undefined });
+  };
+
+  return (
+    <ModalShell open={open} onClose={onClose} title={vendor ? 'Edit Vendor' : 'Add Vendor'}
+      description={vendor ? `Editing ${vendor.name}` : 'Add a supplier you order from'} maxWidth="520px"
+      footer={
+        <div className="flex gap-3 justify-end">
+          <button type="button" onClick={onClose}
+            className="rounded-[9px] border px-4 py-2 text-[13px] font-medium transition-colors hover:bg-[#f4f1eb]"
+            style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
+            Cancel
+          </button>
+          <button type="submit" form="vendor-form" disabled={loading}
+            className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium disabled:opacity-50"
+            style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+            {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {vendor ? 'Save Changes' : 'Add Vendor'}
+          </button>
+        </div>
+      }>
+      <form id="vendor-form" onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className={labelCls}>Vendor Name *</label>
+          <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Dhaka Linen Supplies" className={inputCls} />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelCls}>Contact Person</label>
+            <input value={form.contactName} onChange={e => set('contactName', e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Phone</label>
+            <input value={form.phone} onChange={e => set('phone', e.target.value)} className={inputCls} />
+          </div>
+        </div>
+        <div>
+          <label className={labelCls}>Email</label>
+          <input value={form.email} onChange={e => set('email', e.target.value)} type="email" className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Address</label>
+          <input value={form.address} onChange={e => set('address', e.target.value)} className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Notes</label>
+          <input value={form.notes} onChange={e => set('notes', e.target.value)} className={inputCls} />
+        </div>
+      </form>
+    </ModalShell>
+  );
+}
+
+// ── Create Purchase Order Modal ───────────────────────────────────────────────
+function CreatePOModal({ open, onClose, vendors, loading, onSubmit }: {
+  open: boolean; onClose: () => void; vendors: Vendor[]; loading: boolean;
+  onSubmit: (data: { vendorId: string; notes?: string; items: { inventoryItemId: string; quantityOrdered: number; unitCost: number }[] }) => void;
+}) {
+  const [vendorId, setVendorId] = useState('');
+  const [notes, setNotes]       = useState('');
+  const [lines, setLines]       = useState<Record<string, { qty: string; cost: string; checked: boolean }>>({});
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['inventory-low-stock-for-po'],
+    queryFn:  () => inventoryApi.list({ lowStock: 'true', limit: 100 }),
+    enabled:  open,
+  });
+  const lowStockItems: InventoryItem[] = data?.data?.data ?? [];
+
+  useEffect(() => {
+    if (open) {
+      setVendorId(''); setNotes('');
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (open && lowStockItems.length > 0) {
+      const initial: Record<string, { qty: string; cost: string; checked: boolean }> = {};
+      for (const item of lowStockItems) {
+        const suggested = Math.max(Number(item.minimumStock) * 2 - Number(item.currentStock), Number(item.minimumStock) || 1);
+        initial[item.id] = { qty: String(Math.ceil(suggested)), cost: String(item.unitCost), checked: false };
+      }
+      setLines(initial);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, data]);
+
+  const toggle = (id: string) => setLines(l => ({ ...l, [id]: { ...l[id], checked: !l[id].checked } }));
+  const setLine = (id: string, k: 'qty' | 'cost', v: string) => setLines(l => ({ ...l, [id]: { ...l[id], [k]: v } }));
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!vendorId) { toast({ title: 'Select a vendor', variant: 'destructive' }); return; }
+    const items = Object.entries(lines)
+      .filter(([, v]) => v.checked)
+      .map(([id, v]) => ({ inventoryItemId: id, quantityOrdered: parseFloat(v.qty) || 0, unitCost: parseFloat(v.cost) || 0 }))
+      .filter(i => i.quantityOrdered > 0);
+    if (items.length === 0) { toast({ title: 'Select at least one item', variant: 'destructive' }); return; }
+    onSubmit({ vendorId, notes: notes || undefined, items });
+  };
+
+  return (
+    <ModalShell open={open} onClose={onClose} title="Create Purchase Order"
+      description="Reorder from low-stock items" maxWidth="640px"
+      footer={
+        <div className="flex gap-3 justify-end">
+          <button type="button" onClick={onClose}
+            className="rounded-[9px] border px-4 py-2 text-[13px] font-medium transition-colors hover:bg-[#f4f1eb]"
+            style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
+            Cancel
+          </button>
+          <button type="submit" form="po-form" disabled={loading}
+            className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium disabled:opacity-50"
+            style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+            {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            Create Purchase Order
+          </button>
+        </div>
+      }>
+      <form id="po-form" onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className={labelCls}>Vendor *</label>
+          {vendors.length === 0 ? (
+            <p className="text-[12.5px]" style={{ color: 'var(--rp-text-muted)' }}>No vendors yet — add one in the Vendors tab first.</p>
+          ) : (
+            <select value={vendorId} onChange={e => setVendorId(e.target.value)} className={inputCls + ' cursor-pointer'}>
+              <option value="">Select vendor</option>
+              {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+            </select>
+          )}
+        </div>
+
+        <div>
+          <label className={labelCls}>Items to reorder</label>
+          {isLoading ? (
+            <div className="flex h-20 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin" style={{ color: '#9bbdb7' }} /></div>
+          ) : lowStockItems.length === 0 ? (
+            <p className="text-[12.5px]" style={{ color: 'var(--rp-text-muted)' }}>No items are currently below their minimum stock.</p>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {lowStockItems.map(item => {
+                const line = lines[item.id] ?? { qty: '0', cost: '0', checked: false };
+                return (
+                  <div key={item.id} className="flex items-center gap-3 rounded-[10px] border p-3" style={{ borderColor: 'var(--rp-border)' }}>
+                    <input type="checkbox" checked={line.checked} onChange={() => toggle(item.id)} className="h-4 w-4 cursor-pointer" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{item.name}</p>
+                      <p className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">Current: {item.currentStock} {item.unit} · Min: {item.minimumStock}</p>
+                    </div>
+                    <input value={line.qty} onChange={e => setLine(item.id, 'qty', e.target.value)} type="number" min="0" step="0.01"
+                      className="w-20 rounded-[7px] border border-black/5 bg-[#f4f1eb] px-2 py-1.5 text-[12.5px] text-center" placeholder="Qty" />
+                    <div className="relative w-24">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[12px]" style={{ color: '#9bbdb7' }}>$</span>
+                      <input value={line.cost} onChange={e => setLine(item.id, 'cost', e.target.value)} type="number" min="0" step="0.01"
+                        className="w-full rounded-[7px] border border-black/5 bg-[#f4f1eb] pl-5 pr-2 py-1.5 text-[12.5px]" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label className={labelCls}>Notes <span style={{ color: 'var(--rp-text-faint)' }}>(optional)</span></label>
+          <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Delivery instructions, etc." className={inputCls} />
+        </div>
+      </form>
+    </ModalShell>
+  );
+}
+
+// ── PO Detail / Receive Modal ─────────────────────────────────────────────────
+function PODetailModal({ open, onClose, poId, onSend, onCancel, onReceive, sending, cancelling, receiving }: {
+  open: boolean; onClose: () => void; poId: string | null;
+  onSend: (id: string) => void; onCancel: (id: string) => void;
+  onReceive: (id: string, items: { inventoryItemId: string; quantityReceived: number }[]) => void;
+  sending: boolean; cancelling: boolean; receiving: boolean;
+}) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['purchase-order', poId],
+    queryFn:  () => purchaseOrdersApi.get(poId!),
+    enabled:  open && !!poId,
+  });
+  const order = data?.data?.data;
+  const [receiveQty, setReceiveQty] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (order?.items) {
+      const init: Record<string, string> = {};
+      for (const line of order.items) init[line.inventoryItemId] = String(line.quantityOrdered);
+      setReceiveQty(init);
+    }
+  }, [order]);
+
+  const handleReceive = () => {
+    const items = Object.entries(receiveQty).map(([id, v]) => ({ inventoryItemId: id, quantityReceived: parseFloat(v) || 0 })).filter(i => i.quantityReceived > 0);
+    if (items.length === 0) { toast({ title: 'Enter received quantity for at least one item', variant: 'destructive' }); return; }
+    onReceive(poId!, items);
+  };
+
+  return (
+    <ModalShell open={open} onClose={onClose} title={order ? order.poNumber : 'Purchase Order'}
+      description={order ? `${order.vendor?.name ?? ''} — ${order.status}` : ''} maxWidth="600px"
+      footer={
+        <div className="flex gap-3 justify-end">
+          <button onClick={onClose}
+            className="rounded-[9px] border px-4 py-2 text-[13px] font-medium transition-colors hover:bg-[#f4f1eb]"
+            style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
+            Close
+          </button>
+          {order?.status === 'DRAFT' && (
+            <>
+              <button onClick={() => onCancel(order.id)} disabled={cancelling}
+                className="rounded-[9px] border px-4 py-2 text-[13px] font-medium disabled:opacity-50" style={{ borderColor: 'rgba(200,60,60,0.25)', color: '#c43c3c' }}>
+                Cancel Order
+              </button>
+              <button onClick={() => onSend(order.id)} disabled={sending}
+                className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium disabled:opacity-50"
+                style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+                {sending && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Mark as Sent
+              </button>
+            </>
+          )}
+          {order?.status === 'SENT' && (
+            <button onClick={handleReceive} disabled={receiving}
+              className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium disabled:opacity-50"
+              style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+              {receiving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Receive Stock
+            </button>
+          )}
+        </div>
+      }>
+      {isLoading || !order ? (
+        <div className="flex h-32 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" style={{ color: '#9bbdb7' }} /></div>
+      ) : (
+        <div className="space-y-3">
+          {order.notes && <p className="text-[12.5px] italic" style={{ color: 'var(--rp-text-muted)' }}>&ldquo;{order.notes}&rdquo;</p>}
+          {order.items.map((line: { id: string; inventoryItemId: string; quantityOrdered: number; quantityReceived: number; unitCost: number; inventoryItem: { name: string; unit: string } }) => (
+            <div key={line.id} className="flex items-center gap-3 rounded-[10px] border p-3" style={{ borderColor: 'var(--rp-border)' }}>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{line.inventoryItem.name}</p>
+                <p className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+                  Ordered: {line.quantityOrdered} {line.inventoryItem.unit} · {formatCurrency(line.unitCost)}/unit
+                  {line.quantityReceived > 0 && ` · Received: ${line.quantityReceived}`}
+                </p>
+              </div>
+              {order.status === 'SENT' && (
+                <input value={receiveQty[line.inventoryItemId] ?? ''} onChange={e => setReceiveQty(q => ({ ...q, [line.inventoryItemId]: e.target.value }))}
+                  type="number" min="0" step="0.01"
+                  className="w-24 rounded-[7px] border border-black/5 bg-[#f4f1eb] px-2 py-1.5 text-[12.5px] text-center" placeholder="Received" />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </ModalShell>
+  );
+}
+
+// ── Vendors Tab ────────────────────────────────────────────────────────────────
+function VendorsTab() {
+  const queryClient = useQueryClient();
+  const [addOpen, setAddOpen] = useState(false);
+  const [editVendor, setEditVendor] = useState<Vendor | null>(null);
+
+  const { data, isLoading } = useQuery({ queryKey: ['vendors'], queryFn: () => vendorsApi.list() });
+  const vendors: Vendor[] = data?.data?.data ?? [];
+
+  const createMutation = useMutation({
+    mutationFn: (d: unknown) => vendorsApi.create(d),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['vendors'] }); toast({ title: 'Vendor added' }); setAddOpen(false); },
+    onError: () => toast({ title: 'Error', description: 'Failed to add vendor', variant: 'destructive' }),
+  });
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: unknown }) => vendorsApi.update(id, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['vendors'] }); toast({ title: 'Vendor updated' }); setEditVendor(null); },
+    onError: () => toast({ title: 'Error', description: 'Failed to update vendor', variant: 'destructive' }),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <button onClick={() => setAddOpen(true)}
+          className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors hover:opacity-90"
+          style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+          <Plus className="h-4 w-4" /> Add Vendor
+        </button>
+      </div>
+      <div className="rounded-[14px] border bg-white overflow-hidden" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+        {isLoading ? (
+          <div className="h-32 animate-pulse" style={{ background: 'var(--rp-surface-2)' }} />
+        ) : vendors.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-2">
+            <Truck className="h-10 w-10" style={{ color: '#c5bdb4' }} />
+            <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">No vendors yet</p>
+            <p className="text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">Add a supplier to start creating purchase orders</p>
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr style={{ background: 'var(--rp-surface-2)' }}>
+                {['Vendor', 'Contact', 'Phone', 'Email', 'Items', 'POs', ''].map(h => (
+                  <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] dark:text-[#94b8b0]">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {vendors.map(v => (
+                <tr key={v.id} className="transition-colors hover:bg-[#faf9f7] dark:hover:bg-white/5" style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
+                  <td className="px-5 py-3.5 text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{v.name}</td>
+                  <td className="px-5 py-3.5 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{v.contactName ?? '—'}</td>
+                  <td className="px-5 py-3.5 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{v.phone ?? '—'}</td>
+                  <td className="px-5 py-3.5 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{v.email ?? '—'}</td>
+                  <td className="px-5 py-3.5 text-[13px] text-[#18231f] dark:text-[#dfd9d0]">{v._count?.items ?? 0}</td>
+                  <td className="px-5 py-3.5 text-[13px] text-[#18231f] dark:text-[#dfd9d0]">{v._count?.purchaseOrders ?? 0}</td>
+                  <td className="px-5 py-3.5">
+                    <button onClick={() => setEditVendor(v)} className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#e3f2ef]" style={{ color: '#9bbdb7' }}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      <VendorModal open={addOpen} onClose={() => setAddOpen(false)} loading={createMutation.isPending} onSubmit={d => createMutation.mutate(d)} />
+      <VendorModal open={!!editVendor} onClose={() => setEditVendor(null)} vendor={editVendor} loading={updateMutation.isPending}
+        onSubmit={d => editVendor && updateMutation.mutate({ id: editVendor.id, data: d })} />
+    </div>
+  );
+}
+
+// ── Purchase Orders Tab ───────────────────────────────────────────────────────
+function PurchaseOrdersTab() {
+  const queryClient = useQueryClient();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
+
+  const { data: vendorsData } = useQuery({ queryKey: ['vendors'], queryFn: () => vendorsApi.list() });
+  const vendors: Vendor[] = vendorsData?.data?.data ?? [];
+
+  const { data, isLoading } = useQuery({ queryKey: ['purchase-orders'], queryFn: () => purchaseOrdersApi.list() });
+  const orders: PurchaseOrder[] = data?.data?.data ?? [];
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+    queryClient.invalidateQueries({ queryKey: ['purchase-order', detailId] });
+    queryClient.invalidateQueries({ queryKey: ['inventory'] });
+    queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
+  };
+
+  const createMutation = useMutation({
+    mutationFn: (d: unknown) => purchaseOrdersApi.create(d),
+    onSuccess: () => { invalidate(); toast({ title: 'Purchase order created' }); setCreateOpen(false); },
+    onError: (err: { response?: { data?: { error?: string } } }) => toast({ title: 'Error', description: err?.response?.data?.error ?? 'Failed to create PO', variant: 'destructive' }),
+  });
+  const sendMutation = useMutation({
+    mutationFn: (id: string) => purchaseOrdersApi.send(id),
+    onSuccess: () => { invalidate(); toast({ title: 'Marked as sent' }); },
+  });
+  const cancelMutation = useMutation({
+    mutationFn: (id: string) => purchaseOrdersApi.cancel(id),
+    onSuccess: () => { invalidate(); toast({ title: 'Order cancelled' }); setDetailId(null); },
+  });
+  const receiveMutation = useMutation({
+    mutationFn: ({ id, items }: { id: string; items: { inventoryItemId: string; quantityReceived: number }[] }) => purchaseOrdersApi.receive(id, { items }),
+    onSuccess: () => { invalidate(); toast({ title: 'Stock updated' }); setDetailId(null); },
+    onError: () => toast({ title: 'Error', description: 'Failed to receive order', variant: 'destructive' }),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <button onClick={() => setCreateOpen(true)}
+          className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors hover:opacity-90"
+          style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+          <Plus className="h-4 w-4" /> Create PO
+        </button>
+      </div>
+      <div className="rounded-[14px] border bg-white overflow-hidden" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+        {isLoading ? (
+          <div className="h-32 animate-pulse" style={{ background: 'var(--rp-surface-2)' }} />
+        ) : orders.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-2">
+            <ClipboardList className="h-10 w-10" style={{ color: '#c5bdb4' }} />
+            <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">No purchase orders yet</p>
+            <p className="text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">Create one from your low-stock items</p>
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr style={{ background: 'var(--rp-surface-2)' }}>
+                {['PO Number', 'Vendor', 'Items', 'Total', 'Status', 'Created', ''].map(h => (
+                  <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] dark:text-[#94b8b0]">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map(o => {
+                const sm = PO_STATUS_META[o.status];
+                return (
+                  <tr key={o.id} className="transition-colors hover:bg-[#faf9f7] dark:hover:bg-white/5" style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
+                    <td className="px-5 py-3.5 text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{o.poNumber}</td>
+                    <td className="px-5 py-3.5 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{o.vendorName}</td>
+                    <td className="px-5 py-3.5 text-[13px] text-[#18231f] dark:text-[#dfd9d0]">{o.itemCount}</td>
+                    <td className="px-5 py-3.5 text-[13px] text-[#18231f] dark:text-[#dfd9d0]">{formatCurrency(o.totalCost)}</td>
+                    <td className="px-5 py-3.5">
+                      <span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: sm.bg, color: sm.text }}>{o.status}</span>
+                    </td>
+                    <td className="px-5 py-3.5 text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">{new Date(o.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
+                    <td className="px-5 py-3.5">
+                      <button onClick={() => setDetailId(o.id)}
+                        className="rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium transition-colors hover:bg-[#e3f2ef]"
+                        style={{ borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+      <CreatePOModal open={createOpen} onClose={() => setCreateOpen(false)} vendors={vendors} loading={createMutation.isPending}
+        onSubmit={d => createMutation.mutate(d)} />
+      <PODetailModal open={!!detailId} onClose={() => setDetailId(null)} poId={detailId}
+        onSend={id => sendMutation.mutate(id)} onCancel={id => cancelMutation.mutate(id)}
+        onReceive={(id, items) => receiveMutation.mutate({ id, items })}
+        sending={sendMutation.isPending} cancelling={cancelMutation.isPending} receiving={receiveMutation.isPending} />
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function InventoryPage() {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [tab, setTab] = useState<'items' | 'vendors' | 'purchase-orders'>('items');
   const [catFilter, setCatFilter]     = useState('');
   const [search, setSearch]           = useState('');
   const [page, setPage]               = useState(1);
@@ -321,6 +828,9 @@ export default function InventoryPage() {
     queryKey: ['inventory-stats'],
     queryFn:  () => inventoryApi.stats(),
   });
+
+  const { data: vendorsData } = useQuery({ queryKey: ['vendors'], queryFn: () => vendorsApi.list() });
+  const vendors: Vendor[] = vendorsData?.data?.data ?? [];
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['inventory'] });
@@ -346,6 +856,67 @@ export default function InventoryPage() {
     onError: () => toast({ title: 'Error', description: 'Failed to record movement', variant: 'destructive' }),
   });
 
+  const importMutation = useMutation({
+    mutationFn: (rows: unknown[]) => inventoryApi.importCsv(rows),
+    onSuccess: (res) => {
+      invalidate();
+      const { created, updated, errors } = res.data.data;
+      toast({ title: 'Import complete', description: `${created} added, ${updated} updated${errors.length ? `, ${errors.length} failed` : ''}` });
+    },
+    onError: () => toast({ title: 'Error', description: 'Failed to import CSV', variant: 'destructive' }),
+  });
+
+  const handleExport = async () => {
+    try {
+      const res = await inventoryApi.exportCsv();
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = 'inventory-export.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: 'Error', description: 'Failed to export CSV', variant: 'destructive' });
+    }
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result ?? '');
+      const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+      if (lines.length < 2) { toast({ title: 'CSV has no data rows', variant: 'destructive' }); return; }
+      const parseCsvLine = (line: string) => line.match(/(".*?"|[^,]+)(?=,|$)/g)?.map(v => v.replace(/^"|"$/g, '').replace(/""/g, '"').trim()) ?? [];
+      const headers = parseCsvLine(lines[0]).map(h => h.toLowerCase());
+      const idx = {
+        name: headers.findIndex(h => h.includes('name')),
+        category: headers.findIndex(h => h.includes('category')),
+        unit: headers.findIndex(h => h === 'unit'),
+        currentStock: headers.findIndex(h => h.includes('current')),
+        minimumStock: headers.findIndex(h => h.includes('minimum')),
+        unitCost: headers.findIndex(h => h.includes('cost')),
+        supplier: headers.findIndex(h => h.includes('supplier')),
+      };
+      if (idx.name === -1) { toast({ title: 'CSV must have a "Name" column', variant: 'destructive' }); return; }
+      const rows = lines.slice(1).map(l => {
+        const cols = parseCsvLine(l);
+        return {
+          name: cols[idx.name],
+          category: idx.category > -1 ? cols[idx.category]?.toUpperCase().replace(' ', '_') : undefined,
+          unit: idx.unit > -1 ? cols[idx.unit] : undefined,
+          currentStock: idx.currentStock > -1 ? parseFloat(cols[idx.currentStock]) : undefined,
+          minimumStock: idx.minimumStock > -1 ? parseFloat(cols[idx.minimumStock]) : undefined,
+          unitCost: idx.unitCost > -1 ? parseFloat(cols[idx.unitCost]) : undefined,
+          supplier: idx.supplier > -1 ? cols[idx.supplier] : undefined,
+        };
+      }).filter(r => r.name);
+      importMutation.mutate(rows);
+    };
+    reader.readAsText(file);
+  };
+
   const items: InventoryItem[] = data?.data?.data ?? [];
   const pagination              = data?.data?.pagination;
   const stats                   = statsData?.data?.data ?? { total: 0, lowStockCount: 0, totalValue: 0 };
@@ -360,193 +931,241 @@ export default function InventoryPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Inventory</h1>
-          <p className="mt-[4px] text-[13px] text-[#7a9890]">Track stock levels and movements</p>
+          <p className="mt-[4px] text-[13px] text-[#7a9890]">Track stock levels, vendors, and purchase orders</p>
         </div>
-        <button onClick={() => setAddOpen(true)}
-          className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors hover:opacity-90"
-          style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
-          <Plus className="h-4 w-4" /> Add Item
-        </button>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: 'Total Items',  value: totalItems,                Icon: Package,       iconBg: 'var(--rp-teal-bg)', iconColor: '#23766a' },
-          { label: 'Low Stock',    value: lowStockCount,             Icon: AlertTriangle, iconBg: lowStockCount > 0 ? 'var(--rp-red-bg)' : 'var(--rp-teal-bg)', iconColor: lowStockCount > 0 ? '#c43c3c' : '#23766a' },
-          { label: 'Stock Value',  value: formatCurrency(totalValue), Icon: TrendingUp,   iconBg: 'var(--rp-amber-bg)', iconColor: '#b89040' },
-        ].map(({ label, value, Icon, iconBg, iconColor }) => (
-          <div key={label} className="rounded-[14px] border bg-white p-4"
-            style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
-            <div className="flex items-center gap-2.5 mb-3">
-              <div className="flex h-[36px] w-[36px] items-center justify-center rounded-[9px]"
-                style={{ background: iconBg }}>
-                <Icon className="h-[16px] w-[16px]" style={{ color: iconColor }} />
-              </div>
-              <p className="text-[12.5px] font-medium text-[#8aa29a] dark:text-[#94b8b0]">{label}</p>
-            </div>
-            <p className="text-[26px] font-semibold leading-none text-[#18231f] dark:text-[#dfd9d0]">{value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center flex-wrap">
-        <div className="relative max-w-sm flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: '#9bbdb7' }} />
-          <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Search items or supplier…"
-            className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-[9px] pl-9 pr-3 text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30" />
-        </div>
-        <button onClick={() => { setLowStockOnly(v => !v); setPage(1); }}
-          className="flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12px] font-medium transition-colors"
-          style={lowStockOnly
-            ? { background: 'var(--rp-red-bg)', borderColor: 'rgba(200,60,60,0.25)', color: '#c43c3c' }
-            : { background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border)', color: 'var(--rp-text-subtle)' }}>
-          <AlertTriangle className="h-3.5 w-3.5" /> Low Stock Only
-        </button>
-        <div className="flex gap-2 flex-wrap">
-          {CATEGORIES.map(c => (
-            <button key={c || 'all'} onClick={() => { setCatFilter(c); setPage(1); }}
-              className="rounded-[8px] border px-3 py-1.5 text-[12px] font-medium transition-colors"
-              style={catFilter === c
-                ? { background: 'var(--rp-btn-accent)', borderColor: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }
-                : { background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border)', color: 'var(--rp-text-subtle)' }}>
-              {c ? c.replace('_', ' ') : 'All'}
+        {tab === 'items' && (
+          <div className="flex items-center gap-2">
+            <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleImportFile} />
+            <button onClick={() => fileInputRef.current?.click()} disabled={importMutation.isPending}
+              className="flex items-center gap-2 rounded-[9px] border px-3 py-2 text-[13px] font-medium transition-colors hover:bg-[#f4f1eb] disabled:opacity-50"
+              style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
+              {importMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Import CSV
             </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="rounded-[14px] border bg-white overflow-hidden"
-        style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
-        {isLoading ? (
-          <div className="space-y-px">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-[72px] animate-pulse" style={{ background: i % 2 === 0 ? 'var(--rp-surface-2)' : 'var(--rp-surface)' }} />
-            ))}
-          </div>
-        ) : items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'var(--rp-teal-bg)' }}>
-              <Package className="h-7 w-7" style={{ color: '#23766a' }} />
-            </div>
-            <p className="text-[13.5px] font-medium text-[#18231f] dark:text-[#dfd9d0]">
-              {search || catFilter || lowStockOnly ? 'No items found' : 'No inventory yet'}
-            </p>
-            <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">
-              {search || catFilter ? 'Try adjusting filters' : 'Add your first inventory item'}
-            </p>
-            {!search && !catFilter && !lowStockOnly && (
-              <button onClick={() => setAddOpen(true)}
-                className="flex items-center gap-2 mt-1 rounded-[9px] px-4 py-2 text-[13px] font-medium"
-                style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
-                <Plus className="h-4 w-4" /> Add Item
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr style={{ background: 'var(--rp-surface-2)', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                  {['Item', 'Category', 'Stock', 'Unit Cost', 'Total Value', 'Supplier', 'Actions'].map(h => (
-                    <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] dark:text-[#94b8b0]">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {items.map(item => {
-                  const isLow  = Number(item.currentStock) <= Number(item.minimumStock);
-                  const cm     = CAT_META[item.category] ?? CAT_META.OTHER;
-                  return (
-                    <tr key={item.id} className="transition-colors hover:bg-[#faf9f7] dark:hover:bg-white/5 dark:hover:bg-white/5"
-                      style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px]"
-                            style={{ background: isLow ? 'var(--rp-red-bg)' : 'var(--rp-teal-bg)' }}>
-                            <Package className="h-4 w-4" style={{ color: isLow ? '#c43c3c' : '#23766a' }} />
-                          </div>
-                          <div>
-                            <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{item.name}</p>
-                            {isLow && (
-                              <p className="text-[11.5px] flex items-center gap-0.5" style={{ color: '#c43c3c' }}>
-                                <AlertTriangle className="h-3 w-3" /> Low stock
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className="rounded-[7px] border px-[9px] py-[3px] text-[11.5px] font-semibold"
-                          style={{ background: cm.bg, borderColor: cm.border, color: cm.text }}>
-                          {item.category.replace('_', ' ')}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        <p className="text-[13px] font-semibold" style={{ color: isLow ? '#c43c3c' : isDark ? '#dfd9d0' : 'var(--rp-text)' }}>
-                          {item.currentStock} {item.unit}
-                        </p>
-                        <p className="text-[11.5px] text-[#c5bdb4] dark:text-[#6e8580]">Min: {item.minimumStock}</p>
-                      </td>
-                      <td className="px-5 py-4 text-[13px] text-[#4a6e66] dark:text-[#6d9990]">{formatCurrency(Number(item.unitCost))}</td>
-                      <td className="px-5 py-4 text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">
-                        {formatCurrency(Number(item.currentStock) * Number(item.unitCost))}
-                      </td>
-                      <td className="px-5 py-4 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{item.supplier ?? '—'}</td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => setMovementItem(item)}
-                            className="flex items-center gap-1 rounded-[7px] border px-2 py-1 text-[11.5px] font-medium transition-colors hover:bg-[#e3f2ef]"
-                            style={{ borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
-                            <ArrowUpDown className="h-3 w-3" /> Stock
-                          </button>
-                          <button onClick={() => setHistoryItem(item)}
-                            className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#f4ecda] text-[#c5bdb4] dark:text-[#6e8580]" title="View history">
-                            <History className="h-3.5 w-3.5" />
-                          </button>
-                          <button onClick={() => setEditItem(item)}
-                            className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#e3f2ef]"
-                            style={{ color: '#9bbdb7' }}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <button onClick={handleExport}
+              className="flex items-center gap-2 rounded-[9px] border px-3 py-2 text-[13px] font-medium transition-colors hover:bg-[#f4f1eb]"
+              style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
+              <Download className="h-4 w-4" /> Export CSV
+            </button>
+            <button onClick={() => setAddOpen(true)}
+              className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors hover:opacity-90"
+              style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+              <Plus className="h-4 w-4" /> Add Item
+            </button>
           </div>
         )}
       </div>
 
-      {/* Pagination */}
-      {pagination && pagination.totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">
-            Showing {(page - 1) * 30 + 1}–{Math.min(page * 30, pagination.total)} of {pagination.total}
-          </p>
-          <div className="flex gap-2">
-            <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
-              className="flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12.5px] font-medium transition-colors hover:bg-[#f4f1eb] disabled:opacity-40"
-              style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
-              <ChevronLeft className="h-4 w-4" /> Previous
-            </button>
-            <button disabled={page === pagination.totalPages} onClick={() => setPage(p => p + 1)}
-              className="flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12.5px] font-medium transition-colors hover:bg-[#f4f1eb] disabled:opacity-40"
-              style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
-              Next <ChevronRight className="h-4 w-4" />
-            </button>
+      {/* Tabs */}
+      <div className="flex gap-1 rounded-[10px] p-1 w-fit" style={{ background: 'var(--rp-surface-3)' }}>
+        {([
+          { key: 'items', label: 'Items' },
+          { key: 'vendors', label: 'Vendors' },
+          { key: 'purchase-orders', label: 'Purchase Orders' },
+        ] as const).map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)}
+            className="rounded-[8px] px-4 py-1.5 text-[13px] font-medium transition-colors"
+            style={tab === t.key
+              ? { background: 'var(--rp-surface)', color: 'var(--rp-text)', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }
+              : { color: 'var(--rp-text-muted)' }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'vendors' ? <VendorsTab /> : tab === 'purchase-orders' ? <PurchaseOrdersTab /> : (
+        <>
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { label: 'Total Items',  value: totalItems,                Icon: Package,       iconBg: 'var(--rp-teal-bg)', iconColor: '#23766a' },
+              { label: 'Low Stock',    value: lowStockCount,             Icon: AlertTriangle, iconBg: lowStockCount > 0 ? 'var(--rp-red-bg)' : 'var(--rp-teal-bg)', iconColor: lowStockCount > 0 ? '#c43c3c' : '#23766a' },
+              { label: 'Stock Value',  value: formatCurrency(totalValue), Icon: TrendingUp,   iconBg: 'var(--rp-amber-bg)', iconColor: '#b89040' },
+            ].map(({ label, value, Icon, iconBg, iconColor }) => (
+              <div key={label} className="rounded-[14px] border bg-white p-4"
+                style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+                <div className="flex items-center gap-2.5 mb-3">
+                  <div className="flex h-[36px] w-[36px] items-center justify-center rounded-[9px]"
+                    style={{ background: iconBg }}>
+                    <Icon className="h-[16px] w-[16px]" style={{ color: iconColor }} />
+                  </div>
+                  <p className="text-[12.5px] font-medium text-[#8aa29a] dark:text-[#94b8b0]">{label}</p>
+                </div>
+                <p className="text-[26px] font-semibold leading-none text-[#18231f] dark:text-[#dfd9d0]">{value}</p>
+              </div>
+            ))}
           </div>
-        </div>
+
+          {/* Filters */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center flex-wrap">
+            <div className="relative max-w-sm flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: '#9bbdb7' }} />
+              <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Search items or supplier…"
+                className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-[9px] pl-9 pr-3 text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30" />
+            </div>
+            <button onClick={() => { setLowStockOnly(v => !v); setPage(1); }}
+              className="flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12px] font-medium transition-colors"
+              style={lowStockOnly
+                ? { background: 'var(--rp-red-bg)', borderColor: 'rgba(200,60,60,0.25)', color: '#c43c3c' }
+                : { background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border)', color: 'var(--rp-text-subtle)' }}>
+              <AlertTriangle className="h-3.5 w-3.5" /> Low Stock Only
+            </button>
+            {lowStockOnly && lowStockCount > 0 && (
+              <button onClick={() => setTab('purchase-orders')}
+                className="flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12px] font-medium transition-colors hover:opacity-90"
+                style={{ background: 'var(--rp-btn-accent)', borderColor: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+                <ClipboardList className="h-3.5 w-3.5" /> Create PO
+              </button>
+            )}
+            <div className="flex gap-2 flex-wrap">
+              {CATEGORIES.map(c => (
+                <button key={c || 'all'} onClick={() => { setCatFilter(c); setPage(1); }}
+                  className="rounded-[8px] border px-3 py-1.5 text-[12px] font-medium transition-colors"
+                  style={catFilter === c
+                    ? { background: 'var(--rp-btn-accent)', borderColor: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }
+                    : { background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border)', color: 'var(--rp-text-subtle)' }}>
+                  {c ? c.replace('_', ' ') : 'All'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="rounded-[14px] border bg-white overflow-hidden"
+            style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+            {isLoading ? (
+              <div className="space-y-px">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="h-[72px] animate-pulse" style={{ background: i % 2 === 0 ? 'var(--rp-surface-2)' : 'var(--rp-surface)' }} />
+                ))}
+              </div>
+            ) : items.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-3">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'var(--rp-teal-bg)' }}>
+                  <Package className="h-7 w-7" style={{ color: '#23766a' }} />
+                </div>
+                <p className="text-[13.5px] font-medium text-[#18231f] dark:text-[#dfd9d0]">
+                  {search || catFilter || lowStockOnly ? 'No items found' : 'No inventory yet'}
+                </p>
+                <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+                  {search || catFilter ? 'Try adjusting filters' : 'Add your first inventory item'}
+                </p>
+                {!search && !catFilter && !lowStockOnly && (
+                  <button onClick={() => setAddOpen(true)}
+                    className="flex items-center gap-2 mt-1 rounded-[9px] px-4 py-2 text-[13px] font-medium"
+                    style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+                    <Plus className="h-4 w-4" /> Add Item
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr style={{ background: 'var(--rp-surface-2)', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                      {['Item', 'Category', 'Stock', 'Unit Cost', 'Total Value', 'Vendor', 'Actions'].map(h => (
+                        <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] dark:text-[#94b8b0]">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map(item => {
+                      const isLow  = Number(item.currentStock) <= Number(item.minimumStock);
+                      const cm     = CAT_META[item.category] ?? CAT_META.OTHER;
+                      return (
+                        <tr key={item.id} className="transition-colors hover:bg-[#faf9f7] dark:hover:bg-white/5"
+                          style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-2.5">
+                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px]"
+                                style={{ background: isLow ? 'var(--rp-red-bg)' : 'var(--rp-teal-bg)' }}>
+                                <Package className="h-4 w-4" style={{ color: isLow ? '#c43c3c' : '#23766a' }} />
+                              </div>
+                              <div>
+                                <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{item.name}</p>
+                                {isLow && (
+                                  <p className="text-[11.5px] flex items-center gap-0.5" style={{ color: '#c43c3c' }}>
+                                    <AlertTriangle className="h-3 w-3" /> Low stock
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-5 py-4">
+                            <span className="rounded-[7px] border px-[9px] py-[3px] text-[11.5px] font-semibold"
+                              style={{ background: cm.bg, borderColor: cm.border, color: cm.text }}>
+                              {item.category.replace('_', ' ')}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4">
+                            <p className="text-[13px] font-semibold" style={{ color: isLow ? '#c43c3c' : isDark ? '#dfd9d0' : 'var(--rp-text)' }}>
+                              {item.currentStock} {item.unit}
+                            </p>
+                            <p className="text-[11.5px] text-[#c5bdb4] dark:text-[#6e8580]">Min: {item.minimumStock}</p>
+                            {item.daysUntilStockout !== null && item.daysUntilStockout !== undefined && (
+                              <p className="text-[11px]" style={{ color: item.daysUntilStockout <= 7 ? '#c43c3c' : '#8aa29a' }}>
+                                ~{item.daysUntilStockout} days left
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 text-[13px] text-[#4a6e66] dark:text-[#6d9990]">{formatCurrency(Number(item.unitCost))}</td>
+                          <td className="px-5 py-4 text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">
+                            {formatCurrency(Number(item.currentStock) * Number(item.unitCost))}
+                          </td>
+                          <td className="px-5 py-4 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{item.vendor?.name ?? item.supplier ?? '—'}</td>
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => setMovementItem(item)}
+                                className="flex items-center gap-1 rounded-[7px] border px-2 py-1 text-[11.5px] font-medium transition-colors hover:bg-[#e3f2ef]"
+                                style={{ borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                                <ArrowUpDown className="h-3 w-3" /> Stock
+                              </button>
+                              <button onClick={() => setHistoryItem(item)}
+                                className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#f4ecda] text-[#c5bdb4] dark:text-[#6e8580]" title="View history">
+                                <History className="h-3.5 w-3.5" />
+                              </button>
+                              <button onClick={() => setEditItem(item)}
+                                className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#e3f2ef]"
+                                style={{ color: '#9bbdb7' }}>
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Pagination */}
+          {pagination && pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+                Showing {(page - 1) * 30 + 1}–{Math.min(page * 30, pagination.total)} of {pagination.total}
+              </p>
+              <div className="flex gap-2">
+                <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
+                  className="flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12.5px] font-medium transition-colors hover:bg-[#f4f1eb] disabled:opacity-40"
+                  style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
+                  <ChevronLeft className="h-4 w-4" /> Previous
+                </button>
+                <button disabled={page === pagination.totalPages} onClick={() => setPage(p => p + 1)}
+                  className="flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12.5px] font-medium transition-colors hover:bg-[#f4f1eb] disabled:opacity-40"
+                  style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
+                  Next <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
-      <ItemModal open={addOpen} onClose={() => setAddOpen(false)} loading={createMutation.isPending} onSubmit={d => createMutation.mutate(d)} />
-      <ItemModal open={!!editItem} onClose={() => setEditItem(null)} item={editItem} loading={updateMutation.isPending}
+      <ItemModal open={addOpen} onClose={() => setAddOpen(false)} loading={createMutation.isPending} onSubmit={d => createMutation.mutate(d)} vendors={vendors} />
+      <ItemModal open={!!editItem} onClose={() => setEditItem(null)} item={editItem} loading={updateMutation.isPending} vendors={vendors}
         onSubmit={d => editItem && updateMutation.mutate({ id: editItem.id, data: d })} />
       <MovementModal open={!!movementItem} onClose={() => setMovementItem(null)} item={movementItem} loading={movementMutation.isPending}
         onSubmit={d => movementItem && movementMutation.mutate({ id: movementItem.id, data: d })} />

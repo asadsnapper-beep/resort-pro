@@ -27,7 +27,7 @@ plan/
 | [maintenance.md](./maintenance.md) | Issue reporting, assignment, OOO room management | ✅ Built |
 | [roles-permissions.md](./roles-permissions.md) | 7-role permission system, access matrix | 🟡 Partial — `/dashboard/roles` আছে, কিন্তু Staff page-এ merge করার plan (see [foundation/part-14](./foundation/part-14-staff-roles-merge.md)) হয়নি, ২টা আলাদা page-ই আছে |
 | [staff-management.md](./staff-management.md) | Staff directory, shift scheduling, department management | ✅ Built |
-| [shareholder-portal.md](./shareholder-portal.md) | Shareholder ownership %, payout tracking, self-service investor view, monthly auto-report | ❌ Not built — SHAREHOLDER role exists but is treated as generic staff invite, no %/payout/report data anywhere |
+| [shareholder-portal.md](./shareholder-portal.md) | Shareholder ownership %, payout tracking, self-service investor view, monthly auto-report | ✅ Built |
 
 ---
 
@@ -110,6 +110,8 @@ plan/
 |------|---------|--------|
 | [custom-room-types.md](./custom-room-types.md) | Custom/flexible room type definitions | — (not yet audited in detail) |
 | [security-plan.md](./security-plan.md) | Security hardening plan | — (not yet audited in detail) |
+| [inventory.md](./inventory.md) | Stock items, categories, IN/OUT/ADJUSTMENT movements, low-stock filter | ✅ Built |
+| [inventory-vendor-po.md](./inventory-vendor-po.md) | Vendor management, purchase orders (draft→sent→received), 30-day demand tracking, low-stock notification bell, CSV import/export | ✅ Built |
 
 ---
 

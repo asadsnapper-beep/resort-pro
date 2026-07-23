@@ -438,6 +438,8 @@ model Tenant {
   foodOrders             FoodOrder[]
   inventoryItems         InventoryItem[]
   inventoryMovements     InventoryMovement[]
+  vendors                Vendor[]
+  purchaseOrders         PurchaseOrder[]
   supportTickets         SupportTicket[]
   amenities              Amenity[]
   websiteContent         WebsiteContent?
@@ -1493,13 +1495,17 @@ model InventoryItem {
   minimumStock Decimal           @db.Decimal(10, 2)
   unitCost     Decimal           @db.Decimal(10, 2)
   supplier     String?
+  vendorId     String?
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
-  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  movements InventoryMovement[]
+  tenant           Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vendor           Vendor?              @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  movements        InventoryMovement[]
+  purchaseOrderItems PurchaseOrderItem[]
 
   @@index([tenantId])
+  @@index([vendorId])
   @@map("inventory_items")
 }
 
@@ -1518,6 +1524,62 @@ model InventoryMovement {
   @@index([tenantId])
   @@index([inventoryItemId])
   @@map("inventory_movements")
+}
+
+model Vendor {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  contactName String?
+  phone       String?
+  email       String?
+  address     String?
+  notes       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items          InventoryItem[]
+  purchaseOrders PurchaseOrder[]
+
+  @@index([tenantId])
+  @@map("vendors")
+}
+
+model PurchaseOrder {
+  id         String    @id @default(uuid())
+  tenantId   String
+  vendorId   String
+  poNumber   String    @unique
+  status     String    @default("DRAFT") // DRAFT | SENT | RECEIVED | CANCELLED
+  notes      String?
+  sentAt     DateTime?
+  receivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  tenant Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vendor Vendor              @relation(fields: [vendorId], references: [id])
+  items  PurchaseOrderItem[]
+
+  @@index([tenantId])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id               String @id @default(uuid())
+  purchaseOrderId  String
+  inventoryItemId  String
+  quantityOrdered  Float
+  quantityReceived Float  @default(0)
+  unitCost         Float
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+
+  @@index([purchaseOrderId])
+  @@map("purchase_order_items")
 }
 
 // ─── Support ──────────────────────────────────────────────────────────────────
