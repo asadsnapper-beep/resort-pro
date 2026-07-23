@@ -103,6 +103,7 @@ const createBookingSchema = z.object({
   guestLastName: z.string().optional(),
   guestEmail: z.string().email().optional(),
   guestPhone: z.string().optional(),
+  corporateAccountId: z.string().uuid().optional(), // bill to company instead of guest
 });
 
 export async function bookingRoutes(app: FastifyInstance) {
@@ -392,6 +393,7 @@ export async function bookingRoutes(app: FastifyInstance) {
               status: body.autoCheckIn ? 'CHECKED_IN' : 'CONFIRMED',
               source: body.source,
               actualCheckIn: body.autoCheckIn ? now : undefined,
+              corporateAccountId: body.corporateAccountId,
             },
             include: {
               guest: { select: { firstName: true, lastName: true, email: true } },

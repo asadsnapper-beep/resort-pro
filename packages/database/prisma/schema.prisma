@@ -493,6 +493,8 @@ model Tenant {
   investorReports        InvestorReport[]
   venues                 Venue[]
   venueBookings          VenueBooking[]
+  corporateAccounts      CorporateAccount[]
+  corporateInvoices      CorporateInvoice[]
 
   @@map("tenants")
 }
@@ -730,6 +732,9 @@ model Booking {
   loyaltyPointsAwarded  Boolean       @default(false)
   // Group booking
   groupId               String?
+  // Corporate account (bill to company instead of guest)
+  corporateAccountId    String?
+  corporateInvoiceId    String? // set once included in a generated invoice
   // Stripe guest payment
   stripePaymentIntentId String?
   stripePaymentLinkId   String?
@@ -753,17 +758,19 @@ model Booking {
   updatedAt             DateTime      @updatedAt
 
   // Relations
-  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  room            Room             @relation(fields: [roomId], references: [id])
-  guest           Guest            @relation(fields: [guestId], references: [id])
-  group           GroupBooking?    @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  payments        Payment[]
-  foodOrders      FoodOrder[]
-  supportTickets  SupportTicket[]
-  invoiceExtras   InvoiceExtra[]
-  bookingPackages BookingPackage[]
-  bookingOffers   BookingOffer[]
-  invoice         Invoice?
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  room             Room              @relation(fields: [roomId], references: [id])
+  guest            Guest             @relation(fields: [guestId], references: [id])
+  group            GroupBooking?     @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  corporateAccount CorporateAccount? @relation(fields: [corporateAccountId], references: [id], onDelete: SetNull)
+  corporateInvoice CorporateInvoice? @relation(fields: [corporateInvoiceId], references: [id], onDelete: SetNull)
+  payments         Payment[]
+  foodOrders       FoodOrder[]
+  supportTickets   SupportTicket[]
+  invoiceExtras    InvoiceExtra[]
+  bookingPackages  BookingPackage[]
+  bookingOffers    BookingOffer[]
+  invoice          Invoice?
 
   @@index([tenantId])
   @@index([checkIn, checkOut])
@@ -2492,4 +2499,62 @@ model VenueBooking {
   @@index([tenantId])
   @@index([venueId, date])
   @@map("venue_bookings")
+}
+
+// ─── Corporate Accounts (see plan/corporate-accounts.md) ──────────────────────
+model CorporateAccount {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  companyName    String
+  billingAddress String?
+  taxId          String?
+  contactName    String
+  contactEmail   String
+  contactPhone   String
+
+  paymentTermDays Int    @default(30)
+  discountPercent Float  @default(0)
+  creditLimit     Float?
+
+  isActive Boolean @default(true)
+  notes    String?
+
+  bookings Booking[]
+  invoices CorporateInvoice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("corporate_accounts")
+}
+
+model CorporateInvoice {
+  id                 String           @id @default(uuid())
+  tenantId           String
+  tenant             Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  corporateAccountId String
+  corporateAccount   CorporateAccount @relation(fields: [corporateAccountId], references: [id], onDelete: Cascade)
+
+  invoiceNumber String    @unique // "CORP-2026-0001"
+  bookings      Booking[]
+
+  subtotal       Float
+  discountAmount Float @default(0)
+  totalAmount    Float
+  paidAmount     Float @default(0)
+
+  status  String    @default("DRAFT") // DRAFT | SENT | PARTIAL | PAID | OVERDUE
+  dueDate DateTime
+  sentAt  DateTime?
+  paidAt  DateTime?
+  notes   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("corporate_invoices")
 }

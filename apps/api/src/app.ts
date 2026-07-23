@@ -21,6 +21,7 @@ import { guestRoutes } from './routes/guests';
 import { staffRoutes } from './routes/staff';
 import { shareholderRoutes } from './routes/shareholders';
 import { venueRoutes } from './routes/venues';
+import { corporateAccountRoutes } from './routes/corporateAccounts';
 import { housekeepingRoutes } from './routes/housekeeping';
 import { menuRoutes } from './routes/menu';
 import { foodOrderRoutes } from './routes/foodOrders';
@@ -208,6 +209,7 @@ export async function buildApp() {
   await app.register(staffRoutes, { prefix: '/api/staff' });
   await app.register(shareholderRoutes, { prefix: '/api/shareholders' });
   await app.register(venueRoutes, { prefix: '/api/venues' });
+  await app.register(corporateAccountRoutes, { prefix: '/api/corporate-accounts' });
   await app.register(housekeepingRoutes, { prefix: '/api/housekeeping' });
   await app.register(menuRoutes, { prefix: '/api/menu' });
   await app.register(foodOrderRoutes, { prefix: '/api/food-orders' });

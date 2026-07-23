@@ -171,6 +171,19 @@ export const venuesApi = {
   updateBooking:   (id: string, data: unknown) => api.patch(`/venues/bookings/${id}`, data),
 };
 
+// ── Corporate Accounts ────────────────────────────────────────────────────────
+export const corporateAccountsApi = {
+  list:            () => api.get('/corporate-accounts'),
+  active:          () => api.get('/corporate-accounts/active'),
+  create:          (data: unknown) => api.post('/corporate-accounts', data),
+  update:          (id: string, data: unknown) => api.patch(`/corporate-accounts/${id}`, data),
+  remove:          (id: string) => api.delete(`/corporate-accounts/${id}`),
+  bookings:        (id: string) => api.get(`/corporate-accounts/${id}/bookings`),
+  invoices:        (id: string) => api.get(`/corporate-accounts/${id}/invoices`),
+  generateInvoice: (id: string, bookingIds: string[]) => api.post(`/corporate-accounts/${id}/invoices`, { bookingIds }),
+  updateInvoice:   (id: string, data: { status?: string; paidAmount?: number }) => api.patch(`/corporate-accounts/invoices/${id}`, data),
+};
+
 // ── Housekeeping ──────────────────────────────────────────────────────────────
 export const housekeepingApi = {
   list:         (params?: Record<string, unknown>) => api.get('/housekeeping', { params }),
