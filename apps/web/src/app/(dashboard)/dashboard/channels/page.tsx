@@ -388,7 +388,7 @@ export default function ChannelsPage() {
   const errored         = calendars.filter(c => c.lastError).length;
 
   return (
-    <div className="max-w-3xl space-y-6 animate-fade-up">
+    <div className="space-y-6 animate-fade-up">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

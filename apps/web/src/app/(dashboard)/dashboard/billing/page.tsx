@@ -226,7 +226,7 @@ export default function BillingPage() {
   const currentPlan = billing?.plan || 'FREE';
 
   return (
-    <div className="max-w-5xl space-y-8 animate-fade-up">
+    <div className="space-y-8 animate-fade-up">
       {/* Header */}
       <div>
         <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f] dark:text-[#dfd9d0]">
