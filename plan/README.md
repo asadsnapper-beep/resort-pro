@@ -38,6 +38,7 @@ plan/
 | [offers-promotions.md](./offers-promotions.md) | Offer creation, promo codes, website display, booking form integration | ✅ Built |
 | [dynamic-pricing.md](./dynamic-pricing.md) | Seasonal rules, occupancy-based, day-of-week, advance/last-minute pricing | ❌ Not built — কোনো PricingRule model/seasonal logic নাই |
 | [online-payment.md](./online-payment.md) | Stripe + bKash payment integration | ✅ Built — Stripe + bKash + SSLCommerz সব real |
+| [corporate-accounts.md](./corporate-accounts.md) | Company/B2B client accounts — consolidated billing, credit terms, corporate rates (separate from one-off Group Bookings) | ❌ Not built — planned |
 | [reporting-analytics.md](./reporting-analytics.md) | Revenue, occupancy, room performance, guest analytics, scheduled email reports | ✅ Built |
 
 ---
