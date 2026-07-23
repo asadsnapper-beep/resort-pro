@@ -27,6 +27,8 @@ const baseSchema = z.object({
   position:   z.string().min(1, 'Position required'),
   phone:      z.string().optional(),
   hireDate:   z.string().min(1, 'Hire date required'),
+  shiftStartTime: z.string().optional(),
+  deviceUserId:   z.string().optional(),
 });
 
 const editSchema = baseSchema;
@@ -48,6 +50,8 @@ interface Staff {
   position: string;
   phone?: string;
   hireDate: string;
+  shiftStartTime?: string;
+  deviceUserId?: string;
   user: { firstName: string; lastName: string; email: string };
 }
 
@@ -98,10 +102,12 @@ export function StaffModal({ open, onClose, onSubmit, loading, staff }: Props) {
           position:   staff.position,
           phone:      staff.phone ?? '',
           hireDate:   staff.hireDate?.split('T')[0] ?? '',
+          shiftStartTime: staff.shiftStartTime ?? '',
+          deviceUserId:   staff.deviceUserId ?? '',
         });
         setGiveAccess(false);
       } else {
-        reset({ firstName: '', lastName: '', department: undefined, position: '', phone: '', hireDate: '', email: '', role: 'RECEPTIONIST' });
+        reset({ firstName: '', lastName: '', department: undefined, position: '', phone: '', hireDate: '', shiftStartTime: '', deviceUserId: '', email: '', role: 'RECEPTIONIST' });
         setGiveAccess(false);
         setSelectedRole('RECEPTIONIST');
       }
@@ -186,6 +192,20 @@ export function StaffModal({ open, onClose, onSubmit, loading, staff }: Props) {
             <label className={labelCls}>Hire Date</label>
             <input {...register('hireDate')} type="date" className={inputCls} />
             {errors.hireDate && <p className={errCls}>{errors.hireDate.message}</p>}
+          </div>
+        </div>
+
+        {/* Attendance settings */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelCls}>Shift Start Time <span style={{ color: 'var(--rp-text-faint)' }}>(optional)</span></label>
+            <input {...register('shiftStartTime')} type="time" className={inputCls} />
+            <p className="mt-1 text-[11px]" style={{ color: 'var(--rp-text-faint)' }}>Used to mark clock-ins Late</p>
+          </div>
+          <div>
+            <label className={labelCls}>Fingerprint Device ID <span style={{ color: 'var(--rp-text-faint)' }}>(optional)</span></label>
+            <input {...register('deviceUserId')} placeholder="e.g. 1024" className={inputCls} />
+            <p className="mt-1 text-[11px]" style={{ color: 'var(--rp-text-faint)' }}>ID configured on the attendance device</p>
           </div>
         </div>
 

@@ -85,4 +85,19 @@ contextBridge.exposeInMainWorld('resortpro', {
   // Remove saved credentials (disable biometric login)
   clearCredentials: (): Promise<{ success: boolean }> =>
     ipcRenderer.invoke('clear-credentials'),
+
+  // ── Fingerprint attendance device ────────────────────────────────────────
+
+  // Current device config, or null if not set up yet
+  getAttendanceDeviceConfig: (): Promise<{ ip: string; port: number; device_key: string; api_base: string; poll_interval_ms: number; last_synced_at: string | null } | null> =>
+    ipcRenderer.invoke('get-attendance-device-config'),
+
+  // Save device IP/port + tenant device key (from Staff → Attendance → Device Setup in the web app)
+  // and (re)start the poll loop
+  saveAttendanceDeviceConfig: (config: { ip: string; port: number; deviceKey: string; apiBase: string; pollIntervalMs?: number }): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('save-attendance-device-config', config),
+
+  // Manually trigger one poll cycle (e.g. a "Sync Now" button)
+  pollAttendanceDeviceNow: (): Promise<{ pushed: number; skipped: boolean }> =>
+    ipcRenderer.invoke('poll-attendance-device-now'),
 });

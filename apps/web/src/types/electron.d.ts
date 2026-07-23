@@ -36,6 +36,14 @@ interface ResortProElectronBridge {
   }>;
   saveCredentials: (creds: { slug: string; email: string; password: string }) => Promise<{ success: boolean }>;
   clearCredentials: () => Promise<{ success: boolean }>;
+
+  // Fingerprint attendance device (local network — see apps/desktop/src/attendance-device.ts)
+  getAttendanceDeviceConfig: () => Promise<{
+    ip: string; port: number; device_key: string; api_base: string;
+    poll_interval_ms: number; last_synced_at: string | null;
+  } | null>;
+  saveAttendanceDeviceConfig: (config: { ip: string; port: number; deviceKey: string; apiBase: string; pollIntervalMs?: number }) => Promise<{ success: boolean }>;
+  pollAttendanceDeviceNow: () => Promise<{ pushed: number; skipped: boolean }>;
 }
 
 declare global {

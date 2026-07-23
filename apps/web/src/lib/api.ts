@@ -145,6 +145,35 @@ export const staffApi = {
   cancelInvite:  (id: string) => api.delete(`/staff/invites/${id}`),
 };
 
+// ── Attendance ────────────────────────────────────────────────────────────────
+export const attendanceApi = {
+  clockIn: () => api.post('/attendance/clock-in'),
+  clockOut: () => api.post('/attendance/clock-out'),
+  myToday: () => api.get('/attendance/me/today'),
+  list: (params?: Record<string, unknown>) => api.get('/attendance', { params }),
+  correct: (id: string, data: unknown) => api.patch(`/attendance/${id}`, data),
+  mark: (data: { staffId: string; date: string; status: string; notes?: string }) => api.post('/attendance/mark', data),
+  import: (punches: unknown[]) => api.post('/attendance/import', { punches }),
+  getDeviceKey: () => api.get('/attendance/device-key'),
+  rotateDeviceKey: () => api.post('/attendance/device-key/rotate'),
+};
+
+// ── Salary ────────────────────────────────────────────────────────────────────
+export const salaryApi = {
+  adjustments: (staffId: string) => api.get(`/salary/${staffId}/adjustments`),
+  addAdjustment: (staffId: string, data: unknown) => api.post(`/salary/${staffId}/adjustments`, data),
+};
+
+// ── Training ──────────────────────────────────────────────────────────────────
+export const trainingApi = {
+  list: () => api.get('/training'),
+  get: (id: string) => api.get(`/training/${id}`),
+  create: (data: unknown) => api.post('/training', data),
+  update: (id: string, data: unknown) => api.patch(`/training/${id}`, data),
+  invite: (id: string, data: { staffIds?: string[]; department?: string }) => api.post(`/training/${id}/invite`, data),
+  markAttendee: (id: string, staffId: string, status: string) => api.patch(`/training/${id}/attendees/${staffId}`, { status }),
+};
+
 // ── Shareholders ──────────────────────────────────────────────────────────────
 export const shareholdersApi = {
   list:          () => api.get('/shareholders'),

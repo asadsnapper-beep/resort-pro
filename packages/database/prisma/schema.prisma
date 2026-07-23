@@ -322,6 +322,7 @@ model Tenant {
   timezone                String     @default("Asia/Dhaka")
   checkInTime             String     @default("14:00")
   checkOutTime            String     @default("11:00")
+  attendanceDeviceKey     String?    @unique // secret for the fingerprint device webhook
   roomTypeLabels          Json? // { "STANDARD": "Garden Room", ... } — display-layer override
   // Stripe billing
   stripeCustomerId        String?    @unique
@@ -445,6 +446,9 @@ model Tenant {
   minibarItems           MinibarItem[]
   minibarConsumptions    MinibarConsumption[]
   laundryOrders          LaundryOrder[]
+  staffAttendance        StaffAttendance[]
+  salaryAdjustments      SalaryAdjustment[]
+  trainingSessions       TrainingSession[]
   supportTickets         SupportTicket[]
   amenities              Amenity[]
   websiteContent         WebsiteContent?
@@ -1217,24 +1221,103 @@ model LoyaltyTransaction {
 // ─── Staff ────────────────────────────────────────────────────────────────────
 
 model Staff {
-  id         String          @id @default(uuid())
-  tenantId   String
-  userId     String          @unique
-  department StaffDepartment @default(FRONT_DESK)
-  position   String
-  phone      String?
-  hireDate   DateTime        @db.Date
-  isActive   Boolean         @default(true)
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  id             String          @id @default(uuid())
+  tenantId       String
+  userId         String          @unique
+  department     StaffDepartment @default(FRONT_DESK)
+  position       String
+  phone          String?
+  hireDate       DateTime        @db.Date
+  isActive       Boolean         @default(true)
+  shiftStartTime String? // "09:00" — used to compute LATE on clock-in
+  baseSalary     Float?
+  deviceUserId   String? // ID configured on the fingerprint device for this staff member
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   // Relations
-  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  housekeepingTasks HousekeepingTask[]
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  housekeepingTasks  HousekeepingTask[]
+  attendance         StaffAttendance[]
+  salaryAdjustments  SalaryAdjustment[]
+  trainingAttendance TrainingAttendee[]
 
   @@index([tenantId])
+  @@index([deviceUserId])
   @@map("staff")
+}
+
+model StaffAttendance {
+  id          String   @id @default(uuid())
+  tenantId    String
+  staffId     String
+  date        DateTime @db.Date
+  clockIn     DateTime?
+  clockOut    DateTime?
+  status      String   @default("PRESENT") // PRESENT | LATE | ABSENT | ON_LEAVE
+  hoursWorked Float?
+  source      String   @default("MANUAL") // MANUAL | DEVICE_IMPORT | DEVICE_WEBHOOK
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([staffId, date])
+  @@index([tenantId])
+  @@map("staff_attendance")
+}
+
+model SalaryAdjustment {
+  id            String   @id @default(uuid())
+  tenantId      String
+  staffId       String
+  type          String // RAISE | BONUS | DEDUCTION
+  amount        Float
+  reason        String?
+  effectiveDate DateTime @db.Date
+  createdAt     DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([staffId])
+  @@map("salary_adjustments")
+}
+
+model TrainingSession {
+  id            String   @id @default(uuid())
+  tenantId      String
+  title         String
+  description   String?
+  scheduledDate DateTime
+  location      String?
+  trainer       String?
+  department    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  attendees TrainingAttendee[]
+
+  @@index([tenantId])
+  @@map("training_sessions")
+}
+
+model TrainingAttendee {
+  id                String @id @default(uuid())
+  trainingSessionId String
+  staffId           String
+  status            String @default("INVITED") // INVITED | ATTENDED | MISSED
+
+  trainingSession TrainingSession @relation(fields: [trainingSessionId], references: [id], onDelete: Cascade)
+  staff           Staff           @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([trainingSessionId, staffId])
+  @@map("training_attendees")
 }
 
 // ─── Housekeeping ─────────────────────────────────────────────────────────────

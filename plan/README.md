@@ -28,6 +28,7 @@ plan/
 | [maintenance.md](./maintenance.md) | Issue reporting, assignment, OOO room management | ✅ Built |
 | [roles-permissions.md](./roles-permissions.md) | 7-role permission system, access matrix | 🟡 Partial — `/dashboard/roles` আছে, কিন্তু Staff page-এ merge করার plan (see [foundation/part-14](./foundation/part-14-staff-roles-merge.md)) হয়নি, ২টা আলাদা page-ই আছে |
 | [staff-management.md](./staff-management.md) | Staff directory, shift scheduling, department management | ✅ Built |
+| [staff-extras.md](./staff-extras.md) | Attendance (fingerprint device via Desktop app / CSV import / webhook / self clock-in), salary adjustments, training schedule | ✅ Built |
 | [shareholder-portal.md](./shareholder-portal.md) | Shareholder ownership %, payout tracking, self-service investor view, monthly auto-report | ✅ Built |
 
 ---

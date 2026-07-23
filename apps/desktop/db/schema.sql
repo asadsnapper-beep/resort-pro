@@ -156,6 +156,20 @@ CREATE TABLE IF NOT EXISTS food_orders (
   synced_at   TEXT
 );
 
+-- ─── Fingerprint attendance device ─────────────────────────────────────────────
+-- Single-row config for the on-premise fingerprint machine (ZKTeco/eSSL protocol).
+-- Set from Settings in the desktop app UI; polling only runs if ip is non-null.
+CREATE TABLE IF NOT EXISTS attendance_device_config (
+  id               INTEGER PRIMARY KEY CHECK (id = 1),
+  ip               TEXT,
+  port             INTEGER DEFAULT 4370,
+  device_key       TEXT,             -- tenant's X-Attendance-Key (from /api/attendance/device-key)
+  api_base         TEXT DEFAULT 'http://localhost:4000',
+  poll_interval_ms INTEGER DEFAULT 60000,
+  last_synced_at   TEXT,             -- ISO timestamp of the latest punch already pushed
+  updated_at       TEXT
+);
+
 -- ─── Indexes ───────────────────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_bookings_check_in      ON bookings(check_in);
 CREATE INDEX IF NOT EXISTS idx_bookings_guest_id      ON bookings(guest_id);

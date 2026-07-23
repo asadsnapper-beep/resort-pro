@@ -3,6 +3,10 @@ import * as path from 'path';
 import { getDb, closeDb } from '../db/local-db';
 import { syncPull, getLastSynced } from './sync-service';
 import { flushQueue, getQueueStats } from './sync-queue';
+import {
+  getDeviceConfig, saveDeviceConfig, pollAttendanceDevice,
+  startAttendanceDevicePolling, stopAttendanceDevicePolling,
+} from './attendance-device';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const WEB_URL    = 'http://localhost:3000';
@@ -148,6 +152,20 @@ function registerIpcHandlers() {
       return { success: false, error: String(err) };
     }
   });
+
+  // ── Fingerprint attendance device ─────────────────────────────────────
+  // window.resortpro.getAttendanceDeviceConfig()
+  ipcMain.handle('get-attendance-device-config', () => getDeviceConfig());
+
+  // window.resortpro.saveAttendanceDeviceConfig({ ip, port, deviceKey, apiBase })
+  ipcMain.handle('save-attendance-device-config', (_event, config: { ip: string; port: number; deviceKey: string; apiBase: string; pollIntervalMs?: number }) => {
+    saveDeviceConfig(config);
+    startAttendanceDevicePolling();
+    return { success: true };
+  });
+
+  // window.resortpro.pollAttendanceDeviceNow() — manual "sync now" button
+  ipcMain.handle('poll-attendance-device-now', () => pollAttendanceDevice());
 }
 
 // ─── Create Window ────────────────────────────────────────────────────────────
@@ -206,6 +224,9 @@ app.whenReady().then(() => {
   registerIpcHandlers();
   createWindow();
 
+  // No-op if no device has been configured yet (attendance-device.ts checks internally)
+  startAttendanceDevicePolling();
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -216,5 +237,6 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
+  stopAttendanceDevicePolling();
   closeDb();
 });

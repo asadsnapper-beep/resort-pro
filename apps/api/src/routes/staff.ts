@@ -22,6 +22,9 @@ const createStaffSchema = z.object({
   phone: z.string().optional(),
   hireDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   role: z.enum(INVITE_ROLES).default('STAFF'),
+  shiftStartTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  baseSalary: z.number().min(0).optional(),
+  deviceUserId: z.string().optional(),
 });
 
 export async function staffRoutes(app: FastifyInstance) {
@@ -102,6 +105,9 @@ export async function staffRoutes(app: FastifyInstance) {
           position: body.position,
           phone: body.phone,
           hireDate: new Date(body.hireDate),
+          shiftStartTime: body.shiftStartTime,
+          baseSalary: body.baseSalary,
+          deviceUserId: body.deviceUserId,
         },
         include: { user: { select: { email: true, firstName: true, lastName: true } } },
       });

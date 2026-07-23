@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
-import { dashboardApi, websiteApi, bookingsApi } from '@/lib/api';
+import { dashboardApi, websiteApi, bookingsApi, attendanceApi } from '@/lib/api';
 import { NewBookingModal } from '@/components/bookings/NewBookingModal';
 import { toast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +26,57 @@ const ICON_STYLES: Record<IconFamily, { bg: string; color: string }> = {
   gold:  { bg: 'var(--rp-amber-bg)', color: '#b89040' },
   coral: { bg: 'var(--rp-coral-bg)', color: '#b8724a' },
 };
+
+function ClockWidget() {
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery({ queryKey: ['attendance-today'], queryFn: () => attendanceApi.myToday() });
+  const attendance = data?.data?.data as { clockIn?: string; clockOut?: string; status?: string; hoursWorked?: number } | null;
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['attendance-today'] });
+  const clockInMutation = useMutation({
+    mutationFn: () => attendanceApi.clockIn(),
+    onSuccess: (res) => { invalidate(); toast({ title: res.data.message }); },
+    onError: (err: { response?: { data?: { error?: string } } }) => toast({ title: 'Error', description: err?.response?.data?.error, variant: 'destructive' }),
+  });
+  const clockOutMutation = useMutation({
+    mutationFn: () => attendanceApi.clockOut(),
+    onSuccess: () => { invalidate(); toast({ title: 'Clocked out' }); },
+    onError: (err: { response?: { data?: { error?: string } } }) => toast({ title: 'Error', description: err?.response?.data?.error, variant: 'destructive' }),
+  });
+
+  if (isLoading) return null;
+
+  const fmtTime = (iso?: string) => iso ? new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+
+  if (!attendance?.clockIn) {
+    return (
+      <button onClick={() => clockInMutation.mutate()} disabled={clockInMutation.isPending}
+        className="flex items-center gap-1.5 rounded-[9px] border px-3 py-[9px] text-[13px] font-medium transition-colors hover:bg-[#f4f1eb] disabled:opacity-50"
+        style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
+        <LogIn className="h-[13px] w-[13px]" /> Clock In
+      </button>
+    );
+  }
+  if (!attendance.clockOut) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-[12px]" style={{ color: attendance.status === 'LATE' ? '#c43c3c' : 'var(--rp-text-muted)' }}>
+          In at {fmtTime(attendance.clockIn)}{attendance.status === 'LATE' ? ' (Late)' : ''}
+        </span>
+        <button onClick={() => clockOutMutation.mutate()} disabled={clockOutMutation.isPending}
+          className="flex items-center gap-1.5 rounded-[9px] border px-3 py-[9px] text-[13px] font-medium transition-colors hover:bg-[#f4f1eb] disabled:opacity-50"
+          style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
+          <LogOut className="h-[13px] w-[13px]" /> Clock Out
+        </button>
+      </div>
+    );
+  }
+  return (
+    <span className="text-[12px]" style={{ color: 'var(--rp-text-muted)' }}>
+      Worked {attendance.hoursWorked?.toFixed(1)}h today
+    </span>
+  );
+}
 
 function HeroStatCard({
   title, value, unit, subtext, icon: Icon, family, dark = false,
@@ -190,15 +241,18 @@ export default function DashboardPage() {
             {today}
           </p>
         </div>
-        {['OWNER', 'MANAGER', 'RECEPTIONIST'].includes(user?.role ?? '') && (
-          <button
-            onClick={() => setNewBookingOpen(true)}
-            className="rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
-            style={{ background: 'var(--rp-btn-accent)' }}
-          >
-            + New Booking
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          <ClockWidget />
+          {['OWNER', 'MANAGER', 'RECEPTIONIST'].includes(user?.role ?? '') && (
+            <button
+              onClick={() => setNewBookingOpen(true)}
+              className="rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
+              style={{ background: 'var(--rp-btn-accent)' }}
+            >
+              + New Booking
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stat Cards & Charts — hidden for housekeeping staff */}
