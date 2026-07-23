@@ -72,7 +72,7 @@ export default function CorporateAccountsPage() {
   });
 
   return (
-    <div className="max-w-4xl space-y-6 animate-fade-up">
+    <div className="space-y-6 animate-fade-up">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px]" style={{ background: 'var(--rp-teal-bg)' }}>
