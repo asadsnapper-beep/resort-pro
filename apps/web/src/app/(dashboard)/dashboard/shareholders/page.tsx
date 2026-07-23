@@ -423,12 +423,27 @@ const METHOD_LABEL: Record<string, string> = {
 };
 
 function PayoutHistoryModal({ shareholder, onClose }: { shareholder: Shareholder; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+
   const { data, isLoading } = useQuery<PayoutEntry[]>({
     queryKey: ['shareholder-payouts', shareholder.id],
     queryFn: () => shareholdersApi.payouts(shareholder.id).then((r) => r.data.data),
   });
   const payouts = data ?? [];
   const total = payouts.reduce((sum, p) => sum + p.amount, 0);
+
+  const deleteMutation = useMutation({
+    mutationFn: (payoutId: string) => shareholdersApi.deletePayout(shareholder.id, payoutId),
+    onSuccess: () => {
+      toast({ title: 'Payout deleted' });
+      setConfirmId(null);
+      queryClient.invalidateQueries({ queryKey: ['shareholder-payouts', shareholder.id] });
+      queryClient.invalidateQueries({ queryKey: ['shareholders'] });
+    },
+    onError: (err: { response?: { data?: { error?: string } } }) =>
+      toast({ title: 'Failed', description: err?.response?.data?.error ?? 'Could not delete payout', variant: 'destructive' }),
+  });
 
   return (
     <ModalShell
@@ -462,6 +477,34 @@ function PayoutHistoryModal({ shareholder, onClose }: { shareholder: Shareholder
                   {p.note && <span> · {p.note}</span>}
                 </p>
               </div>
+              {confirmId === p.id ? (
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <span className="text-[11.5px] text-[#c43c3c]">Delete?</span>
+                  <button
+                    onClick={() => deleteMutation.mutate(p.id)}
+                    disabled={deleteMutation.isPending}
+                    className="rounded-[7px] px-2.5 py-1 text-[11.5px] font-semibold text-white"
+                    style={{ background: '#c43c3c' }}
+                  >
+                    {deleteMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Yes'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmId(null)}
+                    className="rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium"
+                    style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}
+                  >
+                    No
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmId(p.id)}
+                  className="shrink-0 rounded-[7px] px-2.5 py-1.5 text-[11.5px] font-medium transition-colors hover:bg-[#fbeceb]"
+                  style={{ color: '#c43c3c' }}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
           ))}
         </div>

@@ -154,6 +154,7 @@ export const shareholdersApi = {
   recordPayout:  (id: string, data: { amount: number; method: string; paidAt: string; note?: string }) =>
     api.post(`/shareholders/${id}/payouts`, data),
   payouts:       (id: string) => api.get(`/shareholders/${id}/payouts`),
+  deletePayout:  (id: string, payoutId: string) => api.delete(`/shareholders/${id}/payouts/${payoutId}`),
   me:            () => api.get('/shareholders/me'),
   myPayouts:     () => api.get('/shareholders/me/payouts'),
 };

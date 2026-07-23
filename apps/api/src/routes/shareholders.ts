@@ -167,6 +167,22 @@ export async function shareholderRoutes(app: FastifyInstance) {
     },
   });
 
+  // DELETE /api/shareholders/:id/payouts/:payoutId — remove a wrongly-entered payout
+  app.delete('/:id/payouts/:payoutId', {
+    schema: { tags: ['shareholders'], summary: 'Delete a payout entry', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER'),
+    handler: async (request, reply) => {
+      const { db } = request;
+      const { id, payoutId } = request.params as { id: string; payoutId: string };
+      const payout = await db.payout.findUnique({ where: { id: payoutId } });
+      if (!payout || payout.shareholderProfileId !== id) {
+        return reply.status(404).send({ success: false, error: 'Payout not found' });
+      }
+      await db.payout.delete({ where: { id: payoutId } });
+      return ok(null, 'Payout deleted');
+    },
+  });
+
   // ── Self-service (SHAREHOLDER role — own data only) ──────────────────────
 
   // GET /api/shareholders/me — own ownership % + this month's estimated share
