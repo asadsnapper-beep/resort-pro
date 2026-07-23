@@ -112,6 +112,7 @@ plan/
 | [security-plan.md](./security-plan.md) | Security hardening plan | — (not yet audited in detail) |
 | [inventory.md](./inventory.md) | Stock items, categories, IN/OUT/ADJUSTMENT movements, low-stock filter | ✅ Built |
 | [inventory-vendor-po.md](./inventory-vendor-po.md) | Vendor management, purchase orders (draft→sent→received), 30-day demand tracking, low-stock notification bell, CSV import/export | ✅ Built |
+| [asset-register.md](./asset-register.md) | Durable property (furniture, equipment, vehicles) — asset tag, location, purchase/warranty info, maintenance log history, separate from consumable Inventory | ✅ Built |
 
 ---
 

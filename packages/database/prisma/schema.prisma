@@ -440,6 +440,7 @@ model Tenant {
   inventoryMovements     InventoryMovement[]
   vendors                Vendor[]
   purchaseOrders         PurchaseOrder[]
+  assets                 Asset[]
   supportTickets         SupportTicket[]
   amenities              Amenity[]
   websiteContent         WebsiteContent?
@@ -627,6 +628,7 @@ model Room {
   ratePlans          RatePlan[]
   maintenanceTickets MaintenanceTicket[]
   externalCalendars  ExternalCalendar[]
+  assets             Asset[]
 
   @@unique([tenantId, number])
   @@index([tenantId])
@@ -1542,6 +1544,7 @@ model Vendor {
   tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   items          InventoryItem[]
   purchaseOrders PurchaseOrder[]
+  assets         Asset[]
 
   @@index([tenantId])
   @@map("vendors")
@@ -1580,6 +1583,67 @@ model PurchaseOrderItem {
 
   @@index([purchaseOrderId])
   @@map("purchase_order_items")
+}
+
+enum AssetCategory {
+  FURNITURE
+  ELECTRONICS
+  APPLIANCE
+  KITCHEN_EQUIPMENT
+  VEHICLE
+  IT_EQUIPMENT
+  OTHER
+}
+
+enum AssetStatus {
+  IN_USE
+  IN_REPAIR
+  IN_STORAGE
+  RETIRED
+}
+
+model Asset {
+  id                String        @id @default(uuid())
+  tenantId          String
+  assetTag          String        @unique
+  name              String
+  category          AssetCategory @default(OTHER)
+  status            AssetStatus   @default(IN_USE)
+  condition         String        @default("GOOD") // GOOD | FAIR | POOR
+  locationRoomId    String?
+  locationLabel     String?
+  purchaseDate      DateTime?
+  purchasePrice     Float?
+  warrantyExpiresAt DateTime?
+  vendorId          String?
+  notes             String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  locationRoom    Room?                 @relation(fields: [locationRoomId], references: [id], onDelete: SetNull)
+  vendor          Vendor?               @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  maintenanceLogs AssetMaintenanceLog[]
+
+  @@index([tenantId])
+  @@index([locationRoomId])
+  @@index([vendorId])
+  @@map("assets")
+}
+
+model AssetMaintenanceLog {
+  id          String   @id @default(uuid())
+  assetId     String
+  type        String // SERVICE | REPAIR | INSPECTION
+  cost        Float?
+  performedBy String?
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+  @@map("asset_maintenance_logs")
 }
 
 // ─── Support ──────────────────────────────────────────────────────────────────

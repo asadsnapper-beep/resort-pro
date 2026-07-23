@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, BedDouble, CalendarDays, Users, UserCog,
   Sparkles, ClipboardList, UtensilsCrossed, ShoppingBag,
-  Package, Ticket, Globe, Bell, Settings, LogOut, Mail,
+  Package, Ticket, Globe, Bell, Settings, LogOut, Mail, Archive,
   CreditCard, BarChart2, LayoutGrid, Tags, Wrench, FileBarChart2,
   Gift, UsersRound, Star, Link2, Receipt, ChevronDown, LifeBuoy, FileText, Megaphone, Building2,
   PieChart, TrendingUp, Landmark, Briefcase,
@@ -108,6 +108,8 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard/housekeeping', labelKey: 'nav.housekeeping', labelFallback: 'Housekeeping', icon: Sparkles, group: 'Operations', groupKey: 'groups.operations',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'STAFF'] },
   { href: '/dashboard/maintenance',  labelKey: 'nav.maintenance',  labelFallback: 'Maintenance',  icon: Wrench,   group: 'Operations', groupKey: 'groups.operations',
+    roles: ['OWNER', 'MANAGER'] },
+  { href: '/dashboard/assets',       labelKey: 'nav.assets',       labelFallback: 'Assets',       icon: Archive,  group: 'Operations', groupKey: 'groups.operations',
     roles: ['OWNER', 'MANAGER'] },
 
   // ── Restaurant ────────────────────────────────────────────

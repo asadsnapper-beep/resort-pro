@@ -252,6 +252,16 @@ export const purchaseOrdersApi = {
   cancel: (id: string) => api.patch(`/purchase-orders/${id}/cancel`),
 };
 
+// ── Assets (Asset Register) ──────────────────────────────────────────────────
+export const assetsApi = {
+  list: (params?: Record<string, unknown>) => api.get('/assets', { params }),
+  stats: () => api.get('/assets/stats'),
+  create: (data: unknown) => api.post('/assets', data),
+  update: (id: string, data: unknown) => api.patch(`/assets/${id}`, data),
+  getLogs: (id: string) => api.get(`/assets/${id}/logs`),
+  addLog: (id: string, data: unknown) => api.post(`/assets/${id}/logs`, data),
+};
+
 // ── Tickets ───────────────────────────────────────────────────────────────────
 export const ticketsApi = {
   list: (params?: Record<string, unknown>) => api.get('/tickets', { params }),
