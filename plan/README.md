@@ -78,7 +78,7 @@ plan/
 
 | File | কী আছে | Status |
 |------|---------|--------|
-| [event-venue.md](./event-venue.md) | Conference/banquet/lawn booking, event management, pricing | ❌ Not built |
+| [event-venue.md](./event-venue.md) | Conference/banquet/lawn booking, event management, pricing | ✅ Built — venue CRUD, booking with double-booking conflict check, half/full-day/hourly pricing. Public website enquiry form not included yet (dashboard-only for now). |
 
 ---
 
@@ -162,7 +162,6 @@ Full docs: [marketing/](./marketing/)
 ## 🎯 Biggest gaps if launching beyond the pilot
 
 - **review-management** — guest review collect/display, zero code
-- **event-venue** — banquet/conference booking, zero code
 - **tenant-backup-restore** — was 🔴 High priority, zero code — no customer-data safety net beyond manual DB backups
 - **dynamic-pricing** — no seasonal/occupancy auto-rate automation
 - **booking-com / airbnb** — only manual iCal paste, no real OTA channel management
@@ -194,7 +193,7 @@ Phase 2 — পরের ৩ মাস:
 Phase 3 — ৬+ মাস পরে:
   12. sms-whatsapp-marketing              ✅ done
   13. in-room-dining                      🟡 partial
-  14. event-venue                         ❌ still open
+  14. event-venue                         ✅ done
   15. staff-management                    ✅ done
   16. maintenance                         ✅ done
   17. booking-com-integration             ❌ still open

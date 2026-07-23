@@ -159,6 +159,18 @@ export const shareholdersApi = {
   myPayouts:     () => api.get('/shareholders/me/payouts'),
 };
 
+// ── Venues & Events ───────────────────────────────────────────────────────────
+export const venuesApi = {
+  list:            () => api.get('/venues'),
+  create:          (data: unknown) => api.post('/venues', data),
+  update:          (id: string, data: unknown) => api.patch(`/venues/${id}`, data),
+  remove:          (id: string) => api.delete(`/venues/${id}`),
+  availability:    (id: string, date: string) => api.get(`/venues/${id}/availability`, { params: { date } }),
+  listBookings:    (venueId?: string) => api.get('/venues/bookings', { params: venueId ? { venueId } : {} }),
+  createBooking:   (data: unknown) => api.post('/venues/bookings', data),
+  updateBooking:   (id: string, data: unknown) => api.patch(`/venues/bookings/${id}`, data),
+};
+
 // ── Housekeeping ──────────────────────────────────────────────────────────────
 export const housekeepingApi = {
   list:         (params?: Record<string, unknown>) => api.get('/housekeeping', { params }),

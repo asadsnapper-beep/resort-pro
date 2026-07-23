@@ -491,6 +491,8 @@ model Tenant {
   shareholderProfiles    ShareholderProfile[]
   payouts                Payout[]
   investorReports        InvestorReport[]
+  venues                 Venue[]
+  venueBookings          VenueBooking[]
 
   @@map("tenants")
 }
@@ -2401,4 +2403,93 @@ model InvestorReport {
   @@unique([tenantId, month])
   @@index([tenantId])
   @@map("investor_reports")
+}
+
+// ─── Event & Venue Management (see plan/event-venue.md) ───────────────────────
+enum VenueType {
+  INDOOR
+  OUTDOOR
+  BOTH
+}
+
+enum EventType {
+  WEDDING
+  BIRTHDAY
+  CORPORATE
+  SOCIAL
+  OTHER
+}
+
+enum VenueBookingStatus {
+  TENTATIVE
+  CONFIRMED
+  CANCELLED
+}
+
+model Venue {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name        String
+  type        VenueType @default(INDOOR)
+  capacity    Int
+  description String?
+  photos      String[]
+  amenities   String[]
+
+  halfDayRate  Float?
+  fullDayRate  Float?
+  hourlyRate   Float?
+  overtimeRate Float?
+
+  opensAt       String  @default("08:00")
+  closesAt      String  @default("22:00")
+  minAdvanceHrs Int     @default(24)
+  isVisible     Boolean @default(true)
+  isActive      Boolean @default(true)
+  sortOrder     Int     @default(0)
+
+  bookings VenueBooking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("venues")
+}
+
+model VenueBooking {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  venueId  String
+  venue    Venue  @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  clientName  String
+  clientPhone String
+  clientEmail String?
+  eventType   EventType @default(OTHER)
+
+  date       DateTime @db.Date
+  startTime  String // "09:00"
+  endTime    String // "17:00"
+  guestCount Int
+
+  baseAmount   Float
+  addonsAmount Float   @default(0)
+  totalAmount  Float
+  paidAmount   Float   @default(0)
+  addons       Json? // { catering: 8000, decoration: 5000 }
+  notes        String?
+
+  status    VenueBookingStatus @default(CONFIRMED)
+  createdBy String // user id
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([venueId, date])
+  @@map("venue_bookings")
 }

@@ -8,7 +8,7 @@ import {
   Package, Ticket, Globe, Bell, Settings, LogOut, Mail,
   CreditCard, BarChart2, LayoutGrid, Tags, Wrench, FileBarChart2,
   Gift, UsersRound, Star, Link2, Receipt, ChevronDown, LifeBuoy, FileText, Megaphone, Building2,
-  PieChart, TrendingUp,
+  PieChart, TrendingUp, Landmark,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
@@ -89,6 +89,8 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
   { href: '/dashboard/channels',       labelKey: 'nav.channels',      labelFallback: 'Channel Sync',     icon: Link2,         group: 'Rooms & Bookings', groupKey: 'groups.rooms',
     roles: ['OWNER', 'MANAGER', 'DEVELOPER'] },
+  { href: '/dashboard/venues',         labelKey: 'nav.venues',        labelFallback: 'Venues & Events',  icon: Landmark,      group: 'Rooms & Bookings', groupKey: 'groups.rooms',
+    roles: ['OWNER', 'MANAGER'] },
 
   // ── Guests ────────────────────────────────────────────────
   { href: '/dashboard/guests',   labelKey: 'nav.guests',  labelFallback: 'Guests',          icon: Users,  group: 'Guests', groupKey: 'groups.guests',
