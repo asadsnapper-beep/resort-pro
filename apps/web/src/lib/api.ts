@@ -262,6 +262,32 @@ export const assetsApi = {
   addLog: (id: string, data: unknown) => api.post(`/assets/${id}/logs`, data),
 };
 
+// ── Lost & Found ──────────────────────────────────────────────────────────────
+export const lostFoundApi = {
+  list: (params?: Record<string, unknown>) => api.get('/lost-found', { params }),
+  create: (data: unknown) => api.post('/lost-found', data),
+  claim: (id: string, data: { claimedBy: string; claimedContact?: string }) => api.patch(`/lost-found/${id}/claim`, data),
+  dispose: (id: string) => api.patch(`/lost-found/${id}/dispose`),
+};
+
+// ── Minibar ───────────────────────────────────────────────────────────────────
+export const minibarApi = {
+  catalog: () => api.get('/minibar/catalog'),
+  addCatalogItem: (data: unknown) => api.post('/minibar/catalog', data),
+  updateCatalogItem: (id: string, data: unknown) => api.patch(`/minibar/catalog/${id}`, data),
+  consumption: (params?: Record<string, unknown>) => api.get('/minibar/consumption', { params }),
+  logConsumption: (data: unknown) => api.post('/minibar/consumption', data),
+  markBilled: (id: string) => api.patch(`/minibar/consumption/${id}/billed`),
+};
+
+// ── Laundry ───────────────────────────────────────────────────────────────────
+export const laundryApi = {
+  list: (params?: Record<string, unknown>) => api.get('/laundry', { params }),
+  create: (data: unknown) => api.post('/laundry', data),
+  updateStatus: (id: string, data: { status: string; cost?: number }) => api.patch(`/laundry/${id}/status`, data),
+  markBilled: (id: string) => api.patch(`/laundry/${id}/billed`),
+};
+
 // ── Tickets ───────────────────────────────────────────────────────────────────
 export const ticketsApi = {
   list: (params?: Record<string, unknown>) => api.get('/tickets', { params }),

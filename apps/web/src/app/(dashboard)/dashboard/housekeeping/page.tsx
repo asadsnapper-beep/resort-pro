@@ -3,14 +3,16 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { housekeepingApi, roomsApi, staffApi } from '@/lib/api';
+import { housekeepingApi, roomsApi, staffApi, lostFoundApi, minibarApi, laundryApi, bookingsApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { Modal } from '@/components/ui/modal';
-import { formatDate } from '@/lib/utils';
+import { ModalShell } from '@/components/ui/modal-shell';
+import { formatDate, formatCurrency } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import {
   Plus, Search, CheckSquare, Clock, AlertCircle, CheckCircle2,
-  Bed, User, CalendarDays, ChevronLeft, ChevronRight,
+  Bed, CalendarDays, ChevronLeft, ChevronRight, PackageSearch, Wine, Shirt,
+  Loader2, Receipt,
 } from 'lucide-react';
 
 interface HKTask {
@@ -22,6 +24,33 @@ interface HKTask {
   completedAt?: string;
   room: { number: string; name: string; floor: number };
   assignedTo?: { id: string; user: { firstName: string; lastName: string } };
+}
+
+interface Room { id: string; number: string; name: string; }
+
+interface LostFoundItem {
+  id: string;
+  description: string;
+  category?: string;
+  foundDate: string;
+  storageLocation?: string;
+  status: 'UNCLAIMED' | 'CLAIMED' | 'DISPOSED';
+  claimedBy?: string;
+  claimedContact?: string;
+  room?: { name: string; number: string } | null;
+}
+
+interface MinibarCatalogItem { id: string; name: string; price: number; isActive: boolean; }
+interface MinibarConsumption {
+  id: string; itemName: string; quantity: number; unitPrice: number; billed: boolean;
+  createdAt: string; bookingId?: string | null;
+  room: { name: string; number: string };
+}
+
+interface LaundryOrder {
+  id: string; itemCount: number; description?: string; serviceType: string; status: string;
+  cost?: number | null; billed: boolean; createdAt: string; bookingId?: string | null;
+  room: { name: string; number: string };
 }
 
 const TASK_TYPES = ['DAILY', 'DEEP_CLEAN', 'TURNDOWN', 'CHECKOUT', 'CHECKIN'] as const;
@@ -42,8 +71,31 @@ const STATUS_PILL: Record<string, { bg: string; border: string; text: string; la
   SKIPPED:     { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)', label: 'Skipped' },
 };
 
+const LOST_FOUND_STATUS_META: Record<string, { bg: string; text: string }> = {
+  UNCLAIMED: { bg: 'var(--rp-amber-bg)', text: '#b89040' },
+  CLAIMED:   { bg: 'var(--rp-teal-bg)', text: '#23766a' },
+  DISPOSED:  { bg: 'var(--rp-surface-3)', text: 'var(--rp-text-muted)' },
+};
+
+const LAUNDRY_STATUS_FLOW = ['REQUESTED', 'IN_PROGRESS', 'READY', 'DELIVERED'] as const;
+const LAUNDRY_STATUS_META: Record<string, { bg: string; text: string }> = {
+  REQUESTED:   { bg: 'var(--rp-amber-bg)', text: '#b89040' },
+  IN_PROGRESS: { bg: 'var(--rp-teal-bg)', text: '#23766a' },
+  READY:       { bg: 'var(--rp-teal-bg)', text: '#23766a' },
+  DELIVERED:   { bg: 'var(--rp-surface-3)', text: 'var(--rp-text-muted)' },
+};
+
 const selectCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[8px] text-[13px] text-[#18231f] focus:outline-none focus:ring-1 focus:ring-resort-600/20';
 const labelCls  = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+
+async function tryGetCurrentBookingId(roomId: string): Promise<string | undefined> {
+  try {
+    const res = await roomsApi.get(roomId);
+    return res.data?.data?.currentBooking?.id ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 function NewTaskModal({ open, onClose, loading, onSubmit }: {
   open: boolean; onClose: () => void; loading: boolean;
@@ -132,7 +184,8 @@ function NewTaskModal({ open, onClose, loading, onSubmit }: {
   );
 }
 
-export default function HousekeepingPage() {
+// ── Tasks Tab (existing feature, unchanged) ──────────────────────────────────
+function TasksTab() {
   const queryClient = useQueryClient();
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
@@ -187,14 +240,8 @@ export default function HousekeepingPage() {
   const completedCount  = stats.completed  ?? 0;
 
   return (
-    <div className="space-y-4 animate-fade-up">
-
-      {/* Header */}
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Housekeeping</h1>
-          <p className="mt-[4px] text-[13px] text-[#7a9890]">Schedule and track room cleaning tasks</p>
-        </div>
+    <div className="space-y-4">
+      <div className="flex items-end justify-end">
         {canManage && (
           <button
             onClick={() => setAddOpen(true)}
@@ -206,7 +253,6 @@ export default function HousekeepingPage() {
         )}
       </div>
 
-      {/* Stats row */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
           { label: 'Total Tasks',  value: total || 0,    icon: CheckSquare, bg: 'var(--rp-teal-bg)', color: '#23766a' },
@@ -226,7 +272,6 @@ export default function HousekeepingPage() {
         ))}
       </div>
 
-      {/* Filters */}
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
         <div className="relative max-w-xs flex-1">
           <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8aa29a]" />
@@ -259,7 +304,6 @@ export default function HousekeepingPage() {
         </div>
       </div>
 
-      {/* Table */}
       <div className="overflow-hidden rounded-[14px] border bg-white dark:bg-white/5" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
         {isLoading ? (
           <div className="space-y-px p-4">
@@ -395,7 +439,6 @@ export default function HousekeepingPage() {
         )}
       </div>
 
-      {/* Pagination */}
       {pagination && pagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-[12.5px] text-[#8aa29a]">
@@ -417,6 +460,604 @@ export default function HousekeepingPage() {
       )}
 
       <NewTaskModal open={addOpen} onClose={() => setAddOpen(false)} loading={createMutation.isPending} onSubmit={d => createMutation.mutate(d)} />
+    </div>
+  );
+}
+
+// ── Lost & Found Tab ──────────────────────────────────────────────────────────
+function LogFoundModal({ open, onClose, loading, onSubmit, rooms }: {
+  open: boolean; onClose: () => void; loading: boolean; rooms: Room[];
+  onSubmit: (data: Record<string, unknown>) => void;
+}) {
+  const [form, setForm] = useState({ roomId: '', description: '', category: '', storageLocation: '', foundBy: '', notes: '' });
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+  useEffect(() => { if (open) setForm({ roomId: '', description: '', category: '', storageLocation: '', foundBy: '', notes: '' }); }, [open]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.description) { toast({ title: 'Description is required', variant: 'destructive' }); return; }
+    onSubmit({ ...form, roomId: form.roomId || undefined, category: form.category || undefined, storageLocation: form.storageLocation || undefined, foundBy: form.foundBy || undefined, notes: form.notes || undefined });
+  };
+
+  return (
+    <ModalShell open={open} onClose={onClose} title="Log Found Item" description="Something a guest left behind" maxWidth="500px"
+      footer={
+        <div className="flex gap-3 justify-end">
+          <button type="button" onClick={onClose} className="rounded-[9px] border px-4 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>Cancel</button>
+          <button type="submit" form="lf-form" disabled={loading} className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium disabled:opacity-50" style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+            {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Log Item
+          </button>
+        </div>
+      }>
+      <form id="lf-form" onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className={labelCls}>Description *</label>
+          <input value={form.description} onChange={e => set('description', e.target.value)} placeholder="Black wallet, phone charger…" className={selectCls} />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelCls}>Room</label>
+            <select value={form.roomId} onChange={e => set('roomId', e.target.value)} className={selectCls}>
+              <option value="">Not room-specific</option>
+              {rooms.map(r => <option key={r.id} value={r.id}>#{r.number} — {r.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>Category</label>
+            <input value={form.category} onChange={e => set('category', e.target.value)} placeholder="Electronics, Clothing…" className={selectCls} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelCls}>Storage Location</label>
+            <input value={form.storageLocation} onChange={e => set('storageLocation', e.target.value)} placeholder="Front desk drawer" className={selectCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Found By</label>
+            <input value={form.foundBy} onChange={e => set('foundBy', e.target.value)} placeholder="Staff name" className={selectCls} />
+          </div>
+        </div>
+        <div>
+          <label className={labelCls}>Notes</label>
+          <input value={form.notes} onChange={e => set('notes', e.target.value)} className={selectCls} />
+        </div>
+      </form>
+    </ModalShell>
+  );
+}
+
+function ClaimModal({ open, onClose, loading, onSubmit }: {
+  open: boolean; onClose: () => void; loading: boolean;
+  onSubmit: (data: { claimedBy: string; claimedContact?: string }) => void;
+}) {
+  const [claimedBy, setClaimedBy] = useState('');
+  const [claimedContact, setClaimedContact] = useState('');
+  useEffect(() => { if (open) { setClaimedBy(''); setClaimedContact(''); } }, [open]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!claimedBy) { toast({ title: 'Guest name is required', variant: 'destructive' }); return; }
+    onSubmit({ claimedBy, claimedContact: claimedContact || undefined });
+  };
+
+  return (
+    <ModalShell open={open} onClose={onClose} title="Mark as Claimed" maxWidth="420px"
+      footer={
+        <div className="flex gap-3 justify-end">
+          <button type="button" onClick={onClose} className="rounded-[9px] border px-4 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>Cancel</button>
+          <button type="submit" form="claim-form" disabled={loading} className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium disabled:opacity-50" style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+            {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Confirm
+          </button>
+        </div>
+      }>
+      <form id="claim-form" onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className={labelCls}>Guest Name *</label>
+          <input value={claimedBy} onChange={e => setClaimedBy(e.target.value)} className={selectCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Contact</label>
+          <input value={claimedContact} onChange={e => setClaimedContact(e.target.value)} placeholder="Phone or email" className={selectCls} />
+        </div>
+      </form>
+    </ModalShell>
+  );
+}
+
+function LostFoundTab() {
+  const queryClient = useQueryClient();
+  const [statusFilter, setStatusFilter] = useState('');
+  const [logOpen, setLogOpen] = useState(false);
+  const [claimItem, setClaimItem] = useState<LostFoundItem | null>(null);
+
+  const { data, isLoading } = useQuery({ queryKey: ['lost-found', statusFilter], queryFn: () => lostFoundApi.list({ status: statusFilter || undefined, limit: 50 }) });
+  const { data: roomsData } = useQuery({ queryKey: ['rooms-list'], queryFn: () => roomsApi.list({ limit: 200, isActive: true }) });
+  const items: LostFoundItem[] = data?.data?.data ?? [];
+  const rooms: Room[] = roomsData?.data?.data ?? [];
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['lost-found'] });
+
+  const createMutation = useMutation({
+    mutationFn: (d: unknown) => lostFoundApi.create(d),
+    onSuccess: () => { invalidate(); toast({ title: 'Item logged' }); setLogOpen(false); },
+  });
+  const claimMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { claimedBy: string; claimedContact?: string } }) => lostFoundApi.claim(id, data),
+    onSuccess: () => { invalidate(); toast({ title: 'Marked as claimed' }); setClaimItem(null); },
+  });
+  const disposeMutation = useMutation({
+    mutationFn: (id: string) => lostFoundApi.dispose(id),
+    onSuccess: () => { invalidate(); toast({ title: 'Marked as disposed' }); },
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-1.5 flex-wrap">
+          {['', 'UNCLAIMED', 'CLAIMED', 'DISPOSED'].map(s => (
+            <button key={s} onClick={() => setStatusFilter(s)}
+              className="rounded-[8px] border px-3 py-1.5 text-[12px] font-medium transition-colors"
+              style={statusFilter === s ? { background: 'var(--rp-btn-accent)', borderColor: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' } : { background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border)', color: 'var(--rp-text-subtle)' }}>
+              {s || 'All'}
+            </button>
+          ))}
+        </div>
+        <button onClick={() => setLogOpen(true)} className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium" style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+          <Plus className="h-4 w-4" /> Log Item
+        </button>
+      </div>
+
+      <div className="rounded-[14px] border bg-white overflow-hidden" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+        {isLoading ? (
+          <div className="h-32 animate-pulse" style={{ background: 'var(--rp-surface-2)' }} />
+        ) : items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-2">
+            <PackageSearch className="h-10 w-10" style={{ color: '#c5bdb4' }} />
+            <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No lost & found items</p>
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr style={{ background: 'var(--rp-surface-2)' }}>
+                {['Item', 'Room', 'Found', 'Storage', 'Status', ''].map(h => <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]">{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {items.map(it => {
+                const sm = LOST_FOUND_STATUS_META[it.status];
+                return (
+                  <tr key={it.id} className="hover:bg-[#faf9f7] dark:hover:bg-white/5" style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
+                    <td className="px-5 py-3.5">
+                      <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{it.description}</p>
+                      {it.category && <p className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">{it.category}</p>}
+                      {it.status === 'CLAIMED' && it.claimedBy && <p className="text-[11.5px] text-[#23766a]">Claimed by {it.claimedBy}</p>}
+                    </td>
+                    <td className="px-5 py-3.5 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{it.room ? `#${it.room.number} ${it.room.name}` : '—'}</td>
+                    <td className="px-5 py-3.5 text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">{formatDate(it.foundDate)}</td>
+                    <td className="px-5 py-3.5 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{it.storageLocation ?? '—'}</td>
+                    <td className="px-5 py-3.5"><span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: sm.bg, color: sm.text }}>{it.status}</span></td>
+                    <td className="px-5 py-3.5">
+                      {it.status === 'UNCLAIMED' && (
+                        <div className="flex gap-1">
+                          <button onClick={() => setClaimItem(it)} className="rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e3f2ef]" style={{ borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>Claim</button>
+                          <button onClick={() => disposeMutation.mutate(it.id)} className="rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#faf0ee]" style={{ borderColor: 'rgba(200,60,60,0.2)', color: '#c43c3c' }}>Dispose</button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <LogFoundModal open={logOpen} onClose={() => setLogOpen(false)} loading={createMutation.isPending} onSubmit={d => createMutation.mutate(d)} rooms={rooms} />
+      <ClaimModal open={!!claimItem} onClose={() => setClaimItem(null)} loading={claimMutation.isPending}
+        onSubmit={d => claimItem && claimMutation.mutate({ id: claimItem.id, data: d })} />
+    </div>
+  );
+}
+
+// ── Minibar Tab ────────────────────────────────────────────────────────────────
+function CatalogModal({ open, onClose, catalog, loading, onSubmit }: {
+  open: boolean; onClose: () => void; catalog: MinibarCatalogItem[]; loading: boolean;
+  onSubmit: (data: { name: string; price: number }) => void;
+}) {
+  const [name, setName] = useState('');
+  const [price, setPrice] = useState('');
+  useEffect(() => { if (open) { setName(''); setPrice(''); } }, [open]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name || !price) { toast({ title: 'Name and price are required', variant: 'destructive' }); return; }
+    onSubmit({ name, price: parseFloat(price) });
+  };
+
+  return (
+    <ModalShell open={open} onClose={onClose} title="Minibar Price List" description="Manage catalog items" maxWidth="480px"
+      footer={<div className="flex justify-end"><button onClick={onClose} className="rounded-[9px] border px-4 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>Close</button></div>}>
+      <div className="space-y-4">
+        <form onSubmit={handleSubmit} className="flex gap-2 items-end">
+          <div className="flex-1">
+            <label className={labelCls}>Item Name</label>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="Coca-Cola" className={selectCls} />
+          </div>
+          <div className="w-28">
+            <label className={labelCls}>Price</label>
+            <input value={price} onChange={e => setPrice(e.target.value)} type="number" min="0" step="0.01" className={selectCls} />
+          </div>
+          <button type="submit" disabled={loading} className="flex items-center gap-1 rounded-[8px] px-3 py-2 text-[13px] font-medium disabled:opacity-50" style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+          </button>
+        </form>
+        <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+          {catalog.length === 0 ? (
+            <p className="text-[12.5px] text-center py-6" style={{ color: 'var(--rp-text-muted)' }}>No catalog items yet</p>
+          ) : catalog.map(c => (
+            <div key={c.id} className="flex items-center justify-between rounded-[8px] border px-3 py-2" style={{ borderColor: 'var(--rp-border)' }}>
+              <span className="text-[13px] text-[#18231f] dark:text-[#dfd9d0]">{c.name}</span>
+              <span className="text-[13px] font-medium text-[#23766a]">{formatCurrency(c.price)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
+function LogConsumptionModal({ open, onClose, rooms, catalog, loading, onSubmit }: {
+  open: boolean; onClose: () => void; rooms: Room[]; catalog: MinibarCatalogItem[]; loading: boolean;
+  onSubmit: (data: { roomId: string; bookingId?: string; items: { minibarItemId: string; quantity: number }[] }) => void;
+}) {
+  const [roomId, setRoomId] = useState('');
+  const [qty, setQty] = useState<Record<string, string>>({});
+  useEffect(() => { if (open) { setRoomId(''); setQty({}); } }, [open]);
+
+  const total = catalog.reduce((s, c) => s + (parseFloat(qty[c.id] || '0') || 0) * c.price, 0);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!roomId) { toast({ title: 'Select a room', variant: 'destructive' }); return; }
+    const items = Object.entries(qty).map(([id, v]) => ({ minibarItemId: id, quantity: parseInt(v, 10) || 0 })).filter(i => i.quantity > 0);
+    if (items.length === 0) { toast({ title: 'Enter at least one item quantity', variant: 'destructive' }); return; }
+    const bookingId = await tryGetCurrentBookingId(roomId);
+    onSubmit({ roomId, bookingId, items });
+  };
+
+  return (
+    <ModalShell open={open} onClose={onClose} title="Log Minibar Consumption" maxWidth="520px"
+      footer={
+        <div className="flex items-center justify-between w-full">
+          <span className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">Total: {formatCurrency(total)}</span>
+          <div className="flex gap-3">
+            <button type="button" onClick={onClose} className="rounded-[9px] border px-4 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>Cancel</button>
+            <button type="submit" form="mb-form" disabled={loading} className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium disabled:opacity-50" style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+              {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Log
+            </button>
+          </div>
+        </div>
+      }>
+      <form id="mb-form" onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className={labelCls}>Room *</label>
+          <select value={roomId} onChange={e => setRoomId(e.target.value)} className={selectCls}>
+            <option value="">Select room</option>
+            {rooms.map(r => <option key={r.id} value={r.id}>#{r.number} — {r.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className={labelCls}>Items Consumed</label>
+          {catalog.length === 0 ? (
+            <p className="text-[12.5px]" style={{ color: 'var(--rp-text-muted)' }}>No catalog items yet — add some from &ldquo;Manage Price List&rdquo; first.</p>
+          ) : (
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+              {catalog.map(c => (
+                <div key={c.id} className="flex items-center gap-3 rounded-[8px] border px-3 py-2" style={{ borderColor: 'var(--rp-border)' }}>
+                  <span className="flex-1 text-[13px] text-[#18231f] dark:text-[#dfd9d0]">{c.name} <span className="text-[#8aa29a]">· {formatCurrency(c.price)}</span></span>
+                  <input value={qty[c.id] ?? ''} onChange={e => setQty(q => ({ ...q, [c.id]: e.target.value }))} type="number" min="0" placeholder="0"
+                    className="w-16 rounded-[7px] border border-black/5 bg-[#f4f1eb] px-2 py-1.5 text-[12.5px] text-center" />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </form>
+    </ModalShell>
+  );
+}
+
+function MinibarTab() {
+  const queryClient = useQueryClient();
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
+
+  const { data, isLoading } = useQuery({ queryKey: ['minibar-consumption'], queryFn: () => minibarApi.consumption({ limit: 50 }) });
+  const { data: catalogData } = useQuery({ queryKey: ['minibar-catalog'], queryFn: () => minibarApi.catalog() });
+  const { data: roomsData } = useQuery({ queryKey: ['rooms-list'], queryFn: () => roomsApi.list({ limit: 200, isActive: true }) });
+
+  const consumption: MinibarConsumption[] = data?.data?.data ?? [];
+  const catalog: MinibarCatalogItem[] = catalogData?.data?.data ?? [];
+  const rooms: Room[] = roomsData?.data?.data ?? [];
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['minibar-consumption'] });
+
+  const catalogMutation = useMutation({
+    mutationFn: (d: { name: string; price: number }) => minibarApi.addCatalogItem(d),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['minibar-catalog'] }); toast({ title: 'Catalog item added' }); },
+  });
+  const logMutation = useMutation({
+    mutationFn: (d: unknown) => minibarApi.logConsumption(d),
+    onSuccess: () => { invalidate(); toast({ title: 'Consumption logged' }); setLogOpen(false); },
+  });
+  const billMutation = useMutation({
+    mutationFn: async ({ entry }: { entry: MinibarConsumption }) => {
+      await bookingsApi.addInvoiceExtra(entry.bookingId!, { description: `Minibar: ${entry.itemName} x${entry.quantity}`, amount: entry.unitPrice, quantity: entry.quantity });
+      return minibarApi.markBilled(entry.id);
+    },
+    onSuccess: () => { invalidate(); toast({ title: 'Added to guest bill' }); },
+    onError: () => toast({ title: 'Error', description: 'Failed to bill — check the booking has an active invoice', variant: 'destructive' }),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-end gap-2">
+        <button onClick={() => setCatalogOpen(true)} className="flex items-center gap-2 rounded-[9px] border px-4 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
+          <Wine className="h-4 w-4" /> Manage Price List
+        </button>
+        <button onClick={() => setLogOpen(true)} className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium" style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+          <Plus className="h-4 w-4" /> Log Consumption
+        </button>
+      </div>
+
+      <div className="rounded-[14px] border bg-white overflow-hidden" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+        {isLoading ? (
+          <div className="h-32 animate-pulse" style={{ background: 'var(--rp-surface-2)' }} />
+        ) : consumption.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-2">
+            <Wine className="h-10 w-10" style={{ color: '#c5bdb4' }} />
+            <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No minibar consumption logged</p>
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr style={{ background: 'var(--rp-surface-2)' }}>
+                {['Room', 'Item', 'Qty', 'Cost', 'Date', 'Billed', ''].map(h => <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]">{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {consumption.map(c => (
+                <tr key={c.id} className="hover:bg-[#faf9f7] dark:hover:bg-white/5" style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
+                  <td className="px-5 py-3.5 text-[13px] text-[#18231f] dark:text-[#dfd9d0]">#{c.room.number} {c.room.name}</td>
+                  <td className="px-5 py-3.5 text-[13px] text-[#18231f] dark:text-[#dfd9d0]">{c.itemName}</td>
+                  <td className="px-5 py-3.5 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{c.quantity}</td>
+                  <td className="px-5 py-3.5 text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{formatCurrency(c.unitPrice * c.quantity)}</td>
+                  <td className="px-5 py-3.5 text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">{formatDate(c.createdAt)}</td>
+                  <td className="px-5 py-3.5">
+                    {c.billed ? <span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: 'var(--rp-teal-bg)', color: '#23766a' }}>Billed</span>
+                      : <span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: 'var(--rp-surface-3)', color: 'var(--rp-text-muted)' }}>Pending</span>}
+                  </td>
+                  <td className="px-5 py-3.5">
+                    {!c.billed && c.bookingId && (
+                      <button onClick={() => billMutation.mutate({ entry: c })} className="flex items-center gap-1 rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e3f2ef]" style={{ borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                        <Receipt className="h-3 w-3" /> Bill
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <CatalogModal open={catalogOpen} onClose={() => setCatalogOpen(false)} catalog={catalog} loading={catalogMutation.isPending} onSubmit={d => catalogMutation.mutate(d)} />
+      <LogConsumptionModal open={logOpen} onClose={() => setLogOpen(false)} rooms={rooms} catalog={catalog} loading={logMutation.isPending} onSubmit={d => logMutation.mutate(d)} />
+    </div>
+  );
+}
+
+// ── Laundry Tab ────────────────────────────────────────────────────────────────
+function NewLaundryModal({ open, onClose, rooms, loading, onSubmit }: {
+  open: boolean; onClose: () => void; rooms: Room[]; loading: boolean;
+  onSubmit: (data: Record<string, unknown>) => void;
+}) {
+  const [form, setForm] = useState({ roomId: '', itemCount: '', description: '', serviceType: 'WASH', cost: '' });
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+  useEffect(() => { if (open) setForm({ roomId: '', itemCount: '', description: '', serviceType: 'WASH', cost: '' }); }, [open]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.roomId || !form.itemCount) { toast({ title: 'Room and item count are required', variant: 'destructive' }); return; }
+    const bookingId = await tryGetCurrentBookingId(form.roomId);
+    onSubmit({
+      roomId: form.roomId, bookingId, itemCount: parseInt(form.itemCount, 10),
+      description: form.description || undefined, serviceType: form.serviceType,
+      cost: form.cost ? parseFloat(form.cost) : undefined,
+    });
+  };
+
+  return (
+    <ModalShell open={open} onClose={onClose} title="New Laundry Order" maxWidth="480px"
+      footer={
+        <div className="flex gap-3 justify-end">
+          <button type="button" onClick={onClose} className="rounded-[9px] border px-4 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>Cancel</button>
+          <button type="submit" form="laundry-form" disabled={loading} className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium disabled:opacity-50" style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+            {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Create Order
+          </button>
+        </div>
+      }>
+      <form id="laundry-form" onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className={labelCls}>Room *</label>
+          <select value={form.roomId} onChange={e => set('roomId', e.target.value)} className={selectCls}>
+            <option value="">Select room</option>
+            {rooms.map(r => <option key={r.id} value={r.id}>#{r.number} — {r.name}</option>)}
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelCls}>Item Count *</label>
+            <input value={form.itemCount} onChange={e => set('itemCount', e.target.value)} type="number" min="1" className={selectCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Service Type</label>
+            <select value={form.serviceType} onChange={e => set('serviceType', e.target.value)} className={selectCls}>
+              <option value="WASH">Wash</option>
+              <option value="DRY_CLEAN">Dry Clean</option>
+              <option value="IRON">Iron</option>
+              <option value="WASH_AND_IRON">Wash & Iron</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className={labelCls}>Description</label>
+          <input value={form.description} onChange={e => set('description', e.target.value)} placeholder="3 shirts, 2 pants…" className={selectCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Cost <span style={{ color: 'var(--rp-text-faint)' }}>(optional)</span></label>
+          <input value={form.cost} onChange={e => set('cost', e.target.value)} type="number" min="0" step="0.01" className={selectCls} />
+        </div>
+      </form>
+    </ModalShell>
+  );
+}
+
+function LaundryTab() {
+  const queryClient = useQueryClient();
+  const [statusFilter, setStatusFilter] = useState('');
+  const [addOpen, setAddOpen] = useState(false);
+
+  const { data, isLoading } = useQuery({ queryKey: ['laundry', statusFilter], queryFn: () => laundryApi.list({ status: statusFilter || undefined, limit: 50 }) });
+  const { data: roomsData } = useQuery({ queryKey: ['rooms-list'], queryFn: () => roomsApi.list({ limit: 200, isActive: true }) });
+  const orders: LaundryOrder[] = data?.data?.data ?? [];
+  const rooms: Room[] = roomsData?.data?.data ?? [];
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['laundry'] });
+
+  const createMutation = useMutation({
+    mutationFn: (d: unknown) => laundryApi.create(d),
+    onSuccess: () => { invalidate(); toast({ title: 'Order created' }); setAddOpen(false); },
+  });
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) => laundryApi.updateStatus(id, { status }),
+    onSuccess: () => { invalidate(); toast({ title: 'Status updated' }); },
+  });
+  const billMutation = useMutation({
+    mutationFn: async (order: LaundryOrder) => {
+      await bookingsApi.addInvoiceExtra(order.bookingId!, { description: `Laundry: ${order.description || order.serviceType} (${order.itemCount} items)`, amount: order.cost ?? 0, quantity: 1 });
+      return laundryApi.markBilled(order.id);
+    },
+    onSuccess: () => { invalidate(); toast({ title: 'Added to guest bill' }); },
+    onError: () => toast({ title: 'Error', description: 'Failed to bill — check the booking has an active invoice', variant: 'destructive' }),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-1.5 flex-wrap">
+          {['', ...LAUNDRY_STATUS_FLOW].map(s => (
+            <button key={s} onClick={() => setStatusFilter(s)}
+              className="rounded-[8px] border px-3 py-1.5 text-[12px] font-medium transition-colors"
+              style={statusFilter === s ? { background: 'var(--rp-btn-accent)', borderColor: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' } : { background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border)', color: 'var(--rp-text-subtle)' }}>
+              {s ? s.replace('_', ' ') : 'All'}
+            </button>
+          ))}
+        </div>
+        <button onClick={() => setAddOpen(true)} className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium" style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+          <Plus className="h-4 w-4" /> New Order
+        </button>
+      </div>
+
+      <div className="rounded-[14px] border bg-white overflow-hidden" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+        {isLoading ? (
+          <div className="h-32 animate-pulse" style={{ background: 'var(--rp-surface-2)' }} />
+        ) : orders.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-2">
+            <Shirt className="h-10 w-10" style={{ color: '#c5bdb4' }} />
+            <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No laundry orders</p>
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr style={{ background: 'var(--rp-surface-2)' }}>
+                {['Room', 'Items', 'Service', 'Cost', 'Status', 'Billed', ''].map(h => <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]">{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map(o => {
+                const sm = LAUNDRY_STATUS_META[o.status];
+                const nextIdx = LAUNDRY_STATUS_FLOW.indexOf(o.status as typeof LAUNDRY_STATUS_FLOW[number]) + 1;
+                const nextStatus = LAUNDRY_STATUS_FLOW[nextIdx];
+                return (
+                  <tr key={o.id} className="hover:bg-[#faf9f7] dark:hover:bg-white/5" style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
+                    <td className="px-5 py-3.5 text-[13px] text-[#18231f] dark:text-[#dfd9d0]">#{o.room.number} {o.room.name}</td>
+                    <td className="px-5 py-3.5 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{o.itemCount} — {o.description ?? '—'}</td>
+                    <td className="px-5 py-3.5 text-[12.5px] text-[#4a6e66] dark:text-[#6d9990]">{o.serviceType.replace(/_/g, ' ')}</td>
+                    <td className="px-5 py-3.5 text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{o.cost != null ? formatCurrency(o.cost) : '—'}</td>
+                    <td className="px-5 py-3.5"><span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: sm.bg, color: sm.text }}>{o.status.replace('_', ' ')}</span></td>
+                    <td className="px-5 py-3.5">
+                      {o.billed ? <span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: 'var(--rp-teal-bg)', color: '#23766a' }}>Billed</span>
+                        : <span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: 'var(--rp-surface-3)', color: 'var(--rp-text-muted)' }}>Pending</span>}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <div className="flex gap-1">
+                        {nextStatus && (
+                          <button onClick={() => statusMutation.mutate({ id: o.id, status: nextStatus })}
+                            className="rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e3f2ef]" style={{ borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                            Mark {nextStatus.replace('_', ' ')}
+                          </button>
+                        )}
+                        {!o.billed && o.bookingId && o.cost != null && (
+                          <button onClick={() => billMutation.mutate(o)} className="flex items-center gap-1 rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e3f2ef]" style={{ borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                            <Receipt className="h-3 w-3" /> Bill
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <NewLaundryModal open={addOpen} onClose={() => setAddOpen(false)} rooms={rooms} loading={createMutation.isPending} onSubmit={d => createMutation.mutate(d)} />
+    </div>
+  );
+}
+
+// ── Main Page ──────────────────────────────────────────────────────────────────
+export default function HousekeepingPage() {
+  const [tab, setTab] = useState<'tasks' | 'lost-found' | 'minibar' | 'laundry'>('tasks');
+
+  return (
+    <div className="space-y-4 animate-fade-up">
+      <div>
+        <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Housekeeping</h1>
+        <p className="mt-[4px] text-[13px] text-[#7a9890]">Cleaning tasks, lost & found, minibar, laundry</p>
+      </div>
+
+      <div className="flex gap-1 rounded-[10px] p-1 w-fit" style={{ background: 'var(--rp-surface-3)' }}>
+        {([
+          { key: 'tasks', label: 'Tasks' },
+          { key: 'lost-found', label: 'Lost & Found' },
+          { key: 'minibar', label: 'Minibar' },
+          { key: 'laundry', label: 'Laundry' },
+        ] as const).map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)}
+            className="rounded-[8px] px-4 py-1.5 text-[13px] font-medium transition-colors"
+            style={tab === t.key ? { background: 'var(--rp-surface)', color: 'var(--rp-text)', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' } : { color: 'var(--rp-text-muted)' }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'tasks' && <TasksTab />}
+      {tab === 'lost-found' && <LostFoundTab />}
+      {tab === 'minibar' && <MinibarTab />}
+      {tab === 'laundry' && <LaundryTab />}
     </div>
   );
 }

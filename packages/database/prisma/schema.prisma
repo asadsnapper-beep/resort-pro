@@ -441,6 +441,10 @@ model Tenant {
   vendors                Vendor[]
   purchaseOrders         PurchaseOrder[]
   assets                 Asset[]
+  lostFoundItems         LostFoundItem[]
+  minibarItems           MinibarItem[]
+  minibarConsumptions    MinibarConsumption[]
+  laundryOrders          LaundryOrder[]
   supportTickets         SupportTicket[]
   amenities              Amenity[]
   websiteContent         WebsiteContent?
@@ -629,6 +633,9 @@ model Room {
   maintenanceTickets MaintenanceTicket[]
   externalCalendars  ExternalCalendar[]
   assets             Asset[]
+  lostFoundItems      LostFoundItem[]
+  minibarConsumptions MinibarConsumption[]
+  laundryOrders       LaundryOrder[]
 
   @@unique([tenantId, number])
   @@index([tenantId])
@@ -775,6 +782,8 @@ model Booking {
   bookingPackages  BookingPackage[]
   bookingOffers    BookingOffer[]
   invoice          Invoice?
+  minibarConsumptions MinibarConsumption[]
+  laundryOrders       LaundryOrder[]
 
   @@index([tenantId])
   @@index([checkIn, checkOut])
@@ -1252,6 +1261,115 @@ model HousekeepingTask {
   @@index([scheduledDate])
   @@index([status])
   @@map("housekeeping_tasks")
+}
+
+enum LostFoundStatus {
+  UNCLAIMED
+  CLAIMED
+  DISPOSED
+}
+
+model LostFoundItem {
+  id              String          @id @default(uuid())
+  tenantId        String
+  roomId          String?
+  description     String
+  category        String?
+  foundDate       DateTime        @default(now())
+  foundBy         String?
+  storageLocation String?
+  status          LostFoundStatus @default(UNCLAIMED)
+  claimedBy       String?
+  claimedContact  String?
+  claimedDate     DateTime?
+  notes           String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  room   Room?  @relation(fields: [roomId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@map("lost_found_items")
+}
+
+model MinibarItem {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  price     Float
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  consumptions MinibarConsumption[]
+
+  @@index([tenantId])
+  @@map("minibar_items")
+}
+
+model MinibarConsumption {
+  id            String   @id @default(uuid())
+  tenantId      String
+  roomId        String
+  bookingId     String?
+  minibarItemId String
+  itemName      String
+  quantity      Int
+  unitPrice     Float
+  billed        Boolean  @default(false)
+  recordedBy    String?
+  createdAt     DateTime @default(now())
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  room        Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  booking     Booking?    @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  minibarItem MinibarItem @relation(fields: [minibarItemId], references: [id])
+
+  @@index([tenantId])
+  @@index([roomId])
+  @@map("minibar_consumptions")
+}
+
+enum LaundryStatus {
+  REQUESTED
+  IN_PROGRESS
+  READY
+  DELIVERED
+}
+
+enum LaundryServiceType {
+  WASH
+  DRY_CLEAN
+  IRON
+  WASH_AND_IRON
+}
+
+model LaundryOrder {
+  id          String             @id @default(uuid())
+  tenantId    String
+  roomId      String
+  bookingId   String?
+  itemCount   Int
+  description String?
+  serviceType LaundryServiceType @default(WASH)
+  status      LaundryStatus      @default(REQUESTED)
+  cost        Float?
+  billed      Boolean            @default(false)
+  readyAt     DateTime?
+  deliveredAt DateTime?
+  notes       String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  room    Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([roomId])
+  @@map("laundry_orders")
 }
 
 // ─── Restaurant / F&B ────────────────────────────────────────────────────────

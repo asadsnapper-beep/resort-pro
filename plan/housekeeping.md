@@ -221,6 +221,13 @@ Total: ~5 days
 
 ---
 
+## Extras (Lost & Found, Minibar, Laundry) — see [housekeeping-extras.md](./housekeeping-extras.md)
+
+Three more tabs on `/dashboard/housekeeping` beyond the Tasks tab documented above:
+Lost & Found tracking, a minibar price list + per-room consumption log, and laundry
+orders — both minibar and laundry can push charges straight to a guest's bill via
+the existing `InvoiceExtra` mechanism (`POST /api/bookings/:id/invoice/extras`).
+
 ## Bug Fixes Applied (June 2026)
 
 ### 1. ✅ DAILY/TURNDOWN task complete করলে room AVAILABLE হয়ে যেত
