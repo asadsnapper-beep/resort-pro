@@ -9,7 +9,7 @@ import {
 } from './attendance-device';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const WEB_URL    = 'http://localhost:3000';
+const WEB_URL    = process.env.RESORTPRO_WEB_URL || 'https://app.resortpro.site';
 const START_PAGE = `${WEB_URL}/dashboard`;
 // Logged in  → dashboard
 // Not logged → Next.js middleware redirects to /auth/login

@@ -99,7 +99,7 @@ export async function syncPull(token: string, since?: string): Promise<SyncResul
       return { success: false, error: `HTTP ${response.status}: ${body}` };
     }
 
-    const payload: SyncPullResponse = await response.json();
+    const payload = await response.json() as SyncPullResponse;
     if (!payload.success) {
       return { success: false, error: 'API returned success:false' };
     }

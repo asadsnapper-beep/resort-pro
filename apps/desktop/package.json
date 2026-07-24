@@ -8,13 +8,37 @@
     "dev": "tsc && cp db/schema.sql dist/db/schema.sql && electron dist/src/main.js",
     "build": "tsc && cp db/schema.sql dist/db/schema.sql",
     "rebuild-native": "electron-rebuild -f -w better-sqlite3",
-    "start": "electron dist/src/main.js"
+    "start": "electron dist/src/main.js",
+    "dist:win": "pnpm run build && electron-builder --win --x64"
+  },
+  "build": {
+    "appId": "site.resortpro.desktop",
+    "productName": "ResortPro",
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/node_modules/better-sqlite3/**",
+      "**/node_modules/node-zklib/**"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.4",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.0.0",
     "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
     "typescript": "^5.4.5"
   },
   "dependencies": {
