@@ -174,6 +174,20 @@ export const trainingApi = {
   markAttendee: (id: string, staffId: string, status: string) => api.patch(`/training/${id}/attendees/${staffId}`, { status }),
 };
 
+// ── Vehicles (Vehicle Rental) ─────────────────────────────────────────────────
+export const vehiclesApi = {
+  list: () => api.get('/vehicles'),
+  create: (data: unknown) => api.post('/vehicles', data),
+  update: (id: string, data: unknown) => api.patch(`/vehicles/${id}`, data),
+  availability: (id: string, start: string, end: string) => api.get(`/vehicles/${id}/availability`, { params: { start, end } }),
+  rentals: (params?: Record<string, unknown>) => api.get('/vehicles/rentals', { params }),
+  createRental: (data: unknown) => api.post('/vehicles/rentals', data),
+  markOut: (id: string, data: unknown) => api.patch(`/vehicles/rentals/${id}/out`, data),
+  markReturned: (id: string, data: unknown) => api.patch(`/vehicles/rentals/${id}/return`, data),
+  markBilled: (id: string) => api.patch(`/vehicles/rentals/${id}/billed`),
+  cancelRental: (id: string) => api.patch(`/vehicles/rentals/${id}/cancel`),
+};
+
 // ── Shareholders ──────────────────────────────────────────────────────────────
 export const shareholdersApi = {
   list:          () => api.get('/shareholders'),

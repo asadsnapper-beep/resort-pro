@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, BedDouble, CalendarDays, Users, UserCog,
   Sparkles, ClipboardList, UtensilsCrossed, ShoppingBag,
-  Package, Ticket, Globe, Bell, Settings, LogOut, Mail, Archive,
+  Package, Ticket, Globe, Bell, Settings, LogOut, Mail, Archive, Car,
   CreditCard, BarChart2, LayoutGrid, Tags, Wrench, FileBarChart2,
   Gift, UsersRound, Star, Link2, Receipt, ChevronDown, LifeBuoy, FileText, Megaphone, Building2,
   PieChart, TrendingUp, Landmark, Briefcase,
@@ -93,6 +93,8 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['OWNER', 'MANAGER'] },
   { href: '/dashboard/corporate-accounts', labelKey: 'nav.corporateAccounts', labelFallback: 'Corporate Accounts', icon: Briefcase, group: 'Rooms & Bookings', groupKey: 'groups.rooms',
     roles: ['OWNER', 'MANAGER'] },
+  { href: '/dashboard/vehicles',       labelKey: 'nav.vehicles',      labelFallback: 'Vehicle Rental',   icon: Car,           group: 'Rooms & Bookings', groupKey: 'groups.rooms',
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
 
   // ── Guests ────────────────────────────────────────────────
   { href: '/dashboard/guests',   labelKey: 'nav.guests',  labelFallback: 'Guests',          icon: Users,  group: 'Guests', groupKey: 'groups.guests',

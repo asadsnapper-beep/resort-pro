@@ -35,6 +35,7 @@ import { laundryRoutes } from './routes/laundry';
 import { attendanceRoutes } from './routes/attendance';
 import { salaryRoutes } from './routes/salary';
 import { trainingRoutes } from './routes/training';
+import { vehicleRoutes } from './routes/vehicles';
 import { ticketRoutes } from './routes/tickets';
 import { ticketWebhookRoutes } from './routes/ticketWebhooks';
 import { websiteRoutes, publicWebsiteRoutes } from './routes/website';
@@ -232,6 +233,7 @@ export async function buildApp() {
   await app.register(attendanceRoutes, { prefix: '/api/attendance' });
   await app.register(salaryRoutes, { prefix: '/api/salary' });
   await app.register(trainingRoutes, { prefix: '/api/training' });
+  await app.register(vehicleRoutes, { prefix: '/api/vehicles' });
   await app.register(ticketRoutes, { prefix: '/api/tickets' });
   await app.register(ticketWebhookRoutes, { prefix: '/api/ticket-webhooks' });
   await app.register(chatRoutes, { prefix: '/api/chat' });

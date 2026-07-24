@@ -82,6 +82,7 @@ plan/
 | File | কী আছে | Status |
 |------|---------|--------|
 | [event-venue.md](./event-venue.md) | Conference/banquet/lawn booking, event management, pricing | ✅ Built — venue CRUD, booking with double-booking conflict check, half/full-day/hourly pricing. Public website enquiry form not included yet (dashboard-only for now). |
+| [vehicle-rental.md](./vehicle-rental.md) | Car/bike/scooty/cycle fleet, guest rentals with pickup/return (odometer, fuel, deposit, condition notes), conflict-checked time-slot booking, bill-to-room | ✅ Built |
 
 ---
 

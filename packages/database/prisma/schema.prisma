@@ -449,6 +449,8 @@ model Tenant {
   staffAttendance        StaffAttendance[]
   salaryAdjustments      SalaryAdjustment[]
   trainingSessions       TrainingSession[]
+  vehicles               Vehicle[]
+  vehicleRentals         VehicleRental[]
   supportTickets         SupportTicket[]
   amenities              Amenity[]
   websiteContent         WebsiteContent?
@@ -695,6 +697,7 @@ model Guest {
   enrollments    SequenceEnrollment[]
   loyaltyAccount LoyaltyAccount?
   documents      GuestDocument[]
+  vehicleRentals VehicleRental[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -788,6 +791,7 @@ model Booking {
   invoice          Invoice?
   minibarConsumptions MinibarConsumption[]
   laundryOrders       LaundryOrder[]
+  vehicleRentals      VehicleRental[]
 
   @@index([tenantId])
   @@index([checkIn, checkOut])
@@ -2826,6 +2830,88 @@ model VenueBooking {
   @@index([tenantId])
   @@index([venueId, date])
   @@map("venue_bookings")
+}
+
+// ─── Vehicle Rental (see plan/vehicle-rental.md) ──────────────────────────────
+
+enum VehicleType {
+  CAR
+  BIKE
+  SCOOTY
+  BICYCLE
+  VAN
+  OTHER
+}
+
+enum VehicleAvailability {
+  AVAILABLE
+  RENTED
+  MAINTENANCE
+}
+
+enum RentalStatus {
+  RESERVED
+  OUT
+  RETURNED
+  CANCELLED
+}
+
+model Vehicle {
+  id                 String              @id @default(uuid())
+  tenantId           String
+  type               VehicleType         @default(CAR)
+  name               String
+  registrationNumber String?
+  capacity           Int?
+  hourlyRate         Float?
+  dailyRate          Float?
+  depositAmount      Float?
+  availability       VehicleAvailability @default(AVAILABLE)
+  notes              String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rentals VehicleRental[]
+
+  @@index([tenantId])
+  @@map("vehicles")
+}
+
+model VehicleRental {
+  id                String       @id @default(uuid())
+  tenantId          String
+  vehicleId         String
+  guestId           String?
+  bookingId         String?
+  guestName         String
+  guestPhone        String?
+  startAt           DateTime
+  endAt             DateTime
+  actualReturnAt    DateTime?
+  status            RentalStatus @default(RESERVED)
+  rate              Float
+  totalAmount       Float?
+  depositCollected  Float?
+  depositReturned   Float?
+  odometerOut       Int?
+  odometerIn        Int?
+  fuelOut           String?
+  fuelIn            String?
+  conditionNotesOut String?
+  conditionNotesIn  String?
+  billed            Boolean      @default(false)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vehicle Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  guest   Guest?   @relation(fields: [guestId], references: [id], onDelete: SetNull)
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([vehicleId])
+  @@map("vehicle_rentals")
 }
 
 // ─── Corporate Accounts (see plan/corporate-accounts.md) ──────────────────────
