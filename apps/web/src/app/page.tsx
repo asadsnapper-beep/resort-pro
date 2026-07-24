@@ -11,6 +11,7 @@ const NAV_LINKS = [
   { label: 'Features', href: '#features' },
   { label: 'How it works', href: '#how' },
   { label: 'Pricing', href: '#pricing' },
+  { label: 'Desktop App', href: '#desktop-app' },
   { label: 'FAQ', href: '#faq' },
 ];
 
@@ -179,6 +180,32 @@ const TRUST_BRANDS = [
 const EMBED_CODE = `<script src="https://cdn.resortpro.site/embed.js"
         data-property="bay-breeze"
         data-widget="booking"></script>`;
+
+const DESKTOP_RELEASE_BASE = 'https://github.com/asadsnapper-beep/resort-pro/releases/download/desktop-v0.1.0';
+
+const DOWNLOADS = [
+  {
+    os: 'Windows',
+    note: 'Windows 10/11 · v0.1.0 · 78 MB',
+    url: `${DESKTOP_RELEASE_BASE}/ResortPro.Setup.0.1.0.exe`,
+    icon: (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#23766a" strokeWidth={1.6}>
+        <rect x="3" y="3" width="8" height="8" rx="1" /><rect x="13" y="3" width="8" height="8" rx="1" />
+        <rect x="3" y="13" width="8" height="8" rx="1" /><rect x="13" y="13" width="8" height="8" rx="1" />
+      </svg>
+    ),
+  },
+  {
+    os: 'Mac',
+    note: 'Apple Silicon · v0.1.0 · 94 MB',
+    url: `${DESKTOP_RELEASE_BASE}/ResortPro-0.1.0-arm64.dmg`,
+    icon: (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#23766a" strokeWidth={1.6}>
+        <rect x="3" y="4" width="18" height="12" rx="1.5" /><path d="M8 20h8M12 16v4" />
+      </svg>
+    ),
+  },
+];
 
 const taka = (n: number) => '৳' + n.toLocaleString('en-IN');
 
@@ -728,6 +755,42 @@ export default function HomePage() {
               Contact sales
             </Link>
           </Reveal>
+        </div>
+      </section>
+
+      {/* ── DESKTOP APP ── */}
+      <section id="desktop-app" className="border-b border-[rgba(25,64,59,0.08)] bg-[#faf8f4] px-7 py-[110px]">
+        <div className="mx-auto max-w-[1180px]">
+          <Reveal className="mx-auto max-w-[640px] text-center">
+            <Eyebrow label="For your front desk" centered />
+            <h2 className="mb-3.5 mt-[18px] font-display text-[clamp(2rem,4vw,3.1rem)] font-medium leading-[1.1] tracking-[-0.02em] text-resort-900">
+              A desktop app for the front desk.
+            </h2>
+            <p className="text-[1.12rem] leading-[1.6] text-[#5b6360]">
+              Runs alongside your browser, syncs offline bookings automatically, and connects a fingerprint
+              attendance device — no extra tab, no lost connection at checkout.
+            </p>
+          </Reveal>
+
+          <div className="mx-auto mt-[54px] grid max-w-[820px] grid-cols-1 gap-6 sm:grid-cols-2">
+            {DOWNLOADS.map((d, i) => (
+              <Reveal key={d.os} delay={i * 80}>
+                <div className="flex h-full flex-col items-center rounded-[20px] border border-[rgba(25,64,59,0.1)] bg-white p-9 text-center">
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[rgba(35,118,106,0.09)]">
+                    {d.icon}
+                  </span>
+                  <div className="mt-5 font-display text-[19px] font-semibold text-resort-900">{d.os}</div>
+                  <div className="mt-1.5 text-[13.5px] text-[#8a918d]">{d.note}</div>
+                  <a
+                    href={d.url}
+                    className="mt-6 inline-flex items-center gap-2 rounded-full bg-resort-900 px-7 py-3 text-[14.5px] font-semibold text-white transition-all hover:-translate-y-px hover:bg-resort-600"
+                  >
+                    Download for {d.os}
+                  </a>
+                </div>
+              </Reveal>
+            ))}
+          </div>
         </div>
       </section>
 
