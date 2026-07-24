@@ -9,7 +9,8 @@
     "build": "tsc && cp db/schema.sql dist/db/schema.sql",
     "rebuild-native": "electron-rebuild -f -w better-sqlite3",
     "start": "electron dist/src/main.js",
-    "dist:win": "pnpm run build && electron-builder --win --x64"
+    "dist:win": "pnpm run build && electron-builder --win --x64",
+    "dist:mac": "pnpm run build && electron-builder --mac"
   },
   "build": {
     "appId": "site.resortpro.desktop",
@@ -31,6 +32,11 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.business",
+      "identity": null
     }
   },
   "devDependencies": {
