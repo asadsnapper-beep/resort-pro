@@ -141,8 +141,8 @@ export default function PropertiesPage() {
           <Building2 size={40} color="var(--rp-text-muted)" style={{ margin: '0 auto 16px' }} />
           <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--rp-text)', margin: '0 0 8px' }}>No properties yet</h2>
           <p style={{ fontSize: 13, color: 'var(--rp-text-muted)', marginBottom: 20 }}>Add your first property to get started.</p>
-          <button onClick={openCreate} style={{ padding: '8px 20px', background: '#1a6b5e', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>
-            <Plus size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} /> Add Property
+          <button onClick={openCreate} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px 20px', background: '#1a6b5e', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>
+            <Plus size={14} /> Add Property
           </button>
         </div>
       )}
