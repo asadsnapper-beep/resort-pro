@@ -81,6 +81,25 @@ function runMigrations(db: Database.Database): void {
       name: 'initial_schema',
       sql: fs.readFileSync(path.join(__dirname, '../db/schema.sql'), 'utf-8'),
     },
+    {
+      // schema.sql only ever runs once, under version 1 — tables added to it
+      // afterward (like this one) never reach a database that already exists,
+      // so from here on each schema change needs its own numbered migration.
+      version: 2,
+      name: 'attendance_device_config',
+      sql: `
+        CREATE TABLE IF NOT EXISTS attendance_device_config (
+          id               INTEGER PRIMARY KEY CHECK (id = 1),
+          ip               TEXT,
+          port             INTEGER DEFAULT 4370,
+          device_key       TEXT,
+          api_base         TEXT DEFAULT 'http://localhost:4000',
+          poll_interval_ms INTEGER DEFAULT 60000,
+          last_synced_at   TEXT,
+          updated_at       TEXT
+        );
+      `,
+    },
   ];
 
   const getRan = db.prepare('SELECT version FROM _migrations WHERE version = ?');
