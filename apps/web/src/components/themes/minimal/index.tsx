@@ -10,7 +10,7 @@ import {
   ContactSection, FooterSection,
 } from './sections'
 import { WhatsAppButton } from '../_widgets/SocialLinks'
-import { MenuWidget } from '../_widgets'
+import { MenuWidget, VenuesWidget, VehiclesWidget } from '../_widgets'
 
 const NAV_ITEMS = [
   { id: 'about',        label: 'About' },
@@ -132,11 +132,13 @@ export function MinimalTheme({ data }: ThemeProps) {
             about:        show('about')        && <AboutSection  data={data} />,
             rooms:        <RoomsSection  data={data} onBookRoom={handleBookRoom} />,
             menu:         show('menu')         && <MenuWidget slug={tenant.slug} primaryColor={primary} accentColor={website.accentColor || '#3b82f6'} currency={tenant.currency} />,
+            venues:       show('venues')       && <VenuesWidget slug={tenant.slug} primaryColor={primary} accentColor={website.accentColor || '#3b82f6'} currency={tenant.currency} />,
+            vehicles:     show('vehicles')     && <VehiclesWidget slug={tenant.slug} primaryColor={primary} accentColor={website.accentColor || '#3b82f6'} currency={tenant.currency} />,
             availability: show('availability') && <AvailabilitySection data={data} onRoomSelect={handleRoomSelect} />,
             booking:      <BookingSection data={data} initialCheckIn={calendarCheckIn} initialCheckOut={calendarCheckOut} initialRoomId={calendarRoomId} />,
             contact:      show('contact')      && <ContactSection data={data} />,
           }
-          const order = orderSections(['about', 'rooms', 'menu', 'availability', 'booking', 'contact'], website.sectionOrder)
+          const order = orderSections(['about', 'rooms', 'menu', 'venues', 'vehicles', 'availability', 'booking', 'contact'], website.sectionOrder)
           return (
             <>
               <HeroSection data={data} scrollTo={scrollTo} />

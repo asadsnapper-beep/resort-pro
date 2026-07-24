@@ -11,7 +11,7 @@ import {
   ConfigAvailability, ConfigBooking, ConfigContact,
 } from './sections'
 import { WhatsAppButton } from '../_widgets/SocialLinks'
-import { MenuWidget } from '../_widgets'
+import { MenuWidget, VenuesWidget, VehiclesWidget } from '../_widgets'
 import { AnnouncementBar, OffersSection, usePublicOffers } from '../_widgets/OffersWidget'
 
 /* ── ConfigThemeRenderer ─────────────────────────────────────────────────────
@@ -254,6 +254,22 @@ export function ConfigThemeRenderer({ data, config: rawConfig }: ConfigThemeProp
               currency={tenant.currency}
             />
           ),
+          venues: show('venues') && (
+            <VenuesWidget
+              slug={tenant.slug}
+              primaryColor={primary}
+              accentColor={accent}
+              currency={tenant.currency}
+            />
+          ),
+          vehicles: show('vehicles') && (
+            <VehiclesWidget
+              slug={tenant.slug}
+              primaryColor={primary}
+              accentColor={accent}
+              currency={tenant.currency}
+            />
+          ),
           availability: show('availability') && (
             <ConfigAvailability data={data} config={config} onRoomSelect={handleRoomSelect} />
           ),
@@ -280,7 +296,7 @@ export function ConfigThemeRenderer({ data, config: rawConfig }: ConfigThemeProp
           contact:      show('contact')      && <ConfigContact       data={data} config={config} />,
         }
         const order = orderSections(
-          ['about', 'rooms', 'menu', 'availability', 'offers', 'booking', 'gallery', 'testimonials', 'contact'],
+          ['about', 'rooms', 'menu', 'venues', 'vehicles', 'availability', 'offers', 'booking', 'gallery', 'testimonials', 'contact'],
           website.sectionOrder,
         )
         return order.map(id => <React.Fragment key={id}>{nodes[id]}</React.Fragment>)

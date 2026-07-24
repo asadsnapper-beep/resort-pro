@@ -10,7 +10,7 @@ import {
   TestimonialsSection, ContactSection, FooterSection,
 } from './sections'
 import { WhatsAppButton } from '../_widgets/SocialLinks'
-import { MenuWidget } from '../_widgets'
+import { MenuWidget, VenuesWidget, VehiclesWidget } from '../_widgets'
 import { AnnouncementBar, OffersSection, usePublicOffers } from '../_widgets/OffersWidget'
 
 const NAV_ITEMS = [
@@ -162,6 +162,8 @@ export function CoastalTheme({ data }: ThemeProps) {
           amenities:    show('amenities')    && <AmenitiesSection data={data} />,
           rooms:        <RoomsSection data={data} offers={offers} onViewRoom={handleBookRoom} onBookRoom={handleBookRoom} />,
           menu:         show('menu')         && <MenuWidget slug={tenant.slug} primaryColor={primary} accentColor={accentLocal} currency={tenant.currency} />,
+          venues:       show('venues')       && <VenuesWidget slug={tenant.slug} primaryColor={primary} accentColor={accentLocal} currency={tenant.currency} />,
+          vehicles:     show('vehicles')     && <VehiclesWidget slug={tenant.slug} primaryColor={primary} accentColor={accentLocal} currency={tenant.currency} />,
           availability: show('availability') && <AvailabilitySection data={data} onRoomSelect={handleRoomSelect} />,
           offers:       show('offers')       && <OffersSection slug={tenant.slug} primaryColor={primary} accentColor={accentLocal} onApplyCode={handleApplyCode} />,
           booking:      <BookingSection data={data} initialCheckIn={calendarCheckIn} initialCheckOut={calendarCheckOut} initialRoomId={calendarRoomId} initialPromoCode={promoCode} />,
@@ -170,7 +172,7 @@ export function CoastalTheme({ data }: ThemeProps) {
           contact:      show('contact')      && <ContactSection data={data} />,
         }
         const order = orderSections(
-          ['about', 'amenities', 'rooms', 'menu', 'availability', 'offers', 'booking', 'gallery', 'testimonials', 'contact'],
+          ['about', 'amenities', 'rooms', 'menu', 'venues', 'vehicles', 'availability', 'offers', 'booking', 'gallery', 'testimonials', 'contact'],
           website.sectionOrder,
         )
         return (

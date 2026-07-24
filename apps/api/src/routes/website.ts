@@ -393,6 +393,131 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
     },
   });
 
+  // ── Public Venues (see plan/public-venues-vehicles.md) ─────────────────────
+
+  app.get('/:slug/venues', {
+    schema: { tags: ['website'], summary: 'List active venues for the public site' },
+    handler: async (request, reply) => {
+      const { slug } = request.params as { slug: string };
+      const tenant = await prisma.tenant.findUnique({ where: { slug } });
+      if (!tenant || !tenant.isActive) return reply.status(404).send({ success: false, error: 'Resort not found' });
+
+      const venues = await prisma.venue.findMany({
+        where: { tenantId: tenant.id, isActive: true, isVisible: true },
+        select: {
+          id: true, name: true, type: true, capacity: true, description: true, photos: true, amenities: true,
+          halfDayRate: true, fullDayRate: true, hourlyRate: true, opensAt: true, closesAt: true,
+        },
+        orderBy: { sortOrder: 'asc' },
+      });
+      return ok(venues);
+    },
+  });
+
+  const venueEnquirySchema = z.object({
+    venueId: z.string().min(1),
+    name: z.string().min(1),
+    email: z.string().email().optional().or(z.literal('')),
+    phone: z.string().min(1),
+    preferredDate: z.string().optional(),
+    guestCount: z.number().int().positive().optional(),
+    message: z.string().optional(),
+  });
+
+  app.post('/:slug/venue-enquiry', {
+    schema: { tags: ['website'], summary: 'Submit a venue booking enquiry' },
+    handler: async (request, reply) => {
+      const { slug } = request.params as { slug: string };
+      const tenant = await prisma.tenant.findUnique({ where: { slug } });
+      if (!tenant || !tenant.isActive) return reply.status(404).send({ success: false, error: 'Resort not found' });
+
+      const body = venueEnquirySchema.parse(request.body);
+      const venue = await prisma.venue.findFirst({ where: { id: body.venueId, tenantId: tenant.id } });
+      if (!venue) return reply.status(404).send({ success: false, error: 'Venue not found' });
+
+      const guest = body.email ? await prisma.guest.findFirst({ where: { tenantId: tenant.id, email: body.email } }) : null;
+
+      await prisma.supportTicket.create({
+        data: {
+          tenantId: tenant.id,
+          guestId: guest?.id,
+          title: `Venue Enquiry: ${venue.name}`,
+          description: [
+            `From: ${body.name} <${body.email || 'no email'}> · ${body.phone}`,
+            body.preferredDate && `Preferred date: ${body.preferredDate}`,
+            body.guestCount && `Guest count: ${body.guestCount}`,
+            body.message && `\n${body.message}`,
+          ].filter(Boolean).join('\n'),
+          category: 'REQUEST',
+          priority: 'MEDIUM',
+          status: 'OPEN',
+        },
+      });
+
+      return reply.status(201).send(ok(null, "Thank you! We'll get back to you shortly."));
+    },
+  });
+
+  // ── Public Vehicle Rental (see plan/public-venues-vehicles.md) ─────────────
+
+  app.get('/:slug/vehicles', {
+    schema: { tags: ['website'], summary: 'List available vehicles for the public site' },
+    handler: async (request, reply) => {
+      const { slug } = request.params as { slug: string };
+      const tenant = await prisma.tenant.findUnique({ where: { slug } });
+      if (!tenant || !tenant.isActive) return reply.status(404).send({ success: false, error: 'Resort not found' });
+
+      const vehicles = await prisma.vehicle.findMany({
+        where: { tenantId: tenant.id, availability: { not: 'MAINTENANCE' } },
+        select: { id: true, type: true, name: true, capacity: true, hourlyRate: true, dailyRate: true },
+        orderBy: { name: 'asc' },
+      });
+      return ok(vehicles);
+    },
+  });
+
+  const vehicleEnquirySchema = z.object({
+    vehicleId: z.string().min(1),
+    name: z.string().min(1),
+    email: z.string().email().optional().or(z.literal('')),
+    phone: z.string().min(1),
+    preferredDate: z.string().optional(),
+    message: z.string().optional(),
+  });
+
+  app.post('/:slug/vehicle-enquiry', {
+    schema: { tags: ['website'], summary: 'Submit a vehicle rental enquiry' },
+    handler: async (request, reply) => {
+      const { slug } = request.params as { slug: string };
+      const tenant = await prisma.tenant.findUnique({ where: { slug } });
+      if (!tenant || !tenant.isActive) return reply.status(404).send({ success: false, error: 'Resort not found' });
+
+      const body = vehicleEnquirySchema.parse(request.body);
+      const vehicle = await prisma.vehicle.findFirst({ where: { id: body.vehicleId, tenantId: tenant.id } });
+      if (!vehicle) return reply.status(404).send({ success: false, error: 'Vehicle not found' });
+
+      const guest = body.email ? await prisma.guest.findFirst({ where: { tenantId: tenant.id, email: body.email } }) : null;
+
+      await prisma.supportTicket.create({
+        data: {
+          tenantId: tenant.id,
+          guestId: guest?.id,
+          title: `Vehicle Rental Enquiry: ${vehicle.name}`,
+          description: [
+            `From: ${body.name} <${body.email || 'no email'}> · ${body.phone}`,
+            body.preferredDate && `Preferred date: ${body.preferredDate}`,
+            body.message && `\n${body.message}`,
+          ].filter(Boolean).join('\n'),
+          category: 'REQUEST',
+          priority: 'MEDIUM',
+          status: 'OPEN',
+        },
+      });
+
+      return reply.status(201).send(ok(null, "Thank you! We'll get back to you shortly."));
+    },
+  });
+
   // GET /site/:slug/availability — check room availability for dates
   app.get('/:slug/availability', {
     schema: { tags: ['website'], summary: 'Check room availability' },

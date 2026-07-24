@@ -50,6 +50,8 @@ const SITE_SECTIONS = [
   { id: 'amenities',    label: 'Amenities',              desc: 'Pool, spa, gym etc. (Coastal theme)' },
   { id: 'rooms',        label: 'Rooms & Villas',         desc: 'Room cards with prices & booking', fixed: true },
   { id: 'menu',         label: 'Restaurant Menu',        desc: 'Food menu with in-room ordering' },
+  { id: 'venues',       label: 'Venues & Events',        desc: 'Conference hall, banquet, lawn — with enquiry form' },
+  { id: 'vehicles',     label: 'Vehicle Rental',         desc: 'Cars, bikes, scooties, cycles — with enquiry form' },
   { id: 'gallery',      label: 'Photo Gallery',          desc: 'Image gallery grid' },
   { id: 'testimonials', label: 'Testimonials',           desc: 'Guest reviews & ratings' },
   { id: 'availability', label: 'Availability Calendar',  desc: 'Date picker to check open rooms' },

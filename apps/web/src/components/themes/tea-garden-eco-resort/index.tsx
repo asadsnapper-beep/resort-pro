@@ -10,7 +10,7 @@ import {
   ContactSection, FooterSection,
 } from './sections'
 import { WhatsAppButton } from '../_widgets/SocialLinks'
-import { MenuWidget } from '../_widgets'
+import { MenuWidget, VenuesWidget, VehiclesWidget } from '../_widgets'
 import { AnnouncementBar, OffersSection, usePublicOffers } from '../_widgets/OffersWidget'
 
 const NAV_ITEMS = [
@@ -201,6 +201,22 @@ export function TeaGardenEcoResortTheme({ data }: ThemeProps) {
               currency={tenant.currency}
             />
           ),
+          venues: show('venues') && (
+            <VenuesWidget
+              slug={tenant.slug}
+              primaryColor={primary}
+              accentColor={accent}
+              currency={tenant.currency}
+            />
+          ),
+          vehicles: show('vehicles') && (
+            <VehiclesWidget
+              slug={tenant.slug}
+              primaryColor={primary}
+              accentColor={accent}
+              currency={tenant.currency}
+            />
+          ),
           availability: show('availability') && (
             <AvailabilitySection data={data} onRoomSelect={handleRoomSelect} />
           ),
@@ -226,7 +242,7 @@ export function TeaGardenEcoResortTheme({ data }: ThemeProps) {
           contact:      show('contact')      && <ContactSection data={data} />,
         }
         const order = orderSections(
-          ['about', 'rooms', 'menu', 'availability', 'offers', 'booking', 'gallery', 'testimonials', 'contact'],
+          ['about', 'rooms', 'menu', 'venues', 'vehicles', 'availability', 'offers', 'booking', 'gallery', 'testimonials', 'contact'],
           website.sectionOrder,
         )
         return order.map(id => <React.Fragment key={id}>{nodes[id]}</React.Fragment>)

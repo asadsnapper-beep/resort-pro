@@ -5,8 +5,8 @@ import { Menu, X } from 'lucide-react'
 import type { ThemeProps, ResortRoom } from '../types'
 import { orderSections } from '../_utils/sections'
 
-const LUXE_SECTION_ORDER = ['about', 'rooms', 'menu', 'gallery', 'testimonials', 'availability', 'booking', 'contact'] as const
-import { AvailabilityCalendar, BookingForm, MenuWidget, ContactForm } from '../_widgets'
+const LUXE_SECTION_ORDER = ['about', 'rooms', 'menu', 'venues', 'vehicles', 'gallery', 'testimonials', 'availability', 'booking', 'contact'] as const
+import { AvailabilityCalendar, BookingForm, MenuWidget, ContactForm, VenuesWidget, VehiclesWidget } from '../_widgets'
 import { WhatsAppButton } from '../_widgets/SocialLinks'
 import {
   HeroSection, AboutSection, RoomsSection,
@@ -139,6 +139,12 @@ export function LuxeTheme({ data }: ThemeProps) {
           rooms: <RoomsSection data={data} onViewRoom={setSelectedRoom} onBookRoom={setBookingRoom} />,
           menu: show('menu') && (
             <MenuWidget slug={tenant.slug} primaryColor={primary} accentColor={accent} currency={tenant.currency} />
+          ),
+          venues: show('venues') && (
+            <VenuesWidget slug={tenant.slug} primaryColor={primary} accentColor={accent} currency={tenant.currency} />
+          ),
+          vehicles: show('vehicles') && (
+            <VehiclesWidget slug={tenant.slug} primaryColor={primary} accentColor={accent} currency={tenant.currency} />
           ),
           gallery: show('gallery') && <GallerySection data={data} />,
           testimonials: show('testimonials') && <TestimonialsSection data={data} />,

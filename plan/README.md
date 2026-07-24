@@ -81,8 +81,9 @@ plan/
 
 | File | কী আছে | Status |
 |------|---------|--------|
-| [event-venue.md](./event-venue.md) | Conference/banquet/lawn booking, event management, pricing | ✅ Built — venue CRUD, booking with double-booking conflict check, half/full-day/hourly pricing. Public website enquiry form not included yet (dashboard-only for now). |
+| [event-venue.md](./event-venue.md) | Conference/banquet/lawn booking, event management, pricing | ✅ Built — venue CRUD, booking with double-booking conflict check, half/full-day/hourly pricing. Public website section + enquiry form now live too (see [public-venues-vehicles.md](./public-venues-vehicles.md)). |
 | [vehicle-rental.md](./vehicle-rental.md) | Car/bike/scooty/cycle fleet, guest rentals with pickup/return (odometer, fuel, deposit, condition notes), conflict-checked time-slot booking, bill-to-room | ✅ Built |
+| [public-venues-vehicles.md](./public-venues-vehicles.md) | Venues & Vehicle Rental sections on the public resort website — self-fetching widgets on all 5 themes, "Enquire" modal → SupportTicket, owner-toggleable in website editor | ✅ Built |
 
 ---
 
