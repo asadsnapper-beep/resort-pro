@@ -70,6 +70,18 @@ import { aiRoutes } from './routes/ai';
 import { metrics, normalizePath } from './utils/metrics';
 
 export async function buildApp() {
+  // ── Fail-fast: JWT_SECRET must be set in production ───────────────────────
+  // Never fall back to a hardcoded default secret in production — a missing
+  // JWT_SECRET would otherwise let the app boot on a publicly-known value,
+  // allowing anyone to forge tokens (including SUPER_ADMIN). Crash instead.
+  // This also covers the cookie secret, which falls back to JWT_SECRET below.
+  if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+    throw new Error(
+      'FATAL: JWT_SECRET is not set in production. ' +
+      'Refusing to start with an insecure default secret.',
+    );
+  }
+
   const app = Fastify({
     // Behind Coolify/Traefik: without this, request.protocol/hostname reflect
     // the internal http connection instead of the real public https domain —

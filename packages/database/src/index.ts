@@ -30,6 +30,13 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 export type TenantScopedPrisma = ReturnType<typeof tenantPrisma>;
 
 export function tenantPrisma(tenantId: string) {
+  // Fail-closed: a falsy tenantId would make Prisma treat `where: { tenantId:
+  // undefined }` as "no filter", silently turning every query UNSCOPED across
+  // all tenants. Never allow that — a missing tenantId is always a bug (e.g. a
+  // refresh token used as an access token) and must crash, not leak.
+  if (!tenantId) {
+    throw new Error('tenantPrisma called without a tenantId — refusing to run unscoped queries');
+  }
   return prisma.$extends({
     query: {
       $allModels: {
@@ -51,6 +58,18 @@ export function tenantPrisma(tenantId: string) {
           return query(args);
         },
         async aggregate({ model, args, query }) {
+          if (model !== 'Tenant') {
+            (args as { where?: Record<string, unknown> }).where = {
+              tenantId,
+              ...(args as { where?: Record<string, unknown> }).where,
+            };
+          }
+          return query(args);
+        },
+        // groupBy is NOT covered by aggregate/count above — without this hook,
+        // db.model.groupBy(...) runs UNSCOPED and leaks every tenant's rows
+        // into the aggregation. Inject tenantId into its where clause too.
+        async groupBy({ model, args, query }) {
           if (model !== 'Tenant') {
             (args as { where?: Record<string, unknown> }).where = {
               tenantId,
