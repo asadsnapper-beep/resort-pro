@@ -85,11 +85,39 @@ const ALLOWED_TYPES = new Set([
 ]);
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
+// Sniff the real image type from the file's magic bytes (file signature),
+// independent of the client-supplied mimetype. Returns null if the bytes
+// don't match any allowed image format — which means the "image/png" a
+// client claimed could actually be HTML/script/SVG trying to sneak in.
+function sniffImageType(b: Buffer): string | null {
+  if (b.length < 12) return null;
+  // JPEG: FF D8 FF
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 &&
+      b[4] === 0x0d && b[5] === 0x0a && b[6] === 0x1a && b[7] === 0x0a) return 'image/png';
+  // GIF: "GIF8"
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38) return 'image/gif';
+  // WebP: "RIFF"...."WEBP"
+  if (b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
+  // AVIF: ...."ftyp" then a "avif"/"avis"/"mif1" brand
+  if (b.toString('ascii', 4, 8) === 'ftyp') {
+    const brand = b.toString('ascii', 8, 12);
+    if (brand === 'avif' || brand === 'avis' || brand === 'mif1') return 'image/avif';
+  }
+  return null;
+}
+
 function validate(buffer: Buffer, mimetype: string) {
   if (!ALLOWED_TYPES.has(mimetype))
     throw new Error(`File type "${mimetype}" not allowed. Use JPEG, PNG, WebP, GIF, or AVIF.`);
   if (buffer.byteLength > MAX_SIZE_BYTES)
     throw new Error(`File too large (${(buffer.byteLength / 1024 / 1024).toFixed(1)} MB). Max is 5 MB.`);
+  // Content-sniff: never trust the client's mimetype alone. The actual bytes
+  // must be a real image, or the upload is rejected (blocks HTML/SVG/script
+  // disguised with an image mimetype).
+  if (!sniffImageType(buffer))
+    throw new Error('File content is not a valid image. Upload a real JPEG, PNG, WebP, GIF, or AVIF.');
 }
 
 function ext(mimetype: string) {
