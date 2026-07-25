@@ -53,7 +53,9 @@ plan/
 | [facilities-activities.md](./facilities-activities.md) | Facilities section, activity booking, public website display | ❌ Not built |
 | [review-management.md](./review-management.md) | Auto review request, collect/approve/display, TripAdvisor/Google links | ❌ Not built |
 | [theme-system.md](./theme-system.md) | Super Admin theme management + complete theme development guide for Claude | ✅ Built — ei session-e heavily rework hoyeche |
+| [theme-studio-and-design-service.md](./theme-studio-and-design-service.md) | 3-tier theme system (config / uploadable HTML template / code) to break the "same skeleton, different paint" ceiling + paid custom-design request pipeline (income) | 📋 Plan only — approval-er opekkhay |
 | [ui-design-plan.md](./ui-design-plan.md) | Full UI redesign plan (11 phases) — use with Claude for design work | 🟡 Partial — ad-hoc kore kisu page redesign hoyeche (sidebar, /try, website builder), systematic 11-phase execution hoy nai |
+| [design-system-migration.md](./design-system-migration.md) | **স্থায়ী সমাধান** "eक page fix = sob page fix" korar jonno — 1475 inline style + 93 hardcoded color-ke 3-tier enforced design system (token → primitive → composite)-e migrate. Incremental + regression-safe | 📋 Plan only — approval-er opekkhay |
 
 ---
 
@@ -114,6 +116,7 @@ plan/
 |------|---------|--------|
 | [custom-room-types.md](./custom-room-types.md) | Custom/flexible room type definitions | — (not yet audited in detail) |
 | [security-plan.md](./security-plan.md) | Security hardening plan | — (not yet audited in detail) |
+| [auth-origin-hardening.md](./auth-origin-hardening.md) | Access token localStorage → httpOnly cookie, CSP/security headers, per-origin separation (dashboard vs tenant public site). Precondition for theme Tier 2 | 📋 Plan only — approval-er opekkhay |
 | [inventory.md](./inventory.md) | Stock items, categories, IN/OUT/ADJUSTMENT movements, low-stock filter | ✅ Built |
 | [inventory-vendor-po.md](./inventory-vendor-po.md) | Vendor management, purchase orders (draft→sent→received), 30-day demand tracking, low-stock notification bell, CSV import/export | ✅ Built |
 | [asset-register.md](./asset-register.md) | Durable property (furniture, equipment, vehicles) — asset tag, location, purchase/warranty info, maintenance log history, separate from consumable Inventory | ✅ Built |
