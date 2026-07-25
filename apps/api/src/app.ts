@@ -129,7 +129,11 @@ export async function buildApp() {
   await app.register(rateLimit, {
     max: 100,
     timeWindow: '1 minute',
+    // statusCode must be included here — without it the throttled response is
+    // sent with a 500 instead of the correct 429 (the returned object is used
+    // verbatim as the response). Applies to per-route overrides too.
     errorResponseBuilder: () => ({
+      statusCode: 429,
       success: false,
       error: 'Too many requests. Please slow down.',
     }),
@@ -191,11 +195,17 @@ export async function buildApp() {
     },
   });
 
-  await app.register(swaggerUi, {
-    routePrefix: '/docs',
-    uiConfig: { docExpansion: 'list', deepLinking: false },
-    staticCSP: false,
-  });
+  // Only expose the interactive /docs UI (and its /docs/json spec) outside
+  // production — in prod it would hand an attacker the full 459-endpoint API
+  // surface, parameter names, and schemas. The spec plugin above stays
+  // registered so app.swagger() still works for any internal use.
+  if (process.env.NODE_ENV !== 'production') {
+    await app.register(swaggerUi, {
+      routePrefix: '/docs',
+      uiConfig: { docExpansion: 'list', deepLinking: false },
+      staticCSP: false,
+    });
+  }
 
   // ── Request metrics hook ─────────────────────────────────────────────────
   app.addHook('onResponse', (request, reply, done) => {

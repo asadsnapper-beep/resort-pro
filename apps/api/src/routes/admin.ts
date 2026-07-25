@@ -101,7 +101,10 @@ async function logAdminAction({
 export async function adminRoutes(app: FastifyInstance) {
   // ── POST /api/admin/login ──────────────────────────────────────────────
   // DB-based admin auth — queries AdminUser table, not tenant users
-  app.post<{ Body: { email: string; password: string } }>('/login', async (request, reply) => {
+  app.post<{ Body: { email: string; password: string } }>('/login', {
+    // Admin login is a single high-value target — cap brute-force attempts.
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+  }, async (request, reply) => {
     const { email, password } = request.body || {};
     if (!email || !password) {
       return reply.status(400).send({ success: false, error: 'Email and password required' });

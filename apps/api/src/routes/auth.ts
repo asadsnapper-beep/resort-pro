@@ -54,6 +54,7 @@ const loginSchema = z.object({
 export async function authRoutes(app: FastifyInstance) {
   // POST /api/auth/register
   app.post('/register', {
+    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
     schema: {
       tags: ['auth'],
       summary: 'Register a new resort (tenant)',
@@ -233,6 +234,9 @@ export async function authRoutes(app: FastifyInstance) {
 
   // POST /api/auth/login
   app.post('/login', {
+    // Brute-force / credential-stuffing guard — far stricter than the global
+    // 100/min. Keyed per-IP by the rate-limit plugin's default keyGenerator.
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     schema: {
       tags: ['auth'],
       summary: 'Login to the dashboard',
@@ -420,6 +424,7 @@ export async function authRoutes(app: FastifyInstance) {
 
   // POST /api/auth/forgot-password
   app.post('/forgot-password', {
+    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
     schema: { tags: ['auth'], summary: 'Request password reset email' },
     handler: async (request, reply) => {
       const { email, slug } = request.body as { email: string; slug: string };
@@ -466,6 +471,7 @@ export async function authRoutes(app: FastifyInstance) {
 
   // POST /api/auth/reset-password
   app.post('/reset-password', {
+    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
     schema: { tags: ['auth'], summary: 'Reset password using token' },
     handler: async (request, reply) => {
       const body = z.object({
