@@ -49,6 +49,7 @@ services:
 
   api:
     image: ghcr.io/asadsnapper-beep/resort-pro-api:latest
+    pull_policy: always
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -85,6 +86,7 @@ services:
 
   web:
     image: ghcr.io/asadsnapper-beep/resort-pro-web:latest
+    pull_policy: always
     restart: unless-stopped
     environment:
       NODE_ENV: production

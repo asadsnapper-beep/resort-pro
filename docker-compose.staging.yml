@@ -42,6 +42,7 @@ services:
   # ── API (Fastify) ────────────────────────────────────────────────────────────
   api:
     image: ghcr.io/asadsnapper-beep/resort-pro-api:dev
+    pull_policy: always
     restart: unless-stopped
     ports:
       - '4001:4000'
@@ -79,6 +80,7 @@ services:
   # ── Web (Next.js) ────────────────────────────────────────────────────────────
   web:
     image: ghcr.io/asadsnapper-beep/resort-pro-web:dev
+    pull_policy: always
     restart: unless-stopped
     ports:
       - '3001:3000'
