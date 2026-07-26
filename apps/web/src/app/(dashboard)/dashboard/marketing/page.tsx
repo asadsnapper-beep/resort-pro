@@ -92,7 +92,7 @@ export default function MarketingPage() {
   const campaigns: Campaign[] = data?.data?.data ?? [];
 
   return (
-    <PageShell gap={6} className="max-w-5xl">
+    <PageShell gap={6}>
       {/* Header */}
       <PageHeader
         icon={
