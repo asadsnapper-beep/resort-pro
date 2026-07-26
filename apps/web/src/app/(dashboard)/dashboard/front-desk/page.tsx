@@ -10,6 +10,7 @@ import {
   BedDouble, Users, Sparkles, Wrench, LogIn, LogOut, Clock,
   Plus, Phone, Banknote, LayoutGrid, List, RefreshCw, AlertTriangle,
 } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Guest { id: string; firstName: string; lastName: string; phone?: string; email?: string }
@@ -470,17 +471,19 @@ export default function FrontDeskPage() {
   );
 
   return (
-    <div className="space-y-4 animate-fade-up">
+    <PageShell gap={4}>
       {/* Header */}
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Front Desk</h1>
-          <p className="mt-[4px] text-[13px] text-[#7a9890]">
+      <PageHeader
+        title="Front Desk"
+        subtitle={
+          <>
             {d?.date ? new Date(d.date).toLocaleDateString('en-BD', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : ''}
             {d?.totalGuests ? ` · ${d.totalGuests} guests in-house` : ''}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+          </>
+        }
+        align="end"
+        actions={
+          <div className="flex items-center gap-2">
           <button onClick={() => refetch()}
             className="flex h-[38px] w-[38px] items-center justify-center rounded-[9px] border transition-colors hover:bg-[#faf9f7] dark:hover:bg-white/5"
             style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-muted)' }}>
@@ -503,8 +506,9 @@ export default function FrontDeskPage() {
             style={{ background: 'var(--rp-btn-accent)' }}>
             <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} /> Walk-In
           </button>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       {/* Stats bar */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -597,6 +601,6 @@ export default function FrontDeskPage() {
       {checkInFor  && <CheckInModal  booking={checkInFor}  onClose={() => setCheckInFor(null)}  onSuccess={() => setCheckInFor(null)}  />}
       {checkOutFor && <CheckOutModal booking={checkOutFor} onClose={() => setCheckOutFor(null)} onSuccess={() => setCheckOutFor(null)} />}
       {walkInOpen  && <WalkInModal onClose={() => setWalkInOpen(false)} onSuccess={() => setWalkInOpen(false)} />}
-    </div>
+    </PageShell>
   );
 }
