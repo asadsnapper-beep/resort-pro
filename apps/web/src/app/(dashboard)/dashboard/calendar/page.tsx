@@ -9,6 +9,7 @@ import {
   ChevronLeft, ChevronRight, Loader2, BedDouble,
   CalendarDays, RefreshCw, Plus, X,
 } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 import { formatCurrency } from '@/lib/utils';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -302,18 +303,13 @@ export default function BookingCalendarPage() {
   ).length;
 
   return (
-    <div className="space-y-4 animate-fade-up">
+    <PageShell gap={4}>
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">
-            Booking Calendar
-          </h1>
-          <p className="mt-[4px] text-[13px] text-[#7a9890]">
-            {rooms.length} rooms · {totalBookings} bookings · {occupiedToday} occupied today
-          </p>
-        </div>
-
+      <PageHeader
+        title="Booking Calendar"
+        subtitle={`${rooms.length} rooms · ${totalBookings} bookings · ${occupiedToday} occupied today`}
+        align="start"
+        actions={
         <div className="flex items-center gap-2">
           <button onClick={() => navigate('today')}
             className="rounded-[9px] border px-3 py-2 text-[13px] transition-colors hover:bg-[#f4f1eb]"
@@ -332,7 +328,8 @@ export default function BookingCalendarPage() {
             New Booking
           </button>
         </div>
-      </div>
+        }
+      />
 
       {/* Quick stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -501,6 +498,6 @@ export default function BookingCalendarPage() {
           </div>
         </div>
       ), document.body)}
-    </div>
+    </PageShell>
   );
 }

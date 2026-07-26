@@ -15,6 +15,7 @@ import {
   X, Clock, Monitor, ShieldOff, Fingerprint, Upload, Key, DollarSign,
   GraduationCap, Loader2, Check, Pencil,
 } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 
 interface Staff {
   id: string;
@@ -1149,11 +1150,11 @@ export default function StaffPage() {
   const [tab, setTab] = useState<'directory' | 'attendance' | 'salary' | 'training'>('directory');
 
   return (
-    <div className="space-y-6 animate-fade-up">
-      <div>
-        <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Staff</h1>
-        <p className="mt-[4px] text-[13px] text-[#7a9890]">Directory, attendance, salary, training</p>
-      </div>
+    <PageShell gap={6}>
+      <PageHeader
+        title="Staff"
+        subtitle="Directory, attendance, salary, training"
+      />
 
       <div className="flex gap-1 rounded-[10px] p-1 w-fit" style={{ background: 'var(--rp-surface-3)' }}>
         {([
@@ -1174,6 +1175,6 @@ export default function StaffPage() {
       {tab === 'attendance' && <AttendanceTab />}
       {tab === 'salary' && <SalaryTab />}
       {tab === 'training' && <TrainingTab />}
-    </div>
+    </PageShell>
   );
 }

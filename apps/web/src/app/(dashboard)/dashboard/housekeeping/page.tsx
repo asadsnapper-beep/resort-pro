@@ -14,6 +14,7 @@ import {
   Bed, CalendarDays, ChevronLeft, ChevronRight, PackageSearch, Wine, Shirt,
   Loader2, Receipt,
 } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 
 interface HKTask {
   id: string;
@@ -1033,11 +1034,11 @@ export default function HousekeepingPage() {
   const [tab, setTab] = useState<'tasks' | 'lost-found' | 'minibar' | 'laundry'>('tasks');
 
   return (
-    <div className="space-y-4 animate-fade-up">
-      <div>
-        <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Housekeeping</h1>
-        <p className="mt-[4px] text-[13px] text-[#7a9890]">Cleaning tasks, lost & found, minibar, laundry</p>
-      </div>
+    <PageShell gap={4}>
+      <PageHeader
+        title="Housekeeping"
+        subtitle="Cleaning tasks, lost & found, minibar, laundry"
+      />
 
       <div className="flex gap-1 rounded-[10px] p-1 w-fit" style={{ background: 'var(--rp-surface-3)' }}>
         {([
@@ -1058,6 +1059,6 @@ export default function HousekeepingPage() {
       {tab === 'lost-found' && <LostFoundTab />}
       {tab === 'minibar' && <MinibarTab />}
       {tab === 'laundry' && <LaundryTab />}
-    </div>
+    </PageShell>
   );
 }

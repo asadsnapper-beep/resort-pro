@@ -7,6 +7,7 @@ import {
   X, ChevronDown, CheckCircle, Crown, Medal, Award,
   TrendingUp, ArrowRight, RefreshCw, Loader2,
 } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 import { useAuthStore } from '@/store/auth';
 import { api } from '@/lib/api';
 
@@ -95,11 +96,11 @@ export default function CRMPage() {
   ] as const;
 
   return (
-    <div className="space-y-6 animate-fade-up">
-      <div>
-        <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">CRM & Email Marketing</h1>
-        <p className="mt-[4px] text-[13px] text-[#7a9890]">Manage guest relationships, campaigns and automated sequences</p>
-      </div>
+    <PageShell gap={6}>
+      <PageHeader
+        title="CRM & Email Marketing"
+        subtitle="Manage guest relationships, campaigns and automated sequences"
+      />
 
       {/* Tabs */}
       <div className="flex gap-0 border-b" style={{ borderColor: 'var(--rp-border)' }}>
@@ -119,7 +120,7 @@ export default function CRMPage() {
       {tab === 'sequences' && <SequencesTab token={token!} />}
       {tab === 'templates' && <TemplatesTab token={token!} />}
       {tab === 'analytics' && <AnalyticsTab token={token!} />}
-    </div>
+    </PageShell>
   );
 }
 

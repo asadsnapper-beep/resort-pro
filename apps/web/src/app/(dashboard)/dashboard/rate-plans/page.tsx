@@ -8,6 +8,7 @@ import {
   Plus, Tags, Pencil, Trash2, ToggleLeft, ToggleRight,
   CalendarDays, BedDouble, Star, Loader2, Info,
 } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 import { useToast } from '@/hooks/use-toast';
 import { ModalShell } from '@/components/ui/modal-shell';
 
@@ -300,19 +301,20 @@ export default function RatePlansPage() {
   const openEdit = (p: RatePlan) => { setEditPlan(p); setShowModal(true); };
 
   return (
-    <div className="space-y-6 animate-fade-up">
+    <PageShell gap={6}>
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Rate Plans</h1>
-          <p className="mt-[4px] text-[13px] text-[#7a9890]">Dynamic pricing by season, day-of-week, or promotion</p>
-        </div>
-        <button onClick={openCreate}
-          className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors"
-          style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
-          <Plus className="h-4 w-4" /> New Rate Plan
-        </button>
-      </div>
+      <PageHeader
+        title="Rate Plans"
+        subtitle="Dynamic pricing by season, day-of-week, or promotion"
+        align="start"
+        actions={
+          <button onClick={openCreate}
+            className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors"
+            style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+            <Plus className="h-4 w-4" /> New Rate Plan
+          </button>
+        }
+      />
 
       {/* Priority legend */}
       <div className="rounded-[14px] border bg-white dark:bg-white/5 p-4"
@@ -486,6 +488,6 @@ export default function RatePlansPage() {
           onClose={() => { setShowModal(false); setEditPlan(undefined); }}
         />
       )}
-    </div>
+    </PageShell>
   );
 }
