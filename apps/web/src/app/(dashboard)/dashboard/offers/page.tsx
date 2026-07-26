@@ -9,7 +9,7 @@ import {
   MoonStar, CalendarDays, Users, CheckCircle2, XCircle, Clock,
   AlertTriangle, Loader2,
 } from 'lucide-react';
-import { PageHeader } from '@/components/patterns';
+import { PageShell, PageHeader } from '@/components/patterns';
 import { offersApi } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 
@@ -277,7 +277,7 @@ export default function OffersPage() {
   );
 
   return (
-    <div className="flex flex-col gap-6 max-w-5xl animate-fade-up">
+    <PageShell gap={6}>
       {/* Header */}
       <PageHeader
         title="Offers & Promotions"
@@ -470,6 +470,6 @@ export default function OffersPage() {
           </p>
         </ModalShell>
       )}
-    </div>
+    </PageShell>
   );
 }
