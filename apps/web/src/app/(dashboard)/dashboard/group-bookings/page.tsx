@@ -12,6 +12,7 @@ import {
   Phone, Mail, Calendar, BedDouble, Banknote, Pencil,
   CheckCircle2, Tag, Loader2,
 } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const EVENT_TYPES = ['WEDDING', 'CORPORATE', 'CONFERENCE', 'SPORTS', 'TOUR', 'FAMILY', 'OTHER'] as const;
@@ -694,19 +695,20 @@ export default function GroupBookingsPage() {
   const STATUS_OPTIONS = ['', 'TENTATIVE', 'CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED'];
 
   return (
-    <div className="space-y-6 animate-fade-up">
+    <PageShell gap={6}>
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Group Bookings</h1>
-          <p className="mt-[4px] text-[13px] text-[#7a9890]">Weddings, corporate retreats, conferences — manage multi-room groups</p>
-        </div>
-        <button onClick={() => { setEditingGroup(null); setModalOpen(true); }}
-          className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors"
-          style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
-          <Plus className="h-4 w-4" /> New Group
-        </button>
-      </div>
+      <PageHeader
+        title="Group Bookings"
+        subtitle="Weddings, corporate retreats, conferences — manage multi-room groups"
+        align="responsive"
+        actions={
+          <button onClick={() => { setEditingGroup(null); setModalOpen(true); }}
+            className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors"
+            style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+            <Plus className="h-4 w-4" /> New Group
+          </button>
+        }
+      />
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-3">
@@ -798,6 +800,6 @@ export default function GroupBookingsPage() {
           }}
         />
       )}
-    </div>
+    </PageShell>
   );
 }

@@ -9,6 +9,7 @@ import {
   Gift, Plus, Pencil, Trash2, X, Check, ToggleLeft, ToggleRight,
   Image, Star, Loader2,
 } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 import { formatCurrency } from '@/lib/utils';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -348,19 +349,20 @@ export default function PackagesPage() {
   const openEdit   = (pkg: PackageItem) => { setEditingPkg(pkg); setModalOpen(true); };
 
   return (
-    <div className="space-y-6 animate-fade-up">
+    <PageShell gap={6}>
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Package Deals</h1>
-          <p className="mt-[4px] text-[13px] text-[#7a9890]">Bundle rooms with experiences — breakfast, spa, transfers and more</p>
-        </div>
-        <button onClick={openCreate}
-          className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors"
-          style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
-          <Plus className="h-4 w-4" /> New Package
-        </button>
-      </div>
+      <PageHeader
+        title="Package Deals"
+        subtitle="Bundle rooms with experiences — breakfast, spa, transfers and more"
+        align="responsive"
+        actions={
+          <button onClick={openCreate}
+            className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors"
+            style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+            <Plus className="h-4 w-4" /> New Package
+          </button>
+        }
+      />
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-3">
@@ -452,6 +454,6 @@ export default function PackagesPage() {
           onClose={() => { setModalOpen(false); setEditingPkg(undefined); }}
         />
       )}
-    </div>
+    </PageShell>
   );
 }

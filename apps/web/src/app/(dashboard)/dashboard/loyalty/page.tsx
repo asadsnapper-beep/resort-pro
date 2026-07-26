@@ -12,6 +12,7 @@ import {
   Search, X, Gift, ToggleLeft, ToggleRight,
   Crown, History, Check, Loader2,
 } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const TIER_CONFIG = {
@@ -464,17 +465,13 @@ export default function LoyaltyPage() {
   const tierCounts = Object.fromEntries(stats.map((s: any) => [s.tier, s._count]));
 
   return (
-    <div className="space-y-6 animate-fade-up">
+    <PageShell gap={6}>
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">
-            {prog?.programName ?? 'Loyalty Program'}
-          </h1>
-          <p className="mt-[4px] text-[13px] text-[#7a9890]">
-            Reward loyal guests with points, tier upgrades, and redeemable discounts
-          </p>
-        </div>
+      <PageHeader
+        title={prog?.programName ?? 'Loyalty Program'}
+        subtitle="Reward loyal guests with points, tier upgrades, and redeemable discounts"
+        align="responsive"
+        actions={
         <div className="flex items-center gap-2">
           {prog && (
             <span className="flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12px] font-semibold"
@@ -491,7 +488,8 @@ export default function LoyaltyPage() {
             <Settings className="h-4 w-4" /> Settings
           </button>
         </div>
-      </div>
+        }
+      />
 
       {/* Disabled banner */}
       {prog && !prog.isEnabled && (
@@ -709,6 +707,6 @@ export default function LoyaltyPage() {
       {selectedGuest && (
         <MemberDrawer guestId={selectedGuest} prog={prog} onClose={() => setSelectedGuest(null)} />
       )}
-    </div>
+    </PageShell>
   );
 }

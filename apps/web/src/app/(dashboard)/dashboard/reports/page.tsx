@@ -12,6 +12,7 @@ import {
   Banknote, CreditCard, Building2, ArrowRight,
   Send, MessageCircle, Bell, BellOff, Clock, CheckCircle2,
 } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 import { formatCurrency } from '@/lib/utils';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -302,14 +303,14 @@ export default function ReportsPage() {
         }
       `}</style>
 
-      <div className="space-y-6 animate-fade-up">
+      <PageShell gap={6}>
         {/* ── Header ── */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between no-print">
-          <div>
-            <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Daily Report</h1>
-            <p className="mt-[4px] text-[13px] text-[#7a9890]">End-of-day summary for front desk & management</p>
-          </div>
-
+        <PageHeader
+          title="Daily Report"
+          subtitle="End-of-day summary for front desk & management"
+          align="responsive"
+          className="no-print"
+          actions={
           <div className="flex flex-wrap items-center gap-2">
             {/* Date navigator */}
             <div className="flex items-center overflow-hidden rounded-[9px] border" style={{ borderColor: 'var(--rp-border-md)' }}>
@@ -347,7 +348,8 @@ export default function ReportsPage() {
               Print
             </button>
           </div>
-        </div>
+          }
+        />
 
         {/* Email input row */}
         {showEmailInput && (
@@ -647,7 +649,7 @@ export default function ReportsPage() {
 
         {/* ── Auto-Dispatch Settings ── */}
         <DispatchSettings />
-      </div>
+      </PageShell>
     </>
   );
 }
