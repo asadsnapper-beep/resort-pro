@@ -11,6 +11,7 @@ import {
   Clock, ExternalLink, AlertTriangle, ChevronDown, ChevronUp,
   Wifi, WifiOff, Copy, Check, Loader2,
 } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 
 interface Room { id: string; number: string; name: string; }
 
@@ -388,26 +389,25 @@ export default function ChannelsPage() {
   const errored         = calendars.filter(c => c.lastError).length;
 
   return (
-    <div className="space-y-6 animate-fade-up">
+    <PageShell gap={6}>
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] flex items-center gap-3 text-[#18231f] dark:text-[#dfd9d0]">
-            <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px]" style={{ background: 'var(--rp-teal-bg)' }}>
-              <Link2 className="h-4 w-4" style={{ color: '#23766a' }} />
-            </div>
-            Channel Sync
-          </h1>
-          <p className="mt-[4px] text-[13px] text-[#7a9890] dark:text-[#94b8b0]">
-            Connect Booking.com, Airbnb, or any iCal source to prevent double bookings
-          </p>
-        </div>
-        <button onClick={() => { setPreselectedRoom(null); setShowModal(true); }}
-          className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium hover:opacity-90"
-          style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
-          <Plus className="h-4 w-4" /> Add Calendar
-        </button>
-      </div>
+      <PageHeader
+        icon={
+          <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px]" style={{ background: 'var(--rp-teal-bg)' }}>
+            <Link2 className="h-4 w-4" style={{ color: '#23766a' }} />
+          </div>
+        }
+        title="Channel Sync"
+        subtitle="Connect Booking.com, Airbnb, or any iCal source to prevent double bookings"
+        align="center"
+        actions={
+          <button onClick={() => { setPreselectedRoom(null); setShowModal(true); }}
+            className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium hover:opacity-90"
+            style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+            <Plus className="h-4 w-4" /> Add Calendar
+          </button>
+        }
+      />
 
       {/* Info banner */}
       <div className="flex items-start gap-3 rounded-[12px] border px-4 py-3"
@@ -472,6 +472,6 @@ export default function ChannelsPage() {
           onClose={() => { setShowModal(false); setPreselectedRoom(null); }}
           onSaved={() => { setShowModal(false); setPreselectedRoom(null); }} />
       )}
-    </div>
+    </PageShell>
   );
 }

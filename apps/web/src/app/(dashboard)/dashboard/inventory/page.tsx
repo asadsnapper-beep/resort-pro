@@ -13,6 +13,7 @@ import {
   Pencil, ArrowUpDown, ChevronLeft, ChevronRight, History, Clock, Loader2,
   Download, Upload, Truck, ClipboardList,
 } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 
 interface InventoryItem {
   id: string;
@@ -925,15 +926,15 @@ export default function InventoryPage() {
   const totalValue              = stats.totalValue    ?? 0;
 
   return (
-    <div className="space-y-6 animate-fade-up">
+    <PageShell gap={6}>
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Inventory</h1>
-          <p className="mt-[4px] text-[13px] text-[#7a9890]">Track stock levels, vendors, and purchase orders</p>
-        </div>
-        {tab === 'items' && (
+      <PageHeader
+        title="Inventory"
+        subtitle="Track stock levels, vendors, and purchase orders"
+        align="center"
+        actions={
+          tab === 'items' && (
           <div className="flex items-center gap-2">
             <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleImportFile} />
             <button onClick={() => fileInputRef.current?.click()} disabled={importMutation.isPending}
@@ -952,8 +953,9 @@ export default function InventoryPage() {
               <Plus className="h-4 w-4" /> Add Item
             </button>
           </div>
-        )}
-      </div>
+          )
+        }
+      />
 
       {/* Tabs */}
       <div className="flex gap-1 rounded-[10px] p-1 w-fit" style={{ background: 'var(--rp-surface-3)' }}>
@@ -1170,6 +1172,6 @@ export default function InventoryPage() {
       <MovementModal open={!!movementItem} onClose={() => setMovementItem(null)} item={movementItem} loading={movementMutation.isPending}
         onSubmit={d => movementItem && movementMutation.mutate({ id: movementItem.id, data: d })} />
       <HistoryModal open={!!historyItem} onClose={() => setHistoryItem(null)} item={historyItem} />
-    </div>
+    </PageShell>
   );
 }

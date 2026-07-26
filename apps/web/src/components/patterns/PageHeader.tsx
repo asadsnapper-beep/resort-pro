@@ -42,6 +42,7 @@ export function PageHeader({
   title,
   subtitle,
   actions,
+  icon,
   align = 'start',
   className = '',
 }: {
@@ -49,6 +50,12 @@ export function PageHeader({
   subtitle?: ReactNode;
   /** Right-aligned action area — usually one <ActionButton>. */
   actions?: ReactNode;
+  /**
+   * Optional badge/icon rendered before the title, inside the h1. Three pages
+   * do this today by adding `flex items-center gap-3` to the h1 itself; this
+   * reproduces that exactly without callers needing to know the internals.
+   */
+  icon?: ReactNode;
   /** Vertical alignment of the actions against the title block. */
   align?: Align;
   /** Extra classes on the row (e.g. `no-print` on the reports page). */
@@ -56,7 +63,12 @@ export function PageHeader({
 }) {
   const heading = (
     <div>
-      <h1 className="font-display text-rp-title font-medium tracking-[-0.01em] text-rp-text">
+      <h1
+        className={`font-display text-rp-title font-medium tracking-[-0.01em]${
+          icon ? ' flex items-center gap-3' : ''
+        } text-rp-text`}
+      >
+        {icon}
         {title}
       </h1>
       {subtitle && (
