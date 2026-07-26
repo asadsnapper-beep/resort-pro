@@ -10,6 +10,7 @@ import {
   Megaphone, ChevronRight, ChevronLeft, Users, Clock, Send,
   Loader2, Check, Info, Calendar,
 } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 
 type Channel      = 'sms' | 'whatsapp' | 'both';
 type AudienceType = 'all' | 'past' | 'upcoming' | 'date_range' | 'vip';
@@ -98,17 +99,17 @@ export default function NewCampaignPage() {
   };
 
   return (
-    <div className="max-w-2xl space-y-6 animate-fade-up">
+    <PageShell gap={6} className="max-w-2xl">
       {/* Header */}
-      <div>
-        <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] flex items-center gap-3 text-[#18231f] dark:text-[#dfd9d0]">
+      <PageHeader
+        icon={
           <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px]" style={{ background: 'var(--rp-teal-bg)' }}>
             <Megaphone className="h-4 w-4" style={{ color: '#23766a' }} />
           </div>
-          New Campaign
-        </h1>
-        <p className="mt-[4px] text-[13px] text-[#7a9890] dark:text-[#94b8b0]">Send SMS or WhatsApp to guests</p>
-      </div>
+        }
+        title="New Campaign"
+        subtitle="Send SMS or WhatsApp to guests"
+      />
 
       {/* Step progress */}
       <div className="flex items-center gap-2">
@@ -427,6 +428,6 @@ export default function NewCampaignPage() {
           </div>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }
