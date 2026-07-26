@@ -1,6 +1,7 @@
 'use client';
 
 import { ModalShell } from '@/components/ui/modal-shell';
+import { PageShell, PageHeader, ActionButton } from '@/components/patterns';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { expensesApi } from '@/lib/api';
@@ -337,19 +338,19 @@ export default function ExpensesPage() {
   const totalPages = expensesData?.pages ?? 1;
 
   return (
-    <div className="space-y-6 animate-fade-up">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Expenses</h1>
-          <p className="mt-[4px] text-[13px] text-[#7a9890]">Track operational costs and view profit margins</p>
-        </div>
-        <button onClick={() => { setEditingExpense(null); setShowModal(true); }}
-          className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors"
-          style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
-          <Plus className="h-4 w-4" /> Add Expense
-        </button>
-      </div>
+    <PageShell gap={6}>
+      <PageHeader
+        title="Expenses"
+        subtitle="Track operational costs and view profit margins"
+        actions={
+          <ActionButton
+            icon={<Plus className="h-4 w-4" />}
+            onClick={() => { setEditingExpense(null); setShowModal(true); }}
+          >
+            Add Expense
+          </ActionButton>
+        }
+      />
 
       {/* Month navigator + filter */}
       <div className="flex flex-wrap items-center gap-3">
@@ -669,6 +670,6 @@ export default function ExpensesPage() {
           onClose={() => { setShowModal(false); setEditingExpense(null); }}
         />
       )}
-    </div>
+    </PageShell>
   );
 }

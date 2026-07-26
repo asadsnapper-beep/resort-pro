@@ -69,6 +69,10 @@
   /* Text */
   --rp-text:          #18231f;
   --rp-text-muted:    #8aa29a;
+  /* Drift from --rp-text-muted: a second, slightly darker muted green used 45×
+     (mostly page subtitles). Kept as its own token so migration stays
+     pixel-identical; collapsing it into --rp-text-muted is a design decision. */
+  --rp-text-muted-2:  #7a9890;
   --rp-text-subtle:   #6b8880;
   --rp-text-faint:    #c5bdb4;
   --rp-text-accent:   #4a6e66;
@@ -116,6 +120,7 @@
   /* Text */
   --rp-text:          #dfd9d0;
   --rp-text-muted:    #94b8b0;
+  --rp-text-muted-2:  #94b8b0;  /* both muted greens converge in dark mode */
   --rp-text-subtle:   #94b8b0;
   --rp-text-faint:    #6e8580;
   --rp-text-accent:   #6d9990;

@@ -72,6 +72,7 @@ const config: Config = {
           // Text
           text:               'var(--rp-text)',
           muted:              'var(--rp-text-muted)',
+          'muted-2':          'var(--rp-text-muted-2)',
           subtle:             'var(--rp-text-subtle)',
           faint:              'var(--rp-text-faint)',
           accent:             'var(--rp-text-accent)',
