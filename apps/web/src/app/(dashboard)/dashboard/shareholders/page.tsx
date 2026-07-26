@@ -8,6 +8,7 @@ import { toast } from '@/hooks/use-toast';
 import {
   PieChart, Plus, Loader2, Users, Pencil, Banknote, Clock, X, History,
 } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 
 interface Shareholder {
   id: string;
@@ -57,21 +58,18 @@ export default function ShareholdersPage() {
   });
 
   return (
-    <div className="space-y-6 animate-fade-up">
+    <PageShell gap={6}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px]" style={{ background: 'var(--rp-teal-bg)' }}>
             <PieChart className="h-4 w-4" style={{ color: '#23766a' }} />
           </div>
-          <div>
-            <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f] dark:text-[#dfd9d0]">
-              Shareholders
-            </h1>
-            <p className="text-[13px] text-[#7a9890] dark:text-[#94b8b0]">
-              Ownership %, payout history — সব একসাথে
-            </p>
-          </div>
+          <PageHeader
+            title="Shareholders"
+            subtitle="Ownership %, payout history — সব একসাথে"
+            tightSubtitle
+          />
         </div>
         <button
           onClick={() => setAddOpen(true)}
@@ -221,7 +219,7 @@ export default function ShareholdersPage() {
           onClose={() => setHistoryTarget(null)}
         />
       )}
-    </div>
+    </PageShell>
   );
 }
 

@@ -44,6 +44,7 @@ export function PageHeader({
   actions,
   icon,
   align = 'start',
+  tightSubtitle = false,
   className = '',
 }: {
   title: ReactNode;
@@ -58,6 +59,18 @@ export function PageHeader({
   icon?: ReactNode;
   /** Vertical alignment of the actions against the title block. */
   align?: Align;
+  /**
+   * Drops the subtitle's `mt-[4px]`.
+   *
+   * Exists only to preserve 6 pages (corporate-accounts, my-shares,
+   * referrals, shareholders, vehicles, venues) whose subtitles omit that
+   * margin while the other 30 include it. That is drift, not intent — but
+   * migrating them without this would silently add 4px of spacing.
+   *
+   * Once the drift is reconciled (i.e. those 6 adopt the canonical spacing),
+   * this prop and its call sites should be deleted.
+   */
+  tightSubtitle?: boolean;
   /** Extra classes on the row (e.g. `no-print` on the reports page). */
   className?: string;
 }) {
@@ -72,7 +85,9 @@ export function PageHeader({
         {title}
       </h1>
       {subtitle && (
-        <p className="mt-[4px] text-rp-body text-rp-muted-2">{subtitle}</p>
+        <p className={`${tightSubtitle ? '' : 'mt-[4px] '}text-rp-body text-rp-muted-2`}>
+          {subtitle}
+        </p>
       )}
     </div>
   );

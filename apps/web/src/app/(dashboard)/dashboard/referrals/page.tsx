@@ -7,6 +7,7 @@ import {
   Gift, Link2, Copy, Check, Users, Clock, Award,
   Share2, MessageCircle, Mail, ExternalLink, Loader2, Sparkles, CreditCard,
 } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 import { toast } from '@/hooks/use-toast';
 
 interface ReferralEntry {
@@ -93,20 +94,17 @@ export default function ReferralsPage() {
   );
 
   return (
-    <div className="space-y-6 animate-fade-up">
+    <PageShell gap={6}>
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px]" style={{ background: 'var(--rp-teal-bg)' }}>
           <Gift className="h-4 w-4" style={{ color: '#23766a' }} />
         </div>
-        <div>
-          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f] dark:text-[#dfd9d0]">
-            Referral Program
-          </h1>
-          <p className="text-[13px] text-[#7a9890] dark:text-[#94b8b0]">
-            Share your link — যে resort signup করবে তার জন্য admin reward দেবে।
-          </p>
-        </div>
+        <PageHeader
+          title="Referral Program"
+          subtitle="Share your link — যে resort signup করবে তার জন্য admin reward দেবে।"
+          tightSubtitle
+        />
       </div>
 
       {/* Reward banners */}
@@ -267,6 +265,6 @@ export default function ReferralsPage() {
           </div>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }

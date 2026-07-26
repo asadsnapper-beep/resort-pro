@@ -9,6 +9,7 @@ import { toast } from '@/hooks/use-toast';
 import {
   Plus, Car, Bike, Loader2, Receipt, LogOut, LogIn, X,
 } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 
 interface Vehicle {
   id: string;
@@ -561,15 +562,16 @@ export default function VehiclesPage() {
   const [tab, setTab] = useState<'fleet' | 'rentals'>('fleet');
 
   return (
-    <div className="space-y-6 animate-fade-up">
+    <PageShell gap={6}>
       <div className="flex items-center gap-3">
         <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px]" style={{ background: 'var(--rp-teal-bg)' }}>
           <Car className="h-4 w-4" style={{ color: '#23766a' }} />
         </div>
-        <div>
-          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f] dark:text-[#dfd9d0]">Vehicle Rental</h1>
-          <p className="text-[13px] text-[#7a9890] dark:text-[#94b8b0]">Car, bike, scooty, cycle — rent to guests</p>
-        </div>
+        <PageHeader
+          title="Vehicle Rental"
+          subtitle="Car, bike, scooty, cycle — rent to guests"
+          tightSubtitle
+        />
       </div>
 
       <div className="flex gap-1 rounded-[10px] p-1 w-fit" style={{ background: 'var(--rp-surface-3)' }}>
@@ -583,6 +585,6 @@ export default function VehiclesPage() {
       </div>
 
       {tab === 'fleet' ? <FleetTab /> : <RentalsTab />}
-    </div>
+    </PageShell>
   );
 }
