@@ -33,6 +33,42 @@ jobs:
             echo "✅ All routes use tenant-scoped request.db — isolation complete!"
           fi
 
+      # The check above only catches bare `prisma.` usage. It would NOT have
+      # caught the 2026-07-25 CRITICAL leak, where routes correctly used the
+      # tenant-scoped `db.` client but hit `groupBy` — an operation tenantPrisma
+      # had no hook for, so those queries ran unscoped across every tenant.
+      # This asserts every data-reaching Prisma operation is intercepted, so
+      # dropping a hook (or Prisma adding an operation) fails the build.
+      - name: Assert tenantPrisma intercepts every data operation
+        run: |
+          FILE=packages/database/src/index.ts
+          MISSING=""
+          for op in findMany findFirst findFirstOrThrow findUnique findUniqueOrThrow \
+                    count aggregate groupBy create createMany update updateMany \
+                    upsert delete deleteMany; do
+            grep -qE "^ *async ${op}\(" "$FILE" || MISSING="$MISSING $op"
+          done
+          if [ -n "$MISSING" ]; then
+            echo "✗ tenantPrisma is missing hooks for:$MISSING"
+            echo ""
+            echo "Any operation without a hook runs UNSCOPED — it returns and writes"
+            echo "rows across all tenants. Add a hook in $FILE (mirror aggregate/groupBy)."
+            exit 1
+          fi
+          echo "✅ tenantPrisma intercepts all expected operations."
+
+      - name: Assert tenantPrisma fails closed on a missing tenantId
+        run: |
+          # A falsy tenantId makes Prisma treat `where: { tenantId: undefined }`
+          # as "no filter", silently unscoping the query. The guard clause must stay.
+          if ! grep -q "refusing to run unscoped queries" packages/database/src/index.ts; then
+            echo "✗ tenantPrisma's fail-closed guard for a missing tenantId is gone."
+            echo "  Without it, a token lacking tenantId (e.g. a refresh token used as"
+            echo "  an access token) yields queries that span every tenant."
+            exit 1
+          fi
+          echo "✅ tenantPrisma fails closed without a tenantId."
+
   # ── Schema Drift Guard ─────────────────────────────────────────────────────
   schema-drift:
     name: Schema Drift Check
@@ -319,3 +355,24 @@ jobs:
       - name: Typecheck API
         working-directory: apps/api
         run: npx tsc --noEmit
+
+  # ── Design system ratchet (blocking) ─────────────────────────────────────────
+  # Existing design debt is allowed to sit, but it may not grow: this fails if
+  # any violation category (hardcoded hex, inline styles, arbitrary px sizes,
+  # hand-written page headers …) increases above the committed baseline.
+  # Blocking on purpose — without it the migration in plan/design-system-
+  # migration.md silently regresses. Needs no dependencies, just node.
+  design-system:
+    name: Design system ratchet
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+
+      - name: Check for design system regressions
+        run: node scripts/design-system-ratchet.mjs
