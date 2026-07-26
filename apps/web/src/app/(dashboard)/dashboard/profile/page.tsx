@@ -7,6 +7,7 @@ import { toast } from '@/hooks/use-toast';
 import {
   User, Mail, Phone, Lock, Eye, EyeOff, CheckCircle2, Shield,
 } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 
 const ROLE_CONFIG: Record<string, { label: string; bg: string; border: string; text: string }> = {
@@ -129,13 +130,13 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5 pb-12 animate-fade-up">
+    <PageShell gap={5} className="mx-auto max-w-2xl pb-12">
 
       {/* Page header */}
-      <div>
-        <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">My Profile</h1>
-        <p className="mt-[4px] text-[13px] text-[#7a9890]">Manage your personal information and password</p>
-      </div>
+      <PageHeader
+        title="My Profile"
+        subtitle="Manage your personal information and password"
+      />
 
       {/* Avatar + identity card */}
       <div className={cardCls} style={cardStyle}>
@@ -380,6 +381,6 @@ export default function ProfilePage() {
         </div>
       </div>
 
-    </div>
+    </PageShell>
   );
 }

@@ -9,6 +9,7 @@ import {
   CreditCard, CheckCircle2, AlertTriangle, Clock, Zap,
   Shield, Building2, ExternalLink, Receipt, Loader2, Star, ArrowRight,
 } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 
 type PlanKey = 'FREE' | 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';
 
@@ -226,14 +227,12 @@ export default function BillingPage() {
   const currentPlan = billing?.plan || 'FREE';
 
   return (
-    <div className="space-y-8 animate-fade-up">
+    <PageShell gap={8}>
       {/* Header */}
-      <div>
-        <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f] dark:text-[#dfd9d0]">
-          Billing & Subscription
-        </h1>
-        <p className="mt-[4px] text-[13px] text-[#7a9890] dark:text-[#94b8b0]">Manage your plan and payment details</p>
-      </div>
+      <PageHeader
+        title="Billing & Subscription"
+        subtitle="Manage your plan and payment details"
+      />
 
       {/* Current plan card */}
       <div className="rounded-[14px] border bg-white p-6"
@@ -391,6 +390,6 @@ export default function BillingPage() {
           </p>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

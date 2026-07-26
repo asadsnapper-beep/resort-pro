@@ -9,6 +9,7 @@ import {
   CalendarCheck, BarChart2, ArrowUp, ArrowDown, Loader2,
   Globe, Star, Clock, Receipt, PiggyBank,
 } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart, Pie,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell,
@@ -174,12 +175,12 @@ export default function AnalyticsPage() {
   const occData = occupancy.filter((_, i) => i % 3 === 0 || i === occupancy.length - 1);
 
   return (
-    <div className="space-y-6 animate-fade-up">
+    <PageShell gap={6}>
       {/* Header */}
-      <div>
-        <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Analytics</h1>
-        <p className="mt-[4px] text-[13px] text-[#7a9890]">Revenue, occupancy, guests, and booking insights</p>
-      </div>
+      <PageHeader
+        title="Analytics"
+        subtitle="Revenue, occupancy, guests, and booking insights"
+      />
 
       {/* ── KPI Grid — Revenue & Operations ── */}
       <div>
@@ -415,6 +416,6 @@ export default function AnalyticsPage() {
           </div>
         </ChartCard>
       )}
-    </div>
+    </PageShell>
   );
 }
