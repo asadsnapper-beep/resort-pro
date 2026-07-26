@@ -13,6 +13,7 @@ import {
   Clock, ChevronDown, Wind, Droplets, Zap, Sofa,
   DoorOpen, Wifi, Tv, HelpCircle, User, BedDouble, Trash2,
 } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Priority = 'URGENT' | 'HIGH' | 'NORMAL' | 'LOW';
@@ -416,20 +417,21 @@ export default function MaintenancePage() {
   const tickets = ticketsRes ?? [];
 
   return (
-    <div className="space-y-4 animate-fade-up">
+    <PageShell gap={4}>
       {/* Header */}
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Maintenance</h1>
-          <p className="mt-[4px] text-[13px] text-[#7a9890]">Track and resolve room technical issues</p>
-        </div>
-        <button
-          className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
-          style={{ background: 'var(--rp-btn-accent)' }}
-          onClick={() => setShowCreate(true)}>
-          <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} /> New Ticket
-        </button>
-      </div>
+      <PageHeader
+        title="Maintenance"
+        subtitle="Track and resolve room technical issues"
+        align="end"
+        actions={
+          <button
+            className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
+            style={{ background: 'var(--rp-btn-accent)' }}
+            onClick={() => setShowCreate(true)}>
+            <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} /> New Ticket
+          </button>
+        }
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -515,6 +517,6 @@ export default function MaintenancePage() {
       )}
 
       {showCreate && <CreateTicketModal onClose={() => setShowCreate(false)} />}
-    </div>
+    </PageShell>
   );
 }

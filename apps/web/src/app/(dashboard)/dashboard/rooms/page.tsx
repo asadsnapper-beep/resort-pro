@@ -11,6 +11,7 @@ import { RoomDetailSheet } from '@/components/rooms/RoomDetailSheet';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { Plus, BedDouble, Users, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 import type { Room } from '@resort-pro/types';
 import { useRoomTypeLabels } from '@/hooks/use-room-type-labels';
 
@@ -132,21 +133,22 @@ export default function RoomsPage() {
   const resetFilters = () => { setSearchInput(''); setStatusFilter(''); setTypeFilter(''); setPage(1); };
 
   return (
-    <div className="space-y-4 animate-fade-up">
+    <PageShell gap={4}>
       {/* Header */}
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Rooms & Villas</h1>
-          <p className="mt-[4px] text-[13px] text-[#7a9890]">Manage your resort accommodations</p>
-        </div>
-        <button
-          onClick={() => setAddOpen(true)}
-          className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
-          style={{ background: 'var(--rp-btn-accent)' }}
-        >
-          <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} /> Add Room
-        </button>
-      </div>
+      <PageHeader
+        title="Rooms & Villas"
+        subtitle="Manage your resort accommodations"
+        align="end"
+        actions={
+          <button
+            onClick={() => setAddOpen(true)}
+            className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
+            style={{ background: 'var(--rp-btn-accent)' }}
+          >
+            <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} /> Add Room
+          </button>
+        }
+      />
 
       {/* Stats bar — clickable filters */}
       <div className="grid grid-cols-3 gap-2 md:grid-cols-6">
@@ -355,6 +357,6 @@ export default function RoomsPage() {
       <RoomModal open={!!editRoom} onClose={() => setEditRoom(null)} room={editRoom} loading={updateMutation.isPending} onSubmit={data => editRoom && updateMutation.mutate({ id: editRoom.id, data })} />
       <RoomDetailSheet room={selectedRoom} onClose={() => setSelectedRoom(null)} onEdit={r => { setEditRoom(r); setSelectedRoom(null); }} onDelete={r => setDeleteRoom(r)} onStatusChange={(id, status) => statusMutation.mutate({ id, status })} statusLoading={statusMutation.isPending} />
       <ConfirmModal open={!!deleteRoom} onClose={() => setDeleteRoom(null)} onConfirm={() => deleteRoom && deleteMutation.mutate(deleteRoom.id)} loading={deleteMutation.isPending} title="Delete Room" description={`Are you sure you want to delete "${deleteRoom?.name}"? This action cannot be undone.`} />
-    </div>
+    </PageShell>
   );
 }

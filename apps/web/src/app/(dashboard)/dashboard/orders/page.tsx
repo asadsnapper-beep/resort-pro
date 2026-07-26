@@ -18,6 +18,7 @@ import {
   Trash2, ChevronLeft, ChevronRight, UtensilsCrossed, Bell,
   Maximize2, Minimize2,
 } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 
 interface OrderItem {
   id: string;
@@ -621,20 +622,21 @@ export default function OrdersPage() {
   const stats = statsData?.data?.data ?? {};
 
   return (
-    <div className="space-y-4 animate-fade-up">
+    <PageShell gap={4}>
       {/* Header */}
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">F&B Orders</h1>
-          <p className="mt-[4px] text-[13px] text-[#7a9890]">Food & beverage order management</p>
-        </div>
-        <button
-          onClick={() => setAddOpen(true)}
-          className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
-          style={{ background: 'var(--rp-btn-accent)' }}>
-          <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} /> New Order
-        </button>
-      </div>
+      <PageHeader
+        title="F&B Orders"
+        subtitle="Food & beverage order management"
+        align="end"
+        actions={
+          <button
+            onClick={() => setAddOpen(true)}
+            className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
+            style={{ background: 'var(--rp-btn-accent)' }}>
+            <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} /> New Order
+          </button>
+        }
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -726,6 +728,6 @@ export default function OrdersPage() {
       )}
 
       <NewOrderModal open={addOpen} onClose={() => setAddOpen(false)} loading={createMutation.isPending} onSubmit={d => createMutation.mutate(d)} />
-    </div>
+    </PageShell>
   );
 }

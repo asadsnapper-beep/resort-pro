@@ -14,6 +14,7 @@ import {
   FileText, Palette, Lock, CheckCircle2, Circle, Loader2, Shield, Send, ToggleLeft, ToggleRight,
   CreditCard, Eye, EyeOff, ChevronDown, ChevronRight, Bell, LayoutGrid,
 } from 'lucide-react'
+import { PageShell, PageHeader } from '@/components/patterns';
 import { paymentGatewayApi } from '@/lib/api';
 import { RoomTypeSettings } from '@/components/settings/RoomTypeSettings';
 
@@ -328,13 +329,13 @@ export default function SettingsPage() {
   const activeTab = TABS.find(t => t.id === tab);
 
   return (
-    <div className="space-y-5 animate-fade-up">
+    <PageShell gap={5}>
       {/* Page header */}
       <div className="flex items-end justify-between">
-        <div>
-          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Settings</h1>
-          <p className="mt-[4px] text-[13px] text-[#7a9890]">Manage your resort configuration</p>
-        </div>
+        <PageHeader
+          title="Settings"
+          subtitle="Manage your resort configuration"
+        />
       </div>
 
       {/* Tenant Info Banner */}
@@ -882,7 +883,7 @@ export default function SettingsPage() {
 
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }
 
