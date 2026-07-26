@@ -94,6 +94,22 @@
   --rp-red-bg:        #fef2f2;
   --rp-coral-bg:      #fceee4;
   --rp-teal-soft:     #f5faf9;
+
+  /* Brand / foreground accents
+     These are deliberately NOT redeclared in .dark — pages use them today with
+     no `dark:` variant, so they are mode-invariant. Keeping that exact
+     behaviour means migrating a page to these tokens is a pure refactor with
+     no visual change. (Whether dark mode *should* lighten the brand green is a
+     design decision, tracked separately — not a silent change here.) */
+  --rp-brand:         #23766a;  /* resort-600 — primary actions, links, active icons */
+  --rp-brand-hover:   #1e5f57;  /* resort-700 */
+  --rp-brand-deep:    #19403b;  /* resort-900 — headings, dark sections */
+
+  /* Accents */
+  --rp-gold:          #b89040;  /* dominant gold across pages; note tailwind gold-600 is #b8893f */
+  --rp-gold-bright:   #d4a853;  /* = gold-500 */
+  --rp-danger:        #c43c3c;
+  --rp-coral:         #b8724a;
 }
 
 .dark {
