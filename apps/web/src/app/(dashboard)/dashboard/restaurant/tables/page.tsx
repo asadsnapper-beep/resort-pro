@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/auth';
 import { Modal } from '@/components/ui/modal';
 import { toast } from '@/hooks/use-toast';
 import { Plus, Copy, Check, Pencil, Trash2, LayoutGrid, QrCode, Loader2 } from 'lucide-react';
+import { PageShell } from '@/components/patterns';
 
 interface RestaurantTable {
   id: string;
@@ -74,7 +75,7 @@ export default function TablesPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-up max-w-4xl">
+    <PageShell gap={6} className="mx-auto max-w-4xl">
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -214,6 +215,6 @@ export default function TablesPage() {
           </div>
         </div>
       </Modal>
-    </div>
+    </PageShell>
   );
 }
