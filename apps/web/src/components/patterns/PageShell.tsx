@@ -15,6 +15,7 @@ import type { ReactNode } from 'react';
 
 const GAP = {
   4: 'space-y-4',
+  5: 'space-y-5',
   6: 'space-y-6',
   8: 'space-y-8',
 } as const;

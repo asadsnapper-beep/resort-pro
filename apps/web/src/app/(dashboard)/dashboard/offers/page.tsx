@@ -9,6 +9,7 @@ import {
   MoonStar, CalendarDays, Users, CheckCircle2, XCircle, Clock,
   AlertTriangle, Loader2,
 } from 'lucide-react';
+import { PageHeader } from '@/components/patterns';
 import { offersApi } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 
@@ -278,17 +279,18 @@ export default function OffersPage() {
   return (
     <div className="flex flex-col gap-6 max-w-5xl animate-fade-up">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Offers & Promotions</h1>
-          <p className="mt-[4px] text-[13px] text-[#7a9890]">Create discounts and promo codes for your guests</p>
-        </div>
-        <button onClick={() => setEditing('new')}
-          className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium hover:opacity-90"
-          style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
-          <Plus className="h-4 w-4" /> New Offer
-        </button>
-      </div>
+      <PageHeader
+        title="Offers & Promotions"
+        subtitle="Create discounts and promo codes for your guests"
+        align="center"
+        actions={
+          <button onClick={() => setEditing('new')}
+            className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium hover:opacity-90"
+            style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+            <Plus className="h-4 w-4" /> New Offer
+          </button>
+        }
+      />
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

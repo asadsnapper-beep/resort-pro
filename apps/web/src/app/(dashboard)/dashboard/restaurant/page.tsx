@@ -11,6 +11,7 @@ import {
   Plus, Search, UtensilsCrossed, Coffee, ChefHat, Pencil, Trash2,
   CheckCircle2, XCircle, Star, Loader2,
 } from 'lucide-react';
+import { PageShell, PageHeader, ActionButton } from '@/components/patterns';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 
 interface MenuItem {
@@ -194,22 +195,19 @@ export default function RestaurantPage() {
   }, {});
 
   return (
-    <div className="space-y-6 animate-fade-up">
+    <PageShell gap={6}>
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Restaurant & Menu</h1>
-          <p className="mt-[4px] text-[13px] text-[#7a9890]">
-            {allItems.length > 0 ? `${allItems.length} items · ${availableCount} available` : 'Manage your restaurant menu'}
-          </p>
-        </div>
-        <button onClick={() => setAddOpen(true)}
-          className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors hover:opacity-90"
-          style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
-          <Plus className="h-4 w-4" /> Add Item
-        </button>
-      </div>
+      <PageHeader
+        title="Restaurant & Menu"
+        subtitle={allItems.length > 0 ? `${allItems.length} items · ${availableCount} available` : 'Manage your restaurant menu'}
+        align="center"
+        actions={
+          <ActionButton icon={<Plus className="h-4 w-4" />} onClick={() => setAddOpen(true)}>
+            Add Item
+          </ActionButton>
+        }
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
@@ -371,6 +369,6 @@ export default function RestaurantPage() {
         description={`Remove "${deleteItem?.name}" from the menu? This cannot be undone.`}
         confirmLabel="Delete"
       />
-    </div>
+    </PageShell>
   );
 }

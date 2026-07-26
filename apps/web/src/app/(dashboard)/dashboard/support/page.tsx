@@ -10,6 +10,7 @@ import {
   Ticket, MessageSquare, Send, Link2,
   CheckCircle2, XCircle, Copy, Check, Trash2, ExternalLink, Loader2,
 } from 'lucide-react';
+import { PageShell, PageHeader } from '@/components/patterns';
 import type { SupportTicket } from '@resort-pro/types';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -306,19 +307,20 @@ export default function SupportPage() {
   const STATUS_FILTERS = ['', 'OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
 
   return (
-    <div className="space-y-6 animate-fade-up">
+    <PageShell gap={6}>
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f]">Guest Support</h1>
-          <p className="mt-[4px] text-[13px] text-[#7a9890]">Manage tickets and live chat across all channels</p>
-        </div>
-        <button onClick={() => setChannelSettingsOpen(true)}
-          className="flex items-center gap-2 rounded-[9px] border px-4 py-2 text-[13px] font-medium transition-colors hover:bg-[#f4f1eb]"
-          style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
-          <Link2 className="h-4 w-4" /> Channels
-        </button>
-      </div>
+      <PageHeader
+        title="Guest Support"
+        subtitle="Manage tickets and live chat across all channels"
+        align="center"
+        actions={
+          <button onClick={() => setChannelSettingsOpen(true)}
+            className="flex items-center gap-2 rounded-[9px] border px-4 py-2 text-[13px] font-medium transition-colors hover:bg-[#f4f1eb]"
+            style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
+            <Link2 className="h-4 w-4" /> Channels
+          </button>
+        }
+      />
 
       {/* Status filters */}
       <div className="flex gap-2 flex-wrap">
@@ -516,6 +518,6 @@ export default function SupportPage() {
       {channelSettingsOpen && (
         <ChannelSettingsModal onClose={() => setChannelSettingsOpen(false)} />
       )}
-    </div>
+    </PageShell>
   );
 }
