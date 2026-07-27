@@ -590,20 +590,26 @@ model StaffInvite {
 
 // ─── Resort ───────────────────────────────────────────────────────────────────
 
+enum PropertyType {
+  ROOM_BASED
+  VESSEL_BASED
+}
+
 model Property {
-  id           String   @id @default(uuid())
+  id           String       @id @default(uuid())
   tenantId     String
   name         String
   slug         String // e.g. "beach-villa", "mountain-lodge"
+  type         PropertyType @default(ROOM_BASED)
   address      String?
   phone        String?
   email        String?
-  timezone     String   @default("Asia/Dhaka")
-  checkInTime  String   @default("14:00")
-  checkOutTime String   @default("11:00")
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  timezone     String       @default("Asia/Dhaka")
+  checkInTime  String       @default("14:00")
+  checkOutTime String       @default("11:00")
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   rooms  Room[]

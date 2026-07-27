@@ -8,6 +8,7 @@ import type { JwtPayload } from '@resort-pro/types';
 const propertySchema = z.object({
   name:         z.string().min(1).max(100),
   slug:         z.string().min(1).max(60).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase letters, numbers, and hyphens only'),
+  type:         z.enum(['ROOM_BASED', 'VESSEL_BASED']).optional(),
   address:      z.string().optional(),
   phone:        z.string().optional(),
   email:        z.string().email().optional().or(z.literal('')),
