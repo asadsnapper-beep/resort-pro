@@ -612,6 +612,11 @@ export const invoiceApi = {
 };
 
 // ── Offers API ────────────────────────────────────────────────────────────────
+export const designRequestsApi = {
+  list:   ()                => api.get('/design-requests'),
+  create: (data: unknown)   => api.post('/design-requests', data),
+};
+
 export const offersApi = {
   list:   (status?: string)            => api.get('/offers', { params: status ? { status } : {} }),
   create: (data: unknown)              => api.post('/offers', data),

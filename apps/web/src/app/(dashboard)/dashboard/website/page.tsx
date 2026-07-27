@@ -12,6 +12,7 @@ import {
   Monitor, Smartphone, Copy, Check, ChevronUp, ChevronDown,
 } from 'lucide-react';
 import { ThemePicker } from '@/components/dashboard/website/ThemePicker';
+import { CustomDesignModal, CustomDesignCta } from '@/components/dashboard/website/CustomDesignModal';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 import { ModalShell } from '@/components/ui/modal-shell';
 
@@ -118,6 +119,7 @@ export default function WebsitePage() {
   const [urlCopied,   setUrlCopied]   = useState(false);
   const [mobileView,  setMobileView]  = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [designModalOpen, setDesignModalOpen] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -414,11 +416,15 @@ export default function WebsitePage() {
 
             {/* ── Template tab ─────────────────────────────────────────────── */}
             {tab === 'template' && tenant?.slug && (
-              <ThemePicker
-                currentTheme={form.templateId ?? 'luxe'}
-                slug={tenant.slug}
-                onSelect={(key) => set('templateId', key)}
-              />
+              <div className="space-y-4">
+                <ThemePicker
+                  currentTheme={form.templateId ?? 'luxe'}
+                  slug={tenant.slug}
+                  onSelect={(key) => set('templateId', key)}
+                />
+                {/* Paid custom-design service — plan/theme-studio-and-design-service.md */}
+                <CustomDesignCta onClick={() => setDesignModalOpen(true)} />
+              </div>
             )}
 
             {/* ── Hero & About tab ──────────────────────────────────────────── */}
@@ -1068,6 +1074,7 @@ export default function WebsitePage() {
           )}
         </div>
       </ModalShell>
+      <CustomDesignModal open={designModalOpen} onClose={() => setDesignModalOpen(false)} />
     </div>
   );
 }
