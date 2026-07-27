@@ -288,11 +288,11 @@ model DesignRequest {
 
 | Tier | কী পাবে | দাম (প্রস্তাবিত) |
 |---|---|---|
-| **Branding polish** | Existing theme + তাদের রং/লোগো/ফন্ট/কপি tune করা | ৳৮,০০০ |
-| **Custom design** | সম্পূর্ণ unique Tier 2 template theme, তাদের জন্যই | ৳৩৫,০০০ |
+| **Branding polish** | Existing theme + তাদের রং/লোগো/ফন্ট/কপি tune করা | ৳১০,০০০ |
+| **Custom design** | সম্পূর্ণ unique Tier 2 template theme, তাদের জন্যই | ৳৪০,০০০ |
 | **Premium** | Tier 3 code theme — custom animation, unique interaction | ৳৮০,০০০+ |
 
-দাম তোমার সিদ্ধান্ত — এগুলো শুধু placeholder। Modal-এ "starting from" হিসেবে দেখানো ভালো, fixed না।
+দাম নির্ধারিত (২০২৬-০৭-২৫)। Modal-এ "starting from" হিসেবে দেখানো হবে, fixed quote না — আসল quote admin দেবে।
 
 ## নতুন/পরিবর্তিত ফাইল
 

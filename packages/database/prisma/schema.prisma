@@ -508,6 +508,8 @@ model Tenant {
   venueBookings          VenueBooking[]
   corporateAccounts      CorporateAccount[]
   corporateInvoices      CorporateInvoice[]
+  designRequests         DesignRequest[]
+  exclusiveThemes        Theme[]
 
   @@map("tenants")
 }
@@ -2568,6 +2570,54 @@ enum ThemeStatus {
   PUBLISHED // live — tenants can select it
 }
 
+/// Paid custom-design service — see plan/theme-studio-and-design-service.md.
+/// An owner asks for a bespoke website from the dashboard; admin quotes it,
+/// builds it, and ships it as a theme scoped to that tenant only.
+enum DesignRequestStatus {
+  NEW
+  CONTACTED
+  QUOTED
+  ACCEPTED
+  IN_PROGRESS
+  DELIVERED
+  CANCELLED
+}
+
+model DesignRequest {
+  id       String @id @default(uuid())
+  tenantId String // required — tenantPrisma injects and filters on this
+
+  contactName  String
+  contactPhone String
+  contactEmail String
+
+  /// What they asked for
+  tier          String? // "branding" | "custom" | "premium" — the pricing tier they picked
+  budgetRange   String?
+  timeline      String?
+  description   String
+  referenceUrls String[] @default([])
+
+  /// Pipeline
+  status       DesignRequestStatus @default(NEW)
+  quotedAmount Float?
+  currency     String?
+  quotedAt     DateTime?
+  adminNotes   String?
+
+  /// Set once the bespoke theme is built — pairs with Theme.exclusiveToTenantId
+  deliveredThemeKey String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("design_requests")
+}
+
 model Theme {
   id           String   @id @default(uuid())
   key          String   @unique // "luxe", "minimal", "coastal", "mountain-escape"
@@ -2592,9 +2642,16 @@ model Theme {
   aiProvider  String? // "claude", "gpt-4", etc.
   uploadedBy  String? // super admin user id who uploaded/generated
 
+  // Bespoke themes: a theme built and paid for by one tenant must not be
+  // offered to every other tenant. Null = available to everyone (the default,
+  // and how all existing themes behave).
+  exclusiveToTenantId String?
+  exclusiveToTenant   Tenant? @relation(fields: [exclusiveToTenantId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
+  @@index([exclusiveToTenantId])
   @@map("themes")
 }
 

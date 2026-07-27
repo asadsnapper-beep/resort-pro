@@ -6,7 +6,8 @@ export type AdminNotificationType =
   | 'payment_failed'
   | 'subscription_canceled'
   | 'trial_expiring'
-  | 'account_suspended';
+  | 'account_suspended'
+  | 'design_request';
 
 interface CreateNotificationArgs {
   type: AdminNotificationType;

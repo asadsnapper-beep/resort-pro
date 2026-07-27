@@ -3003,4 +3003,82 @@ Rules:
     return reply.send(ok(updated, 'Theme updated'));
   });
 
+  // ── Custom design requests (paid service pipeline) ─────────────────────────
+  // Owner-facing side is apps/api/src/routes/designRequests.ts.
+  // See plan/theme-studio-and-design-service.md (Part B).
+
+  // GET /api/admin/design-requests — cross-tenant list, newest first
+  app.get<{ Querystring: { status?: string } }>(
+    '/design-requests',
+    { preHandler: requireAdminRole() },
+    async (request, reply) => {
+      const { status } = request.query;
+      const rows = await prisma.designRequest.findMany({
+        where: status && status !== 'all' ? { status: status as any } : undefined,
+        orderBy: { createdAt: 'desc' },
+        include: { tenant: { select: { id: true, name: true, slug: true, plan: true } } },
+      });
+      const counts = await prisma.designRequest.groupBy({
+        by: ['status'],
+        _count: { status: true },
+      });
+      return reply.send(ok({
+        requests: rows,
+        counts: Object.fromEntries(counts.map((c) => [c.status, c._count.status])),
+      }));
+    },
+  );
+
+  // PATCH /api/admin/design-requests/:id — move through the pipeline / quote it
+  app.patch<{
+    Params: { id: string };
+    Body: {
+      status?: 'NEW' | 'CONTACTED' | 'QUOTED' | 'ACCEPTED' | 'IN_PROGRESS' | 'DELIVERED' | 'CANCELLED';
+      quotedAmount?: number | null;
+      currency?: string | null;
+      adminNotes?: string | null;
+      deliveredThemeKey?: string | null;
+    };
+  }>(
+    '/design-requests/:id',
+    { preHandler: requireAdminRole(['SUPER_ADMIN', 'SUPPORT']) },
+    async (request, reply) => {
+      const { id } = request.params;
+      const body = request.body ?? {};
+
+      const existing = await prisma.designRequest.findUnique({
+        where: { id },
+        include: { tenant: { select: { name: true } } },
+      });
+      if (!existing) return reply.status(404).send({ success: false, error: 'Design request not found' });
+
+      const data: Record<string, unknown> = {};
+      if (body.status !== undefined) data.status = body.status;
+      if (body.adminNotes !== undefined) data.adminNotes = body.adminNotes;
+      if (body.deliveredThemeKey !== undefined) data.deliveredThemeKey = body.deliveredThemeKey;
+      if (body.currency !== undefined) data.currency = body.currency;
+      if (body.quotedAmount !== undefined) {
+        data.quotedAmount = body.quotedAmount;
+        // Stamp when the quote was actually given, so "how long since we quoted"
+        // is answerable without digging through the audit log.
+        data.quotedAt = body.quotedAmount === null ? null : new Date();
+      }
+
+      const updated = await prisma.designRequest.update({ where: { id }, data });
+
+      const adminUser = request.user as any;
+      await logAdminAction({
+        adminEmail: adminUser.email,
+        action: 'design_request_update',
+        targetType: 'design_request',
+        targetId: id,
+        targetName: existing.tenant.name,
+        metadata: { from: existing.status, to: updated.status, quotedAmount: updated.quotedAmount },
+        ipAddress: request.ip,
+      });
+
+      return reply.send(ok(updated, 'Design request updated'));
+    },
+  );
+
 }
