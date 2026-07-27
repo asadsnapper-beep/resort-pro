@@ -75,7 +75,7 @@ jobs:
   # The production DB is not reachable from GitHub runners (docker-internal
   # host `postgres`), so a runner-side migrate job can never work.
 
-  # ─── Step 2: Deploy via Coolify webhook ───────────────────────────────────
+  # ─── Step 2: Deploy via Coolify API ────────────────────────────────────────
   deploy:
     name: Deploy via Coolify
     runs-on: ubuntu-latest
@@ -85,16 +85,58 @@ jobs:
       url: https://resortpro.site
 
     steps:
-      - name: Trigger Coolify deploy
-        # Coolify's deploy webhook requires an API token (Keys & Tokens → API tokens)
+      # Root cause (confirmed live, 2026-07-28 via direct Coolify-side debugging):
+      # this service's Docker Compose config lives as a raw copy in Coolify's own
+      # DB (NOT git-linked to docker-compose.coolify.yml in this repo — editing
+      # that file does nothing by itself). The old webhook trigger asked Coolify
+      # to redeploy whatever compose it already had stored, with both images
+      # pinned to the floating `:latest` tag. Whether that redeploy actually
+      # pulled a fresh image depended on `--force-recreate` + `pull_policy: always`
+      # cache semantics inside Coolify's queued deploy job — proven unreliable:
+      # a fully green run left production running yesterday's image with today's
+      # security fixes and routes completely absent.
+      #
+      # Fix: stamp this commit's SHA onto both image tags and PATCH Coolify's
+      # stored compose directly before deploying. A tag Coolify has never pulled
+      # before forces a real registry fetch — no dependency on pull_policy,
+      # recreate-cache semantics, or any other Coolify internal quirk. (Digest
+      # pinning was tried first and rejected: GHCR images from
+      # docker/build-push-action are multi-arch manifest lists, and pinning the
+      # list digest instead of the platform-specific one fails pull with
+      # "manifest unknown" — tags resolve the right platform automatically.)
+      - name: Deploy via Coolify API (SHA-tagged, guaranteed fresh)
+        env:
+          COOLIFY_API: https://manage.musafir.co.za/api/v1/services/b48m2cix8odgfuvlyr8zr31p
         run: |
-          STATUS=$(curl -s -o /tmp/coolify-resp.txt -w "%{http_code}" \
-            --retry 3 --retry-delay 5 --retry-all-errors \
+          set -euo pipefail
+
+          RAW_B64=$(curl -sf "$COOLIFY_API" \
             -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}" \
-            -X GET "${{ secrets.COOLIFY_WEBHOOK_WEB }}")
-          echo "Coolify responded: HTTP $STATUS"
+            | jq -r '.docker_compose_raw')
+          CURRENT=$(echo "$RAW_B64" | base64 -d)
+
+          # Match the tag on resort-pro-api/-web regardless of what it currently
+          # is (:latest on the first stamped deploy, :<previous-sha> on every
+          # deploy after that) — pinning the sed pattern to :latest alone would
+          # only work once, then find nothing to replace on deploy #2 onward.
+          NEW=$(echo "$CURRENT" | sed -E \
+            -e "s#(resort-pro-api):[A-Za-z0-9_.-]+#\1:${GITHUB_SHA}#" \
+            -e "s#(resort-pro-web):[A-Za-z0-9_.-]+#\1:${GITHUB_SHA}#")
+
+          if [ "$NEW" = "$CURRENT" ]; then
+            echo "Refusing to deploy: no resort-pro-api/resort-pro-web image lines found to stamp — compose format may have changed, check manually."
+            exit 1
+          fi
+
+          NEW_B64=$(echo "$NEW" | base64 -w0)
+
+          HTTP_STATUS=$(curl -sf -o /tmp/coolify-resp.txt -w "%{http_code}" -X PATCH "$COOLIFY_API" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"docker_compose_raw\": \"$NEW_B64\", \"instant_deploy\": true}")
+
+          echo "Coolify PATCH responded: HTTP $HTTP_STATUS"
           cat /tmp/coolify-resp.txt || true
-          echo "$STATUS" | grep -qE '^2' || { echo "Coolify deploy failed (HTTP $STATUS)"; exit 1; }
 
       - name: Wait for health check — API
         run: |
