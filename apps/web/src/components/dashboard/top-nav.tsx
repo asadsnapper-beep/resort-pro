@@ -1,10 +1,11 @@
 'use client';
 
-import { Bell, Search, Moon, Sun, AlertTriangle, ArrowRight, X, PanelLeft, PanelLeftClose } from 'lucide-react';
+import { Search, Moon, Sun, AlertTriangle, ArrowRight, X, PanelLeft, PanelLeftClose } from 'lucide-react';
 import { ElectronStatusBadge } from './ElectronStatusBadge';
+import { NotificationBell } from './NotificationBell';
 import { useTheme } from 'next-themes';
 import { useQuery } from '@tanstack/react-query';
-import { notificationsApi, billingApi } from '@/lib/api';
+import { billingApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -62,14 +63,6 @@ export function TopNav() {
   const { theme, setTheme } = useTheme();
   const { sidebarCollapsed, toggleSidebar } = useUiStore();
 
-  const { data: notificationsRes } = useQuery({
-    queryKey: ['notifications'],
-    queryFn: () => notificationsApi.list(),
-    refetchInterval: 30000,
-  });
-
-  const unread = notificationsRes?.data?.data?.filter((n: { isRead: boolean }) => !n.isRead)?.length || 0;
-
   return (
     <header className="border-b border-resort-900/10 bg-white dark:border-white/8 dark:bg-resort-900/60">
       <TrialBanner />
@@ -107,14 +100,7 @@ export function TopNav() {
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
 
-          <Button variant="ghost" size="icon" className="relative h-8 w-8 text-[#8fa8a1] hover:text-resort-900 dark:hover:text-white">
-            <Bell className="h-4 w-4" />
-            {unread > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                {unread > 9 ? '9+' : unread}
-              </span>
-            )}
-          </Button>
+          <NotificationBell />
         </div>
       </div>
     </header>
