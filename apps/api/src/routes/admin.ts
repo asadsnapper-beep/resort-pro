@@ -2987,7 +2987,9 @@ Rules:
   // PATCH /api/admin/themes/:key — partial update (isDefault, requiredPlan, etc.)
   app.patch<{
     Params: { key: string };
-    Body: { isDefault?: boolean; requiredPlan?: string; sortOrder?: number; name?: string; description?: string; previewImage?: string; screenshots?: string[]; author?: string; version?: string; tags?: string[]; isPremium?: boolean; isActive?: boolean; };
+    Body: { isDefault?: boolean; requiredPlan?: string; sortOrder?: number; name?: string; description?: string; previewImage?: string; screenshots?: string[]; author?: string; version?: string; tags?: string[]; isPremium?: boolean; isActive?: boolean;
+      /** Scope a bespoke theme to the tenant that commissioned it. null = shared catalogue. */
+      exclusiveToTenantId?: string | null; };
   }>('/themes/:key', { preHandler: requireAdminRole(['SUPER_ADMIN']) }, async (request, reply) => {
     const { key } = request.params;
     const body = request.body ?? {};

@@ -66,10 +66,27 @@ export async function websiteRoutes(app: FastifyInstance) {
   app.put('/', {
     schema: { tags: ['website'], summary: 'Update website content', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'MARKETER', 'DEVELOPER'),
-    handler: async (request) => {
+    handler: async (request, reply) => {
       const { db } = request;
       const { tenantId } = request.user as JwtPayload;
       const body = websiteSchema.parse(request.body);
+
+      // templateId is a free-form string, so without this check a tenant who
+      // learns another tenant's bespoke theme key could simply set it and use a
+      // design they didn't pay for. Reject anything exclusive to someone else.
+      if (body.templateId) {
+        const theme = await prisma.theme.findUnique({
+          where: { key: body.templateId },
+          select: { exclusiveToTenantId: true },
+        });
+        if (theme?.exclusiveToTenantId && theme.exclusiveToTenantId !== tenantId) {
+          return reply.status(403).send({
+            success: false,
+            error: 'That theme is not available for your resort.',
+          });
+        }
+      }
+
       const content = await db.websiteContent.upsert({
         where: { tenantId },
         update: body,
@@ -683,9 +700,18 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
       if (!tenant || !tenant.isActive) return reply.status(404).send({ success: false, error: 'Resort not found' });
 
       const themes = await prisma.theme.findMany({
-        where: { isActive: true },
+        where: {
+          isActive: true,
+          // Bespoke themes belong to the tenant that paid for them. Everyone
+          // sees the shared catalogue (exclusiveToTenantId = null) plus their
+          // own commissioned theme — never someone else's.
+          OR: [
+            { exclusiveToTenantId: null },
+            { exclusiveToTenantId: tenant.id },
+          ],
+        },
         orderBy: { sortOrder: 'asc' },
-        select: { key: true, name: true, description: true, previewImage: true, isPremium: true },
+        select: { key: true, name: true, description: true, previewImage: true, isPremium: true, exclusiveToTenantId: true },
       });
 
       return ok(themes);
