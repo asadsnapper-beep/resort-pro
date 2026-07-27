@@ -36,13 +36,19 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Both tags point at the exact same image. `:dev` stays as the
+      # human-friendly floating tag (for manual `docker pull`); `:dev-<sha>`
+      # is what the deploy step actually asks Portainer to run — see the
+      # note in the deploy job for why the floating tag alone isn't enough.
       - name: Build and push API image (dev)
         uses: docker/build-push-action@v5
         with:
           context: .
           file: apps/api/Dockerfile
           push: true
-          tags: ghcr.io/${{ env.OWNER }}/resort-pro-api:dev
+          tags: |
+            ghcr.io/${{ env.OWNER }}/resort-pro-api:dev
+            ghcr.io/${{ env.OWNER }}/resort-pro-api:dev-${{ github.sha }}
           cache-from: type=gha,scope=api-dev
           cache-to: type=gha,mode=max,scope=api-dev
 
@@ -52,7 +58,9 @@ jobs:
           context: .
           file: apps/web/Dockerfile
           push: true
-          tags: ghcr.io/${{ env.OWNER }}/resort-pro-web:dev
+          tags: |
+            ghcr.io/${{ env.OWNER }}/resort-pro-web:dev
+            ghcr.io/${{ env.OWNER }}/resort-pro-web:dev-${{ github.sha }}
           build-args: |
             NEXT_PUBLIC_API_URL=https://resortpro-api.webcoronet.com
           cache-from: type=gha,scope=web-dev
@@ -81,6 +89,28 @@ jobs:
           echo "id=$STACK_ID" >> $GITHUB_OUTPUT
           echo "Stack ID: $STACK_ID"
 
+      # Root cause (confirmed live, 2026-07-27 — see plan/theme-studio-and-design-service.md
+      # sibling investigation notes): Portainer decides whether to recreate a
+      # container by diffing the compose file's TEXT, not the resolved image
+      # digest. `pull_policy: always` does make it pull a fresh `:dev` image
+      # into the local cache, but since the tag string never changes,
+      # Portainer sees no config diff and never swaps the running container
+      # onto it — the API/web containers can silently run an arbitrarily old
+      # image while every deploy still reports success. Known upstream bug:
+      # https://github.com/portainer/portainer/issues/13173
+      #
+      # Fix: stamp a real, unique tag (the commit SHA) into the compose text
+      # sent to Portainer on every deploy, so the config genuinely differs
+      # every time and a recreate is forced. docker-compose.staging.yml in
+      # the repo keeps the floating `:dev` tag for humans; only the copy we
+      # hand to Portainer gets rewritten.
+      - name: Stamp images with this commit's SHA tag
+        run: |
+          sed \
+            -e "s#resort-pro-api:dev#resort-pro-api:dev-${GITHUB_SHA}#" \
+            -e "s#resort-pro-web:dev#resort-pro-web:dev-${GITHUB_SHA}#" \
+            docker-compose.staging.yml > /tmp/docker-compose.staging.deploy.yml
+
       - name: Create stack if not exists
         if: steps.stack.outputs.id == ''
         run: |
@@ -93,7 +123,7 @@ jobs:
           echo "Endpoint ID: $ENDPOINT_ID"
 
           # Create new stack from compose file
-          COMPOSE_CONTENT=$(cat docker-compose.staging.yml)
+          COMPOSE_CONTENT=$(cat /tmp/docker-compose.staging.deploy.yml)
 
           curl -s -X POST \
             -H "X-API-Key: ${{ secrets.PORTAINER_TOKEN }}" \
@@ -109,7 +139,7 @@ jobs:
         if: steps.stack.outputs.id != ''
         run: |
           STACK_ID=${{ steps.stack.outputs.id }}
-          COMPOSE_CONTENT=$(cat docker-compose.staging.yml)
+          COMPOSE_CONTENT=$(cat /tmp/docker-compose.staging.deploy.yml)
 
           # Get endpoint ID
           ENDPOINT_ID=$(curl -s \
