@@ -110,10 +110,24 @@ jobs:
         run: |
           set -euo pipefail
 
-          RAW_B64=$(curl -sf "$COOLIFY_API" \
+          # GET returns docker_compose_raw as plain YAML text — NOT base64. Only
+          # the PATCH body needs base64. Treating GET/PATCH as symmetric here was
+          # the bug that broke the first version of this step: base64-decoding
+          # already-plain text produced garbage that matched nothing below.
+          #
+          # Also: this field is only visible on a GET at all if COOLIFY_TOKEN has
+          # the `read:sensitive` ability (not just `read`/`deploy`) — otherwise
+          # it's silently absent from the response with no error, which is why
+          # the "missing token scope" case gets its own explicit check below
+          # instead of surfacing as a confusing jq/sed failure.
+          CURRENT=$(curl -sf "$COOLIFY_API" \
             -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}" \
             | jq -r '.docker_compose_raw')
-          CURRENT=$(echo "$RAW_B64" | base64 -d)
+
+          if [ -z "$CURRENT" ] || [ "$CURRENT" = "null" ]; then
+            echo "Refusing to deploy: docker_compose_raw missing from GET response — COOLIFY_TOKEN likely needs the 'read:sensitive' ability added in Coolify (Keys & Tokens), not just read/deploy."
+            exit 1
+          fi
 
           # Match the tag on resort-pro-api/-web regardless of what it currently
           # is (:latest on the first stamped deploy, :<previous-sha> on every
