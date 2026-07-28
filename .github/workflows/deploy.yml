@@ -120,12 +120,20 @@ jobs:
           # it's silently absent from the response with no error, which is why
           # the "missing token scope" case gets its own explicit check below
           # instead of surfacing as a confusing jq/sed failure.
-          CURRENT=$(curl -sf "$COOLIFY_API" \
-            -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}" \
-            | jq -r '.docker_compose_raw')
+          GET_STATUS=$(curl -s -o /tmp/coolify-get.txt -w "%{http_code}" "$COOLIFY_API" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}")
+
+          if [ "$GET_STATUS" != "200" ]; then
+            echo "Refusing to deploy: GET $COOLIFY_API returned HTTP $GET_STATUS, expected 200. Response body:"
+            cat /tmp/coolify-get.txt || true
+            exit 1
+          fi
+
+          CURRENT=$(jq -r '.docker_compose_raw' /tmp/coolify-get.txt)
 
           if [ -z "$CURRENT" ] || [ "$CURRENT" = "null" ]; then
-            echo "Refusing to deploy: docker_compose_raw missing from GET response — COOLIFY_TOKEN likely needs the 'read:sensitive' ability added in Coolify (Keys & Tokens), not just read/deploy."
+            echo "Refusing to deploy: docker_compose_raw missing from GET response — COOLIFY_TOKEN likely needs the 'read:sensitive' ability added in Coolify (Keys & Tokens), not just read/deploy. Full response:"
+            cat /tmp/coolify-get.txt || true
             exit 1
           fi
 
@@ -144,13 +152,18 @@ jobs:
 
           NEW_B64=$(echo "$NEW" | base64 -w0)
 
-          HTTP_STATUS=$(curl -sf -o /tmp/coolify-resp.txt -w "%{http_code}" -X PATCH "$COOLIFY_API" \
+          HTTP_STATUS=$(curl -s -o /tmp/coolify-resp.txt -w "%{http_code}" -X PATCH "$COOLIFY_API" \
             -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}" \
             -H "Content-Type: application/json" \
             -d "{\"docker_compose_raw\": \"$NEW_B64\", \"instant_deploy\": true}")
 
           echo "Coolify PATCH responded: HTTP $HTTP_STATUS"
           cat /tmp/coolify-resp.txt || true
+
+          case "$HTTP_STATUS" in
+            2*) ;;
+            *) echo "Refusing to continue: PATCH returned HTTP $HTTP_STATUS (body above)."; exit 1 ;;
+          esac
 
       - name: Wait for health check — API
         run: |
