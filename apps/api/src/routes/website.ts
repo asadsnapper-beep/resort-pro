@@ -179,7 +179,10 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
       const { key } = request.params as { key: string };
       const theme = await prisma.theme.findUnique({
         where: { key },
-        select: { key: true, name: true, themeType: true, configJson: true, themeStatus: true },
+        select: {
+          key: true, name: true, themeType: true, configJson: true, themeStatus: true,
+          templateHtml: true, templateCss: true, contractVersion: true,
+        },
       });
       if (!theme) return reply.status(404).send({ success: false, error: 'Theme not found' });
       return reply.send({ success: true, data: theme });
@@ -204,16 +207,26 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
       });
       if (!tenant || !tenant.isActive) return reply.status(404).send({ success: false, error: 'Resort not found' });
 
-      // Look up theme config if the selected template is a config-driven theme
+      // Look up theme config/template if the selected template is dynamic (not hardcoded)
       const templateId = tenant.websiteContent?.templateId;
       let themeConfig = null;
+      let themeType: string | null = null;
+      let templateHtml: string | null = null;
+      let templateCss: string | null = null;
       if (templateId) {
         const theme = await prisma.theme.findUnique({
           where: { key: templateId },
-          select: { themeType: true, configJson: true },
+          select: { themeType: true, configJson: true, templateHtml: true, templateCss: true },
         });
-        if (theme && theme.themeType !== 'HARDCODED' && theme.configJson) {
-          themeConfig = theme.configJson;
+        if (theme) {
+          themeType = theme.themeType;
+          if (theme.themeType !== 'HARDCODED' && theme.configJson) {
+            themeConfig = theme.configJson;
+          }
+          if (theme.themeType === 'TEMPLATE') {
+            templateHtml = theme.templateHtml;
+            templateCss = theme.templateCss;
+          }
         }
       }
 
@@ -232,6 +245,9 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
         website:     tenant.websiteContent,
         rooms:       tenant.rooms,
         themeConfig,  // null for hardcoded themes, ThemeConfig JSON for uploaded/AI themes
+        themeType,    // null | 'HARDCODED' | 'UPLOADED' | 'AI_GENERATED' | 'TEMPLATE'
+        templateHtml, // Tier 2 only — Handlebars HTML, style stripped out
+        templateCss,  // Tier 2 only
       });
     },
   });

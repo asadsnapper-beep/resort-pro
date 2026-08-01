@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 import { getTheme, isHardcodedTheme } from '@/components/themes/registry';
 import { ConfigThemeRenderer } from '@/components/themes/config-renderer';
+import { TemplateThemeRenderer } from '@/components/themes/template-renderer';
+import { compileTemplate } from '@/components/themes/template-renderer/compile';
 import type { ResortData } from '@/components/themes/types';
 import type { ThemeConfig } from '@/components/themes/config-renderer/config-types';
 
@@ -104,7 +106,7 @@ const MOCK_DATA: ResortData = {
 
 /* ── Preview banner ─────────────────────────────────────────────────────── */
 function PreviewBanner({ themeKey, themeType }: { themeKey: string; themeType?: string }) {
-  const badge = themeType === 'AI_GENERATED' ? '🤖 AI' : themeType === 'UPLOADED' ? '📦 Uploaded' : '🎨 Hardcoded';
+  const badge = themeType === 'AI_GENERATED' ? '🤖 AI' : themeType === 'UPLOADED' ? '📦 Uploaded' : themeType === 'TEMPLATE' ? '🧩 Template' : '🎨 Hardcoded';
   return (
     <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-3 bg-gray-950/95 backdrop-blur-md text-white text-sm px-5 py-3 rounded-2xl shadow-2xl border border-gray-700/80">
       <span className="h-2 w-2 rounded-full bg-indigo-400 animate-pulse flex-shrink-0" />
@@ -142,6 +144,8 @@ export default async function ThemePreviewPage({
   // 2. Fetch theme config from DB via public endpoint
   let configJson: ThemeConfig | null = null;
   let themeType: string | undefined;
+  let templateHtml: string | null = null;
+  let templateCss: string | null = null;
   try {
     const res = await fetch(`${API_URL}/site/theme/${key}`, { cache: 'no-store' });
     if (res.ok) {
@@ -150,15 +154,31 @@ export default async function ThemePreviewPage({
       if (json.data?.configJson) {
         configJson = json.data.configJson as ThemeConfig;
       }
+      if (themeType === 'TEMPLATE') {
+        templateHtml = json.data?.templateHtml ?? null;
+        templateCss = json.data?.templateCss ?? null;
+      }
     }
   } catch { /* no config — fall through to hardcoded */ }
 
   // 3. If not in DB and not hardcoded → 404
-  if (!configJson && !isHardcodedTheme(key)) {
+  if (!configJson && !templateHtml && !isHardcodedTheme(key)) {
     notFound();
   }
 
-  // 4. Render: config-driven or hardcoded
+  // 4. Render: template (Tier 2), config-driven (Tier 1), or hardcoded (Tier 3)
+  if (templateHtml) {
+    const resolvedData: ResortData = { ...data, website: { ...data.website!, templateId: key } };
+    const compiledHtml = compileTemplate(templateHtml, resolvedData);
+    const compiledCss = templateCss ? compileTemplate(templateCss, resolvedData) : null;
+    return (
+      <>
+        <TemplateThemeRenderer html={compiledHtml} css={compiledCss} data={resolvedData} />
+        <PreviewBanner themeKey={key} themeType={themeType} />
+      </>
+    );
+  }
+
   if (configJson) {
     return (
       <>

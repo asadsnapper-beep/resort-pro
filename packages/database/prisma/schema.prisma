@@ -2568,6 +2568,7 @@ enum ThemeType {
   HARDCODED // built-in themes (luxe, minimal, coastal) — rendered by React component
   UPLOADED // admin uploaded a config JSON/ZIP package
   AI_GENERATED // generated via Claude/GPT API
+  TEMPLATE // Tier 2 — designer/Claude-authored HTML+CSS, see plan/theme-contract.md
 }
 
 enum ThemeStatus {
@@ -2647,6 +2648,11 @@ model Theme {
   aiPrompt    String? // original prompt used for AI generation
   aiProvider  String? // "claude", "gpt-4", etc.
   uploadedBy  String? // super admin user id who uploaded/generated
+
+  // Tier 2 (TEMPLATE) fields — see plan/theme-contract.md
+  templateHtml    String? // Handlebars HTML, <style> stripped out at upload
+  templateCss     String? // CSS extracted from the uploaded <style> block
+  contractVersion String? // which theme-contract.md version this was authored against
 
   // Bespoke themes: a theme built and paid for by one tenant must not be
   // offered to every other tenant. Null = available to everyone (the default,

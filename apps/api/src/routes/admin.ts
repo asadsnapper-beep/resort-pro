@@ -1131,6 +1131,78 @@ export async function adminRoutes(app: FastifyInstance) {
         return reply.status(400).send({ success: false, error: 'File too large (max 512 KB)' });
       }
 
+      // ── Tier 2: Template theme (.html) — see plan/theme-contract.md ────────
+      if (data.filename.endsWith('.html') || data.filename.endsWith('.htm')) {
+        const html = buffer.toString('utf8');
+
+        // Forbidden patterns (contract §7) — reject outright, no partial upload
+        const forbidden: { pattern: RegExp; message: string }[] = [
+          { pattern: /<script[\s>]/i, message: 'Contains a <script> tag' },
+          { pattern: /\son\w+\s*=/i, message: 'Contains an inline event handler (on*=)' },
+          { pattern: /javascript:/i, message: 'Contains a javascript: URL' },
+          { pattern: /data:text\/html/i, message: 'Contains a data:text/html URL' },
+          { pattern: /\bfetch\s*\(|XMLHttpRequest|\beval\s*\(|new\s+Function\s*\(/i, message: 'Contains a forbidden JS pattern (fetch/XHR/eval/Function)' },
+          { pattern: /\{\{\{/, message: 'Contains {{{triple-brace}}} unescaped output, which is forbidden' },
+        ];
+        const violations = forbidden.filter((f) => f.pattern.test(html)).map((f) => f.message);
+        if (violations.length > 0) {
+          return reply.status(400).send({ success: false, error: 'Template failed security validation', violations });
+        }
+
+        // Required section ids (contract §5) — rooms/booking can never be hidden by the owner
+        const requiredSections = ['rooms', 'booking'];
+        const missingSections = requiredSections.filter((id) => !new RegExp(`id=["']${id}["']`).test(html));
+        if (missingSections.length > 0) {
+          return reply.status(400).send({ success: false, error: `Missing required section id(s): ${missingSections.join(', ')}` });
+        }
+
+        // Extract <style>...</style> into templateCss, strip from templateHtml
+        const styleBlocks: string[] = [];
+        const templateHtml = html
+          .replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, (_match, css) => { styleBlocks.push(css); return ''; })
+          .trim();
+        const templateCss = styleBlocks.length > 0 ? styleBlocks.join('\n\n') : null;
+
+        // .html uploads carry no separate metadata field — derive key/name from the filename
+        const key = data.filename
+          .replace(/\.(html?|zip|json)$/i, '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+        if (!key) {
+          return reply.status(400).send({ success: false, error: 'Could not derive a theme key from the filename — rename it to something like "sunset-villa.html"' });
+        }
+        const HARDCODED_KEYS = new Set(['luxe', 'minimal', 'coastal', 'tea-garden-eco-resort']);
+        if (HARDCODED_KEYS.has(key)) {
+          return reply.status(400).send({ success: false, error: `Key "${key}" is reserved for a built-in theme` });
+        }
+        const name = key.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+        const adminUser = request.user as any;
+        const theme = await prisma.theme.upsert({
+          where: { key },
+          update: { name, themeType: 'TEMPLATE', themeStatus: 'PREVIEW', templateHtml, templateCss, contractVersion: '1.0', uploadedBy: adminUser.id },
+          create: { key, name, themeType: 'TEMPLATE', themeStatus: 'PREVIEW', templateHtml, templateCss, contractVersion: '1.0', uploadedBy: adminUser.id, isActive: false },
+        });
+
+        await logAdminAction({
+          adminEmail: adminUser.email,
+          action: 'theme_update',
+          targetType: 'theme',
+          targetId: key,
+          targetName: name,
+          metadata: { source: 'template-upload', filename: data.filename },
+          ipAddress: request.ip,
+        });
+
+        // Non-blocking heads-up for recommended-but-not-required checklist items (contract §9)
+        const warnings: string[] = [];
+        if (!/id=["']hero["']/.test(templateHtml)) warnings.push('No id="hero" section found — recommended but not required.');
+        if (!/@media|clamp\(|[0-9]v[wh]|%\s*[;}]/.test(templateCss || '')) warnings.push('No responsive CSS pattern detected (@media/clamp/vw/vh/%) — double-check the mobile layout.');
+
+        return reply.status(201).send(ok({ ...theme, previewUrl: `/theme-preview/${key}`, warnings }, 'Template theme uploaded successfully'));
+      }
+
       let configJson: Record<string, unknown>;
 
       if (data.filename.endsWith('.zip')) {

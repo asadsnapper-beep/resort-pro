@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
 import { getTheme } from '@/components/themes/registry';
 import { ConfigThemeRenderer } from '@/components/themes/config-renderer';
+import { TemplateThemeRenderer } from '@/components/themes/template-renderer';
+import { compileTemplate } from '@/components/themes/template-renderer/compile';
 import { PreviewPage } from './PreviewPage';
 import type { ResortData } from '@/components/themes/types';
 
@@ -74,6 +76,8 @@ export default async function ResortWebsitePage({
   const resolvedData: ResortData = { ...data, website: websiteData };
 
   // Preview mode → client component for live postMessage updates
+  // (Tier 2 live-editing preview is not wired up yet — /theme-preview/[key]
+  // covers static preview for TEMPLATE themes in the meantime)
   if (isPreview) {
     return (
       <PreviewPage
@@ -82,6 +86,17 @@ export default async function ResortWebsitePage({
         configJson={configJson}
       />
     );
+  }
+
+  // Tier 2 template theme — Handlebars-compile server-side (real data baked
+  // into the HTML string here, so SSR output has real content for SEO), then
+  // hand off to the client renderer for widget hydration + section hide/reorder.
+  if (data.themeType === 'TEMPLATE' && data.templateHtml) {
+    const compiledHtml = compileTemplate(data.templateHtml, resolvedData);
+    // CSS can reference the same tokens as HTML (e.g. `background: {{website.primaryColor}}`)
+    // so it needs the same Handlebars pass — raw `{{ }}` left in is invalid CSS.
+    const compiledCss = data.templateCss ? compileTemplate(data.templateCss, resolvedData) : null;
+    return <TemplateThemeRenderer html={compiledHtml} css={compiledCss} data={resolvedData} />;
   }
 
   return (

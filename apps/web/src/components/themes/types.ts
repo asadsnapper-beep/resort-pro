@@ -63,6 +63,10 @@ export interface ResortData {
   website:     ResortWebsite | null
   rooms:       ResortRoom[]
   themeConfig?: import('./config-renderer/config-types').ThemeConfig | null
+  // Tier 2 (TEMPLATE) — see plan/theme-contract.md
+  themeType?:    string | null
+  templateHtml?: string | null
+  templateCss?:  string | null
 }
 
 /* ── Widget props — সব shared widget-এ এই props থাকবে ─────────────────────── */
