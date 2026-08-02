@@ -67,6 +67,7 @@ jobs:
             ghcr.io/${{ env.OWNER }}/resort-pro-web:${{ github.sha }}
           build-args: |
             NEXT_PUBLIC_API_URL=https://api.resortpro.site
+            NEXT_PUBLIC_CLARITY_ID=xw9lf5lnnm
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
 

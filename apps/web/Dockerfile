@@ -19,9 +19,12 @@ COPY . .
 # Install all deps
 RUN pnpm install --no-frozen-lockfile
 
-# NEXT_PUBLIC_API_URL bakes into the client bundle at build time
+# NEXT_PUBLIC_* vars bake into the client bundle at build time — must be
+# passed as build args, not just runtime env, or they silently stay unset.
 ARG NEXT_PUBLIC_API_URL=http://localhost:4000
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_CLARITY_ID=""
+ENV NEXT_PUBLIC_CLARITY_ID=$NEXT_PUBLIC_CLARITY_ID
 
 RUN pnpm --filter @resort-pro/web build
 
