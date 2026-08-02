@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useAdminStore } from '@/store/admin';
 import {
   LayoutDashboard, Building2, Users, CreditCard,
-  LogOut, Shield, ChevronRight, Loader2, Settings, Palette, ClipboardList, Download, Gift, UserCog, Megaphone, ShieldCheck, Activity, Star, Globe, HardDrive, Sparkles,
+  LogOut, Shield, ChevronRight, Loader2, Settings, Palette, ClipboardList, Download, Gift, UserCog, Megaphone, ShieldCheck, Activity, Star, Globe, HardDrive, Sparkles, Mail,
 } from 'lucide-react';
 import NotificationBell from '@/components/admin/NotificationBell';
 import { cn } from '@/lib/utils';
@@ -18,6 +18,7 @@ const navItems = [
   { href: '/admin/billing',   label: 'Billing & MRR', icon: CreditCard },
   { href: '/admin/themes',    label: 'Themes',      icon: Palette },
   { href: '/admin/design-requests', label: 'Design Requests', icon: Sparkles },
+  { href: '/admin/demo-leads', label: 'Demo Leads', icon: Mail },
   { href: '/admin/audit-log', label: 'Audit Log',   icon: ClipboardList },
   { href: '/admin/export',     label: 'Export',      icon: Download },
   { href: '/admin/referrals',  label: 'Referrals',   icon: Gift },

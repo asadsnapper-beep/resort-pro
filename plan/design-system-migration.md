@@ -1,150 +1,172 @@
-# Design System Migration — স্থায়ী সমাধান
+# ResortPro Design System — implementation status and rollout plan
 
-> সমস্যা: "একটা design fix ১টা page-এ করলে বাকিগুলোতে হয় না, প্রতিটা page আলাদা বলতে হয়।"
-> কারণ: design এক জায়গায় থাকে না — ৪৭টা page-এ **copy-paste করা**।
-> এটা [design-system-audit.md](./design-system-audit.md)-এর (কী আছে তার documentation) পরের ধাপ — **কীভাবে সরানো হবে তার execution plan**।
+## লক্ষ্য
 
----
+Dashboard-এর একটি design fix যেন এক জায়গায় করা যায় এবং একই pattern ব্যবহারকারী সব page-এ সেটি পৌঁছে যায়। নতুন dashboard code token ও reusable pattern ব্যবহার করবে; raw hex, arbitrary pixel size, এবং inline visual style ধীরে ধীরে বাদ যাবে।
 
-## যাচাই করা বর্তমান অবস্থা (সব grep দিয়ে confirmed, ২০২৬-০৭-২৫)
+এটি redesign নয়। Migration-এর সময় প্রত্যেক page-এর বর্তমান visual layout, spacing, এবং interaction বজায় রাখতে হবে।
 
-| মেট্রিক | সংখ্যা | মানে |
+## বর্তমান অবস্থা — 2026-08-03
+
+Design system **আংশিকভাবে shipped এবং ব্যবহার হচ্ছে**। এটি আর plan-only নয়।
+
+| Layer | বর্তমান অবস্থা | Source |
 |---|---|---|
-| Dashboard page | ৪৭টা | |
-| ঐ page-গুলোতে মোট লাইন | ২৫,৪১৪ | গড়ে ৫৪০ লাইন/page — বেশিরভাগই markup+style |
-| Inline `style={{...}}` | **১,৪৭৫ বার** | shared component না, copy-paste |
-| আলাদা hardcoded hex color | **৯৩টা** | কোনো enforced palette নেই |
-| Brand green `#1a6b5e` hand-typed | **২৪ বার** | token থাকা সত্ত্বেও |
-| `<thead>` নিজে হাতে বানানো table | ১৬ page | shared DataTable নেই |
-| Empty-state inline | ১৬ page | shared EmptyState নেই |
-| `--rp-*` token ব্যবহার করে | কিছু page | **partial adoption** |
-| `components/ui` import করে | ৩৩/৪৭ page | primitive আছে, কিন্তু অসম্পূর্ণ |
+| Tokens | Shipped | `apps/web/src/app/globals.css`, `apps/web/tailwind.config.ts` |
+| Primitives | Available | `components/ui` — Button, Input, Card, Badge, ModalShell, Toast, Portal |
+| Composite patterns | Initial set shipped | `components/patterns` — PageShell, PageHeader, ActionButton |
+| Dashboard adoption | In progress | 47 dashboard page-এর মধ্যে PageShell 36টিতে, PageHeader 35টিতে, ActionButton 3টিতে |
+| Regression guard | Shipped | `scripts/design-system-ratchet.mjs` এবং `scripts/design-system-baseline.json` |
 
-**মূল রোগ নির্ণয়:** এটা "কিছুই নেই" সমস্যা না — token আছে, low-level primitive (button/input/card) আছে। সমস্যা দুটো:
+Token reference ও naming convention-এর single source of truth হলো [DESIGN_TOKENS.md](../apps/web/DESIGN_TOKENS.md)।
 
-1. **Adoption inconsistent** — কেউ token ব্যবহার করে, কেউ `#1a6b5e` hand-type করে। কোনো enforcement নেই।
-2. **Composite layer অনুপস্থিত** — যেটা প্রতি page-এ বারবার লেখা হয় (page header, toolbar/filter bar, data table, stat card row, empty state, form field) — সেই **মাঝারি-স্তরের** component কোথাও নেই। ১৪৭৫টা inline style এখানেই।
+### যে debt এখনও আছে
 
----
+- সব page এখনও token ও pattern-এ migrate হয়নি।
+- `DataTable`, `FilterBar`, `EmptyState`, `StatCard`, `FormField`, `TabBar`, এবং confirmation pattern এখনও shared Layer 3 component হিসেবে নেই।
+- পুরোনো page-এ raw hex, arbitrary Tailwind value, inline style, এবং hand-written table/header রয়েছে। Ratchet এগুলো নতুন করে বাড়তে দেয় না, কিন্তু পুরোনো debt নিজে থেকে কমায় না।
+- Dark mode-এর compatibility patch `globals.css`-এ আছে। সব raw value migrate হলে এগুলো অপসারণ করা যাবে।
 
-## লক্ষ্য: ৩-স্তরের enforced design system
+## System architecture
 
-```
-Layer 3 — COMPOSITE / PATTERNS   ← এটাই এখন নেই (মূল কাজ)
-  PageShell, PageHeader, Toolbar, DataTable, StatCard,
-  EmptyState, FormField, FilterBar, TabBar, ConfirmDialog
-        ↑ ব্যবহার করে
-Layer 2 — PRIMITIVES             ← আছে, কিন্তু বাড়াতে হবে
-  Button, Input, Card, Badge, Select, Modal(Shell=✅)
-        ↑ ব্যবহার করে
-Layer 1 — TOKENS                ← আছে, কিন্তু enforce করতে হবে
-  color / spacing / radius / typography / shadow
+```text
+Layer 3 — Composite patterns
+PageShell · PageHeader · Toolbar/FilterBar · DataTable · StatCard/StatGrid
+EmptyState · FormField · TabBar · ConfirmDialog
+        ↑
+Layer 2 — Primitives
+Button · Input · Card · Badge · Select · ModalShell · Toast
+        ↑
+Layer 1 — Tokens
+colour · type · radius · shadow · spacing · motion
 ```
 
-**নীতি:** page-এ কখনো raw hex, raw px, বা inline `style` থাকবে না — শুধু Layer 3 component + Layer 1 token। তখন "design fix" মানে এক জায়গায় (component/token) বদল = ৪৭ page-এ auto।
+Rules:
 
----
+1. Dashboard page-এ raw hex, raw pixel type size, অথবা inline visual style লিখবে না।
+2. নতুন modal সবসময় `ModalShell` ব্যবহার করবে।
+3. Existing page migrate করা মানে refactor; visual redesign করা নয়।
+4. New pattern বানানোর আগে token ও existing primitive দিয়ে সেটি compose করা যায় কি না দেখবে।
+5. Pattern API documented না হলে সেটি shared system-এর অংশ হিসেবে ধরা হবে না।
 
-## Phase 0 — Token layer পাকা করা (ভিত্তি)
+## কীভাবে পুরো system implement হবে
 
-আগে single source of truth নিশ্চিত করা, নাহলে উপরের সব স্তর নড়বড়ে।
+### Phase A — foundation complete করা
 
-1. **Token audit + consolidate** — ৯৩টা hex-কে গুটিয়ে একটা canonical palette-এ আনা। বেশিরভাগই brand green/gold-এর সামান্য ভিন্ন shade — token-এ map করা যাবে।
-2. **Token সম্পূর্ণ করা** — color আছে, কিন্তু **spacing/radius/typography/shadow scale** টোকেনও দরকার (নাহলে `padding: '28px 32px'` copy হতেই থাকবে)। tailwind theme + CSS var-এ define।
-3. **Dark mode** ইতিমধ্যে token-driven ([DARK_MODE_PATTERN.md](../DARK_MODE_PATTERN.md)) — সেটার সাথে align রাখা।
+**Goal:** token layer-এর ownership ও usage rules সম্পূর্ণ পরিষ্কার করা।
 
-**আকার:** ছোট-মাঝারি · **ঝুঁকি:** কম (শুধু যোগ, কিছু ভাঙে না)
+1. `DESIGN_TOKENS.md`-এ color, type, radius, shadow-এর পাশাপাশি spacing এবং motion token যোগ করো।
+2. প্রতিটি `rp-*` token-এর semantic use লিখো। একই visual value-এর duplicate token তৈরি কোরো না।
+3. `globals.css`-এর raw-color dark-mode patch-এর তালিকা রাখো; কোন page migrate হলে কোন patch আর দরকার নেই তা track করো।
+4. `node scripts/design-system-ratchet.mjs` CI-তে চালাও। Migration-এর পর count কমলে `--update` দিয়ে শুধু lower baseline commit করো।
 
----
+**Done when:** token naming documented, Tailwind class available, light/dark rendering verified, এবং CI-তে ratchet চলছে।
 
-## Phase 1 — Composite component layer বানানো (মূল কাজ)
+### Phase B — missing composite patterns তৈরি করা
 
-`apps/web/src/components/dashboard/` (বা `components/patterns/`)-এ এই component গুলো — একবার, ভালো করে, dark-mode + responsive সহ:
+**Goal:** যে markup/style সবচেয়ে বেশি copy-paste হয় সেটিকে reusable করা।
 
-| Component | কী replace করবে | কত page-এ লাগবে |
+Priority order:
+
+| Pattern | Covers | Minimum API/behaviour |
 |---|---|---|
-| `PageShell` | বাইরের `<div style={{padding...}}>` wrapper (max-width bug এখানেই ছিল) | ৪৭ |
-| `PageHeader` | title + subtitle + action button pattern | ৪৭ |
-| `Toolbar` / `FilterBar` | search + filter + tab row | ~30 |
-| `DataTable` | হাতে বানানো `<thead>`/`<tbody>` (sort, pagination, empty সহ) | ১৬+ |
-| `StatCard` + `StatGrid` | dashboard-এর stat box row | ~10 |
-| `EmptyState` | "No X found" placeholder | ১৬+ |
-| `FormField` | label + input + error pattern | বেশিরভাগ modal |
-| `TabBar` | tab navigation (staff/housekeeping/etc.) | ~12 |
+| `DataTable` | list/table pages | columns, rows, loading, empty state, pagination, sort, row action |
+| `Toolbar` / `FilterBar` | list controls | search, filters, tabs, reset, responsive wrapping |
+| `EmptyState` | empty list/result | icon, title, copy, primary action |
+| `StatCard` / `StatGrid` | dashboard metrics | label, value, trend, icon, loading state |
+| `FormField` | modal/forms | label, help text, error, required, input slot |
+| `TabBar` | settings/module tabs | keyboard navigation, selected state, mobile overflow |
+| `ConfirmDialog` | destructive action | `ModalShell`, focus management, loading/disabled submit |
 
-প্রতিটা component-এর সাথে: **props API doc + একটা usage example**। এগুলোই ভবিষ্যতে "design fix" করার একমাত্র জায়গা।
+For every pattern:
 
-**আকার:** বড় · **ঝুঁকি:** কম (নতুন component, পুরনো কিছু ভাঙে না — যতক্ষণ না migrate করছি)
+1. Keep a small, composable props API; page-specific business logic pattern-এর মধ্যে দিও না।
+2. Use only `rp-*` tokens and shared primitives.
+3. Document variants, loading/empty/error/disabled states, keyboard behaviour, এবং accessibility requirement.
+4. Add at least one real page usage before declaring the pattern complete.
 
----
+**Done when:** most repeated page structure pattern component থেকে আসে, এবং নতুন page-এ copy-paste layout দরকার হয় না।
 
-## Phase 2 — Page migration (incremental, big-bang নয়)
+### Phase C — pilot migration
 
-⚠️ **সবচেয়ে গুরুত্বপূর্ণ নীতি — একসাথে ৪৭ page rewrite করা যাবে না।** Lakhs of users, তাই এক page করে, verify করে, তারপর পরেরটা।
+**Goal:** component API বাস্তব page-এ যাচাই করা, বড় scale migration-এর আগে।
 
-**Per-page "definition of done":**
-1. পুরনো screenshot নেওয়া (browser tool দিয়ে) — baseline
-2. Page-টা Layer 3 component + token দিয়ে rewrite
-3. নতুন screenshot — **visually identical** হতে হবে (এটা refactor, redesign না)
-4. Inline style count → 0, hardcoded hex → 0 (grep দিয়ে verify)
-5. Dark mode + mobile চেক
-6. Commit (এক page = এক commit, সহজ rollback)
+1. Simple list-and-modal page দিয়ে শুরু করো: `expenses` বা `vehicles`।
+2. দ্বিতীয় page হিসেবে table-heavy page নাও: `rooms` বা `guests`।
+3. তৃতীয় page হিসেবে dashboard shell/stat-heavy page নাও: main `dashboard` বা `front-desk`।
+4. প্রতিটি page-এ PageShell, PageHeader, appropriate composite pattern, এবং token ব্যবহার করো।
+5. Before/after desktop, mobile, এবং dark-mode screenshot compare করো।
 
-**Migration order (সুপারিশ):**
-1. **আগে ২-৩টা "template" page** — সবচেয়ে common pattern (যেমন expenses/vehicles — simple list+table+modal)। এগুলো migrate করে component API পাকা করা
-2. তারপর **সবচেয়ে বেশি ব্যবহৃত** page (dashboard, front-desk, bookings, calendar) — যেখানে সবচেয়ে বেশি user
-3. বাকিগুলো pattern ধরে ধরে (একবার template ঠিক হলে দ্রুত হবে)
+**Done when:** pilot page visually identical, page HTTP 200, type error না বেড়ে, এবং ratchet count কমেছে।
 
-**গতি বাড়ানোর কৌশল:** প্রথম ৩ page-এর পর pattern দাঁড়িয়ে গেলে, বাকিগুলো একই ছাঁচে অনেক দ্রুত — কারণ তখন শুধু content বসানো, structure না ভাবা।
+### Phase D — incremental migration of all dashboard pages
 
-**আকার:** খুব বড় (৪৭ page) কিন্তু **যেকোনো সময় থামানো যায়** — অর্ধেক migrate থাকলেও ক্ষতি নেই, দুই সিস্টেম পাশাপাশি চলে
+**Goal:** 47টি dashboard page ধাপে ধাপে standardise করা।
 
----
+Suggested order:
 
-## Phase 3 — Enforcement (regression আটকানো — এটা বাদ দিলে সব ফেরত আসবে)
+1. High-traffic: dashboard, front-desk, bookings, calendar, rooms, guests.
+2. Repeated list CRUD: staff, inventory, housekeeping, maintenance, vehicles, venues, expenses, invoices.
+3. Configuration/content: website, settings, profile, rate plans, packages, offers, channels.
+4. Specialist/low-traffic: shareholders, referrals, AI content, my shares, suspended, upgrade.
 
-Migration-এর মূল্য শূন্য যদি পরের সপ্তাহে কেউ আবার inline hex লেখে। তাই:
+Per-page checklist:
 
-1. **ESLint rule** — page ফাইলে raw hex color (`/#[0-9a-f]{6}/`) ও `style={{}}` ব্যবহারে warn/error (component ফাইলে allowed)
-2. **`react/forbid-dom-props`** বা custom rule — dashboard page-এ inline `style` নিষিদ্ধ
-3. **CI check** — নতুন page-এ inline-style count বাড়লে fail (baseline ratchet)
-4. **PR template / CLAUDE.md** — "নতুন page? PageShell + token ব্যবহার করো" — যাতে আমিও ভবিষ্যতে ভুল না করি
-5. **Component Storybook** (optional, nice-to-have) — visual reference
+- বর্তমান layout-এর screenshot নাও।
+- Existing header shape অনুযায়ী `PageShell` এবং `PageHeader` ব্যবহার করো। সব page-কে একই header shape-এ redesign কোরো না।
+- Raw values token দিয়ে প্রতিস্থাপন করো; exact visual value preserve করা দরকার হলে existing approved token বেছে নাও।
+- Repeated table/form/empty state হলে shared pattern ব্যবহার করো।
+- Modal হলে `ModalShell` ব্যবহার করো।
+- Light mode, dark mode, এবং 375px viewport check করো।
+- `node scripts/design-system-ratchet.mjs` চালাও; improvement থাকলে baseline কমাও।
+- এক page বা related pattern-এর ছোট, reversible commit রাখো।
 
-**আকার:** ছোট · **ঝুঁকি:** নেই · **মূল্য:** সবচেয়ে বেশি (স্থায়িত্ব এখানেই)
+### Phase E — enforce and retire legacy debt
 
----
+**Goal:** migration শেষ হওয়ার পর পুরোনো path ফিরে না আসা।
 
-## Regression safety (lakhs of users বলে অপরিহার্য)
+1. Ratchet baseline শূন্যের দিকে নামাও।
+2. Dashboard page-এ raw hex ও inline style-এর জন্য lint/custom static check কঠোর করো।
+3. `globals.css` থেকে obsolete dark-mode `!important` patches remove করো—প্রতিটি removal light/dark screenshot দিয়ে verify করে।
+4. Pattern docs ও examples আপডেট রাখো; নতুন team member-এর জন্য short “build a dashboard page” guide যোগ করো।
+5. Component snapshot/visual regression test যোগ করা বিবেচনা করো, বিশেষ করে shared patterns-এর জন্য।
 
-| ঝুঁকি | প্রতিরোধ |
-|---|---|
-| Migrate করতে গিয়ে চেহারা বদলে যাওয়া | Per-page before/after screenshot — identical না হলে merge না |
-| এক page ভাঙলে সব ভাঙা | এক page = এক commit, independent, সহজ revert |
-| দুই সিস্টেম পাশাপাশি চলার সময় inconsistency | ঠিক আছে — ধীরে converge করবে, কোনো point-এ পুরো app কাজ করা বন্ধ হয় না |
-| Dark mode ভাঙা | প্রতিটা component dark-mode-first বানানো, প্রতি page-এ চেক |
-| Mobile ভাঙা | responsive প্রতি page-এ চেক (browser tool resize) |
+## New dashboard page template
 
----
+```tsx
+import { ActionButton, PageHeader, PageShell } from '@/components/patterns';
 
-## সময়/আকারের বাস্তব হিসাব
+export default function ExamplePage() {
+  return (
+    <PageShell gap={6}>
+      <PageHeader
+        title="Example"
+        subtitle="Manage your resort data"
+        align="end"
+        actions={<ActionButton>Create item</ActionButton>}
+      />
+      {/* Use shared table, empty-state, and form patterns here. */}
+    </PageShell>
+  );
+}
+```
 
-- Phase 0: ভিত্তি — ছোট, কিন্তু আগে করা বাধ্যতামূলক
-- Phase 1: ~১০টা component ভালো করে — বড়, একবারের কাজ
-- Phase 2: ৪৭ page — সবচেয়ে সময়সাপেক্ষ, কিন্তু **incremental, যেকোনো সময় pause করা যায়, প্রতিটা page নিজে থেকেই value দেয়**
-- Phase 3: enforcement — ছোট, কিন্তু বাদ দিলে সব বৃথা
+## Success metrics
 
-এটা এক sprint-এর কাজ না, কিন্তু Phase 0+1+3 আর প্রথম ৫টা page migrate করলেই "একবার fix = সব page" workflow চালু হয়ে যায় — বাকি migration তারপর ধীরে চলতে পারে।
+| Metric | Current | Target |
+|---|---:|---:|
+| Dashboard pages using `PageShell` | 36 / 47 | 47 / 47 |
+| Dashboard pages using `PageHeader` | 35 / 47 | 47 / 47 where the page has a header |
+| Composite patterns | 3 | 10+ documented patterns |
+| New design-system violations | Prevented by ratchet | 0 |
+| Legacy dark-mode patches | Present | Removed after migration |
 
----
+## Commands
 
-## সিদ্ধান্ত দরকার
+```bash
+# Check that design-system debt did not increase
+node scripts/design-system-ratchet.mjs
 
-1. **শুরুর বিন্দু** — আমার সুপারিশ: Phase 0 (token) → Phase 1-এর প্রথম ৩টা core component (`PageShell`, `PageHeader`, `DataTable`) → ২টা pilot page migrate → দেখে বোঝা যাবে ছাঁচ কেমন দাঁড়ায়, তারপর বাকিটা
-2. **এটা কি এখনই, নাকি security audit-এর fix গুলোর পরে?** — security (tenant isolation leak) ব্যবহারকারীর data-র ঝুঁকি, design system maintainability-র। আমার মত: **security-র CRITICAL/HIGH আগে**, তারপর এই design system — কারণ data leak এখন live, design debt বাড়ছে কিন্তু কাউকে ক্ষতি করছে না
-
----
-
-## Status
-
-📋 **Plan only — কোনো code লেখা হয়নি।** অনুমোদন + শুরুর বিন্দুর অপেক্ষায়।
+# Record a lower baseline after a verified migration
+node scripts/design-system-ratchet.mjs --update
+```

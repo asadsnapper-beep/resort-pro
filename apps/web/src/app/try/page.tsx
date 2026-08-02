@@ -1,14 +1,19 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { useAuthStore } from '@/store/auth';
 import { api } from '@/lib/api';
 import {
   Loader2, Sparkles, ChevronRight, Languages, Crown, Briefcase,
-  BarChart3, ConciergeBell, Megaphone, Code2, ChefHat,
+  BarChart3, ConciergeBell, Megaphone, Code2, ChefHat, Mail,
 } from 'lucide-react';
+
+// Once a visitor gives their email, remember it on this browser so every
+// role card is instantly explorable afterward — no re-asking per role.
+const DEMO_EMAIL_KEY = 'rp_demo_email';
 
 // ─── Role definitions ─────────────────────────────────────────────────────────
 const ROLES = [
@@ -102,6 +107,18 @@ export default function DemoPage() {
   const isBn = locale === 'bn';
   const { setAuth, clearAuth } = useAuthStore();
   const [loading, setLoading] = useState<string | null>(null);
+  const [capturedEmail, setCapturedEmail] = useState<string | null>(null);
+  const [checkedStorage, setCheckedStorage] = useState(false);
+  const [email, setEmail] = useState('');
+  const [emailError, setEmailError] = useState<string | null>(null);
+
+  // One-time gate: a returning visitor who already gave their email on this
+  // browser skips straight to the role picker, no re-prompt.
+  useEffect(() => {
+    const stored = window.localStorage.getItem(DEMO_EMAIL_KEY);
+    if (stored) setCapturedEmail(stored);
+    setCheckedStorage(true);
+  }, []);
 
   const switchLocale = useCallback(() => {
     const next = isBn ? 'en' : 'bn';
@@ -109,12 +126,12 @@ export default function DemoPage() {
     router.refresh();
   }, [isBn, router]);
 
-  const handleRoleSelect = async (role: string) => {
+  const startDemo = async (role: string, emailValue: string) => {
     setLoading(role);
     clearAuth();
 
     try {
-      const res = await api.post('/auth/demo-login', { role });
+      const res = await api.post('/auth/demo-login', { role, email: emailValue });
       const { token, user, tenant } = res.data.data;
 
       setAuth(
@@ -132,16 +149,34 @@ export default function DemoPage() {
     }
   };
 
+  // Once the email is captured, role cards log straight in — no per-role
+  // prompt. The overlay below blocks these clicks until email is given.
+  const handleRoleSelect = (role: string) => {
+    if (!capturedEmail) return;
+    startDemo(role, capturedEmail);
+  };
+
+  const handleEmailSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setEmailError(isBn ? 'সঠিক email address দিন' : 'Please enter a valid email address');
+      return;
+    }
+    window.localStorage.setItem(DEMO_EMAIL_KEY, trimmed);
+    setCapturedEmail(trimmed);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-resort-900 to-resort-700 text-white">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-5 border-b border-white/10">
-        <div className="flex items-center gap-2.5">
+        <a href="/" className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gold-500 font-display">
             <span className="font-bold text-resort-900 text-sm">R</span>
           </div>
           <span className="font-display font-semibold text-white text-lg">ResortPro</span>
-        </div>
+        </a>
         <div className="flex items-center gap-3">
           <button
             onClick={switchLocale}
@@ -250,6 +285,45 @@ export default function DemoPage() {
           }
         </p>
       </div>
+
+      {checkedStorage && !capturedEmail && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+          <div className="relative w-full max-w-sm rounded-2xl border border-white/10 bg-resort-900 p-6 shadow-2xl">
+            <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-gold-500/15">
+              <Mail className="h-5 w-5 text-gold-400" />
+            </div>
+
+            <h2 className="font-display text-xl font-bold text-white mb-2">
+              {isBn ? 'Demo দেখতে email দিন' : 'Enter your email to explore the demo'}
+            </h2>
+            <p className="text-white/50 text-sm mb-5">
+              {isBn
+                ? 'একবার email দিলেই হবে — এরপর যেকোনো role-এ demo দেখতে পারবেন, আবার চাইবে না। স্প্যাম নেই।'
+                : "Just once — after this you can explore any role's demo freely, no re-asking. No spam."}
+            </p>
+
+            <form onSubmit={handleEmailSubmit}>
+              <input
+                type="email"
+                autoFocus
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setEmailError(null); }}
+                placeholder="you@example.com"
+                className="w-full rounded-xl border border-white/15 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder:text-white/30 outline-none focus:border-gold-500/50"
+              />
+              {emailError && <p className="mt-2 text-xs text-red-400">{emailError}</p>}
+
+              <button
+                type="submit"
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gold-500 px-4 py-3 text-sm font-semibold text-resort-900 transition-all hover:bg-gold-400"
+              >
+                {isBn ? 'Demo দেখুন' : 'Continue to demo'}
+              </button>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

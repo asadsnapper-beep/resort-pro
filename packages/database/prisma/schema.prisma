@@ -2413,6 +2413,23 @@ model PlatformAnnouncement {
   @@map("platform_announcements")
 }
 
+// ─── Demo Leads ───────────────────────────────────────────────────────────────
+// Marketing record of who viewed the /try demo — not an auth record. The demo
+// session itself still uses the existing seeded `demo` tenant users, unchanged.
+
+model DemoLead {
+  id        String   @id @default(cuid())
+  email     String
+  role      String // matches the /try persona key (OWNER, MANAGER, ...)
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([createdAt])
+  @@map("demo_leads")
+}
+
 // ─── Feature Flags ────────────────────────────────────────────────────────────
 
 model TenantFeatureFlag {

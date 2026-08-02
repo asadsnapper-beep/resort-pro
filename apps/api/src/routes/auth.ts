@@ -605,10 +605,20 @@ export async function authRoutes(app: FastifyInstance) {
 
   // ── POST /api/auth/demo-login ─────────────────────────────────────────────
   // No password required — issues a short-lived JWT for the demo tenant.
-  // Accepts optional { role } body to select which demo persona to use.
-  // Safe: demo tenant is completely isolated (separate tenantId, isDemo=true).
-  app.post('/demo-login', async (req, reply) => {
-    const { role: requestedRole } = (req.body as any) ?? {};
+  // Accepts { role, email }. Access is still instant (no verification step),
+  // but a real email is now required: every demo view leaves behind a
+  // DemoLead record + a follow-up email, so marketing knows who's evaluating
+  // the product. Safe: demo tenant is completely isolated (separate
+  // tenantId, isDemo=true).
+  app.post('/demo-login', {
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+  }, async (req, reply) => {
+    const { role: requestedRole, email } = (req.body as any) ?? {};
+
+    const parsedEmail = z.string().trim().email().safeParse(email);
+    if (!parsedEmail.success) {
+      return reply.status(400).send({ error: 'A valid email is required to access the demo' });
+    }
 
     const tenant = await prisma.tenant.findUnique({ where: { slug: 'demo' } });
     if (!tenant || !tenant.isDemo) {
@@ -627,7 +637,8 @@ export async function authRoutes(app: FastifyInstance) {
       CHEF:         'chef@coralbay.demo',
     };
 
-    const targetEmail = roleEmailMap[requestedRole as string] ?? roleEmailMap.OWNER;
+    const role = roleEmailMap[requestedRole as string] ? (requestedRole as string) : 'OWNER';
+    const targetEmail = roleEmailMap[role];
 
     const user = await prisma.user.findFirst({
       where: { tenantId: tenant.id, email: targetEmail },
@@ -636,6 +647,46 @@ export async function authRoutes(app: FastifyInstance) {
     if (!user) {
       return reply.status(404).send({ error: 'Demo user not found' });
     }
+
+    // Record the lead — best-effort, must never block or fail demo access.
+    try {
+      await prisma.demoLead.create({
+        data: {
+          email:     parsedEmail.data,
+          role,
+          ipAddress: req.ip,
+          userAgent: req.headers['user-agent'],
+        },
+      });
+    } catch (err) {
+      req.log.error({ err }, 'Failed to record demo lead');
+    }
+
+    // Email a copy — fire-and-forget, never block the response on delivery.
+    sendEmail({
+      to: parsedEmail.data,
+      subject: 'Your ResortPro demo access',
+      html: `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+          <h2 style="color:#1a6b5e">You're exploring ResortPro as ${user.firstName} (${role.charAt(0)}${role.slice(1).toLowerCase()})</h2>
+          <p>Thanks for taking a look! Your demo session is already open in the tab where you clicked in — this email is just your copy.</p>
+          <p style="margin:24px 0">
+            <a href="${process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:3000'}/try"
+               style="background:#1a6b5e;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600">
+              Open the demo again
+            </a>
+          </p>
+          <p>Liked what you saw? Start your own 14-day free trial — no credit card needed.</p>
+          <p style="margin:24px 0">
+            <a href="${process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:3000'}/plans"
+               style="background:#d4a853;color:#1a1a1a;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600">
+              Start free trial
+            </a>
+          </p>
+          <p>Questions? Reply to this email anytime.</p>
+        </div>
+      `,
+    }).catch((err) => req.log.error({ err }, 'Failed to send demo access email'));
 
     // Short-lived token: 90 minutes only
     const payload: Omit<JwtPayload, 'iat' | 'exp'> = {

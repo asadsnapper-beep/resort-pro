@@ -128,7 +128,13 @@ export async function buildApp() {
   });
 
   await app.register(rateLimit, {
-    max: 100,
+    // A single dashboard page load fires several parallel requests (summary,
+    // notifications, invoices, billing status, etc.), and staff on the same
+    // office network share one IP — 100/min was tripping during ordinary
+    // multi-page browsing, not just abuse. Sensitive routes (login, admin,
+    // design-requests) already have their own tighter per-route overrides
+    // above this global default.
+    max: 300,
     timeWindow: '1 minute',
     // statusCode must be included here — without it the throttled response is
     // sent with a 500 instead of the correct 429 (the returned object is used

@@ -3077,6 +3077,19 @@ Rules:
     return reply.send(ok(updated, 'Theme updated'));
   });
 
+  // ── Demo leads (marketing — who viewed /try) ────────────────────────────────
+  // See plan/demo-gate-and-click-tracking.md. Not an auth record — just a
+  // marketing log of who entered an email to view the sandboxed demo.
+
+  // GET /api/admin/demo-leads — newest first
+  app.get('/demo-leads', { preHandler: requireAdminRole() }, async (_request, reply) => {
+    const leads = await prisma.demoLead.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+    });
+    return reply.send(ok(leads));
+  });
+
   // ── Custom design requests (paid service pipeline) ─────────────────────────
   // Owner-facing side is apps/api/src/routes/designRequests.ts.
   // See plan/theme-studio-and-design-service.md (Part B).

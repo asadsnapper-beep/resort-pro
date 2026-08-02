@@ -227,7 +227,7 @@ export async function sendCheckoutEmail(bookingId: string) {
     include: {
       guest: true,
       room: true,
-      payments: { where: { status: 'COMPLETED' } },
+      payments: { where: { status: 'PAID' } },
       foodOrders: true,
       invoiceExtras: true,
       tenant: { select: { name: true, email: true, currency: true, logoUrl: true, brandPrimaryColor: true, taxRate: true } },

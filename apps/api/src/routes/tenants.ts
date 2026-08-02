@@ -391,7 +391,10 @@ export async function tenantRoutes(app: FastifyInstance) {
       if (!tenant) return ok([]);
 
       const now = new Date();
-      const announcements = await db.platformAnnouncement.findMany({
+      // PlatformAnnouncement has no tenantId column (it's a global/platform model, not
+      // tenant-scoped) — tenantPrisma's $allModels middleware would inject tenantId into
+      // every model's where clause regardless, so this must go through the raw client.
+      const announcements = await prisma.platformAnnouncement.findMany({
         where: {
           isActive: true,
           startsAt: { lte: now },
