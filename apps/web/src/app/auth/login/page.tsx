@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -32,6 +32,7 @@ type FormData = {
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { setAuth } = useAuthStore();
   const [loading, setLoading]           = useState(false);
   const [loginError, setLoginError]     = useState<string | null>(null);
@@ -58,9 +59,17 @@ export default function LoginPage() {
     });
   }, []);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
+
+  // Welcome emails carry the workspace as a query parameter so a new owner
+  // lands on the standard sign-in screen without having to decipher or type a
+  // tenant slug. The value remains editable for shared-device sign-ins.
+  useEffect(() => {
+    const workspace = searchParams.get('workspace');
+    if (workspace) setValue('slug', workspace);
+  }, [searchParams, setValue]);
 
   // Login with credentials (regular flow)
   const onSubmit = async (data: FormData) => {

@@ -256,7 +256,17 @@ export async function authRoutes(app: FastifyInstance) {
         },
       });
 
-      // Send welcome email
+      // Send welcome email. Dashboard routes are platform-level, so never put
+      // the internal tenant slug in the path (e.g. /demopro/dashboard). The
+      // sign-in screen can safely use it to prefill the workspace instead.
+      const webUrl = (
+        process.env.WEB_URL
+        || process.env.NEXT_PUBLIC_APP_URL
+        || process.env.CORS_ORIGIN?.split(',')[0]
+        || 'http://localhost:3000'
+      ).replace(/\/$/, '');
+      const signInUrl = `${webUrl}/auth/login?workspace=${encodeURIComponent(body.slug)}`;
+
       await sendEmail({
         to: body.email,
         subject: promotionGranted ? 'Welcome to ResortPro — your launch offer is active' : 'Welcome to ResortPro — finish setting up your plan',
@@ -265,9 +275,9 @@ export async function authRoutes(app: FastifyInstance) {
             <h2 style="color:#1a6b5e">Welcome to ResortPro, ${body.firstName}!</h2>
             <p>Your resort <strong>${body.resortName}</strong> is ready. ${promotionGranted ? `Your three-month launch offer is active until <strong>${trialEndsAt!.toLocaleDateString('en-US', { dateStyle: 'long', timeZone: 'Asia/Dhaka' })}</strong>.` : 'Complete checkout to activate your selected ResortPro plan.'}</p>
             <p style="margin:24px 0">
-              <a href="${process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:3000'}/${body.slug}/dashboard"
+              <a href="${signInUrl}"
                  style="background:#1a6b5e;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600">
-                Open Your Dashboard
+                ${promotionGranted ? 'Open Your Dashboard' : 'Sign in to finish setup'}
               </a>
             </p>
             <p><strong>After activation, you can:</strong></p>
