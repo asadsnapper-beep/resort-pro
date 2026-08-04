@@ -36,6 +36,17 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
+    if (
+      error.response?.status === 403 &&
+      error.response?.data?.upgradeRequired &&
+      typeof window !== 'undefined' &&
+      !window.location.pathname.startsWith('/dashboard/upgrade')
+    ) {
+      // A server-side entitlement gate was hit. Route the owner to a clear
+      // upgrade screen instead of leaving a paid module looking broken.
+      window.location.assign('/dashboard/upgrade?reason=feature');
+      return Promise.reject(error);
+    }
     if (error.response?.status === 401 && typeof window !== 'undefined') {
       const hasToken = !!getAuthState()?.token;
       if (hasToken) {

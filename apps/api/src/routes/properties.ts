@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams } from '../utils/response';
-import { resolveTenantEntitlement } from '../utils/entitlement';
+import { checkPropertyLimit } from '../utils/entitlement';
 import type { JwtPayload } from '@resort-pro/types';
 
 const propertySchema = z.object({
@@ -17,19 +17,6 @@ const propertySchema = z.object({
   checkOutTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
 });
 
-async function requireMultiProperty(tenantId: string, reply: { status: (code: number) => { send: (body: unknown) => void } }) {
-  const ent = await resolveTenantEntitlement(tenantId);
-  if (!ent.flags['multi_property']) {
-    reply.status(403).send({
-      success: false,
-      error: 'Multi-property management requires an Enterprise plan.',
-      code: 'PLAN_UPGRADE_REQUIRED',
-    });
-    return false;
-  }
-  return true;
-}
-
 export async function propertyRoutes(app: FastifyInstance) {
   /* ── GET /api/properties ─────────────────────────────────────────────── */
   app.get('/', {
@@ -38,8 +25,6 @@ export async function propertyRoutes(app: FastifyInstance) {
     handler: async (request, reply) => {
       const { db } = request;
       const { tenantId } = request.user as JwtPayload;
-
-      if (!await requireMultiProperty(tenantId, reply)) return;
 
       const q = request.query as { page?: number; limit?: number };
       const { page, limit, skip } = parsePageParams(q);
@@ -81,8 +66,6 @@ export async function propertyRoutes(app: FastifyInstance) {
       const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
 
-      if (!await requireMultiProperty(tenantId, reply)) return;
-
       const property = await db.property.findFirst({
         where: { id, tenantId },
         include: { _count: { select: { rooms: true } } },
@@ -101,7 +84,16 @@ export async function propertyRoutes(app: FastifyInstance) {
       const { db } = request;
       const { tenantId } = request.user as JwtPayload;
 
-      if (!await requireMultiProperty(tenantId, reply)) return;
+      const limitCheck = await checkPropertyLimit(tenantId);
+      if (!limitCheck.allowed) {
+        return reply.status(403).send({
+          success: false,
+          error: `Property limit reached. Your plan allows ${limitCheck.limit} properties. Upgrade to add more.`,
+          code: 'PROPERTY_LIMIT_REACHED',
+          upgradeRequired: true,
+          data: { limit: limitCheck.limit, current: limitCheck.current },
+        });
+      }
 
       const body = propertySchema.parse(request.body);
 

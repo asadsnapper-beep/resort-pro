@@ -99,8 +99,74 @@ export const FLAG_REGISTRY: FlagDefinition[] = [
     label: 'Restaurant & F&B',
     description: 'Restaurant menu, F&B orders, and inventory management. Disable if your resort has no restaurant.',
     category: 'Modules',
-    defaultOn: true,
+    defaultOn: false,
     ownerControllable: true,
+  },
+  {
+    flag: 'custom_domain',
+    label: 'Custom Domain',
+    description: 'Connect a domain you own to your ResortPro booking site.',
+    category: 'Modules',
+    defaultOn: false,
+  },
+  {
+    flag: 'payment_gateway',
+    label: 'Online Payment Gateway',
+    description: 'Accept guest payments through your configured payment gateway.',
+    category: 'Modules',
+    defaultOn: false,
+  },
+  {
+    flag: 'housekeeping_module', label: 'Housekeeping',
+    description: 'Plan, assign, and track room cleaning tasks.', category: 'Modules', defaultOn: false,
+  },
+  {
+    flag: 'inventory_module', label: 'Inventory',
+    description: 'Manage stock, vendors, and purchase orders.', category: 'Modules', defaultOn: false,
+  },
+  {
+    flag: 'maintenance_module', label: 'Maintenance',
+    description: 'Track maintenance tickets, schedules, and assets.', category: 'Modules', defaultOn: false,
+  },
+  {
+    flag: 'marketing_module', label: 'Marketing',
+    description: 'Create guest campaigns and marketing automations.', category: 'Modules', defaultOn: false,
+  },
+  {
+    flag: 'loyalty_module', label: 'Loyalty',
+    description: 'Reward returning guests with points and benefits.', category: 'Modules', defaultOn: false,
+  },
+  {
+    flag: 'offers_module', label: 'Offers & Packages',
+    description: 'Publish special offers and stay packages.', category: 'Modules', defaultOn: false,
+  },
+  {
+    flag: 'rate_plans_module', label: 'Rate Plans',
+    description: 'Create flexible pricing plans for rooms and stays.', category: 'Modules', defaultOn: false,
+  },
+  {
+    flag: 'group_bookings_module', label: 'Group Bookings',
+    description: 'Manage room blocks and bookings for groups.', category: 'Modules', defaultOn: false,
+  },
+  {
+    flag: 'vehicles_module', label: 'Vehicles',
+    description: 'Manage transfers and resort vehicle operations.', category: 'Modules', defaultOn: false,
+  },
+  {
+    flag: 'venues_module', label: 'Venues',
+    description: 'Manage venues, event spaces, and bookings.', category: 'Modules', defaultOn: false,
+  },
+  {
+    flag: 'corporate_accounts_module', label: 'Corporate Accounts',
+    description: 'Manage corporate clients, contracts, and billing.', category: 'Modules', defaultOn: false,
+  },
+  {
+    flag: 'channel_sync', label: 'OTA Channel Sync',
+    description: 'Sync availability and rates with external channels.', category: 'Modules', defaultOn: false,
+  },
+  {
+    flag: 'multi_property', label: 'Multi-property Management',
+    description: 'Manage multiple resort properties from one account.', category: 'Modules', defaultOn: false,
   },
 
   // ── Beta ──────────────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { randomBytes } from 'crypto';
 import { prisma } from '@resort-pro/database';
 import { requireAuth } from '../middleware/auth';
+import { applyPlanFlagsToTenant } from '../utils/entitlement';
 import { ok, validate } from '../utils/response';
 import { sendEmail } from '../services/email';
 import { createAdminNotification } from '../utils/notifications';
@@ -12,6 +13,33 @@ import type { JwtPayload } from '@resort-pro/types';
 
 const REFRESH_COOKIE = 'rp_refresh';
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60; // 7 days in seconds
+const LAUNCH_PROMOTION_KEY = 'launch_three_months_2026';
+
+function normalized(value: string | undefined) {
+  return value?.trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US') || undefined;
+}
+
+function launchPromotionWindow() {
+  if (process.env.LAUNCH_PROMOTION_ENABLED !== 'true') return null;
+  const startsAt = process.env.LAUNCH_PROMOTION_START_AT ? new Date(process.env.LAUNCH_PROMOTION_START_AT) : null;
+  const endsAt = process.env.LAUNCH_PROMOTION_END_AT ? new Date(process.env.LAUNCH_PROMOTION_END_AT) : null;
+  const now = new Date();
+  if ((startsAt && Number.isNaN(startsAt.getTime())) || (endsAt && Number.isNaN(endsAt.getTime()))) return null;
+  if ((startsAt && now < startsAt) || (endsAt && now >= endsAt)) return null;
+  return { key: LAUNCH_PROMOTION_KEY, now };
+}
+
+// Calendar months are based on the product's operating timezone, not a
+// browser's local clock. Noon Dhaka avoids a DST-free but still clear boundary.
+function threeCalendarMonthsFromDhaka(now: Date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Dhaka', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(now);
+  const part = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  const expiry = new Date(Date.UTC(part('year'), part('month') - 1, part('day'), 6, 0, 0));
+  expiry.setUTCMonth(expiry.getUTCMonth() + 3);
+  return expiry;
+}
 
 function setRefreshCookie(reply: FastifyReply, token: string) {
   reply.setCookie(REFRESH_COOKIE, token, {
@@ -42,7 +70,10 @@ const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).regex(/(?=.*[A-Z])(?=.*[0-9])/, 'Must contain uppercase and number'),
   referralCode: z.string().max(20).optional(),  // ?ref=CODE from URL
-  plan: z.enum(['STARTER', 'PROFESSIONAL', 'ENTERPRISE']).optional(),
+  address: z.string().min(3).max(200).optional(),
+  // FREE is the internal key for the paid Solo plan. Enterprise remains valid
+  // for existing/admin-assisted accounts but is not a public selector.
+  plan: z.enum(['FREE', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE']).optional(),
 });
 
 const loginSchema = z.object({
@@ -82,10 +113,22 @@ export async function authRoutes(app: FastifyInstance) {
 
       const passwordHash = await bcrypt.hash(body.password, 12);
 
-      // Use platform trial days setting (falls back to 14)
-      const platformSettings = await prisma.platformSettings.findUnique({ where: { id: 'singleton' } });
-      const trialDays = platformSettings?.trialDays ?? 14;
-      const trialEndsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
+      const selectedPlan = body.plan ?? 'FREE';
+      const promotion = launchPromotionWindow();
+      const normalizedBusinessName = normalized(body.resortName)!;
+      const normalizedAddress = normalized(body.address);
+      const previousPromotion = promotion
+        ? await prisma.promotionRedemption.findFirst({
+          where: {
+            promotionKey: promotion.key,
+            normalizedBusinessName: { equals: normalizedBusinessName, mode: 'insensitive' },
+            ...(normalizedAddress && { normalizedAddress: { equals: normalizedAddress, mode: 'insensitive' } }),
+          },
+          select: { id: true },
+        })
+        : null;
+      const promotionGranted = !!promotion && !previousPromotion;
+      const trialEndsAt = promotionGranted ? threeCalendarMonthsFromDhaka(promotion!.now) : null;
 
       // Resolve referral — check tenant referralCode first, then campaign link
       let referredById: string | undefined;
@@ -117,9 +160,13 @@ export async function authRoutes(app: FastifyInstance) {
         data: {
           name: body.resortName,
           slug: body.slug,
-          plan: body.plan ?? 'STARTER',
-          planStatus: 'trialing',
+          ...(body.address && { address: body.address }),
+          plan: selectedPlan,
+          // Accounts are created first so a Stripe/bKash checkout can be tied
+          // to the tenant. They become active only after the payment webhook.
+          planStatus: promotionGranted ? 'trialing' : 'incomplete',
           trialEndsAt,
+          priceProtectedUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
           billingEmail: body.email,
           referralCode,
           ...(referredById && { referredById }),
@@ -143,6 +190,19 @@ export async function authRoutes(app: FastifyInstance) {
         include: { users: true },
       });
 
+      await applyPlanFlagsToTenant(tenant.id, selectedPlan);
+      if (promotionGranted && promotion) {
+        await prisma.promotionRedemption.create({
+          data: {
+            promotionKey: promotion.key,
+            tenantId: tenant.id,
+            normalizedBusinessName,
+            normalizedAddress,
+            expiresAt: trialEndsAt!,
+          },
+        });
+      }
+
       // Create Referral record if referred
       if (referredById) {
         await prisma.referral.create({
@@ -159,14 +219,15 @@ export async function authRoutes(app: FastifyInstance) {
       await createAdminNotification({
         type: 'new_signup',
         title: referredById ? '🔗 New referral signup' : 'New resort signed up',
-        message: `${body.resortName} (${body.email}) just started a ${trialDays}-day trial${referralNote}.`,
+        message: `${body.resortName} (${body.email}) created a ${selectedPlan} account${promotionGranted ? ' with the launch offer' : ' and is ready for checkout'}${referralNote}.`,
         metadata: {
           tenantId: tenant.id,
           tenantName: tenant.name,
           tenantSlug: tenant.slug,
           ownerEmail: body.email,
-          trialDays,
-          trialEndsAt: trialEndsAt.toISOString(),
+          plan: selectedPlan,
+          promotionGranted,
+          ...(trialEndsAt && { trialEndsAt: trialEndsAt.toISOString() }),
           isReferral: !!referredById,
           referredById,
         },
@@ -198,25 +259,25 @@ export async function authRoutes(app: FastifyInstance) {
       // Send welcome email
       await sendEmail({
         to: body.email,
-        subject: `Welcome to ResortPro — Your 14-day trial has started! 🎉`,
+        subject: promotionGranted ? 'Welcome to ResortPro — your launch offer is active' : 'Welcome to ResortPro — finish setting up your plan',
         html: `
           <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
             <h2 style="color:#1a6b5e">Welcome to ResortPro, ${body.firstName}!</h2>
-            <p>Your resort <strong>${body.resortName}</strong> is ready. You have a full <strong>14-day free trial</strong> with access to all Starter features.</p>
+            <p>Your resort <strong>${body.resortName}</strong> is ready. ${promotionGranted ? `Your three-month launch offer is active until <strong>${trialEndsAt!.toLocaleDateString('en-US', { dateStyle: 'long', timeZone: 'Asia/Dhaka' })}</strong>.` : 'Complete checkout to activate your selected ResortPro plan.'}</p>
             <p style="margin:24px 0">
               <a href="${process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:3000'}/${body.slug}/dashboard"
                  style="background:#1a6b5e;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600">
                 Open Your Dashboard
               </a>
             </p>
-            <p><strong>Your trial includes:</strong></p>
+            <p><strong>After activation, you can:</strong></p>
             <ul>
               <li>Full booking management</li>
               <li>Guest CRM</li>
               <li>Room management</li>
               <li>Website builder</li>
             </ul>
-            <p>Trial ends on: <strong>${trialEndsAt.toLocaleDateString('en-US', { dateStyle: 'long' })}</strong></p>
+            <p>You can always view and export your data if you decide not to continue.</p>
             <p>Questions? Reply to this email anytime.</p>
             <p style="color:#666;font-size:13px">— The ResortPro Team</p>
           </div>
@@ -671,7 +732,7 @@ export async function authRoutes(app: FastifyInstance) {
           <h2 style="color:#1a6b5e">You're exploring ResortPro as ${user.firstName} (${role.charAt(0)}${role.slice(1).toLowerCase()})</h2>
           <p>Thanks for taking a look! Your demo session is already open in the tab where you clicked in — this email is just your copy.</p>
           <p style="margin:24px 0">
-            <a href="${process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:3000'}/try"
+            <a href="${process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:3000'}/try?email=${encodeURIComponent(parsedEmail.data)}"
                style="background:#1a6b5e;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600">
               Open the demo again
             </a>

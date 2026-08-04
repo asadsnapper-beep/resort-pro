@@ -38,6 +38,7 @@ plan/
 | File | কী আছে | Status |
 |------|---------|--------|
 | [offers-promotions.md](./offers-promotions.md) | Offer creation, promo codes, website display, booking form integration | ✅ Built |
+| [launch-pricing-and-trial-abuse-prevention.md](./launch-pricing-and-trial-abuse-prevention.md) | **Active pricing decision:** Free Forever + $19 Independent Resort + $59 Resort Group, customer rights, migration, billing and launch steps | 📋 Approved direction — implementation pending |
 | [dynamic-pricing.md](./dynamic-pricing.md) | Seasonal rules, occupancy-based, day-of-week, advance/last-minute pricing | ❌ Not built — কোনো PricingRule model/seasonal logic নাই |
 | [online-payment.md](./online-payment.md) | Stripe + bKash payment integration | ✅ Built — Stripe + bKash + SSLCommerz সব real |
 | [corporate-accounts.md](./corporate-accounts.md) | Company/B2B client accounts — consolidated billing, credit terms, corporate rates (separate from one-off Group Bookings) | ✅ Built |

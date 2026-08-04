@@ -8,7 +8,7 @@
  */
 import type { FastifyInstance } from 'fastify';
 import bcrypt from 'bcryptjs';
-import { prisma } from '@resort-pro/database';
+import { prisma, Prisma } from '@resort-pro/database';
 import { PLAN_PRICING } from '@resort-pro/types';
 import { ok } from '../utils/response';
 
@@ -23,7 +23,7 @@ const MONTHLY_PLAN_PRICE_USD: Record<string, number> = {
 import { createAdminNotification } from '../utils/notifications';
 import { computeChurnRisk } from '../utils/churn';
 import { FLAG_REGISTRY, FLAG_MAP } from '../utils/feature-flags';
-import { applyPlanFlagsToTenant, getPlanConfigs } from '../utils/entitlement';
+import { applyPlanFlagsToTenant, DEFAULT_PLAN_CONFIGS, getPlanConfigs } from '../utils/entitlement';
 import { anonymizeTenant, collectTenantExport, getPendingErasures } from '../utils/gdpr';
 import { metrics } from '../utils/metrics';
 import { getStorageConfig, invalidateStorageCache, uploadToStorage, deleteFromStorage, type StorageConfig } from '../services/storage';
@@ -358,7 +358,10 @@ export async function adminRoutes(app: FastifyInstance) {
     });
 
     const data: any = {};
-    if (plan !== undefined) data.plan = plan;
+    if (plan !== undefined) {
+      data.plan = plan;
+      data.priceProtectedUntil = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+    }
     if (planStatus !== undefined) data.planStatus = planStatus;
     if (isActive !== undefined) data.isActive = isActive;
     if (trialEndsAt !== undefined) data.trialEndsAt = new Date(trialEndsAt);
@@ -894,35 +897,11 @@ export async function adminRoutes(app: FastifyInstance) {
 
   // ── Platform Settings helpers ──────────────────────────────────────────────
 
-  const DEFAULT_PLANS = [
-    {
-      key: 'STARTER',
-      name: PLAN_PRICING.STARTER.displayName,
-      price: PLAN_PRICING.STARTER.monthlyUsd,
-      roomLimit: PLAN_PRICING.STARTER.roomLimit,
-      features: [`Up to ${PLAN_PRICING.STARTER.roomLimit} rooms`, 'Booking management', 'Guest CRM', 'Website builder', 'Email support'],
-    },
-    {
-      key: 'PROFESSIONAL',
-      name: PLAN_PRICING.PROFESSIONAL.displayName,
-      price: PLAN_PRICING.PROFESSIONAL.monthlyUsd,
-      roomLimit: PLAN_PRICING.PROFESSIONAL.roomLimit,
-      features: [`Up to ${PLAN_PRICING.PROFESSIONAL.roomLimit} rooms`, 'Everything in Starter', 'Staff invites', 'Priority support', 'Advanced analytics'],
-    },
-    {
-      key: 'ENTERPRISE',
-      name: PLAN_PRICING.ENTERPRISE.displayName,
-      price: PLAN_PRICING.ENTERPRISE.monthlyUsd,
-      roomLimit: PLAN_PRICING.ENTERPRISE.roomLimit,
-      features: [`Up to ${PLAN_PRICING.ENTERPRISE.roomLimit} rooms`, 'Everything in Pro', 'Custom integrations', 'Dedicated support', 'SLA guarantee'],
-    },
-  ];
-
   async function getOrCreateSettings() {
     let settings = await prisma.platformSettings.findUnique({ where: { id: 'singleton' } });
     if (!settings) {
       settings = await prisma.platformSettings.create({
-        data: { id: 'singleton', trialDays: 14, plans: DEFAULT_PLANS },
+        data: { id: 'singleton', trialDays: 0, plans: DEFAULT_PLAN_CONFIGS as unknown as Prisma.InputJsonValue },
       });
     }
     return settings;
@@ -1497,7 +1476,7 @@ Rules:
     const updated = await prisma.platformSettings.upsert({
       where: { id: 'singleton' },
       update: data,
-      create: { id: 'singleton', trialDays: trialDays ?? 14, plans: plans ?? DEFAULT_PLANS },
+      create: { id: 'singleton', trialDays: trialDays ?? 14, plans: (plans ?? DEFAULT_PLAN_CONFIGS) as unknown as Prisma.InputJsonValue },
     });
 
     const adminUser = request.user as any;
@@ -1530,7 +1509,7 @@ Rules:
       await prisma.platformSettings.upsert({
         where:  { id: 'singleton' },
         update: { aiApiKey: apiKey.trim(), aiProvider: provider },
-        create: { id: 'singleton', trialDays: 14, plans: DEFAULT_PLANS, aiApiKey: apiKey.trim(), aiProvider: provider },
+        create: { id: 'singleton', trialDays: 14, plans: DEFAULT_PLAN_CONFIGS as unknown as Prisma.InputJsonValue, aiApiKey: apiKey.trim(), aiProvider: provider },
       });
       const adminUser = request.user as any;
       await logAdminAction({
@@ -1567,7 +1546,7 @@ Rules:
       await prisma.platformSettings.upsert({
         where:  { id: 'singleton' },
         update: { aiApiKey: null, aiProvider: null },
-        create: { id: 'singleton', trialDays: 14, plans: DEFAULT_PLANS, aiApiKey: null, aiProvider: null },
+        create: { id: 'singleton', trialDays: 14, plans: DEFAULT_PLAN_CONFIGS as unknown as Prisma.InputJsonValue, aiApiKey: null, aiProvider: null },
       });
       const adminUser = request.user as any;
       await logAdminAction({

@@ -1,4 +1,4 @@
-import Fastify from 'fastify';
+import Fastify, { type FastifyInstance } from 'fastify';
 import { ZodError } from 'zod';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
@@ -68,6 +68,7 @@ import { idScanRoutes }         from './routes/idScan';
 import { restaurantTableRoutes } from './routes/restaurantTables';
 import { publicTableRoutes } from './routes/publicTable';
 import { aiRoutes } from './routes/ai';
+import { requireFlag } from './middleware/auth';
 import { metrics, normalizePath } from './utils/metrics';
 
 export async function buildApp() {
@@ -235,6 +236,18 @@ export async function buildApp() {
     version: '1.0.0',
   }));
 
+  // Feature modules are registered inside an encapsulated Fastify scope. That
+  // gives every endpoint in the module the same server-side entitlement gate,
+  // so a hidden dashboard item can never be bypassed with a direct API call.
+  const registerFeatureRoutes = async (
+    prefix: string,
+    flag: string,
+    routes: (instance: FastifyInstance) => Promise<void>,
+  ) => app.register(async (featureApp) => {
+    featureApp.addHook('preHandler', requireFlag(flag));
+    await routes(featureApp);
+  }, { prefix });
+
   // ── Routes ────────────────────────────────────────────────────────────────
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(dashboardRoutes, { prefix: '/api/dashboard' });
@@ -247,15 +260,15 @@ export async function buildApp() {
   await app.register(idScanRoutes,         { prefix: '/api/guests' });
   await app.register(staffRoutes, { prefix: '/api/staff' });
   await app.register(shareholderRoutes, { prefix: '/api/shareholders' });
-  await app.register(venueRoutes, { prefix: '/api/venues' });
-  await app.register(corporateAccountRoutes, { prefix: '/api/corporate-accounts' });
+  await registerFeatureRoutes('/api/venues', 'venues_module', venueRoutes);
+  await registerFeatureRoutes('/api/corporate-accounts', 'corporate_accounts_module', corporateAccountRoutes);
   await app.register(designRequestRoutes, { prefix: '/api/design-requests' });
-  await app.register(housekeepingRoutes, { prefix: '/api/housekeeping' });
-  await app.register(menuRoutes, { prefix: '/api/menu' });
-  await app.register(foodOrderRoutes, { prefix: '/api/food-orders' });
-  await app.register(inventoryRoutes, { prefix: '/api/inventory' });
-  await app.register(vendorRoutes, { prefix: '/api/vendors' });
-  await app.register(purchaseOrderRoutes, { prefix: '/api/purchase-orders' });
+  await registerFeatureRoutes('/api/housekeeping', 'housekeeping_module', housekeepingRoutes);
+  await registerFeatureRoutes('/api/menu', 'restaurant_module', menuRoutes);
+  await registerFeatureRoutes('/api/food-orders', 'restaurant_module', foodOrderRoutes);
+  await registerFeatureRoutes('/api/inventory', 'inventory_module', inventoryRoutes);
+  await registerFeatureRoutes('/api/vendors', 'inventory_module', vendorRoutes);
+  await registerFeatureRoutes('/api/purchase-orders', 'inventory_module', purchaseOrderRoutes);
   await app.register(assetRoutes, { prefix: '/api/assets' });
   await app.register(lostFoundRoutes, { prefix: '/api/lost-found' });
   await app.register(minibarRoutes, { prefix: '/api/minibar' });
@@ -263,37 +276,37 @@ export async function buildApp() {
   await app.register(attendanceRoutes, { prefix: '/api/attendance' });
   await app.register(salaryRoutes, { prefix: '/api/salary' });
   await app.register(trainingRoutes, { prefix: '/api/training' });
-  await app.register(vehicleRoutes, { prefix: '/api/vehicles' });
+  await registerFeatureRoutes('/api/vehicles', 'vehicles_module', vehicleRoutes);
   await app.register(ticketRoutes, { prefix: '/api/tickets' });
   await app.register(ticketWebhookRoutes, { prefix: '/api/ticket-webhooks' });
   await app.register(chatRoutes, { prefix: '/api/chat' });
   await app.register(websiteRoutes, { prefix: '/api/website' });
   await app.register(publicWebsiteRoutes, { prefix: '/site' });
   await app.register(notificationRoutes, { prefix: '/api/notifications' });
-  await app.register(crmRoutes, { prefix: '/api/crm' });
+  await registerFeatureRoutes('/api/crm', 'crm_v2', crmRoutes);
   await app.register(crmPublicRoutes, { prefix: '/crm' });
   await app.register(billingRoutes, { prefix: '/api/billing' });
   await app.register(stripeWebhookRoute, { prefix: '/api/stripe' });
   await app.register(adminRoutes, { prefix: '/api/admin' });
   await app.register(frontDeskRoutes, { prefix: '/api/front-desk' });
-  await app.register(ratePlanRoutes, { prefix: '/api/rate-plans' });
-  await app.register(maintenanceRoutes, { prefix: '/api/maintenance' });
+  await registerFeatureRoutes('/api/rate-plans', 'rate_plans_module', ratePlanRoutes);
+  await registerFeatureRoutes('/api/maintenance', 'maintenance_module', maintenanceRoutes);
   await app.register(reportRoutes, { prefix: '/api/reports' });
-  await app.register(packageRoutes, { prefix: '/api/packages' });
-  await app.register(groupBookingRoutes, { prefix: '/api/group-bookings' });
-  await app.register(loyaltyRoutes, { prefix: '/api/loyalty' });
-  await app.register(externalCalendarRoutes, { prefix: '/api/external-calendars' });
-  await app.register(marketingRoutes, { prefix: '/api/marketing' });
+  await registerFeatureRoutes('/api/packages', 'offers_module', packageRoutes);
+  await registerFeatureRoutes('/api/group-bookings', 'group_bookings_module', groupBookingRoutes);
+  await registerFeatureRoutes('/api/loyalty', 'loyalty_module', loyaltyRoutes);
+  await registerFeatureRoutes('/api/external-calendars', 'channel_sync', externalCalendarRoutes);
+  await registerFeatureRoutes('/api/marketing', 'marketing_module', marketingRoutes);
   await app.register(paymentRoutes, { prefix: '/api/payments' });
   await app.register(expenseRoutes,   { prefix: '/api/expenses' });
   await app.register(invoicesRoutes,  { prefix: '/api/invoices' });
   await app.register(embedRoutes,   { prefix: '/embed' });
   await app.register(uploadRoutes,  { prefix: '/api/upload' });
-  await app.register(offersRoutes,        { prefix: '/api/offers' });
+  await registerFeatureRoutes('/api/offers', 'offers_module', offersRoutes);
   await app.register(publicOffersRoutes,  { prefix: '/site' });
   await app.register(discoveryRoutes,     { prefix: '/api' });
   await app.register(syncRoutes,          { prefix: '/api/sync' });
-  await app.register(restaurantTableRoutes, { prefix: '/api/restaurant/tables' });
+  await registerFeatureRoutes('/api/restaurant/tables', 'restaurant_module', restaurantTableRoutes);
   await app.register(publicTableRoutes,     { prefix: '/table' });
   await app.register(aiRoutes,              { prefix: '/api/ai' });
 

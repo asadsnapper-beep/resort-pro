@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, ArrowUpRight, Check, ChevronDown, Menu, X } from 'lucide-react';
-import { PLAN_PRICING } from '@resort-pro/types';
+import { PLAN_PRICING, PUBLIC_PLAN_ORDER } from '@resort-pro/types';
 
 const navLinks = [
   { label: 'Product', href: '#product' },
@@ -175,40 +175,40 @@ export default function HomePage() {
 
   const planCards = [
     {
-      key: 'STARTER' as const,
-      label: 'Founding Resort',
-      title: 'The full operating toolkit at an early-partner price.',
-      description: 'For the first 100 verified resorts ready to replace the patchwork.',
+      key: 'FREE' as const,
+      label: 'Solo',
+      title: 'Everything a small property needs, day one.',
+      description: 'Bookings, calendar, front desk, guest history, invoices, and a direct booking page.',
       features: [
-        '1 property · Professional toolkit',
-        'Bookings, restaurant, CRM & reporting',
-        'Founding access protected for 12 months',
+        '1 property · 5 rooms · 2 staff',
+        'Bookings, guests & invoices',
+        'Full data export, always',
+      ],
+    },
+    {
+      key: 'STARTER' as const,
+      label: 'Independent Resort',
+      title: 'Everything you need to run one property, fully.',
+      description: 'Your own domain, CRM, restaurant, and every operational module.',
+      features: [
+        '1 property · 20 rooms · 20 staff',
+        'Custom domain & online payments',
+        'CRM, restaurant, housekeeping & more',
       ],
       featured: true,
     },
     {
       key: 'PROFESSIONAL' as const,
-      label: 'Growing Resort',
-      title: 'More capacity when the operation gets busier.',
-      description: 'For a larger single property that needs more room and priority setup.',
-      features: [
-        'Higher room and staff capacity',
-        'Priority onboarding & support',
-        'Future advanced automation',
-      ],
-    },
-    {
-      key: 'ENTERPRISE' as const,
       label: 'Resort Group',
-      title: 'A clearer view across every property.',
-      description: 'For owners who need one dependable operating picture across a group.',
+      title: 'One view across every property you run.',
+      description: 'For owners managing more than one property.',
       features: [
         'Up to 5 properties · 200 rooms',
         'Multi-property owner view',
         'Priority onboarding & support',
       ],
     },
-  ];
+  ].sort((a, b) => PUBLIC_PLAN_ORDER.indexOf(a.key) - PUBLIC_PLAN_ORDER.indexOf(b.key));
 
   return (
     <main id="top" className="min-h-screen overflow-x-hidden bg-white font-sans text-[#183153]">
@@ -239,7 +239,7 @@ export default function HomePage() {
               href="/plans"
               className="bg-[#183153] px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-[#ef725c]"
             >
-              Start free
+              See plans
             </Link>
           </div>
 
@@ -277,7 +277,7 @@ export default function HomePage() {
                   href="/plans"
                   className="bg-[#183153] px-4 py-2.5 text-sm font-bold text-white"
                 >
-                  Start free
+                  See plans
                 </Link>
               </div>
             </div>
@@ -310,7 +310,7 @@ export default function HomePage() {
             </Link>
           </div>
           <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-[12px] font-semibold text-[#64748b]">
-            {['No card required', 'bKash & cards built in', 'Setup in an afternoon'].map((item) => (
+          {['bKash & cards built in', 'Cancel anytime', 'Setup in an afternoon'].map((item) => (
               <span key={item} className="flex items-center gap-2">
                 <i className="h-2 w-2 bg-[#ef725c]" /> {item}
               </span>
@@ -488,11 +488,6 @@ export default function HomePage() {
                   key={plan.key}
                   className={`relative flex min-h-[470px] flex-col border-b-2 border-r-2 border-[#183153] p-7 sm:p-8 ${plan.featured ? 'bg-[#183153] text-white' : 'bg-white'}`}
                 >
-                  {plan.featured && (
-                    <span className="font-bitcount absolute right-0 top-0 bg-[#f4c76b] px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] text-[#183153]">
-                      First 100
-                    </span>
-                  )}
                   <p
                     className={`m-0 text-[11px] font-bold uppercase tracking-[0.12em] ${plan.featured ? 'text-[#f4c76b]' : 'text-[#64748b]'}`}
                   >
@@ -532,7 +527,7 @@ export default function HomePage() {
                     href={`/auth/register?plan=${plan.key}`}
                     className={`mt-auto px-5 py-4 text-center text-sm font-bold transition-colors ${plan.featured ? 'bg-[#ef725c] text-white hover:bg-[#f4c76b] hover:text-[#183153]' : 'border-2 border-[#183153] hover:bg-[#183153] hover:text-white'}`}
                   >
-                    Start free
+                    Choose {pricing.displayName}
                   </Link>
                 </article>
               );
@@ -685,7 +680,7 @@ export default function HomePage() {
               href="/plans"
               className="bg-[#183153] px-6 py-4 text-sm font-bold text-white hover:bg-white hover:text-[#183153]"
             >
-              Start free
+              See plans
             </Link>
             <Link
               href="/contact"

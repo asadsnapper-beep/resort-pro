@@ -1,283 +1,281 @@
-# Launch Pricing and Three-Month Free Offer
+# ResortPro Fair Pricing & Launch Rollout
 
-## সিদ্ধান্ত
+> **Status:** Final — approved by founder 2026-08-04. Core implementation is complete locally; deployment configuration and end-to-end payment verification remain.
+> **Supersedes:** the `$20/$50/$100` plan and the `$0 Free Forever` plan. This is the locked version.
 
-ResortPro Bangladesh-first launch pricing তিনটি সহজ plan-এ দেবে। Customer plan বেছে নেবে তার resort-এর আকার অনুযায়ী, feature checklist পড়ে নয়।
+## 1. The promise we are making
 
-| Customer-facing plan | Internal plan key | Monthly price | Annual price | Best for |
+ResortPro is priced so a small resort owner never feels punished for being small,
+and never feels stuck once they grow. Every paid tier is a genuinely commercial
+business tool — not a crippled trial with a fake "free" label.
+
+> **Start cheap. Pay for real growth, not for basic operations.**
+
+There is **no $0 tier**. Anyone running a resort, even a 5-room guesthouse, is
+running a real business and can afford a small, honest price. What replaces
+"free" is a **3-month launch offer** on whichever paid plan the customer picks
+— this does the trust-building job a $0 tier would have done, without giving
+away the product forever to people who can pay.
+
+## 2. Customer-facing plans — locked
+
+| Customer-facing plan | Internal key | Monthly | Annual | Best for |
 |---|---|---:|---:|---|
-| Small Resort | `STARTER` | $20 | $200 | ছোট resort বা guesthouse |
-| Growing Resort | `PROFESSIONAL` | $50 | $500 | মাঝারি resort |
-| Resort Group | `ENTERPRISE` | $100 | $1,000 | বড় resort বা একাধিক property |
+| **Solo** | `FREE` | **$10** | **$100** | A single small property, hands-on owner |
+| **Independent Resort** | `STARTER` | **$19** | **$190** | A serious independent property running full operations |
+| **Resort Group** | `PROFESSIONAL` | **$59** | **$590** | Several properties or one large operation |
 
-Annual price-এ দুই মাস free থাকবে। Public website, `/plans`, registration, billing API, bKash pricing, Stripe price, admin settings, এবং trial email—সব জায়গায় এই এক source of truth ব্যবহার করতে হবে।
+Annual billing = 10× the monthly price (2 months free), same rule as before.
 
-বর্তমান enum key (`STARTER`, `PROFESSIONAL`, `ENTERPRISE`) বদলানোর দরকার নেই। শুধু display name বদলালে migration risk কম থাকবে।
+`ENTERPRISE` stays in the database enum for backward compatibility only. It is
+**not a fourth public plan** — reserved for legacy accounts or a future custom
+agreement (white-label, SSO, bespoke integration, on-site deployment).
 
-## Founding Resort strategy — launch phase
+Internal enum keys never change (`FREE`/`STARTER`/`PROFESSIONAL`/`ENTERPRISE`).
+Only the customer-facing name and price/limit values changed — `FREE` the enum
+key now maps to the paid "Solo" plan, it does not mean $0.
 
-শুরুর SaaS business-এর প্রধান কাজ হলো customer trust, successful onboarding, এবং
-real case study তৈরি করা। তাই launch phase-এ `$20` plan-কে deliberately বেশি
-attractive করা হবে:
+### Capacity limits — locked
 
-> **Founding Resort Offer:** প্রথম 100টি eligible verified resort `$20/month`
-> price-এ Growing Resort-এর Professional operational toolkit পাবে।
+| Plan | Properties | Rooms | Staff accounts |
+|---|---:|---:|---:|
+| Solo | 1 | 5 | 2 |
+| Independent Resort | 1 | 20 | 20 |
+| Resort Group | Up to 5 | 200 total | 100 total |
 
-Customer-facing copy-তে “$50 value” বলা যাবে না। পরিবর্তে বলা হবে:
+These are capacity limits, not a feature wall — a Solo tenant on 5 rooms gets
+the full Solo feature list at full quality, not a crippled demo.
 
-> *Founding resorts get the full operational toolkit at our early-partner price.*
+## 3. What each plan includes — locked
 
-এই offer-এর value মানে feature access; unlimited capacity, unlimited support,
-বা third-party cost (SMS, WhatsApp, payment gateway, AI) free নয়। Offer নেওয়া
-customer-এর price এবং Professional feature access first paid billing date থেকে
-12 মাস protect করতে হবে। এরপর কোনো surprise downgrade করা যাবে না—renewal-এর
-আগে clear choice এবং অন্তত 60 দিনের notice দিতে হবে।
+### Solo — $10/month
 
-`$20` plan সাধারণত cheap/limited দেখানো যাবে না। Launch page-এ এটিকে
-**Founding Resort** badge দিয়ে সবচেয়ে visible offer হিসেবে দেখাতে হবে। `$50`
-এবং `$100` plan থাকবে বড় capacity ও service need-এর জন্য, feature-wall তৈরি
-করার জন্য নয়।
+Everything needed to run one small property day to day:
 
-## Plan limits and positioning
+- Rooms, bookings, calendar, front desk (check-in / check-out)
+- Guest profiles and booking history
+- Invoices and basic occupancy/revenue reports
+- Free ResortPro subdomain booking page (`yourresort.resortpro.site`)
+- Browser and desktop-app access
+- Full data export at any time, forever
 
-| Plan | Property | Rooms | Staff | Main promise |
-|---|---:|---:|---:|---|
-| Small Resort / Founding Resort | 1 | 50 | 15 | $20 early-partner price-এ Professional operational toolkit |
-| Growing Resort | 1 | 100 | 30 | বড় single property, priority setup ও support |
-| Resort Group | সর্বোচ্চ 5 | 200 | 50 | একাধিক property, group management ও onboarding |
+### Independent Resort — $19/month
 
-5টির বেশি property, 200টির বেশি room, white-label, SSO, বা bespoke integration চাইলে `Contact sales` flow হবে। $100 plan-এ "unlimited" বলা হবে না।
+Everything in Solo, plus what a real, full-service independent property needs:
 
-### Included by plan
+- **Custom domain** for the direct booking website
+- Online payment gateway setup (bKash / Stripe merchant)
+- CRM (guest tags, scoring, segmentation, campaigns)
+- Restaurant/KOT + table ordering
+- Housekeeping, inventory, maintenance
+- Marketing (email/SMS campaigns), loyalty program, offers/packages
+- Rate plans, group bookings
+- Vehicles and venues modules
+- Standard remote support
 
-- **Launch: all three paid plans:** bookings, calendar, rooms, guests,
-  check-in/check-out, invoices, reports, public booking site, staff access,
-  housekeeping, browser/desktop access, restaurant/KOT, inventory, CRM,
-  marketing, loyalty, offers, custom domain, channel sync, and advanced reports.
-- **Small/Founding Resort:** the full operational toolkit with 1-property,
-  50-room, 15-staff capacity and standard remote support.
-- **Growing Resort:** larger capacity, priority setup/support, and a stronger
-  future AI/reporting allowance. It is for scale and service, not a feature tax.
-- **Resort Group:** multi-property dashboard, group-level management, revenue
-  intelligence, advanced AI allowance, priority support, and onboarding help.
+### Resort Group — $59/month
 
-SMS, WhatsApp, payment-gateway charge, AI overage, custom design, onsite hardware setup, and data migration are metered or one-time services. এগুলোকে unlimited plan feature করা যাবে না।
+Everything in Independent Resort, plus the scale layer for more than one property:
 
-### Phase 2 — after traction
+- Multi-property switching, up to 5 properties on one account
+- Consolidated group-level reporting across properties
+- Corporate accounts (B2B billing)
+- OTA channel sync (Airbnb, Booking.com)
+- Advanced analytics / revenue intelligence
+- Higher AI content/chatbot allowance
+- Priority remote support and onboarding help
 
-Business-এ stable activation, support load, এবং paying customer proof আসার পরে
-plan differentiation ধীরে ধীরে বাড়ানো যাবে। তখন `$50`/`$100` plan-এ new
-automation, deeper analytics, higher AI allowance, and premium service যোগ করা
-যাবে। Existing Founding Resort customer-এর protected 12-month access কাটা যাবে
-না। নতুন feature gate বা price change-এর আগে activation/conversion data দেখে
-সিদ্ধান্ত নিতে হবে; assumption থেকে নয়.
+Third-party usage stays separate at every tier when it creates real variable
+cost: SMS, WhatsApp conversations, payment-gateway fees, AI overages, hardware
+setup, and requested data migration. These charges are shown before use, never
+silently bundled as "unlimited."
 
-## Launch offer
+## 4. Customer-rights policy
 
-### Customer promise
+Part of the product, billing copy, and support playbook at every tier:
 
-> **Founding Resort Launch Offer:** প্রথম 100টি eligible verified resort 1 August
-> 2026 থেকে 31 August 2026-এর মধ্যে account খুললে August, September, এবং
-> October—এই তিন calendar month ResortPro free ব্যবহার করা যাবে। Payment শুরু
-> হবে 1 November 2026 থেকে; এরপর তাদের Founding Resort price `$20/month`।
+1. **No data hostage:** every plan can export its own guests, bookings,
+   invoices, and core operational data, always.
+2. **No destructive downgrade:** if a paid customer stops paying, their data
+   stays intact. Move the workspace to read-only first; never delete for a
+   failed card.
+3. **Clear capacity notice:** warn the owner before a room, staff, or property
+   limit blocks a new record, and name the exact next plan. Never interrupt
+   existing records.
+4. **No surprise price rise:** a price increase applies to new accounts first.
+   Existing paid customers get at least 60 days' notice and keep their current
+   price for 12 months from their latest paid start date.
+5. **No feature ransom:** never remove an existing customer's core daily
+   workflow to force an upgrade. Upgrade prompts explain growth capacity or
+   premium service, never threaten access.
 
-এটি fixed-calendar promotion। এটি signup থেকে 90-day trial নয়। উদাহরণ:
+## 5. Three-month launch offer
 
-| Signup date | Free access ends | First paid period |
+> A new verified resort that signs up for **any** paid plan (Solo, Independent
+> Resort, or Resort Group) during the launch window gets **three calendar
+> months free**, then billing starts at their chosen plan's normal price.
+
+The campaign start date, end date, and first billing date live in a
+server-controlled promotion configuration — never hardcoded into the landing
+page, registration page, or an email. When the promotion expires, checkout
+simply shows the normal price with no fallback trial.
+
+The existing `/try` interactive demo (no signup, sandboxed data) remains the
+zero-commitment way to look around before choosing a plan — the launch offer
+is for people who have already decided to create a real account.
+
+### Fair anti-abuse policy for the launch offer
+
+One promotion per real resort/business. A suspected duplicate never blocks the
+ability to pay and use the product normally at full price — it only loses the
+free three months.
+
+1. Normal email verification and business/resort details at signup.
+2. Deduplicate the **promotion**, not the account, using verified business
+   details and, since every plan is paid, the payment method already on file.
+3. If a promotion looks duplicated, charge normally from day one and show
+   neutral copy — never "fraud" or "blocked."
+4. Log the reason privately for audit; a human can review and revoke later.
+5. No mandatory mobile OTP or a manual fraud queue for this launch — the
+   payment method itself (bKash/card) is already a real-identity signal since
+   there is no free tier to abuse into.
+
+## 6. Existing-customer migration rules
+
+| Current internal plan | New public treatment | Migration promise |
 |---|---|---|
-| 4 August 2026 | 31 October 2026 | 1–30 November 2026 |
-| 31 August 2026 | 31 October 2026 | 1–30 November 2026 |
+| `FREE` (old $0 Free Forever, if any exist) | Solo, $10 | Grandfather at $0 for 12 months from today, then move to $10 with 60 days' notice. |
+| `STARTER` at $20 | Independent Resort at $19 | Move to $19 automatically, or grant an equivalent $1/month credit. Never charge more for the same scope. |
+| `PROFESSIONAL` at $50 | Resort Group at $59 | Keep $50 for at least 12 months. Offer the $59 scope only after clear opt-in. |
+| `ENTERPRISE` at $100 | Legacy / custom | Keep current terms until the customer accepts a written migration or chooses $59 Resort Group because it fits. |
 
-প্রথম 100টি verified redemption পূর্ণ হয়ে গেলে, অথবা 1 September 2026 বা তার
-পরে sign-up করলে standard 14-day trial পাবে, যদি নতুন promotion চালু না হয়।
+No automatic migration may delete a property, room, staff member, domain, or
+historical record. If a workspace exceeds its new plan's capacity, mark the
+excess read-only and give the owner a clear upgrade path — never a hard cut.
 
-### Conversion flow
+## 7. Step-by-step implementation plan
 
-1. Day 0: signup, email verification, resort profile completion, bKash wallet-link (offer activate করার শর্ত — নিচে দেখুন)।
-2. Day 0: wallet-link + automated risk score + available Founding Resort slot সিদ্ধান্ত নেয় — approve (launch offer) বা silent-downgrade (standard 14-day trial), কোনো মানুষের অ্যাকশন ছাড়াই। প্রথম 100টি approved redemption-এর পর system automatically standard trial দেবে। উচ্চ risk score শুধু audit dashboard-এ log হয়, block করে না।
-3. Day 45: in-app/onboarding message—selected plan এবং value reminder।
-4. Day 75: first billing date ও plan confirm করার reminder।
-5. Day 85: payment method বা bKash billing instruction চাওয়া।
-6. Day 90: unpaid account 7 দিনের grace/read-only state-এ যাবে (নিচে "Payment verification policy" দেখুন); delete করা হবে না।
+### Step 1 — One canonical pricing source (Engineering)
 
-## Eligibility and abuse-prevention policy
+- Update `packages/types/src/plans.ts`: Solo $10/$100, Independent Resort
+  $19/$190, Resort Group $59/$590; limits per section 2.
+- Keep enum values stable (`FREE`/`STARTER`/`PROFESSIONAL`/`ENTERPRISE`).
+- Add a public-plan visibility flag so `ENTERPRISE` stays available for
+  legacy/custom work without appearing as a fourth public card.
+- Remove every duplicate hardcoded price/limit from website, registration,
+  billing, Stripe/bKash config, emails, and admin forms.
 
-### Policy
+**Acceptance check:** changing one canonical value changes every customer
+surface; no page has a hand-written `$10`, `$19`, or `$59`.
 
-একটি verified resort/business একবারই launch offer নিতে পারবে। নতুন email address খুলে একই owner, same bKash wallet, বা একই business দিয়ে আবার offer নেওয়া যাবে না।
+### Step 2 — Entitlements by capacity (Engineering + Product)
 
-Suspicion মানেই account block নয়। Suspicious registration **automatically** standard trial পাবে (offer ছাড়া) — কোনো manual review queue নেই, তাই approve/reject করার জন্য কাউকে বসে থাকতে হবে না। প্রতিটা সিদ্ধান্ত audit log-এ থাকবে, দরকার হলে admin পরে দেখে revoke করতে পারবে, কিন্তু এটা normal flow-কে block করে না। এতে legitimate shared network বা family-owned business ভুল করে reject হলেও অভিজ্ঞতা খারাপ হয় না — তারা শুধু standard trial পায়, account আটকে থাকে না।
+- Solo stays fully operational at its capacity — no crippled features.
+- Custom domain becomes available starting at Independent Resort ($19).
+- Resort Group gates: multi-property, channel sync, corporate accounts,
+  advanced analytics, higher AI allowance.
+- Pre-limit warning + read-only excess state instead of a sudden hard stop.
 
-### Required signup controls
+**Acceptance check:** a Solo tenant completes a real booking and exports data;
+an Independent Resort tenant attaches a custom domain; no core data locks
+after a downgrade.
 
-1. **Email verification** — unverified email দিয়ে account বা promotion activate হবে না।
-2. **Mobile OTP — deferred, ভবিষ্যতের জন্য রাখা হয়েছে।** SMS gateway-তে টাকা লাগে (কোনো free Bangladesh SMS/OTP provider এখনো ঠিক করা হয়নি), তাই এই launch-এ implement করা হচ্ছে না। Data model-এ জায়গা রাখা আছে (নিচে দেখুন) — free/সস্তা provider পাওয়া গেলে পরে যোগ করা যাবে, তখন এটাই সবচেয়ে শক্ত dedup signal হয়ে উঠবে। আপাতত এর জায়গায় **bKash wallet-link primary dedup signal**।
-3. **Resort identity** — resort name, full address, city, owner name, এবং optionally website/Facebook/Google Business link collect করতে হবে।
-4. **bKash wallet-link** — signup-এর কাছাকাছি সময়ে, launch offer activate করতে bKash wallet number link/consent verify করতে হবে (charge না, শুধু ownership link — নিচে "Payment verification policy" দেখুন)। এক bKash wallet number একবারই promotion redeem করতে পারবে। Wallet link না করলে account normal ভাবে চলবে, শুধু standard 14-day trial পাবে, launch offer পাবে না।
-5. **Server-side eligibility** — promotion decision browser-এর local state বা UI condition দিয়ে করা যাবে না। Registration transaction-এর মধ্যে API/DB থেকে check করতে হবে।
-6. **Rate limits** — register, promotion-retry, এবং bKash wallet-link endpoint-এ strict per-IP ও per-wallet limits থাকবে।
+### Step 3 — Fair billing and downgrade behaviour (Engineering)
 
-### Fraud signals
+- Update Stripe, bKash, invoice records, admin billing controls, and customer
+  emails to use $10/$100, $19/$190, $59/$590.
+- Subscription states: active, payment retry/grace, read-only, cancelled —
+  data persists through all of them.
+- Add `priceProtectedUntil` per account + migration/audit record.
 
-নিচের signal automated score বাড়ায়; score একটা threshold পার হলে system নিজেই standard trial-এ silent-downgrade করে দেয় (কোনো manual approval লাগে না):
+**Acceptance check:** a paid tenant can cancel, see the read-only workspace,
+and export data without contacting support.
 
-| Signal | Automated action |
-|---|---|
-| bKash wallet আগেই promotion নিয়েছে | Offer reject (auto); standard trial |
-| Same normalized resort name + city/address | Score বাড়ে; threshold পার হলে auto-downgrade |
-| Same device/browser fingerprint থেকে অনেক signup | Score বাড়ে; threshold পার হলে auto-downgrade |
-| Short time-এ একই IP থেকে অনেক signup | Rate-limit + score বাড়ে |
-| Disposable email domain | Score বাড়ে |
-| bKash wallet-link সম্পূর্ণ না হলে | Offer activate হয় না (auto); standard trial |
+### Step 4 — Public pricing and onboarding (Design + Engineering)
 
-IP এবং device fingerprint শুধু supportive signal। এগুলো একা ব্যবহার করে block করা যাবে না, কারণ hotel Wi-Fi, agency, বা shared office থেকে legitimate signup হতে পারে। **bKash wallet number-ই এখন সবচেয়ে শক্ত unique-identity signal** (OTP না থাকায়), তাই wallet-dedup check সবসময় হার্ড reject (auto), বাকি signal-গুলো শুধু soft score।
+- Update landing page, `/plans`, register page, upgrade page, admin billing,
+  and the comparison table to show exactly three public plans.
+- Put "Custom domain included" visibly on Independent Resort.
+- Show the active 3-month launch offer behind a server-controlled flag,
+  applied to whichever plan the visitor picks.
 
-### Payment verification policy
+**Acceptance check:** a visitor understands in one screen: Solo for $10 to
+start, $19 once you need your own domain and CRM, $59 once you run more than
+one property.
 
-Launch-এ conversion কমানোর জন্য signup-এর সময় card/charge বাধ্যতামূলক নয়, কিন্তু **bKash wallet-link launch offer পাওয়ার শর্ত**:
+### Step 5 — Launch the promotion safely (Growth + Engineering)
 
-1. Signup-এর কাছাকাছি: resort identity + bKash wallet-link (consent/ownership check, charge না) → pass হলে automatic launch-offer approval, fail/skip হলে automatic standard 14-day trial। কোনো manual queue নেই।
-2. যদি ভবিষ্যতে abuse বেড়ে যায় এবং wallet-link যথেষ্ট মনে না হয়, তখন refundable micro-verification বা trade license/business-page verification যোগ করার কথা ভাবা যাবে — এই launch-এ না।
+- Configurable `Promotion` record: date range, eligible plans (all three),
+  usage rules.
+- Deduplicate per verified business + payment method already on file.
+- Audit record for every redemption.
 
-Payment method ছাড়া renewal automatic বলা যাবে না। Day 85 থেকে user-কে bKash/card method যোগ করতে বলা হবে; payment না হলে **7 দিনের grace/read-only** state প্রযোজ্য হবে (data delete হবে না, শুধু access read-only)।
+**Acceptance check:** a duplicate promotion attempt is charged normally from
+day one; it is never blocked from using the product.
 
-## Data model
+### Step 6 — Migrate existing customers with goodwill (Founder + Support)
 
-একটি promotion-specific table যোগ করতে হবে। Wallet, IP, এবং fingerprint-এর raw value analytics বা admin list-এ দেখানো যাবে না; server-side secret দিয়ে HMAC hash সংরক্ষণ করতে হবে।
+- Dry-run report mapping every existing tenant per section 6.
+- Apply $20 → $19 automatically or credit the difference.
+- Email existing users before any change, with their exact protected price
+  date and a data-export link.
+- `ENTERPRISE` customers stay untouched until they actively choose a new plan.
 
-```prisma
-model PromotionRedemption {
-  id                      String   @id @default(uuid())
-  promotionKey            String
-  tenantId                String   @unique
-  verifiedPhoneHash       String?  // deferred — populated only once mobile OTP ships
-  walletIdentityHash       String  // bKash wallet-link, primary dedup key for this launch
-  businessFingerprintHash String?
-  deviceFingerprintHash   String?
-  ipHash                  String?
-  status                  PromotionRedemptionStatus @default(APPROVED)
-  riskScore               Int      @default(0)
-  reviewReason            String?
-  redeemedAt              DateTime @default(now())
-  expiresAt               DateTime
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+**Acceptance check:** support can explain any customer's price, limit, and
+protection date from one admin screen.
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+### Step 7 — Test before release (QA + Engineering)
 
-  @@index([promotionKey, walletIdentityHash])
-  @@index([promotionKey, verifiedPhoneHash])
-  @@index([promotionKey, businessFingerprintHash])
-  @@index([status])
-}
+- Solo signup requires a payment method and shows $10 (or free-launch-offer
+  price) correctly.
+- Solo tenant creates a booking, invoice, guest record, and exports data.
+- Independent Resort tenant adds a custom domain and uses paid modules.
+- Resort Group tenant manages several properties and sees group reporting.
+- Annual charges equal $100 / $190 / $590 everywhere.
+- Promotion expiry uses server time (Asia/Dhaka), not the browser clock.
+- Duplicate promotion → normal paid account, not a block.
+- Cancellation/payment failure → data intact, read-only state works.
+- Existing-plan migration follows section 6 exactly.
 
-enum PromotionRedemptionStatus {
-  APPROVED
-  DOWNGRADED   // auto-decided standard trial, no offer — replaces the old "REVIEW_REQUIRED"
-  REJECTED
-  REVOKED      // admin can still revoke after the fact if fraud is found later
-}
-```
+### Step 8 — Launch, measure, adjust (Founder + Growth)
 
-`Tenant`-এ promotion metadata copy করা যেতে পারে (`promotionKey`, `promotionExpiresAt`) দ্রুত entitlement check-এর জন্য, কিন্তু eligibility/audit-এর source of truth হবে `PromotionRedemption`।
+Measure monthly: signup → paid conversion, Solo tenants hitting the 5-room/2-staff
+wall, Solo → Independent upgrades, Independent → Resort Group upgrades, support
+time and variable vendor cost per tenant, cancellation reasons, promotion abuse
+rate.
 
-`verifiedPhoneHash` column রাখা হয়েছে যাতে ভবিষ্যতে OTP যোগ করলে বড় migration না লাগে — এই launch-এ সবসময় `null`।
+Review prices only after real evidence: at least 20 paying resorts or three
+months of cost data. Since there is no $0 tier to worry about cannibalizing
+into, the main lever to watch is **Solo's room/staff limit** — tighten it
+(not the price) if too many resorts sit comfortably inside Solo without
+upgrading.
 
-## Backend design
+## 8. Rollback and safety plan
 
-### Promotion configuration
+- Keep the old price mapping and migration audit for reconciliation.
+- Feature flags for: public plan visibility, promotion, custom-domain
+  entitlement, read-only downgrade state.
+- If new billing integration fails, stop new paid checkout and leave every
+  existing account's access intact while fixing it.
+- Never roll back by deleting subscriptions, tenant data, or domains.
 
-`PlatformSettings` বা dedicated `Promotion` table-এ নিচের values থাকবে:
+## 9. Out of scope for this release
 
-```text
-key: LAUNCH_2026_AUG
-signupStartsAt: 2026-08-01T00:00:00+06:00
-signupEndsAt: 2026-08-31T23:59:59+06:00
-accessEndsAt: 2026-10-31T23:59:59+06:00
-maxApprovedRedemptions: 100
-eligiblePlans: STARTER, PROFESSIONAL, ENTERPRISE
-enabled: true
-```
+- A fourth public "enterprise" tier
+- Mandatory mobile OTP or a manual fraud queue
+- Advertising inside the dashboard at any tier
+- Removing data export to increase conversion
+- Price rises for existing users without the protection/notice in section 4
 
-Date comparison Asia/Dhaka timezone-এ server-side করতে হবে। Client clock বিশ্বাস করা যাবে না।
+## 10. Definition of done
 
-### Registration sequence
-
-```text
-POST /api/auth/register
-  → validate body and rate-limit
-  → create pending tenant/user
-  → send email verification
-
-POST /api/auth/link-bkash-wallet
-  → verify wallet ownership (consent flow, no charge)
-  → evaluate promotion eligibility transactionally (auto, no human step)
-  → atomically reserve one of the first 100 approved slots (same DB transaction)
-  → approved: create PromotionRedemption(status=APPROVED) + set trialEndsAt = 2026-10-31
-  → downgraded or full: create PromotionRedemption(status=DOWNGRADED) + keep standard 14-day trial,
-    show clear "you have the standard trial" message — never "blocked"/"fraud"
-```
-
-Wallet redemption check, first-100 slot count, এবং `PromotionRedemption` insert একই database transaction-এ হবে। Unique constraint/transaction ছাড়া concurrent multiple signup offer redeem করে ফেলতে পারে বা 100-এর বেশি slot চলে যেতে পারে।
-
-### Admin visibility (not a working queue)
-
-Super-admin-এ একটি `Launch Offer` **audit dashboard** দরকার — কাজ করার queue না, শুধু দেখার জন্য:
-
-- approved / downgraded / rejected count
-- match reasons: same wallet, business, device, IP
-- revoke action (fraud পরে ধরা পড়লে) — এটাই একমাত্র manual action, normal flow-তে দরকার হয় না
-- audit log-এ actor, timestamp, previous/new status
-- export only hashed identifiers; raw wallet number দেখার permission restricted
-
-## User experience and copy
-
-Signup page-এ offer-এর নিচে এই কথা দেখাতে হবে:
-
-> One launch offer per verified resort/business (linked via bKash wallet). Duplicate or abusive registrations automatically receive the standard trial instead.
-
-First-100 capacity শেষ হলে public offer CTA এবং pricing badge সাথে সাথে hide/update
-করতে হবে। পুরোনো offer copy cache/CDN-এ থেকে গেলে trust damage হবে।
-
-Auto-downgrade হলে copy হবে:
-
-> Your account is ready with the standard 14-day trial.
-
-Reject/downgrade হলে "fraud" বা "blocked" লেখা যাবে না — এটা silent, neutral, এবং কখনো account access আটকায় না।
-
-## Required application changes
-
-1. Display name, price, Founding Resort room/staff capacity, এবং feature entitlement source এক করা। বর্তমানে website, billing, Stripe, এবং entitlement defaults-এর values এক নয়। Launch-এ `STARTER`/Founding Resort-কে Professional operational toolkit দিতে হবে; 12-month protection explicit entitlement data-তে রাখতে হবে, শুধু UI copy-তে নয়।
-2. bKash wallet-link (consent/ownership, no charge) flow যোগ করা — signup-এর কাছাকাছি ধাপ হিসেবে।
-3. `PromotionRedemption` migration, service, transaction, এবং automated scoring logic যোগ করা (manual review UI লাগবে না, শুধু audit dashboard)।
-4. Register flow-এ wallet-link step যোগ করা (skip করা যাবে, কিন্তু তাহলে offer পাবে না)।
-5. Billing status/upgrade page-এ launch expiry ও first paid date দেখানো।
-6. Trial emails-এর copy ও schedule launch campaign অনুযায়ী update করা।
-7. bKash billing activation এবং unpaid 7-day grace/read-only state implement করা।
-8. Mobile OTP অংশটা কোডে **আনা হবে না** এই launch-এ — শুধু data model-এ ফাঁকা জায়গা রাখা।
-9. Landing page ও `/plans`-এ Founding Resort badge/copy দেখানো এবং 100টি approved slot পূর্ণ হলে server-controlled flag থেকে সেটি hide/update করা।
-
-## Test checklist
-
-- Eligible new wallet + new resort while fewer than 100 approved slots → 31 October 2026 পর্যন্ত offer, কোনো manual step ছাড়াই।
-- 100th valid redemption → approved; 101st valid redemption → standard trial, offer copy আর দেখায় না।
-- Same wallet with new email → no offer, standard trial, automatically, instantly।
-- Concurrent signup with same wallet → কেবল একটি approved redemption (transaction/unique constraint কাজ করছে)।
-- Same business/address but different wallet → risk score বাড়ে, কিন্তু auto-decide হয় (কোনো queue-তে আটকে থাকে না)।
-- Promotion end boundary: 31 August 23:59:59 Dhaka eligible; 1 September ineligible।
-- Admin revoke action → entitlement ও audit log ঠিক থাকে (একমাত্র manual admin action)।
-- 1 November unpaid account → 7 দিন grace/read-only, তারপরের policy, data intact।
-- Plan name/price website, registration, billing, email, Stripe, এবং bKash-এ এক দেখায়।
-- Founding Resort customer → Professional operational module access পায় এবং protected period-এর মধ্যে feature/price silently হারায় না।
-
-## Rollout order
-
-1. Normalize all public/internal pricing to $20 / $50 / $100 and add the Founding Resort presentation/12-month protection — কোনো নতুন vendor লাগে না, সবচেয়ে কম risk, এখনই শুরু করা যায়।
-2. Ship bKash wallet-link flow, atomic 100-slot counter, এবং automated promotion eligibility service (no manual queue)।
-3. Add admin audit dashboard (read-mostly) and audit logging।
-4. Test abuse, 100-slot boundary, timezone boundary, and billing transition in staging।
-5. Enable campaign and publish the offer page; immediately hide/update it when 100 slots are full.
-
-## Status
-
-Planning complete — revised 2026-08-04: Founding Resort strategy added ($20 gets Professional operational value, first 100 verified resorts, 12-month protection); OTP deferred, bKash wallet-link is the primary dedup signal, review queue fully automated, grace period fixed at 7 days. No production code, price, trial, or billing behaviour has been changed by this document.
+1. Solo ($10), Independent Resort ($19), and Resort Group ($59) are the only
+   public plan choices.
+2. Custom domain works starting at Independent Resort.
+3. All pricing/billing/registration/admin/email surfaces use one canonical
+   source (`packages/types/src/plans.ts`).
+4. The 3-month launch offer applies to any of the three plans, server-controlled.
+5. Promotion abuse controls affect only the free-months offer, never the
+   ability to pay and use the product.
+6. Existing customers have an auditable, fair migration and price-protection
+   record.

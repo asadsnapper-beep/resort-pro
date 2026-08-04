@@ -20,6 +20,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslations, useLocale } from 'next-intl';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import type { Locale } from '@/i18n/config';
+import { PLAN_FEATURES } from '@resort-pro/types';
 
 // ─────────────────────────────────────────────────────────────────
 // Role type
@@ -54,6 +55,7 @@ export type NavItem = {
   group: string;
   groupKey: string;         // translation key for group
   roles?: Role[];
+  featureFlag?: string;
   aiFeature?: 'ai_content' | 'ai_chatbot' | 'ai_business_insights'; // hide unless this AI feature is live
   daily?: boolean; // always-visible top tier — the owner's everyday-use items
 };
@@ -76,9 +78,9 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard/rooms',          labelKey: 'nav.rooms',         labelFallback: 'Rooms & Villas',   icon: BedDouble,     group: 'Rooms & Bookings', groupKey: 'groups.rooms', daily: true,
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
   { href: '/dashboard/rate-plans',     labelKey: 'nav.ratePlans',     labelFallback: 'Rate Plans',       icon: Tags,          group: 'Rooms & Bookings', groupKey: 'groups.rooms',
-    roles: ['OWNER', 'MANAGER', 'MARKETER'] },
+    roles: ['OWNER', 'MANAGER', 'MARKETER'], featureFlag: 'rate_plans_module' },
   { href: '/dashboard/packages',       labelKey: 'nav.packages',      labelFallback: 'Packages',         icon: Gift,          group: 'Rooms & Bookings', groupKey: 'groups.rooms',
-    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'MARKETER'] },
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'MARKETER'], featureFlag: 'offers_module' },
   { href: '/dashboard/front-desk',     labelKey: 'nav.frontDesk',     labelFallback: 'Front Desk',       icon: ClipboardList, group: 'Rooms & Bookings', groupKey: 'groups.rooms', daily: true,
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
   { href: '/dashboard/bookings',       labelKey: 'nav.bookings',      labelFallback: 'Bookings',         icon: CalendarDays,  group: 'Rooms & Bookings', groupKey: 'groups.rooms', daily: true,
@@ -86,21 +88,21 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard/calendar',       labelKey: 'nav.calendar',      labelFallback: 'Booking Calendar', icon: LayoutGrid,    group: 'Rooms & Bookings', groupKey: 'groups.rooms', daily: true,
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
   { href: '/dashboard/group-bookings', labelKey: 'nav.groupBookings', labelFallback: 'Group Bookings',   icon: UsersRound,    group: 'Rooms & Bookings', groupKey: 'groups.rooms',
-    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'], featureFlag: 'group_bookings_module' },
   { href: '/dashboard/channels',       labelKey: 'nav.channels',      labelFallback: 'Channel Sync',     icon: Link2,         group: 'Rooms & Bookings', groupKey: 'groups.rooms',
-    roles: ['OWNER', 'MANAGER', 'DEVELOPER'] },
+    roles: ['OWNER', 'MANAGER', 'DEVELOPER'], featureFlag: 'channel_sync' },
   { href: '/dashboard/venues',         labelKey: 'nav.venues',        labelFallback: 'Venues & Events',  icon: Landmark,      group: 'Rooms & Bookings', groupKey: 'groups.rooms',
-    roles: ['OWNER', 'MANAGER'] },
+    roles: ['OWNER', 'MANAGER'], featureFlag: 'venues_module' },
   { href: '/dashboard/corporate-accounts', labelKey: 'nav.corporateAccounts', labelFallback: 'Corporate Accounts', icon: Briefcase, group: 'Rooms & Bookings', groupKey: 'groups.rooms',
-    roles: ['OWNER', 'MANAGER'] },
+    roles: ['OWNER', 'MANAGER'], featureFlag: 'corporate_accounts_module' },
   { href: '/dashboard/vehicles',       labelKey: 'nav.vehicles',      labelFallback: 'Vehicle Rental',   icon: Car,           group: 'Rooms & Bookings', groupKey: 'groups.rooms',
-    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'], featureFlag: 'vehicles_module' },
 
   // ── Guests ────────────────────────────────────────────────
   { href: '/dashboard/guests',   labelKey: 'nav.guests',  labelFallback: 'Guests',          icon: Users,  group: 'Guests', groupKey: 'groups.guests',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'MARKETER'] },
   { href: '/dashboard/loyalty',  labelKey: 'nav.loyalty', labelFallback: 'Loyalty Program', icon: Star,   group: 'Guests', groupKey: 'groups.guests',
-    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'MARKETER'] },
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'MARKETER'], featureFlag: 'loyalty_module' },
   { href: '/dashboard/support',  labelKey: 'nav.support', labelFallback: 'Support',         icon: Ticket, group: 'Guests', groupKey: 'groups.guests',
     roles: ['OWNER', 'MANAGER', 'RECEPTIONIST'] },
 
@@ -108,29 +110,29 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard/staff',        labelKey: 'nav.staff',        labelFallback: 'Staff',        icon: UserCog, group: 'Operations', groupKey: 'groups.operations',
     roles: ['OWNER', 'MANAGER'] },
   { href: '/dashboard/housekeeping', labelKey: 'nav.housekeeping', labelFallback: 'Housekeeping', icon: Sparkles, group: 'Operations', groupKey: 'groups.operations',
-    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'STAFF'] },
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'STAFF'], featureFlag: 'housekeeping_module' },
   { href: '/dashboard/maintenance',  labelKey: 'nav.maintenance',  labelFallback: 'Maintenance',  icon: Wrench,   group: 'Operations', groupKey: 'groups.operations',
-    roles: ['OWNER', 'MANAGER'] },
+    roles: ['OWNER', 'MANAGER'], featureFlag: 'maintenance_module' },
   { href: '/dashboard/assets',       labelKey: 'nav.assets',       labelFallback: 'Assets',       icon: Archive,  group: 'Operations', groupKey: 'groups.operations',
     roles: ['OWNER', 'MANAGER'] },
 
   // ── Restaurant ────────────────────────────────────────────
   { href: '/dashboard/restaurant', labelKey: 'nav.restaurant', labelFallback: 'Restaurant', icon: UtensilsCrossed, group: 'Restaurant', groupKey: 'groups.restaurant',
-    roles: ['OWNER', 'MANAGER'] },
+    roles: ['OWNER', 'MANAGER'], featureFlag: 'restaurant_module' },
   { href: '/dashboard/orders',     labelKey: 'nav.orders',     labelFallback: 'F&B Orders', icon: ShoppingBag,     group: 'Restaurant', groupKey: 'groups.restaurant',
-    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'CHEF'] },
+    roles: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'CHEF'], featureFlag: 'restaurant_module' },
   { href: '/dashboard/restaurant/tables', labelKey: 'nav.tables', labelFallback: 'Tables',    icon: LayoutGrid,      group: 'Restaurant', groupKey: 'groups.restaurant',
-    roles: ['OWNER', 'MANAGER'] },
+    roles: ['OWNER', 'MANAGER'], featureFlag: 'restaurant_module' },
   { href: '/dashboard/inventory',  labelKey: 'nav.inventory',  labelFallback: 'Inventory',  icon: Package,         group: 'Restaurant', groupKey: 'groups.restaurant',
-    roles: ['OWNER', 'MANAGER'] },
+    roles: ['OWNER', 'MANAGER'], featureFlag: 'inventory_module' },
 
   // ── Marketing ─────────────────────────────────────────────
   { href: '/dashboard/offers',    labelKey: 'nav.offers',    labelFallback: 'Offers',       icon: Ticket,   group: 'Marketing', groupKey: 'groups.marketing',
-    roles: ['OWNER', 'MANAGER', 'MARKETER'] },
+    roles: ['OWNER', 'MANAGER', 'MARKETER'], featureFlag: 'offers_module' },
   { href: '/dashboard/crm',       labelKey: 'nav.crm',       labelFallback: 'CRM & Email',  icon: Mail,     group: 'Marketing', groupKey: 'groups.marketing',
-    roles: ['OWNER', 'MANAGER', 'MARKETER'] },
+    roles: ['OWNER', 'MANAGER', 'MARKETER'], featureFlag: 'crm_v2' },
   { href: '/dashboard/marketing', labelKey: 'nav.marketing', labelFallback: 'SMS Marketing', icon: Megaphone, group: 'Marketing', groupKey: 'groups.marketing',
-    roles: ['OWNER', 'MANAGER', 'MARKETER'] },
+    roles: ['OWNER', 'MANAGER', 'MARKETER'], featureFlag: 'marketing_module' },
   { href: '/dashboard/website',   labelKey: 'nav.website',   labelFallback: 'Website',      icon: Globe,    group: 'Marketing', groupKey: 'groups.marketing',
     roles: ['OWNER', 'MANAGER', 'MARKETER', 'DEVELOPER'] },
   { href: '/dashboard/ai-content', labelKey: 'nav.aiContent', labelFallback: 'AI Content',   icon: Sparkles, group: 'Marketing', groupKey: 'groups.marketing',
@@ -211,17 +213,15 @@ export function Sidebar() {
     ((modulesRes?.data?.data ?? []) as { flag: string; enabled: boolean }[])
       .map((m) => [m.flag, m.enabled])
   );
-  // Default restaurant to true while loading (avoids flash of hidden nav)
-  const restaurantEnabled = 'restaurant_module' in enabledModules
-    ? enabledModules['restaurant_module']
-    : true;
+  const planFeatures = new Set(PLAN_FEATURES[(tenant?.plan ?? 'FREE') as keyof typeof PLAN_FEATURES] ?? []);
+  const hasFeature = (flag: string) => flag in enabledModules ? enabledModules[flag] : planFeatures.has(flag);
 
   const { status: aiStatus } = useAiStatus();
 
   const role = (user?.role ?? 'STAFF') as Role;
   const roleConfig = ROLE_LABELS[role] ?? ROLE_LABELS.STAFF;
   const visibleItems = getVisibleItems(role).filter((item) => {
-    if (!restaurantEnabled && item.group === 'Restaurant') return false;
+    if (item.featureFlag && !hasFeature(item.featureFlag)) return false;
     // AI nav items hide unless that AI feature is live (master switch + tenant flag)
     if (item.aiFeature && !aiStatus[item.aiFeature]) return false;
     return true;

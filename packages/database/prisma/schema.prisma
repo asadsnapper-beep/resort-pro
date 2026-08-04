@@ -330,6 +330,7 @@ model Tenant {
   planStatus              String     @default("trialing") // trialing | active | past_due | canceled | incomplete
   trialEndsAt             DateTime?
   currentPeriodEnd        DateTime?
+  priceProtectedUntil     DateTime? // current plan price remains valid through this date
   billingEmail            String?
   // Referral & marketing attribution
   referralCode            String?    @unique // this tenant's shareable code e.g. "SUNSET-A3K9"
@@ -341,6 +342,7 @@ model Tenant {
   freeUntil               DateTime? // free plan expiry (set when reward = FREE_PLAN)
   referralsMade           Referral[] @relation("ReferrerReferrals")
   referralEntry           Referral?  @relation("ReferredReferrals")
+  promotionRedemptions    PromotionRedemption[]
   // GDPR
   gdprErasureRequestedAt  DateTime? // when tenant/admin requested erasure
   gdprErasureRequestedBy  String? // "owner" | admin email
@@ -2446,6 +2448,25 @@ model TenantFeatureFlag {
   @@index([tenantId])
   @@index([flag])
   @@map("tenant_feature_flags")
+}
+
+// A promotion can be redeemed once per tenant. The normalized business fields
+// support a lightweight, human-reviewable duplicate check without collecting
+// identity documents or blocking a legitimate owner from opening an account.
+model PromotionRedemption {
+  id                     String   @id @default(cuid())
+  promotionKey           String
+  tenantId               String   @unique
+  normalizedBusinessName String
+  normalizedAddress      String?
+  redeemedAt             DateTime @default(now())
+  expiresAt              DateTime
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([promotionKey, normalizedBusinessName])
+  @@index([promotionKey, normalizedAddress])
+  @@map("promotion_redemptions")
 }
 
 // ─── SLA Agreements ───────────────────────────────────────────────────────────

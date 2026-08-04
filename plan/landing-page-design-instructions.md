@@ -111,25 +111,24 @@ but the visitor-facing names must be:
 
 | Plan | Monthly | Annual | Best for |
 |---|---:|---:|---|
-| Small Resort / Founding Resort | `$20` | `$200` | Early-partner offer for one property |
-| Growing Resort | `$50` | `$500` | A larger, busier resort with priority support |
-| Resort Group | `$100` | `$1,000` | Multiple properties |
+| Free Forever | `$0` | `$0` | A new or very small single-property resort |
+| Independent Resort | `$19` | `$190` | A serious independent property |
+| Resort Group | `$59` | `$590` | A larger resort or small group of properties |
 
 - Keep the monthly/yearly switcher visible and explain that annual billing gives
   two months free.
-- During the launch phase, make **Founding Resort** the visually featured plan.
-  It includes the Professional operational toolkit at `$20`; its limits are one
-  property, 50 rooms, 15 staff, and standard remote support. This is a value
-  offer, not an unlimited-service offer.
-- Growing Resort and Resort Group are for capacity, priority service, and future
-  advanced automation—not a reason to hide core product value behind a feature
-  wall.
-- The launch promotion is for the first **100 eligible verified** accounts
-  created from **1–31 August 2026**: access through **31 October 2026**, then
-  the protected Founding Resort price for 12 months. Any public promotion copy
-  must be removed or updated when the 100 slots fill or the date expires.
-- Do not imply that the promotion is unlimited or can be claimed repeatedly.
-  Eligibility requires the product's verified mobile/business anti-abuse flow.
+- Lead visibly with **Free Forever**. It is a real, no-card, no-expiry option,
+  not a buried trial. Core booking, guest data, invoices, basic reports, and
+  data export are never held behind a paid plan.
+- **Independent Resort** includes custom domain. Paid plans buy capacity,
+  broader operations, multi-property visibility, and support—not basic freedom.
+- The three-month launch promotion applies only to the two paid plans. Its
+  dates and eligibility must be a server-controlled flag, not hardcoded copy.
+  A duplicate promotion attempt falls back to a usable Free Forever account;
+  it does not block the customer.
+- `ENTERPRISE` may remain as an internal legacy/custom plan but must not render
+  as a fourth public card.
+- Full source of truth: [fair pricing rollout plan](./launch-pricing-and-trial-abuse-prevention.md).
 
 ## 8. Implementation checklist
 

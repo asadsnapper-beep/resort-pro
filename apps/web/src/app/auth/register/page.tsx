@@ -6,18 +6,18 @@ import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { authApi } from '@/lib/api';
+import { authApi, billingApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
-import { Gift, Zap, Crown, Building2, ArrowLeft } from 'lucide-react';
+import { Gift, Zap, Crown, ArrowLeft, CreditCard } from 'lucide-react';
 import { PLAN_PRICING } from '@resort-pro/types';
 
 const PLAN_META: Record<string, { label: string; color: string; icon: React.ElementType; desc: string }> = {
-  STARTER:      { label: PLAN_PRICING.STARTER.displayName,      color: '#1a6b5e', icon: Zap,       desc: `$${PLAN_PRICING.STARTER.monthlyUsd}/mo after trial · Up to ${PLAN_PRICING.STARTER.roomLimit} rooms` },
-  PROFESSIONAL: { label: PLAN_PRICING.PROFESSIONAL.displayName, color: '#d4a853', icon: Crown,     desc: `$${PLAN_PRICING.PROFESSIONAL.monthlyUsd}/mo after trial · Up to ${PLAN_PRICING.PROFESSIONAL.roomLimit} rooms` },
-  ENTERPRISE:   { label: PLAN_PRICING.ENTERPRISE.displayName,   color: '#6366f1', icon: Building2, desc: `$${PLAN_PRICING.ENTERPRISE.monthlyUsd}/mo after trial · Up to ${PLAN_PRICING.ENTERPRISE.roomLimit} rooms` },
+  FREE:          { label: PLAN_PRICING.FREE.displayName,         color: '#64748b', icon: CreditCard, desc: `$${PLAN_PRICING.FREE.monthlyUsd}/mo · Up to ${PLAN_PRICING.FREE.roomLimit} rooms` },
+  STARTER:       { label: PLAN_PRICING.STARTER.displayName,      color: '#1a6b5e', icon: Zap,        desc: `$${PLAN_PRICING.STARTER.monthlyUsd}/mo · Up to ${PLAN_PRICING.STARTER.roomLimit} rooms` },
+  PROFESSIONAL:  { label: PLAN_PRICING.PROFESSIONAL.displayName, color: '#d4a853', icon: Crown,      desc: `$${PLAN_PRICING.PROFESSIONAL.monthlyUsd}/mo · Up to ${PLAN_PRICING.PROFESSIONAL.roomLimit} rooms` },
 };
 
 const schema = z.object({
@@ -38,7 +38,7 @@ function RegisterForm() {
   const [loading, setLoading] = useState(false);
   const [referralCode, setReferralCode] = useState('');
   const [referrerName, setReferrerName] = useState('');
-  const [selectedPlan, setSelectedPlan] = useState<string>('STARTER');
+  const [selectedPlan, setSelectedPlan] = useState<string>('FREE');
 
   // Capture ?ref= and ?plan= from URL on mount
   useEffect(() => {
@@ -77,8 +77,21 @@ function RegisterForm() {
       });
       const { user, tenant, token, refreshToken } = res.data.data;
       setAuth(user, tenant, token, refreshToken);
-      toast({ title: 'Resort created!', description: `Welcome to ResortPro, ${user.firstName}!` });
-      router.push('/onboarding');
+      if (tenant.planStatus === 'trialing') {
+        toast({ title: 'Resort created!', description: 'Your launch offer is active—let’s set up your workspace.' });
+        router.push('/onboarding');
+        return;
+      }
+      toast({ title: 'Resort created!', description: 'Taking you to secure checkout…' });
+      try {
+        const checkout = await billingApi.createCheckout(selectedPlan);
+        window.location.assign(checkout.data.data.url);
+      } catch (checkoutError: unknown) {
+        const message = (checkoutError as { response?: { data?: { error?: string } } })?.response?.data?.error
+          || 'Your account was created, but secure checkout could not start.';
+        toast({ title: 'Checkout needs attention', description: message, variant: 'destructive' });
+        router.push('/dashboard/upgrade');
+      }
     } catch (err: unknown) {
       const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Registration failed';
       toast({ title: 'Error', description: message, variant: 'destructive' });
@@ -87,7 +100,7 @@ function RegisterForm() {
     }
   };
 
-  const planMeta = PLAN_META[selectedPlan] ?? PLAN_META.STARTER;
+  const planMeta = PLAN_META[selectedPlan] ?? PLAN_META.FREE;
   const PlanIcon = planMeta.icon;
 
   return (
@@ -108,7 +121,7 @@ function RegisterForm() {
         <div className="mb-6 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gold-500 font-display text-2xl font-bold text-resort-900">R</div>
           <h1 className="font-display text-3xl font-bold text-white">Create your resort</h1>
-          <p className="mt-2 text-white/60">14-day free trial · No credit card needed</p>
+          <p className="mt-2 text-white/60">Create your workspace, then complete secure checkout.</p>
         </div>
 
         {/* Selected plan badge */}
@@ -117,7 +130,7 @@ function RegisterForm() {
             <PlanIcon className="h-4 w-4 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white text-sm font-semibold">{planMeta.label} Plan — 14-day free trial</p>
+            <p className="text-white text-sm font-semibold">{planMeta.label} Plan</p>
             <p className="text-white/50 text-xs">{planMeta.desc}</p>
           </div>
           <a href="/plans" className="text-white/40 hover:text-white/70 text-xs transition-colors flex-shrink-0">
@@ -192,7 +205,7 @@ function RegisterForm() {
             </div>
 
             <Button type="submit" variant="gold" size="lg" className="w-full mt-2" loading={loading}>
-              Create my resort
+              Continue to secure checkout
             </Button>
             <p className="mt-3 text-center text-xs leading-relaxed text-white/40">
               By creating an account you agree to our{' '}

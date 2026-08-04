@@ -5,98 +5,94 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Check, ChevronDown, Sparkles } from 'lucide-react';
-import { PLAN_PRICING } from '@resort-pro/types';
+import { PLAN_PRICING, PUBLIC_PLAN_ORDER } from '@resort-pro/types';
 
 const PLANS = [
   {
-    id: 'STARTER' as const,
-    eyebrow: 'First 100 resorts',
-    name: PLAN_PRICING.STARTER.displayName,
-    title: 'A confident start for one hands-on property.',
-    price: PLAN_PRICING.STARTER.monthlyUsd,
-    annualPrice: PLAN_PRICING.STARTER.annualUsd,
-    capacity: `1 property · up to ${PLAN_PRICING.STARTER.roomLimit} rooms · ${PLAN_PRICING.STARTER.staffLimit} staff`,
-    badge: 'Founding Resort',
-    featured: true,
-    cta: 'Claim founding access',
+    id: 'FREE' as const,
+    eyebrow: 'For small properties',
+    name: PLAN_PRICING.FREE.displayName,
+    title: 'Everything a smaller property needs, day one.',
+    price: PLAN_PRICING.FREE.monthlyUsd,
+    annualPrice: PLAN_PRICING.FREE.annualUsd,
+    capacity: `1 property · up to ${PLAN_PRICING.FREE.roomLimit} rooms · ${PLAN_PRICING.FREE.staffLimit} staff`,
+    badge: null,
+    featured: false,
+    cta: 'Start with Solo',
     features: [
       'Bookings, check-in and check-out',
-      'Guest CRM, payments and invoices',
-      'Restaurant and room-service workflow',
+      'Guest records, invoices and basic reports',
       'Direct booking website and widgets',
-      'Full operational toolkit for 12 months',
-      'Email support from a real team',
+      'Full data export, always',
+      'A clear upgrade path when you grow',
     ],
   },
   {
     id: 'PROFESSIONAL' as const,
-    eyebrow: 'For growing teams',
+    eyebrow: 'For resort groups',
     name: PLAN_PRICING.PROFESSIONAL.displayName,
-    title: 'More rooms, more people and deeper oversight.',
+    title: 'One operating view across every property you run.',
     price: PLAN_PRICING.PROFESSIONAL.monthlyUsd,
     annualPrice: PLAN_PRICING.PROFESSIONAL.annualUsd,
-    capacity: `1 property · up to ${PLAN_PRICING.PROFESSIONAL.roomLimit} rooms · ${PLAN_PRICING.PROFESSIONAL.staffLimit} staff`,
-    badge: null,
-    featured: false,
-    cta: 'Start with Growing',
-    features: [
-      'Everything in Small Resort',
-      'Advanced reports and rate plans',
-      'Loyalty, inventory and maintenance',
-      'Group bookings and housekeeping',
-      'Custom domain for direct bookings',
-      'Priority support',
-    ],
-  },
-  {
-    id: 'ENTERPRISE' as const,
-    eyebrow: 'For resort groups',
-    name: PLAN_PRICING.ENTERPRISE.displayName,
-    title: 'One operating view across your portfolio.',
-    price: PLAN_PRICING.ENTERPRISE.monthlyUsd,
-    annualPrice: PLAN_PRICING.ENTERPRISE.annualUsd,
-    capacity: `Up to ${PLAN_PRICING.ENTERPRISE.propertyLimit} properties · ${PLAN_PRICING.ENTERPRISE.roomLimit} rooms · ${PLAN_PRICING.ENTERPRISE.staffLimit} staff`,
+    capacity: `Up to ${PLAN_PRICING.PROFESSIONAL.propertyLimit} properties · ${PLAN_PRICING.PROFESSIONAL.roomLimit} rooms · ${PLAN_PRICING.PROFESSIONAL.staffLimit} staff`,
     badge: null,
     featured: false,
     cta: 'Start with Resort Group',
     features: [
-      'Everything in Growing Resort',
-      'Multi-property reporting',
-      'Revenue intelligence dashboard',
-      'Advanced AI allowance',
-      'Onboarding assistance',
+      'Everything in Independent Resort',
+      'Multi-property owner view',
+      'OTA channel sync and corporate accounts',
+      'Advanced reporting and AI chatbot',
       'Priority support',
     ],
   },
-];
+  {
+    id: 'STARTER' as const,
+    eyebrow: 'For independent resorts',
+    name: PLAN_PRICING.STARTER.displayName,
+    title: 'Everything you need to run one property, fully.',
+    price: PLAN_PRICING.STARTER.monthlyUsd,
+    annualPrice: PLAN_PRICING.STARTER.annualUsd,
+    capacity: `1 property · up to ${PLAN_PRICING.STARTER.roomLimit} rooms · ${PLAN_PRICING.STARTER.staffLimit} staff`,
+    badge: 'Most popular',
+    featured: true,
+    cta: 'Start with Independent',
+    features: [
+      'Everything in Solo',
+      'Custom domain and online payments',
+      'CRM, restaurant and housekeeping',
+      'Inventory, maintenance and marketing',
+      'Offers, loyalty, rates and group bookings',
+      'AI content and PDF export',
+    ],
+  },
+].sort((a, b) => PUBLIC_PLAN_ORDER.indexOf(a.id) - PUBLIC_PLAN_ORDER.indexOf(b.id));
 
 const COMPARE_ROWS = [
   {
     label: 'Properties',
     starter: '1',
     pro: '1',
-    group: `Up to ${PLAN_PRICING.ENTERPRISE.propertyLimit}`,
+    group: `Up to ${PLAN_PRICING.PROFESSIONAL.propertyLimit}`,
   },
   {
     label: 'Rooms',
-    starter: `Up to ${PLAN_PRICING.STARTER.roomLimit}`,
-    pro: `Up to ${PLAN_PRICING.PROFESSIONAL.roomLimit}`,
-    group: `Up to ${PLAN_PRICING.ENTERPRISE.roomLimit}`,
+    starter: `Up to ${PLAN_PRICING.FREE.roomLimit}`,
+    pro: `Up to ${PLAN_PRICING.STARTER.roomLimit}`,
+    group: `Up to ${PLAN_PRICING.PROFESSIONAL.roomLimit}`,
   },
   {
     label: 'Staff accounts',
-    starter: `${PLAN_PRICING.STARTER.staffLimit}`,
-    pro: `${PLAN_PRICING.PROFESSIONAL.staffLimit}`,
-    group: `${PLAN_PRICING.ENTERPRISE.staffLimit}`,
+    starter: `${PLAN_PRICING.FREE.staffLimit}`,
+    pro: `${PLAN_PRICING.STARTER.staffLimit}`,
+    group: `${PLAN_PRICING.PROFESSIONAL.staffLimit}`,
   },
   { label: 'Booking, guests and payments', starter: true, pro: true, group: true },
-  { label: 'Restaurant and room service', starter: true, pro: true, group: true },
+  { label: 'Restaurant and room service', starter: false, pro: true, group: true },
   { label: 'Direct booking website', starter: true, pro: true, group: true },
-  { label: 'SMS and WhatsApp notifications', starter: true, pro: true, group: true },
-  { label: 'Advanced analytics and reports', starter: false, pro: true, group: true },
   { label: 'Custom domain and loyalty', starter: false, pro: true, group: true },
+  { label: 'Advanced analytics and reports', starter: false, pro: false, group: true },
   { label: 'Multi-property reporting', starter: false, pro: false, group: true },
-  { label: 'Revenue intelligence', starter: false, pro: false, group: true },
 ];
 
 function BrandMark() {
@@ -182,16 +178,15 @@ export default function PlansPage() {
               </span>
               <div>
                 <p className="font-bitcount text-[10px] font-medium uppercase tracking-[0.14em] text-[#b2402c]">
-                  Founding offer
+                  Fair, predictable pricing
                 </p>
                 <p className="mt-1 text-sm font-extrabold leading-5 text-[#183153]">
-                  First 100 verified resorts get 3 months free.
+                  Choose the capacity and tools that match your operation today.
                 </p>
               </div>
             </div>
             <p className="mt-4 border-t border-[#d9e4ea] pt-4 text-xs leading-5 text-[#64748b]">
-              Your $20 starting price and full operational toolkit are protected for your first 12
-              months.
+              Your selected price is protected for your first 12 months.
             </p>
           </aside>
         </div>
@@ -200,7 +195,7 @@ export default function PlansPage() {
       <section className="border-b-2 border-[#183153] bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-7 sm:px-8 md:flex-row md:items-center md:justify-between">
           <p className="text-sm font-bold text-[#475569]">
-            No setup fee. No credit card to start. Cancel whenever your season changes.
+            No setup fee. Cancel whenever your season changes. Your data stays yours.
           </p>
           <div className="flex w-fit border-2 border-[#183153] bg-white p-1 text-sm font-extrabold">
             <button
@@ -226,7 +221,7 @@ export default function PlansPage() {
           {PLANS.map((plan) => (
             <article
               key={plan.id}
-              className={`relative flex min-w-0 flex-col border-b-2 border-r-2 border-[#183153] p-6 sm:p-8 ${plan.featured ? 'bg-[#e5f0f7]' : plan.id === 'ENTERPRISE' ? 'bg-[#fff1ea]' : 'bg-white'}`}
+              className={`relative flex min-w-0 flex-col border-b-2 border-r-2 border-[#183153] p-6 sm:p-8 ${plan.featured ? 'bg-[#e5f0f7]' : plan.id === 'PROFESSIONAL' ? 'bg-[#fff1ea]' : 'bg-white'}`}
             >
               {plan.badge && (
                 <span className="font-bitcount absolute right-0 top-0 bg-[#ef725c] px-3 py-2 text-[10px] font-medium uppercase tracking-[0.13em] text-white">
@@ -266,7 +261,7 @@ export default function PlansPage() {
           ))}
         </div>
         <p className="mt-6 text-center text-sm leading-6 text-[#64748b]">
-          Have more than {PLAN_PRICING.ENTERPRISE.propertyLimit} properties, need SSO, or want
+          Have more than {PLAN_PRICING.PROFESSIONAL.propertyLimit} properties, need SSO, or want
           white-label support?{' '}
           <Link
             href="/contact"
@@ -290,7 +285,7 @@ export default function PlansPage() {
           </div>
           <div className="grid grid-cols-2 border-l border-white/25 sm:grid-cols-4">
             {[
-              ['3 months', 'free for founding resorts'],
+              ['$10', 'a month to start with Solo'],
               ['1 place', 'for every guest detail'],
               ['0%', 'setup fee'],
               ['24/7', 'your operations stay visible'],
@@ -335,8 +330,8 @@ export default function PlansPage() {
                   <th className="font-bitcount border-r border-[#183153] px-5 py-4 text-[10px] font-medium uppercase tracking-[0.13em]">
                     Included
                   </th>
-                  <th className="border-r border-[#183153] px-5 py-4 font-bold">Small Resort</th>
-                  <th className="border-r border-[#183153] px-5 py-4 font-bold">Growing Resort</th>
+                  <th className="border-r border-[#183153] px-5 py-4 font-bold">Solo</th>
+                  <th className="border-r border-[#183153] px-5 py-4 font-bold">Independent Resort</th>
                   <th className="px-5 py-4 font-bold">Resort Group</th>
                 </tr>
               </thead>

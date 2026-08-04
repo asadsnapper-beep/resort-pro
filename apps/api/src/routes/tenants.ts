@@ -1,11 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '@resort-pro/database'; // kept for cross-tenant checks (e.g. domain uniqueness)
-import { requireRole, requireAuth } from '../middleware/auth';
+import { requireRole, requireAuth, requireFlag } from '../middleware/auth';
 import { ok, validate } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
 import * as dns from 'dns/promises';
 import { FLAG_REGISTRY } from '../utils/feature-flags';
+import { resolveTenantEntitlement } from '../utils/entitlement';
 import { sendTestEmail } from '../utils/guest-emails';
 import crypto from 'crypto';
 
@@ -55,7 +56,7 @@ export async function tenantRoutes(app: FastifyInstance) {
   // PUT /api/tenant/domain — save or clear custom domain
   app.put('/domain', {
     schema: { tags: ['tenant'], summary: 'Set custom domain', security: [{ bearerAuth: [] }] },
-    preHandler: requireRole('OWNER'),
+    preHandler: [requireRole('OWNER'), requireFlag('custom_domain')],
     handler: async (request, reply) => {
       const { db } = request;
       const { tenantId } = request.user as JwtPayload;
@@ -101,7 +102,7 @@ export async function tenantRoutes(app: FastifyInstance) {
   // POST /api/tenant/domain/verify — check DNS then mark verified
   app.post('/domain/verify', {
     schema: { tags: ['tenant'], summary: 'Verify custom domain DNS', security: [{ bearerAuth: [] }] },
-    preHandler: requireRole('OWNER'),
+    preHandler: [requireRole('OWNER'), requireFlag('custom_domain')],
     handler: async (request, reply) => {
       const { db } = request;
       const { tenantId } = request.user as JwtPayload;
@@ -162,7 +163,7 @@ export async function tenantRoutes(app: FastifyInstance) {
   // POST /api/tenant/domain/provision-ssl — request SSL certificate provisioning
   app.post('/domain/provision-ssl', {
     schema: { tags: ['tenant'], summary: 'Request SSL certificate for custom domain', security: [{ bearerAuth: [] }] },
-    preHandler: requireRole('OWNER'),
+    preHandler: [requireRole('OWNER'), requireFlag('custom_domain')],
     handler: async (request, reply) => {
       const { db } = request;
       const { tenantId } = request.user as JwtPayload;
@@ -298,20 +299,16 @@ export async function tenantRoutes(app: FastifyInstance) {
     schema: { tags: ['tenant'], summary: 'Get owner-controllable module flags and their status', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request) => {
-      const { db } = request;
+      const { tenantId } = request.user as JwtPayload;
 
       const moduleFlags = FLAG_REGISTRY.filter((f) => f.ownerControllable);
-      const rows = await db.tenantFeatureFlag.findMany({
-        where: { flag: { in: moduleFlags.map((f) => f.flag) } },
-        select: { flag: true, enabled: true },
-      });
-      const overrides = Object.fromEntries(rows.map((r) => [r.flag, r.enabled]));
+      const entitlement = await resolveTenantEntitlement(tenantId);
 
       const modules = moduleFlags.map((f) => ({
         flag: f.flag,
         label: f.label,
         description: f.description,
-        enabled: f.flag in overrides ? overrides[f.flag] : f.defaultOn,
+        enabled: !!entitlement.flags[f.flag],
       }));
 
       return ok(modules);

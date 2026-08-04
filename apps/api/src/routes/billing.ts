@@ -14,12 +14,24 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder'
 // ── Plan definitions — prices/limits from @resort-pro/types, the single
 // source of truth (see plan/launch-pricing-and-trial-abuse-prevention.md) ──
 export const PLANS = {
+  FREE: {
+    name: PLAN_PRICING.FREE.displayName,
+    price: PLAN_PRICING.FREE.monthlyUsd,
+    annualPrice: PLAN_PRICING.FREE.annualUsd,
+    currency: 'usd',
+    interval: 'month' as const,
+    priceId: process.env.STRIPE_PRICE_FREE || '',
+    annualPriceId: process.env.STRIPE_PRICE_FREE_ANNUAL || '',
+    features: [`Up to ${PLAN_PRICING.FREE.roomLimit} rooms`, 'Booking management', 'Guest records', 'Data export'],
+    roomLimit: PLAN_PRICING.FREE.roomLimit,
+  },
   STARTER: {
     name: PLAN_PRICING.STARTER.displayName,
     price: PLAN_PRICING.STARTER.monthlyUsd,
     currency: 'usd',
     interval: 'month' as const,
     priceId: process.env.STRIPE_PRICE_STARTER || '',
+    annualPriceId: process.env.STRIPE_PRICE_STARTER_ANNUAL || '',
     features: [`Up to ${PLAN_PRICING.STARTER.roomLimit} rooms`, 'Booking management', 'Guest CRM', 'Email support'],
     roomLimit: PLAN_PRICING.STARTER.roomLimit,
   },
@@ -29,6 +41,7 @@ export const PLANS = {
     currency: 'usd',
     interval: 'month' as const,
     priceId: process.env.STRIPE_PRICE_PRO || '',
+    annualPriceId: process.env.STRIPE_PRICE_PRO_ANNUAL || '',
     features: [`Up to ${PLAN_PRICING.PROFESSIONAL.roomLimit} rooms`, 'Everything in Starter', 'Staff invites', 'Priority support', 'Advanced analytics'],
     roomLimit: PLAN_PRICING.PROFESSIONAL.roomLimit,
   },
@@ -38,6 +51,7 @@ export const PLANS = {
     currency: 'usd',
     interval: 'month' as const,
     priceId: process.env.STRIPE_PRICE_ENTERPRISE || '',
+    annualPriceId: process.env.STRIPE_PRICE_ENTERPRISE_ANNUAL || '',
     features: [`Up to ${PLAN_PRICING.ENTERPRISE.roomLimit} rooms`, 'Everything in Pro', 'Custom integrations', 'Dedicated support', 'SLA guarantee'],
     roomLimit: PLAN_PRICING.ENTERPRISE.roomLimit,
   },
@@ -47,13 +61,15 @@ export const PLANS = {
 // Local-payment prices for owners who pay via bKash. Env-overridable so you can
 // tune without a deploy; default falls back to the canonical @resort-pro/types
 // value, not an independent number.
-const BKASH_PLAN_BDT: Record<'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE', number> = {
+const BKASH_PLAN_BDT: Record<keyof typeof PLANS, number> = {
+  FREE: Number(process.env.BKASH_PRICE_FREE) || PLAN_PRICING.FREE.monthlyBdt,
   STARTER: Number(process.env.BKASH_PRICE_STARTER) || PLAN_PRICING.STARTER.monthlyBdt,
   PROFESSIONAL: Number(process.env.BKASH_PRICE_PRO) || PLAN_PRICING.PROFESSIONAL.monthlyBdt,
   ENTERPRISE: Number(process.env.BKASH_PRICE_ENTERPRISE) || PLAN_PRICING.ENTERPRISE.monthlyBdt,
 };
 // Annual is an exact figure (2 months free), not a flat percentage off.
-const BKASH_PLAN_ANNUAL_BDT: Record<'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE', number> = {
+const BKASH_PLAN_ANNUAL_BDT: Record<keyof typeof PLANS, number> = {
+  FREE: Number(process.env.BKASH_PRICE_FREE_ANNUAL) || PLAN_PRICING.FREE.annualBdt,
   STARTER: Number(process.env.BKASH_PRICE_STARTER_ANNUAL) || PLAN_PRICING.STARTER.annualBdt,
   PROFESSIONAL: Number(process.env.BKASH_PRICE_PRO_ANNUAL) || PLAN_PRICING.PROFESSIONAL.annualBdt,
   ENTERPRISE: Number(process.env.BKASH_PRICE_ENTERPRISE_ANNUAL) || PLAN_PRICING.ENTERPRISE.annualBdt,
@@ -90,6 +106,7 @@ export async function billingRoutes(app: FastifyInstance) {
         planStatus: true,
         trialEndsAt: true,
         currentPeriodEnd: true,
+        priceProtectedUntil: true,
         stripeCustomerId: true,
         stripeSubscriptionId: true,
         billingEmail: true,
@@ -128,6 +145,7 @@ export async function billingRoutes(app: FastifyInstance) {
         isCanceled,
         currentPeriodEnd: tenant.currentPeriodEnd,
         trialEndsAt: tenant.trialEndsAt,
+        priceProtectedUntil: tenant.priceProtectedUntil,
         tenantIsActive: tenant.isActive,
         hasStripeCustomer: !!tenant.stripeCustomerId,
         hasSubscription: !!tenant.stripeSubscriptionId,
@@ -135,6 +153,7 @@ export async function billingRoutes(app: FastifyInstance) {
         bkashEnabled: !!getPlatformBkash(),
         bkashPricesBdt: BKASH_PLAN_BDT,
         entitlement: {
+          propertyLimit: entitlement.propertyLimit,
           roomLimit: entitlement.roomLimit,
           staffLimit: entitlement.staffLimit,
           aiMonthlyTokenCap: entitlement.aiMonthlyTokenCap,
@@ -146,16 +165,17 @@ export async function billingRoutes(app: FastifyInstance) {
   });
 
   // POST /billing/checkout — create Stripe checkout session
-  app.post<{ Body: { planKey: 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE' } }>(
+  app.post<{ Body: { planKey: keyof typeof PLANS; interval?: 'month' | 'year' } }>(
     '/checkout',
     async (request, reply) => {
       await requireAuth(request, reply);
       const { tenantId } = request.user as any;
-      const { planKey } = request.body;
+      const { planKey, interval = 'month' } = request.body;
 
       const plan = PLANS[planKey];
       if (!plan) return reply.status(400).send({ success: false, error: 'Invalid plan' });
-      if (!plan.priceId) {
+      const priceId = interval === 'year' ? plan.annualPriceId : plan.priceId;
+      if (!priceId) {
         return reply.status(400).send({
           success: false,
           error: 'Payment gateway not configured. Please contact support.',
@@ -189,14 +209,14 @@ export async function billingRoutes(app: FastifyInstance) {
         customer: customerId,
         mode: 'subscription',
         payment_method_types: ['card'],
-        line_items: [{ price: plan.priceId, quantity: 1 }],
-        success_url: `${appUrl}/dashboard/billing?success=1&plan=${planKey}`,
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: `${appUrl}/dashboard/billing?success=1&plan=${planKey}&interval=${interval}`,
         cancel_url: `${appUrl}/dashboard/billing?canceled=1`,
         subscription_data: {
           metadata: { tenantId, planKey },
           trial_period_days: undefined, // No extra trial for paid plans
         },
-        metadata: { tenantId, planKey },
+        metadata: { tenantId, planKey, interval },
       });
 
       return reply.send({ success: true, data: { url: session.url } });
@@ -231,7 +251,7 @@ export async function billingRoutes(app: FastifyInstance) {
   });
 
   // POST /billing/checkout/bkash — start a bKash subscription payment (BDT)
-  app.post<{ Body: { planKey: 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE'; interval?: 'month' | 'year' } }>(
+  app.post<{ Body: { planKey: keyof typeof PLANS; interval?: 'month' | 'year' } }>(
     '/checkout/bkash',
     async (request, reply) => {
       await requireAuth(request, reply);
@@ -296,16 +316,23 @@ export async function billingRoutes(app: FastifyInstance) {
         if (exec.transactionStatus !== 'Completed') return fail('payment_incomplete');
 
         // Re-verify the paid amount against what we expected (guards tampered callback params)
-        const expected = Number(amt);
+        const expected = interval === 'year'
+          ? BKASH_PLAN_ANNUAL_BDT[planKey as keyof typeof PLANS]
+          : BKASH_PLAN_BDT[planKey as keyof typeof PLANS];
         if (expected && Math.abs(Number(exec.amount) - expected) > 0.5) return fail('amount_mismatch');
 
-        const plan = planKey as 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';
+        const plan = planKey as keyof typeof PLANS;
         const days = interval === 'year' ? 365 : 30;
         const periodEnd = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
         await prisma.tenant.update({
           where: { id: tenantId },
-          data: { plan, planStatus: 'active', currentPeriodEnd: periodEnd },
+          data: {
+            plan,
+            planStatus: 'active',
+            currentPeriodEnd: periodEnd,
+            priceProtectedUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+          },
         });
         await applyPlanFlagsToTenant(tenantId, plan);
 
@@ -522,6 +549,7 @@ async function handleSubscriptionCheckout(session: Stripe.Checkout.Session) {
   if (!tenantId || !planKey) return;
 
   const planMap: Record<string, 'FREE' | 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE'> = {
+    FREE: 'FREE',
     STARTER: 'STARTER',
     PROFESSIONAL: 'PROFESSIONAL',
     ENTERPRISE: 'ENTERPRISE',
@@ -531,7 +559,7 @@ async function handleSubscriptionCheckout(session: Stripe.Checkout.Session) {
     ? await stripe.subscriptions.retrieve(session.subscription as string)
     : null;
 
-  const newPlan = planMap[planKey] || 'STARTER';
+  const newPlan = planMap[planKey] || 'FREE';
   await prisma.tenant.update({
     where: { id: tenantId },
     data: {
@@ -542,6 +570,7 @@ async function handleSubscriptionCheckout(session: Stripe.Checkout.Session) {
       currentPeriodEnd: sub?.current_period_end
         ? new Date(sub.current_period_end * 1000)
         : undefined,
+      priceProtectedUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
     },
   });
 

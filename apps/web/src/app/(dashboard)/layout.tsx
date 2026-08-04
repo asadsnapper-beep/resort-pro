@@ -76,7 +76,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         }
 
         // Trial expired — needs to upgrade
-        if (planStatus === 'trialing' && trialDaysLeft <= 0) {
+        if (planStatus === 'incomplete' || (planStatus === 'trialing' && trialDaysLeft <= 0)) {
           router.push('/dashboard/upgrade');
           setStatusChecked(true);
           return;

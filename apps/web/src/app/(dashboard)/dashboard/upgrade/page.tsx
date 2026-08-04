@@ -6,7 +6,7 @@ import { useAuthStore } from '@/store/auth';
 import { billingApi } from '@/lib/api';
 import { PLAN_PRICING } from '@resort-pro/types';
 import {
-  CheckCircle2, Zap, Building2, Crown, ArrowRight,
+  CheckCircle2, Zap, Building2, ArrowRight,
   Loader2, Shield, Users, BarChart3, Headphones, Star,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -14,6 +14,22 @@ import { cn } from '@/lib/utils';
 // Prices/limits come from @resort-pro/types — see
 // plan/launch-pricing-and-trial-abuse-prevention.md.
 const PLANS = [
+  {
+    key: 'FREE',
+    name: PLAN_PRICING.FREE.displayName,
+    price: PLAN_PRICING.FREE.monthlyUsd,
+    icon: Zap,
+    color: 'from-slate-500 to-slate-700',
+    borderColor: 'border-slate-400/30',
+    bgColor: 'bg-slate-500/5',
+    badgeColor: 'bg-slate-100 text-slate-700',
+    features: [
+      `Up to ${PLAN_PRICING.FREE.roomLimit} rooms`,
+      'Bookings, guests and invoices',
+      'Direct booking page',
+      'Full data export',
+    ],
+  },
   {
     key: 'STARTER',
     name: PLAN_PRICING.STARTER.displayName,
@@ -51,23 +67,6 @@ const PLANS = [
       'Custom domain',
     ],
   },
-  {
-    key: 'ENTERPRISE',
-    name: PLAN_PRICING.ENTERPRISE.displayName,
-    price: PLAN_PRICING.ENTERPRISE.monthlyUsd,
-    icon: Crown,
-    color: 'from-amber-500 to-orange-600',
-    borderColor: 'border-amber-500/30',
-    bgColor: 'bg-amber-500/5',
-    badgeColor: 'bg-amber-100 text-amber-700',
-    features: [
-      `Up to ${PLAN_PRICING.ENTERPRISE.roomLimit} rooms`,
-      'Everything in Professional',
-      `Up to ${PLAN_PRICING.ENTERPRISE.propertyLimit} properties`,
-      'Revenue intelligence',
-      'Priority support + SLA',
-    ],
-  },
 ];
 
 export default function UpgradePage() {
@@ -78,6 +77,7 @@ export default function UpgradePage() {
   const trialEnded = tenant?.planStatus === 'trialing';
   const isCanceled = tenant?.planStatus === 'canceled';
   const isPastDue = tenant?.planStatus === 'past_due';
+  const availablePlans = PLANS.filter((plan) => plan.key !== tenant?.plan);
 
   const handleChoosePlan = async (planKey: string) => {
     setLoadingPlan(planKey);
@@ -133,7 +133,7 @@ export default function UpgradePage() {
 
         {/* Plans */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          {PLANS.map((plan) => {
+          {availablePlans.map((plan) => {
             const Icon = plan.icon;
             const isLoading = loadingPlan === plan.key;
             return (

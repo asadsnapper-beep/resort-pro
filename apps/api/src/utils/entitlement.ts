@@ -21,6 +21,7 @@ export interface PlanConfig {
   name: string;
   price: number;
   annualPrice?: number;
+  propertyLimit: number; // -1 = unlimited
   roomLimit: number;     // -1 = unlimited
   staffLimit: number;    // -1 = unlimited
   aiMonthlyTokenCap: number; // 0 = AI off for this plan
@@ -30,6 +31,7 @@ export interface PlanConfig {
 
 export interface TenantEntitlement {
   plan: string;
+  propertyLimit: number;
   roomLimit: number;
   staffLimit: number;
   aiMonthlyTokenCap: number;
@@ -43,22 +45,34 @@ export const DEFAULT_PLAN_CONFIGS: PlanConfig[] = [
     key: 'FREE',
     name: PLAN_PRICING.FREE.displayName,
     price: PLAN_PRICING.FREE.monthlyUsd,
+    annualPrice: PLAN_PRICING.FREE.annualUsd,
+    propertyLimit: PLAN_PRICING.FREE.propertyLimit,
     roomLimit: PLAN_PRICING.FREE.roomLimit,
     staffLimit: PLAN_PRICING.FREE.staffLimit,
     aiMonthlyTokenCap: 0,
     flags: [],
-    features: ['Up to 5 rooms', 'Basic booking management'],
+    features: [
+      `Up to ${PLAN_PRICING.FREE.roomLimit} rooms`,
+      `${PLAN_PRICING.FREE.staffLimit} staff seats`,
+      'Booking website (subdomain)',
+      'Invoicing & basic reports',
+      'Full data export',
+    ],
   },
   {
     key: 'STARTER',
     name: PLAN_PRICING.STARTER.displayName,
     price: PLAN_PRICING.STARTER.monthlyUsd,
     annualPrice: PLAN_PRICING.STARTER.annualUsd,
+    propertyLimit: PLAN_PRICING.STARTER.propertyLimit,
     roomLimit: PLAN_PRICING.STARTER.roomLimit,
     staffLimit: PLAN_PRICING.STARTER.staffLimit,
     aiMonthlyTokenCap: 30000,
     flags: [
-      'export_pdf',
+      'custom_domain', 'payment_gateway', 'crm_v2', 'restaurant_module',
+      'housekeeping_module', 'inventory_module', 'maintenance_module',
+      'marketing_module', 'loyalty_module', 'offers_module', 'rate_plans_module',
+      'group_bookings_module', 'vehicles_module', 'venues_module', 'export_pdf',
       'ai_content',
     ],
     features: [
@@ -75,17 +89,17 @@ export const DEFAULT_PLAN_CONFIGS: PlanConfig[] = [
     name: PLAN_PRICING.PROFESSIONAL.displayName,
     price: PLAN_PRICING.PROFESSIONAL.monthlyUsd,
     annualPrice: PLAN_PRICING.PROFESSIONAL.annualUsd,
+    propertyLimit: PLAN_PRICING.PROFESSIONAL.propertyLimit,
     roomLimit: PLAN_PRICING.PROFESSIONAL.roomLimit,
     staffLimit: PLAN_PRICING.PROFESSIONAL.staffLimit,
     aiMonthlyTokenCap: 300000,
     flags: [
-      'export_pdf',
-      'ai_content',
-      'ai_chatbot',
-      'restaurant_module',
-      'crm_v2',
-      'advanced_reports',
-      'beta_analytics',
+      'custom_domain', 'payment_gateway', 'crm_v2', 'restaurant_module',
+      'housekeeping_module', 'inventory_module', 'maintenance_module',
+      'marketing_module', 'loyalty_module', 'offers_module', 'rate_plans_module',
+      'group_bookings_module', 'vehicles_module', 'venues_module', 'export_pdf',
+      'ai_content', 'channel_sync', 'corporate_accounts_module',
+      'advanced_reports', 'beta_analytics', 'ai_chatbot', 'multi_property',
     ],
     features: [
       `Up to ${PLAN_PRICING.PROFESSIONAL.roomLimit} rooms`,
@@ -103,6 +117,7 @@ export const DEFAULT_PLAN_CONFIGS: PlanConfig[] = [
     name: PLAN_PRICING.ENTERPRISE.displayName,
     price: PLAN_PRICING.ENTERPRISE.monthlyUsd,
     annualPrice: PLAN_PRICING.ENTERPRISE.annualUsd,
+    propertyLimit: PLAN_PRICING.ENTERPRISE.propertyLimit,
     roomLimit: PLAN_PRICING.ENTERPRISE.roomLimit,
     staffLimit: PLAN_PRICING.ENTERPRISE.staffLimit,
     aiMonthlyTokenCap: 1500000,
@@ -117,6 +132,20 @@ export const DEFAULT_PLAN_CONFIGS: PlanConfig[] = [
       'beta_analytics',
       'revenue_forecast',
       'multi_property',
+      'custom_domain',
+      'payment_gateway',
+      'housekeeping_module',
+      'inventory_module',
+      'maintenance_module',
+      'marketing_module',
+      'loyalty_module',
+      'offers_module',
+      'rate_plans_module',
+      'group_bookings_module',
+      'vehicles_module',
+      'venues_module',
+      'corporate_accounts_module',
+      'channel_sync',
     ],
     features: [
       `Up to ${PLAN_PRICING.ENTERPRISE.roomLimit} rooms`,
@@ -142,11 +171,24 @@ export async function getPlanConfigs(): Promise<PlanConfig[]> {
   const raw = settings?.plans as PlanConfig[] | null;
   if (!raw || !Array.isArray(raw) || raw.length === 0) return DEFAULT_PLAN_CONFIGS;
 
-  // Merge DB configs with defaults — DB wins, but missing fields fall back to defaults
-  return raw.map((dbPlan) => {
-    const def = DEFAULT_PLAN_CONFIGS.find((d) => d.key === dbPlan.key);
-    return { ...def, ...dbPlan } as PlanConfig;
+  // Merge DB configs with defaults — DB wins for editable fields, while a new
+  // canonical plan (such as Solo) is available even before an older settings
+  // row has been manually re-saved in the admin panel.
+  const mergedDefaults = DEFAULT_PLAN_CONFIGS.map((def) => {
+    const dbPlan = raw.find((plan) => plan.key === def.key);
+    if (!dbPlan) return def;
+    // Keep the canonical flags when an older PlatformSettings row only knows
+    // about the previous plan shape; the tenant-level override remains the
+    // explicit way to disable a feature for one resort.
+    return {
+      ...def,
+      ...dbPlan,
+      flags: Array.from(new Set([...def.flags, ...(dbPlan.flags ?? [])])),
+    } as PlanConfig;
   });
+  // Preserve admin-created legacy/custom entries that are not in the defaults.
+  const customConfigs = raw.filter((plan) => !DEFAULT_PLAN_CONFIGS.some((def) => def.key === plan.key));
+  return [...mergedDefaults, ...customConfigs];
 }
 
 /** Get a single plan config by key */
@@ -168,6 +210,7 @@ export async function resolveTenantEntitlement(tenantId: string): Promise<Tenant
   const planKey = tenant?.plan ?? 'FREE';
   const planConfig = await getPlanConfig(planKey);
 
+  const propertyLimit = planConfig?.propertyLimit ?? 1;
   const roomLimit = planConfig?.roomLimit ?? 5;
   const staffLimit = planConfig?.staffLimit ?? 2;
   const aiMonthlyTokenCap = planConfig?.aiMonthlyTokenCap ?? 0;
@@ -187,7 +230,7 @@ export async function resolveTenantEntitlement(tenantId: string): Promise<Tenant
     flags[flag] = enabled;
   }
 
-  return { plan: planKey, roomLimit, staffLimit, aiMonthlyTokenCap, flags };
+  return { plan: planKey, propertyLimit, roomLimit, staffLimit, aiMonthlyTokenCap, flags };
 }
 
 /**
@@ -230,6 +273,19 @@ export async function checkRoomLimit(tenantId: string): Promise<{ allowed: boole
   return {
     allowed: current < entitlement.roomLimit,
     limit: entitlement.roomLimit,
+    current,
+  };
+}
+
+/** Check if tenant has reached its property limit. */
+export async function checkPropertyLimit(tenantId: string): Promise<{ allowed: boolean; limit: number; current: number }> {
+  const entitlement = await resolveTenantEntitlement(tenantId);
+  if (entitlement.propertyLimit === -1) return { allowed: true, limit: -1, current: 0 };
+
+  const current = await prisma.property.count({ where: { tenantId } });
+  return {
+    allowed: current < entitlement.propertyLimit,
+    limit: entitlement.propertyLimit,
     current,
   };
 }
