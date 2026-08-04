@@ -37,7 +37,7 @@ function nights(ci: string, co: string) {
 }
 
 const ROOM_STATUS_PILL: Record<string, { bg: string; border: string; text: string; label: string }> = {
-  AVAILABLE:   { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.25)',  text: '#23766a', label: 'Available'   },
+  AVAILABLE:   { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.25)',  text: '#183153', label: 'Available'   },
   OCCUPIED:    { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.25)',  text: '#b89040', label: 'Occupied'    },
   CLEANING:    { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.25)',  text: '#b8724a', label: 'Cleaning'    },
   MAINTENANCE: { bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.2)',   text: '#c43c3c', label: 'Maintenance' },
@@ -48,13 +48,13 @@ const ROOM_STATUS_PILL: Record<string, { bg: string; border: string; text: strin
 function ModalInput({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1.5 block text-[12.5px] font-semibold text-[#18231f]">{label}</label>
+      <label className="mb-1.5 block text-[12.5px] font-semibold text-[#183153]">{label}</label>
       {children}
     </div>
   );
 }
 
-const inputCls = "w-full rounded-[9px] border border-black/[0.07] bg-[#f5f4f1] px-4 py-[10px] text-[13px] text-[#18231f] placeholder:text-[#8aa29a] focus:outline-none focus:ring-1 focus:ring-resort-600/25";
+const inputCls = "w-full rounded-[9px] border border-black/[0.07] bg-[#f5f4f1] px-4 py-[10px] text-[13px] text-[#183153] placeholder:text-[#64748b] focus:outline-none focus:ring-1 focus:ring-resort-600/25";
 
 // ── Check-In Modal ─────────────────────────────────────────────────────────────
 function CheckInModal({ booking, onClose, onSuccess }: { booking: Booking; onClose: () => void; onSuccess: () => void }) {
@@ -81,7 +81,7 @@ function CheckInModal({ booking, onClose, onSuccess }: { booking: Booking; onClo
       <>
         <button onClick={onClose} className="flex-1 rounded-[9px] border px-4 py-[10px] text-[13px] font-medium" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text)' }}>Cancel</button>
         <button onClick={() => mutation.mutate()} disabled={mutation.isPending}
-          className="flex-1 rounded-[9px] px-4 py-[10px] text-[13px] font-medium text-[#dfd9d0] disabled:opacity-60" style={{ background: 'var(--rp-btn-accent)' }}>
+          className="flex-1 rounded-[9px] px-4 py-[10px] text-[13px] font-medium text-[#f8fafc] disabled:opacity-60" style={{ background: 'var(--rp-btn-accent)' }}>
           {mutation.isPending ? 'Checking in…' : 'Confirm Check-In'}
         </button>
       </>
@@ -95,8 +95,8 @@ function CheckInModal({ booking, onClose, onSuccess }: { booking: Booking; onClo
           ['Guests', `${booking.adults} adults${booking.children > 0 ? `, ${booking.children} children` : ''}`],
         ].map(([k, v]) => (
           <div key={k} className="flex justify-between">
-            <span className="text-[#8aa29a]">{k}</span>
-            <span className="font-medium text-[#18231f]">{v}</span>
+            <span className="text-[#64748b]">{k}</span>
+            <span className="font-medium text-[#183153]">{v}</span>
           </div>
         ))}
         {balance > 0 && (
@@ -107,7 +107,7 @@ function CheckInModal({ booking, onClose, onSuccess }: { booking: Booking; onClo
       </div>
       <ModalInput label="Deposit collected (optional)">
         <div className="relative">
-          <Banknote className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa29a]" />
+          <Banknote className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748b]" />
           <input type="number" value={deposit} onChange={e => setDeposit(e.target.value)} placeholder="0" className={`${inputCls} pl-9`} />
         </div>
       </ModalInput>
@@ -150,16 +150,16 @@ function CheckOutModal({ booking, onClose, onSuccess }: { booking: Booking; onCl
       <>
         <button onClick={onClose} className="flex-1 rounded-[9px] border px-4 py-[10px] text-[13px] font-medium" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text)' }}>Cancel</button>
         <button onClick={() => mutation.mutate()} disabled={mutation.isPending}
-          className="flex-1 rounded-[9px] px-4 py-[10px] text-[13px] font-medium text-[#dfd9d0] disabled:opacity-60" style={{ background: 'var(--rp-btn-accent)' }}>
+          className="flex-1 rounded-[9px] px-4 py-[10px] text-[13px] font-medium text-[#f8fafc] disabled:opacity-60" style={{ background: 'var(--rp-btn-accent)' }}>
           {mutation.isPending ? 'Processing…' : 'Confirm Check-Out'}
         </button>
       </>
     }>
       <div className="rounded-[12px] border p-4 space-y-2 text-[13px]" style={{ background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border)' }}>
-        <div className="flex justify-between"><span className="text-[#8aa29a]">Room ({n} nights)</span><span className="text-[#18231f]">{fmt(Number(booking.totalAmount), tenant?.currency)}</span></div>
-        <div className="flex justify-between border-t pt-2 font-semibold" style={{ borderColor: 'var(--rp-border)' }}><span className="text-[#18231f]">Total</span><span className="text-[#18231f]">{fmt(Number(booking.totalAmount), tenant?.currency)}</span></div>
-        <div className="flex justify-between text-[#23766a]"><span>Already paid</span><span>-{fmt(Number(booking.paidAmount), tenant?.currency)}</span></div>
-        <div className={`flex justify-between border-t pt-2 text-[14px] font-bold ${balance > 0 ? 'text-[#c43c3c]' : 'text-[#23766a]'}`} style={{ borderColor: 'var(--rp-border)' }}>
+        <div className="flex justify-between"><span className="text-[#64748b]">Room ({n} nights)</span><span className="text-[#183153]">{fmt(Number(booking.totalAmount), tenant?.currency)}</span></div>
+        <div className="flex justify-between border-t pt-2 font-semibold" style={{ borderColor: 'var(--rp-border)' }}><span className="text-[#183153]">Total</span><span className="text-[#183153]">{fmt(Number(booking.totalAmount), tenant?.currency)}</span></div>
+        <div className="flex justify-between text-[#183153]"><span>Already paid</span><span>-{fmt(Number(booking.paidAmount), tenant?.currency)}</span></div>
+        <div className={`flex justify-between border-t pt-2 text-[14px] font-bold ${balance > 0 ? 'text-[#c43c3c]' : 'text-[#183153]'}`} style={{ borderColor: 'var(--rp-border)' }}>
           <span>Balance due</span><span>{fmt(balance, tenant?.currency)}</span>
         </div>
       </div>
@@ -171,7 +171,7 @@ function CheckOutModal({ booking, onClose, onSuccess }: { booking: Booking; onCl
               <button key={m} onClick={() => setPaymentMethod(m)}
                 className="flex-1 rounded-[8px] border-2 py-[8px] text-[12px] font-semibold transition-all"
                 style={paymentMethod === m
-                  ? { borderColor: '#23766a', background: 'var(--rp-teal-bg)', color: '#23766a' }
+                  ? { borderColor: '#183153', background: 'var(--rp-teal-bg)', color: '#183153' }
                   : { borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-muted)' }}>
                 {m === 'CASH' ? '💵 Cash' : m === 'CARD' ? '💳 Card' : '🏦 Bank'}
               </button>
@@ -230,7 +230,7 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
           <button onClick={onClose} className="flex-1 rounded-[9px] border px-4 py-[10px] text-[13px] font-medium" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text)' }}>Cancel</button>
           <button onClick={() => mutation.mutate()} disabled={mutation.isPending || !form.guestName || !form.roomId}
-            className="flex-1 rounded-[9px] px-4 py-[10px] text-[13px] font-medium text-[#dfd9d0] disabled:opacity-50" style={{ background: 'var(--rp-btn-accent)' }}>
+            className="flex-1 rounded-[9px] px-4 py-[10px] text-[13px] font-medium text-[#f8fafc] disabled:opacity-50" style={{ background: 'var(--rp-btn-accent)' }}>
             {mutation.isPending ? 'Checking in…' : 'Check In Guest'}
           </button>
         </div>
@@ -272,9 +272,9 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
             </select>
           </ModalInput>
           {estimatedTotal > 0 && (
-            <div className="flex justify-between rounded-[10px] border p-3 text-[13px]" style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)' }}>
-              <span className="text-[#23766a]">{n} night{n !== 1 ? 's' : ''} × {fmt(Number(selectedRoom?.basePrice), tenant?.currency)}</span>
-              <span className="font-bold text-[#23766a]">{fmt(estimatedTotal, tenant?.currency)}</span>
+            <div className="flex justify-between rounded-[10px] border p-3 text-[13px]" style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)' }}>
+              <span className="text-[#183153]">{n} night{n !== 1 ? 's' : ''} × {fmt(Number(selectedRoom?.basePrice), tenant?.currency)}</span>
+              <span className="font-bold text-[#183153]">{fmt(estimatedTotal, tenant?.currency)}</span>
             </div>
           )}
           <ModalInput label="Advance payment">
@@ -284,7 +284,7 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
                 <button key={m} onClick={() => set('paymentMethod', m)}
                   className="flex-1 rounded-[8px] border-2 py-[7px] text-[11.5px] font-semibold transition-all"
                   style={form.paymentMethod === m
-                    ? { borderColor: '#23766a', background: 'var(--rp-teal-bg)', color: '#23766a' }
+                    ? { borderColor: '#183153', background: 'var(--rp-teal-bg)', color: '#183153' }
                     : { borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-muted)' }}>
                   {m === 'CASH' ? '💵' : m === 'CARD' ? '💳' : m === 'BANK_TRANSFER' ? '🏦' : '⏳'} {m === 'BANK_TRANSFER' ? 'Bank' : m.charAt(0) + m.slice(1).toLowerCase()}
                 </button>
@@ -311,24 +311,24 @@ function BookingCard({ booking, onCheckIn, onCheckOut }: { booking: Booking; onC
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className="text-[14px] font-semibold text-[#18231f]">{booking.guest.firstName} {booking.guest.lastName}</span>
+            <span className="text-[14px] font-semibold text-[#183153]">{booking.guest.firstName} {booking.guest.lastName}</span>
             {booking.walkIn && (
               <span className="rounded-[6px] border border-[rgba(184,144,64,0.2)] bg-[#f4ecda] px-[8px] py-[3px] text-[10.5px] font-bold text-[#b89040]">Walk-in</span>
             )}
             {booking.source === 'BOOKING_COM' && (
-              <span className="rounded-[6px] bg-[#e3f2ef] px-[8px] py-[3px] text-[10.5px] font-bold text-[#23766a]">Booking.com</span>
+              <span className="rounded-[6px] bg-[#e5f0f7] px-[8px] py-[3px] text-[10.5px] font-bold text-[#183153]">Booking.com</span>
             )}
             {booking.source === 'AIRBNB' && (
               <span className="rounded-[6px] bg-[#fceee4] px-[8px] py-[3px] text-[10.5px] font-bold text-[#b8724a]">Airbnb</span>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-[12.5px] text-[#8aa29a]">
+          <div className="flex flex-wrap items-center gap-3 text-[12.5px] text-[#64748b]">
             <span className="flex items-center gap-1"><BedDouble className="h-3.5 w-3.5" />Room {booking.room.number}</span>
             {booking.guest.phone && <span className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" />{booking.guest.phone}</span>}
             <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{booking.adults + booking.children} guests</span>
             <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{n} night{n !== 1 ? 's' : ''}</span>
           </div>
-          <div className="mt-1.5 flex items-center gap-3 text-[11.5px] text-[#b0c8c2]">
+          <div className="mt-1.5 flex items-center gap-3 text-[11.5px] text-[#b6c9d7]">
             <span>#{booking.confirmationNo}</span>
             <span>{new Date(booking.checkIn).toLocaleDateString()} → {new Date(booking.checkOut).toLocaleDateString()}</span>
           </div>
@@ -338,13 +338,13 @@ function BookingCard({ booking, onCheckIn, onCheckOut }: { booking: Booking; onC
             </div>
           )}
           {booking.specialRequests && (
-            <p className="mt-1.5 text-[11.5px] text-[#b0c8c2] truncate">📝 {booking.specialRequests}</p>
+            <p className="mt-1.5 text-[11.5px] text-[#b6c9d7] truncate">📝 {booking.specialRequests}</p>
           )}
         </div>
         <div className="flex flex-col gap-2 shrink-0">
           {onCheckIn && (
             <button onClick={onCheckIn}
-              className="flex items-center gap-1.5 rounded-[8px] px-[12px] py-[7px] text-[12px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
+              className="flex items-center gap-1.5 rounded-[8px] px-[12px] py-[7px] text-[12px] font-medium text-[#f8fafc] transition-opacity hover:opacity-80"
               style={{ background: 'var(--rp-btn-accent)' }}>
               <LogIn className="h-3.5 w-3.5" /> Check In
             </button>
@@ -370,14 +370,14 @@ function RoomMap({ onCheckIn, onCheckOut }: { onCheckIn: (b: Booking) => void; o
     refetchInterval: 60_000,
   });
 
-  if (isLoading) return <div className="py-16 text-center text-[13px] text-[#8aa29a]">Loading room map…</div>;
+  if (isLoading) return <div className="py-16 text-center text-[13px] text-[#64748b]">Loading room map…</div>;
   const floors = (data as { floors: { floor: number; rooms: RoomMapRoom[] }[] } | undefined)?.floors ?? [];
 
   return (
     <div className="space-y-8">
       {floors.map(({ floor, rooms }) => (
         <div key={floor}>
-          <h3 className="mb-4 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[#8aa29a]">Floor {floor}</h3>
+          <h3 className="mb-4 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[#64748b]">Floor {floor}</h3>
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
             {rooms.map(room => {
               const s = ROOM_STATUS_PILL[room.status] ?? ROOM_STATUS_PILL.AVAILABLE;
@@ -394,7 +394,7 @@ function RoomMap({ onCheckIn, onCheckOut }: { onCheckIn: (b: Booking) => void; o
                   )}
                   {room.booking?.status === 'CONFIRMED' && (
                     <button onClick={() => onCheckIn(room.booking as unknown as Booking)}
-                      className="mt-2 w-full rounded-[7px] py-[5px] text-[11px] font-semibold text-[#dfd9d0] transition-opacity hover:opacity-80"
+                      className="mt-2 w-full rounded-[7px] py-[5px] text-[11px] font-semibold text-[#f8fafc] transition-opacity hover:opacity-80"
                       style={{ background: 'var(--rp-btn-accent)' }}>Check In</button>
                   )}
                   {room.booking?.status === 'CHECKED_IN' && (
@@ -408,7 +408,7 @@ function RoomMap({ onCheckIn, onCheckOut }: { onCheckIn: (b: Booking) => void; o
           </div>
         </div>
       ))}
-      {floors.length === 0 && <div className="py-12 text-center text-[13px] text-[#8aa29a]">No rooms found</div>}
+      {floors.length === 0 && <div className="py-12 text-center text-[13px] text-[#64748b]">No rooms found</div>}
       {/* Legend */}
       <div className="flex flex-wrap gap-2 border-t pt-5" style={{ borderColor: 'var(--rp-border)' }}>
         {Object.entries(ROOM_STATUS_PILL).map(([, s]) => (
@@ -448,7 +448,7 @@ export default function FrontDeskPage() {
   const STAT_CARDS = [
     { label: 'Total Rooms', value: stats?.total,       bg: 'var(--rp-surface-3)', color: 'var(--rp-text)', icon: BedDouble },
     { label: 'Occupied',    value: stats?.occupied,    bg: 'var(--rp-amber-bg)', color: '#b89040', icon: Users     },
-    { label: 'Available',   value: stats?.available,   bg: 'var(--rp-teal-bg)', color: '#23766a', icon: Sparkles  },
+    { label: 'Available',   value: stats?.available,   bg: 'var(--rp-teal-bg)', color: '#183153', icon: Sparkles  },
     { label: 'Cleaning',    value: stats?.cleaning,    bg: 'var(--rp-coral-bg)', color: '#b8724a', icon: Sparkles  },
     { label: 'Maintenance', value: stats?.maintenance, bg: 'var(--rp-red-bg)', color: '#c43c3c', icon: Wrench    },
   ];
@@ -466,7 +466,7 @@ export default function FrontDeskPage() {
 
   if (isLoading) return (
     <div className="flex min-h-[400px] items-center justify-center">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#e3f2ef] border-t-[#23766a]" />
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#e5f0f7] border-t-[#183153]" />
     </div>
   );
 
@@ -502,7 +502,7 @@ export default function FrontDeskPage() {
             </button>
           </div>
           <button onClick={() => setWalkInOpen(true)}
-            className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
+            className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#f8fafc] transition-opacity hover:opacity-80"
             style={{ background: 'var(--rp-btn-accent)' }}>
             <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} /> Walk-In
           </button>
@@ -519,8 +519,8 @@ export default function FrontDeskPage() {
               <Icon className="h-[13px] w-[13px]" strokeWidth={2} style={{ color }} />
             </div>
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.07em] text-[#8aa29a]">{label}</div>
-              <div className="text-[20px] font-semibold leading-none tracking-[-0.02em] text-[#18231f]">{value ?? 0}</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.07em] text-[#64748b]">{label}</div>
+              <div className="text-[20px] font-semibold leading-none tracking-[-0.02em] text-[#183153]">{value ?? 0}</div>
             </div>
           </div>
         ))}
@@ -529,8 +529,8 @@ export default function FrontDeskPage() {
       {/* Arrivals quick-stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: "Today's Arrivals",   value: d?.arrivals.count,   sub: `${d?.arrivals.pending ?? 0} pending`,   bg: '#1b342f', text: '#dfd9d0', sub2: 'var(--rp-text-accent)' },
-          { label: "Today's Departures", value: d?.departures.count, sub: `${d?.departures.pending ?? 0} pending`, bg: '#23766a', text: 'var(--rp-teal-bg)', sub2: '#6a9990' },
+          { label: "Today's Arrivals",   value: d?.arrivals.count,   sub: `${d?.arrivals.pending ?? 0} pending`,   bg: '#183153', text: '#f8fafc', sub2: 'var(--rp-text-accent)' },
+          { label: "Today's Departures", value: d?.departures.count, sub: `${d?.departures.pending ?? 0} pending`, bg: '#183153', text: 'var(--rp-teal-bg)', sub2: '#91adbf' },
           { label: 'Guests In-House',    value: d?.inHouse.count,    sub: `${d?.totalGuests ?? 0} total guests`,  bg: 'var(--rp-amber-bg)', text: 'var(--rp-text)', sub2: 'var(--rp-text-muted)' },
         ].map(({ label, value, sub, bg, text, sub2 }) => (
           <div key={label} className="rounded-[14px] p-5" style={{ background: bg }}>
@@ -545,7 +545,7 @@ export default function FrontDeskPage() {
       {view === 'map' ? (
         <div className="rounded-[14px] border p-6 bg-white dark:bg-white/5"
           style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
-          <h2 className="mb-6 text-[13px] font-semibold text-[#18231f]">Room Map</h2>
+          <h2 className="mb-6 text-[13px] font-semibold text-[#183153]">Room Map</h2>
           <RoomMap onCheckIn={b => setCheckInFor(b)} onCheckOut={b => setCheckOutFor(b)} />
         </div>
       ) : (
@@ -557,12 +557,12 @@ export default function FrontDeskPage() {
               <button key={t.id} onClick={() => setTab(t.id)}
                 className="flex items-center gap-2 border-b-2 px-4 py-4 text-[13px] font-medium transition-colors"
                 style={tab === t.id
-                  ? { borderColor: '#23766a', color: '#23766a' }
+                  ? { borderColor: '#183153', color: '#183153' }
                   : { borderColor: 'transparent', color: 'var(--rp-text-muted)' }}>
                 {t.label}
                 {t.count !== undefined && (
                   <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                    style={tab === t.id ? { background: 'var(--rp-teal-bg)', color: '#23766a' } : { background: 'var(--rp-surface-3)', color: 'var(--rp-text-muted)' }}>
+                    style={tab === t.id ? { background: 'var(--rp-teal-bg)', color: '#183153' } : { background: 'var(--rp-surface-3)', color: 'var(--rp-text-muted)' }}>
                     {t.count}
                   </span>
                 )}
@@ -578,9 +578,9 @@ export default function FrontDeskPage() {
             {(currentBookings?.length ?? 0) === 0 ? (
               <div className="flex flex-col items-center gap-2 py-14 text-center">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#f5f4f1]">
-                  <BedDouble className="h-6 w-6 text-[#c5bdb4]" />
+                  <BedDouble className="h-6 w-6 text-[#94a3b8]" />
                 </div>
-                <p className="text-[13px] text-[#8aa29a]">
+                <p className="text-[13px] text-[#64748b]">
                   {tab === 'arrivals' ? 'No arrivals today' : tab === 'departures' ? 'No departures today' : 'No guests currently in-house'}
                 </p>
               </div>

@@ -22,7 +22,7 @@ const PRIORITY_META: Record<string, { bg: string; border: string; text: string }
 };
 
 const STATUS_META: Record<string, { bg: string; border: string; text: string; label: string }> = {
-  OPEN:        { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Open' },
+  OPEN:        { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153', label: 'Open' },
   IN_PROGRESS: { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'In Progress' },
   RESOLVED:    { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)', label: 'Resolved' },
   CLOSED:      { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-faint)', label: 'Closed' },
@@ -30,8 +30,8 @@ const STATUS_META: Record<string, { bg: string; border: string; text: string; la
 
 const SOURCE_META: Record<string, { label: string; icon: string; bg: string; text: string; border: string }> = {
   WEB:      { label: 'Web',      icon: '🌐', bg: 'var(--rp-surface-3)', text: 'var(--rp-text-muted)',  border: 'var(--rp-border-md)' },
-  TELEGRAM: { label: 'Telegram', icon: '✈️', bg: 'var(--rp-teal-bg)', text: '#23766a',  border: 'rgba(35,118,106,0.2)' },
-  WHATSAPP: { label: 'WhatsApp', icon: '💬', bg: 'var(--rp-teal-bg)', text: 'var(--rp-text-accent)',  border: 'rgba(35,118,106,0.15)' },
+  TELEGRAM: { label: 'Telegram', icon: '✈️', bg: 'var(--rp-teal-bg)', text: '#183153',  border: 'rgba(24,49,83,0.2)' },
+  WHATSAPP: { label: 'WhatsApp', icon: '💬', bg: 'var(--rp-teal-bg)', text: 'var(--rp-text-accent)',  border: 'rgba(24,49,83,0.15)' },
 };
 
 function StatusPill({ status }: { status: string }) {
@@ -42,9 +42,9 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
-const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30';
-const labelCls = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
-const codeCls  = 'rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-2 font-mono text-[12px] text-[#18231f]';
+const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
+const labelCls = 'block text-[11.5px] font-medium text-[#64748b] mb-1.5';
+const codeCls  = 'rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-2 font-mono text-[12px] text-[#183153]';
 
 // ── Channel Settings Modal ────────────────────────────────────────────────────
 function ChannelSettingsModal({ onClose }: { onClose: () => void }) {
@@ -105,7 +105,7 @@ function ChannelSettingsModal({ onClose }: { onClose: () => void }) {
             <button key={t} onClick={() => setTab(t)}
               className="flex-1 py-3 text-[13px] font-medium transition-colors"
               style={tab === t
-                ? { borderBottom: '2px solid #23766a', color: '#23766a' }
+                ? { borderBottom: '2px solid #183153', color: '#183153' }
                 : { color: 'var(--rp-text-muted)' }}>
               {t === 'telegram' ? '✈️ Telegram' : '💬 WhatsApp'}
             </button>
@@ -117,9 +117,9 @@ function ChannelSettingsModal({ onClose }: { onClose: () => void }) {
             <>
               {/* How it works */}
               <div className="rounded-[12px] border px-4 py-3 space-y-1"
-                style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)' }}>
-                <p className="text-[12.5px] font-semibold" style={{ color: '#1b342f' }}>How it works</p>
-                <ol className="list-decimal list-inside space-y-1 text-[12px]" style={{ color: '#23766a' }}>
+                style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)' }}>
+                <p className="text-[12.5px] font-semibold" style={{ color: '#183153' }}>How it works</p>
+                <ol className="list-decimal list-inside space-y-1 text-[12px]" style={{ color: '#183153' }}>
                   <li>Create a Telegram bot via <strong>@BotFather</strong> → <code>/newbot</code></li>
                   <li>Copy the bot token and paste below</li>
                   <li>Guests message your bot → tickets auto-created here</li>
@@ -129,10 +129,10 @@ function ChannelSettingsModal({ onClose }: { onClose: () => void }) {
 
               {tgInfo?.configured ? (
                 <div className="rounded-[12px] border p-4 space-y-3"
-                  style={{ background: 'var(--rp-teal-soft)', borderColor: 'rgba(35,118,106,0.2)' }}>
+                  style={{ background: 'var(--rp-teal-soft)', borderColor: 'rgba(24,49,83,0.2)' }}>
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: '#23766a' }} />
-                    <p className="text-[13px] font-semibold" style={{ color: '#1b342f' }}>Telegram connected</p>
+                    <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: '#183153' }} />
+                    <p className="text-[13px] font-semibold" style={{ color: '#183153' }}>Telegram connected</p>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-[12.5px]">
@@ -140,12 +140,12 @@ function ChannelSettingsModal({ onClose }: { onClose: () => void }) {
                       <code style={{ color: 'var(--rp-text)' }}>{tgInfo.tokenMasked}</code>
                     </div>
                     <div className="flex items-center justify-between gap-2 text-[12.5px]">
-                      <span className="shrink-0 text-[#8aa29a] dark:text-[#94b8b0]">Webhook URL</span>
+                      <span className="shrink-0 text-[#64748b] dark:text-[#a9c1d0]">Webhook URL</span>
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <code className="truncate max-w-[200px] text-[#18231f] dark:text-[#dfd9d0]">{tgInfo.webhookUrl}</code>
+                        <code className="truncate max-w-[200px] text-[#183153] dark:text-[#f8fafc]">{tgInfo.webhookUrl}</code>
                         <button onClick={() => handleCopy(tgInfo.webhookUrl, 'tg-url')}
-                          className="shrink-0 transition-colors hover:opacity-70 text-[#8aa29a] dark:text-[#94b8b0]">
-                          {copied === 'tg-url' ? <Check className="h-3.5 w-3.5" style={{ color: '#23766a' }} /> : <Copy className="h-3.5 w-3.5" />}
+                          className="shrink-0 transition-colors hover:opacity-70 text-[#64748b] dark:text-[#a9c1d0]">
+                          {copied === 'tg-url' ? <Check className="h-3.5 w-3.5" style={{ color: '#183153' }} /> : <Copy className="h-3.5 w-3.5" />}
                         </button>
                       </div>
                     </div>
@@ -169,14 +169,14 @@ function ChannelSettingsModal({ onClose }: { onClose: () => void }) {
                     <input value={botToken} onChange={(e) => setBotToken(e.target.value)}
                       placeholder="123456789:ABCdefGHIjklMNOpqrSTUvwxYZ"
                       className={inputCls + ' font-mono'} />
-                    <p className="mt-1 text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">Get from @BotFather on Telegram</p>
+                    <p className="mt-1 text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">Get from @BotFather on Telegram</p>
                   </div>
                   <div>
                     <label className={labelCls}>Staff Notification Chat ID <span style={{ color: 'var(--rp-text-faint)' }}>(optional)</span></label>
                     <input value={notifChatId} onChange={(e) => setNotifChatId(e.target.value)}
                       placeholder="-100123456789 (group/channel chat_id)"
                       className={inputCls + ' font-mono'} />
-                    <p className="mt-1 text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">New tickets will be announced here. Add bot to group first.</p>
+                    <p className="mt-1 text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">New tickets will be announced here. Add bot to group first.</p>
                   </div>
                   <button onClick={() => saveTelegram.mutate()} disabled={saveTelegram.isPending || !botToken}
                     className="w-full flex items-center justify-center gap-2 rounded-[9px] py-2.5 text-[13px] font-medium transition-colors disabled:opacity-50"
@@ -192,9 +192,9 @@ function ChannelSettingsModal({ onClose }: { onClose: () => void }) {
           {tab === 'whatsapp' && (
             <>
               <div className="rounded-[12px] border px-4 py-3 space-y-1"
-                style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)' }}>
-                <p className="text-[12.5px] font-semibold" style={{ color: '#1b342f' }}>How it works</p>
-                <ol className="list-decimal list-inside space-y-1 text-[12px]" style={{ color: '#23766a' }}>
+                style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)' }}>
+                <p className="text-[12.5px] font-semibold" style={{ color: '#183153' }}>How it works</p>
+                <ol className="list-decimal list-inside space-y-1 text-[12px]" style={{ color: '#183153' }}>
                   <li>Configure WhatsApp Business API in <strong>Tenant Settings</strong></li>
                   <li>Register the webhook URL below in <strong>Meta Business Manager</strong></li>
                   <li>Use the verify token shown to validate the webhook</li>
@@ -204,12 +204,12 @@ function ChannelSettingsModal({ onClose }: { onClose: () => void }) {
 
               {waInfo?.configured ? (
                 <div className="rounded-[12px] border p-4 space-y-2"
-                  style={{ background: 'var(--rp-teal-soft)', borderColor: 'rgba(35,118,106,0.2)' }}>
+                  style={{ background: 'var(--rp-teal-soft)', borderColor: 'rgba(24,49,83,0.2)' }}>
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: '#23766a' }} />
-                    <p className="text-[13px] font-semibold" style={{ color: '#1b342f' }}>WhatsApp connected</p>
+                    <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: '#183153' }} />
+                    <p className="text-[13px] font-semibold" style={{ color: '#183153' }}>WhatsApp connected</p>
                   </div>
-                  <p className="text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">
+                  <p className="text-[12px] text-[#64748b] dark:text-[#a9c1d0]">
                     Phone Number ID: <code style={{ color: 'var(--rp-text)' }}>{waInfo.phoneNumberId}</code>
                   </p>
                 </div>
@@ -226,27 +226,27 @@ function ChannelSettingsModal({ onClose }: { onClose: () => void }) {
               {waInfo && (
                 <div className="space-y-3">
                   <div>
-                    <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] mb-1.5">Webhook URL</p>
+                    <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] mb-1.5">Webhook URL</p>
                     <div className={codeCls + ' flex items-center gap-2'}>
                       <span className="flex-1 truncate">{waInfo.webhookUrl}</span>
                       <button onClick={() => handleCopy(waInfo.webhookUrl, 'wa-url')}
-                        className="shrink-0 transition-colors hover:opacity-70 text-[#8aa29a] dark:text-[#94b8b0]">
-                        {copied === 'wa-url' ? <Check className="h-3.5 w-3.5" style={{ color: '#23766a' }} /> : <Copy className="h-3.5 w-3.5" />}
+                        className="shrink-0 transition-colors hover:opacity-70 text-[#64748b] dark:text-[#a9c1d0]">
+                        {copied === 'wa-url' ? <Check className="h-3.5 w-3.5" style={{ color: '#183153' }} /> : <Copy className="h-3.5 w-3.5" />}
                       </button>
                     </div>
                   </div>
                   <div>
-                    <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] mb-1.5">Verify Token</p>
+                    <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] mb-1.5">Verify Token</p>
                     <div className={codeCls + ' flex items-center gap-2'}>
                       <span className="flex-1">{waInfo.verifyToken}</span>
                       <button onClick={() => handleCopy(waInfo.verifyToken, 'wa-token')}
-                        className="shrink-0 transition-colors hover:opacity-70 text-[#8aa29a] dark:text-[#94b8b0]">
-                        {copied === 'wa-token' ? <Check className="h-3.5 w-3.5" style={{ color: '#23766a' }} /> : <Copy className="h-3.5 w-3.5" />}
+                        className="shrink-0 transition-colors hover:opacity-70 text-[#64748b] dark:text-[#a9c1d0]">
+                        {copied === 'wa-token' ? <Check className="h-3.5 w-3.5" style={{ color: '#183153' }} /> : <Copy className="h-3.5 w-3.5" />}
                       </button>
                     </div>
                   </div>
                   <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-[12.5px] font-medium hover:underline" style={{ color: '#23766a' }}>
+                    className="flex items-center gap-1.5 text-[12.5px] font-medium hover:underline" style={{ color: '#183153' }}>
                     <ExternalLink className="h-3.5 w-3.5" /> Open Meta Business Manager
                   </a>
                 </div>
@@ -346,9 +346,9 @@ export default function SupportPage() {
             <div className="flex flex-col items-center justify-center py-16 rounded-[14px] border bg-white gap-3"
               style={{ borderColor: 'var(--rp-border)' }}>
               <div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'var(--rp-teal-bg)' }}>
-                <Ticket className="h-7 w-7" style={{ color: '#23766a' }} />
+                <Ticket className="h-7 w-7" style={{ color: '#183153' }} />
               </div>
-              <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No tickets found</p>
+              <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">No tickets found</p>
             </div>
           ) : (
             tickets.map((ticket) => {
@@ -359,8 +359,8 @@ export default function SupportPage() {
                 <div key={ticket.id}
                   className="rounded-[14px] border bg-white p-4 cursor-pointer transition-all hover:shadow-md"
                   style={{
-                    borderColor: isActive ? '#23766a' : 'var(--rp-border)',
-                    boxShadow: isActive ? '0 0 0 2px rgba(35,118,106,0.2)' : '0 1px 6px rgba(0,0,0,0.04)',
+                    borderColor: isActive ? '#183153' : 'var(--rp-border)',
+                    boxShadow: isActive ? '0 0 0 2px rgba(24,49,83,0.2)' : '0 1px 6px rgba(0,0,0,0.04)',
                   }}
                   onClick={() => setSelected(ticket)}>
                   <div className="flex items-start justify-between gap-2">
@@ -373,8 +373,8 @@ export default function SupportPage() {
                           </span>
                         )}
                       </div>
-                      <p className="text-[13px] font-semibold truncate text-[#18231f] dark:text-[#dfd9d0]">{ticket.title}</p>
-                      <p className="text-[11.5px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">
+                      <p className="text-[13px] font-semibold truncate text-[#183153] dark:text-[#f8fafc]">{ticket.title}</p>
+                      <p className="text-[11.5px] mt-0.5 text-[#64748b] dark:text-[#a9c1d0]">
                         {ticket.guest ? `${ticket.guest.firstName} ${ticket.guest.lastName}` : 'Internal'} · {formatDateTime(ticket.createdAt)}
                       </p>
                     </div>
@@ -387,7 +387,7 @@ export default function SupportPage() {
                     </div>
                   </div>
                   {(ticket._count?.messages || 0) > 0 && (
-                    <div className="mt-2 flex items-center gap-1 text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+                    <div className="mt-2 flex items-center gap-1 text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">
                       <MessageSquare className="h-3 w-3" />
                       {ticket._count?.messages} message{(ticket._count?.messages || 0) !== 1 ? 's' : ''}
                     </div>
@@ -404,9 +404,9 @@ export default function SupportPage() {
             <div className="flex flex-col items-center justify-center h-64 rounded-[14px] border bg-white gap-3"
               style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
               <div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'var(--rp-teal-bg)' }}>
-                <MessageSquare className="h-7 w-7" style={{ color: '#23766a' }} />
+                <MessageSquare className="h-7 w-7" style={{ color: '#183153' }} />
               </div>
-              <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">Select a ticket to view details</p>
+              <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Select a ticket to view details</p>
             </div>
           ) : (
             <div className="flex flex-col rounded-[14px] border bg-white overflow-hidden"
@@ -417,7 +417,7 @@ export default function SupportPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                      <h2 className="text-[15px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">
+                      <h2 className="text-[15px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                         {detail?.title || selected.title}
                       </h2>
                       <span className="rounded-[6px] border px-[7px] py-[2px] text-[10.5px] font-semibold"
@@ -425,9 +425,9 @@ export default function SupportPage() {
                         {srcCfg.icon} {srcCfg.label}
                       </span>
                     </div>
-                    <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">{detail?.description || selected.description}</p>
+                    <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">{detail?.description || selected.description}</p>
                     {detail?.externalChatId && (
-                      <p className="mt-1 text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">
+                      <p className="mt-1 text-[12px] text-[#64748b] dark:text-[#a9c1d0]">
                         {sel?.source === 'TELEGRAM' ? '🆔 Chat ID: ' : '📱 Phone: '}
                         <code style={{ color: 'var(--rp-text)' }}>{detail.externalChatId}</code>
                       </p>
@@ -455,7 +455,7 @@ export default function SupportPage() {
               {/* Messages */}
               <div className="flex-1 space-y-3 overflow-y-auto max-h-72 p-4">
                 {detail?.messages?.length === 0 ? (
-                  <p className="text-center text-[12.5px] py-8 text-[#8aa29a] dark:text-[#94b8b0]">No messages yet</p>
+                  <p className="text-center text-[12.5px] py-8 text-[#64748b] dark:text-[#a9c1d0]">No messages yet</p>
                 ) : (
                   detail?.messages?.map((msg: Record<string, unknown>) => (
                     <div key={msg.id as string} className={`flex gap-2 ${msg.senderType === 'STAFF' ? 'flex-row-reverse' : ''}`}>
@@ -498,7 +498,7 @@ export default function SupportPage() {
                       sel?.source === 'WHATSAPP' ? 'Reply via WhatsApp…' :
                       'Type a message…'
                     }
-                    className="flex-1 rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30"
+                    className="flex-1 rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30"
                   />
                   <button
                     onClick={() => newMessage.trim() && sendMessage.mutate()}

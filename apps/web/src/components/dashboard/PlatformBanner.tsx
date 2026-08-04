@@ -20,9 +20,9 @@ const TYPE_STYLE: Record<string, {
 }> = {
   info: {
     icon: Info,
-    iconBg: 'var(--rp-teal-bg)', iconColor: '#23766a',
-    bg: 'var(--rp-teal-soft)', border: 'rgba(35,118,106,0.18)',
-    titleColor: '#1b342f', bodyColor: 'var(--rp-text-accent)',
+    iconBg: 'var(--rp-teal-bg)', iconColor: '#183153',
+    bg: 'var(--rp-teal-soft)', border: 'rgba(24,49,83,0.18)',
+    titleColor: '#183153', bodyColor: 'var(--rp-text-accent)',
   },
   warning: {
     icon: AlertTriangle,
@@ -38,9 +38,9 @@ const TYPE_STYLE: Record<string, {
   },
   feature: {
     icon: Sparkles,
-    iconBg: '#1b342f', iconColor: '#dfd9d0',
-    bg: '#f0f6f5', border: 'rgba(27,52,47,0.15)',
-    titleColor: '#1b342f', bodyColor: 'var(--rp-text-accent)',
+    iconBg: '#183153', iconColor: '#f8fafc',
+    bg: '#f2f7fb', border: 'rgba(24,49,83,0.15)',
+    titleColor: '#183153', bodyColor: 'var(--rp-text-accent)',
   },
 };
 

@@ -12,9 +12,9 @@ import { ImageUpload } from '@/components/ui/ImageUpload';
 
 const ROLE_CONFIG: Record<string, { label: string; bg: string; border: string; text: string }> = {
   OWNER:        { label: 'Owner',        bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.25)',   text: '#b89040' },
-  MANAGER:      { label: 'Manager',      bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',    text: '#23766a' },
+  MANAGER:      { label: 'Manager',      bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',    text: '#183153' },
   SHAREHOLDER:  { label: 'Shareholder',  bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.25)',   text: '#b89040' },
-  RECEPTIONIST: { label: 'Receptionist', bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',    text: '#23766a' },
+  RECEPTIONIST: { label: 'Receptionist', bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',    text: '#183153' },
   MARKETER:     { label: 'Marketer',     bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',    text: '#b8724a' },
   DEVELOPER:    { label: 'Developer',    bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',         text: 'var(--rp-text-subtle)' },
   STAFF:        { label: 'Staff',        bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',    text: '#b8724a' },
@@ -22,8 +22,8 @@ const ROLE_CONFIG: Record<string, { label: string; bg: string; border: string; t
 };
 
 const AVATAR_COLORS = [
-  { bg: '#23766a', id: 'teal' },
-  { bg: '#1b342f', id: 'dark' },
+  { bg: '#183153', id: 'teal' },
+  { bg: '#183153', id: 'dark' },
   { bg: '#d4a853', id: 'gold' },
   { bg: '#b8724a', id: 'coral' },
   { bg: 'var(--rp-text-accent)', id: 'sage' },
@@ -34,8 +34,8 @@ function getInitials(first: string, last: string) {
   return `${first[0] ?? ''}${last[0] ?? ''}`.toUpperCase();
 }
 
-const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#8aa29a] focus:outline-none focus:ring-1 focus:ring-resort-600/20 transition-colors';
-const labelCls = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#64748b] focus:outline-none focus:ring-1 focus:ring-resort-600/20 transition-colors';
+const labelCls = 'block text-[11.5px] font-medium text-[#64748b] mb-1.5';
 const cardCls  = 'rounded-[14px] border bg-white p-6 space-y-5';
 const cardStyle = { borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' };
 
@@ -48,7 +48,7 @@ export default function ProfilePage() {
   const [lastName,     setLastName]     = useState(user?.lastName ?? '');
   const [phone,        setPhone]        = useState(user?.phone ?? '');
   const [avatarUrl,    setAvatarUrl]    = useState(user?.avatarUrl ?? '');
-  const [avatarColor,  setAvatarColor]  = useState('#23766a');
+  const [avatarColor,  setAvatarColor]  = useState('#183153');
   const [savingProfile, setSavingProfile] = useState(false);
 
   useEffect(() => {
@@ -161,10 +161,10 @@ export default function ProfilePage() {
           )}
 
           <div className="flex-1 min-w-0">
-            <h2 className="text-[16px] font-semibold text-[#18231f] truncate">
+            <h2 className="text-[16px] font-semibold text-[#183153] truncate">
               {user?.firstName} {user?.lastName}
             </h2>
-            <p className="text-[13px] text-[#8aa29a] truncate mt-[1px]">{user?.email}</p>
+            <p className="text-[13px] text-[#64748b] truncate mt-[1px]">{user?.email}</p>
             <div className="mt-2">
               <span className="inline-flex items-center gap-1.5 rounded-[7px] border px-[10px] py-[4px] text-[11px] font-semibold"
                 style={{ background: roleConf.bg, borderColor: roleConf.border, color: roleConf.text }}>
@@ -179,7 +179,7 @@ export default function ProfilePage() {
 
         {/* Photo upload */}
         <div className="rounded-[10px] p-4 space-y-3" style={{ background: 'var(--rp-surface-2)', border: '1px solid rgba(0,0,0,0.04)' }}>
-          <p className="text-[11.5px] font-medium text-[#6b8880]">Profile photo</p>
+          <p className="text-[11.5px] font-medium text-[#64748b]">Profile photo</p>
           <ImageUpload
             value={avatarUrl || null}
             onChange={url => setAvatarUrl(url ?? '')}
@@ -191,7 +191,7 @@ export default function ProfilePage() {
           />
           {!avatarUrl && (
             <div>
-              <p className="text-[11px] text-[#8aa29a] mb-2">Or pick an avatar color</p>
+              <p className="text-[11px] text-[#64748b] mb-2">Or pick an avatar color</p>
               <div className="flex gap-2">
                 {AVATAR_COLORS.map(c => (
                   <button
@@ -216,9 +216,9 @@ export default function ProfilePage() {
       <div className={cardCls} style={cardStyle}>
         <div className="flex items-center gap-2">
           <div className="flex h-[30px] w-[30px] items-center justify-center rounded-[8px]" style={{ background: 'var(--rp-teal-bg)' }}>
-            <User className="h-[13px] w-[13px]" style={{ color: '#23766a' }} />
+            <User className="h-[13px] w-[13px]" style={{ color: '#183153' }} />
           </div>
-          <h3 className="text-[14px] font-semibold text-[#18231f]">Personal Information</h3>
+          <h3 className="text-[14px] font-semibold text-[#183153]">Personal Information</h3>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -235,20 +235,20 @@ export default function ProfilePage() {
         <div>
           <label className={labelCls}>Email address</label>
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 h-[13px] w-[13px] -translate-y-1/2 text-[#c5bdb4]" />
+            <Mail className="absolute left-3 top-1/2 h-[13px] w-[13px] -translate-y-1/2 text-[#94a3b8]" />
             <input
               value={user?.email ?? ''}
               disabled
-              className="w-full rounded-[8px] border border-black/5 bg-[#f0ede8] pl-9 pr-4 py-[9px] text-[13px] text-[#8aa29a] cursor-not-allowed"
+              className="w-full rounded-[8px] border border-black/5 bg-[#f0ede8] pl-9 pr-4 py-[9px] text-[13px] text-[#64748b] cursor-not-allowed"
             />
           </div>
-          <p className="mt-1 text-[11.5px] text-[#8aa29a]">Email cannot be changed. Contact support if needed.</p>
+          <p className="mt-1 text-[11.5px] text-[#64748b]">Email cannot be changed. Contact support if needed.</p>
         </div>
 
         <div>
           <label className={labelCls}>Phone number</label>
           <div className="relative">
-            <Phone className="absolute left-3 top-1/2 h-[13px] w-[13px] -translate-y-1/2 text-[#c5bdb4]" />
+            <Phone className="absolute left-3 top-1/2 h-[13px] w-[13px] -translate-y-1/2 text-[#94a3b8]" />
             <input
               className={inputCls + ' pl-9'}
               value={phone}
@@ -262,7 +262,7 @@ export default function ProfilePage() {
           <button
             onClick={handleSaveProfile}
             disabled={savingProfile}
-            className="flex items-center gap-1.5 rounded-[9px] px-5 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-[9px] px-5 py-[9px] text-[13px] font-medium text-[#f8fafc] transition-opacity hover:opacity-80 disabled:opacity-50"
             style={{ background: 'var(--rp-btn-accent)' }}
           >
             {savingProfile ? 'Saving…' : 'Save Changes'}
@@ -276,7 +276,7 @@ export default function ProfilePage() {
           <div className="flex h-[30px] w-[30px] items-center justify-center rounded-[8px]" style={{ background: 'var(--rp-amber-bg)' }}>
             <Lock className="h-[13px] w-[13px]" style={{ color: '#b89040' }} />
           </div>
-          <h3 className="text-[14px] font-semibold text-[#18231f]">Change Password</h3>
+          <h3 className="text-[14px] font-semibold text-[#183153]">Change Password</h3>
         </div>
 
         <div>
@@ -292,7 +292,7 @@ export default function ProfilePage() {
             <button
               type="button"
               onClick={() => setShowCurrent(v => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#c5bdb4] hover:text-[#8aa29a]"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94a3b8] hover:text-[#64748b]"
             >
               {showCurrent ? <EyeOff className="h-[14px] w-[14px]" /> : <Eye className="h-[14px] w-[14px]" />}
             </button>
@@ -312,7 +312,7 @@ export default function ProfilePage() {
             <button
               type="button"
               onClick={() => setShowNew(v => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#c5bdb4] hover:text-[#8aa29a]"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94a3b8] hover:text-[#64748b]"
             >
               {showNew ? <EyeOff className="h-[14px] w-[14px]" /> : <Eye className="h-[14px] w-[14px]" />}
             </button>
@@ -325,7 +325,7 @@ export default function ProfilePage() {
                   <div key={i} className="h-1 flex-1 rounded-full transition-colors"
                     style={{
                       background: i < pwdStrength
-                        ? pwdStrength === 1 ? '#f87171' : pwdStrength === 2 ? '#d4a853' : '#23766a'
+                        ? pwdStrength === 1 ? '#f87171' : pwdStrength === 2 ? '#d4a853' : '#183153'
                         : '#e8e4dd',
                     }}
                   />
@@ -338,9 +338,9 @@ export default function ProfilePage() {
                   { check: pwdChecks.number,    label: 'One number' },
                 ].map(({ check, label }) => (
                   <p key={label} className="flex items-center gap-1.5 text-[12px]"
-                    style={{ color: check ? '#23766a' : 'var(--rp-text-muted)' }}>
+                    style={{ color: check ? '#183153' : 'var(--rp-text-muted)' }}>
                     <CheckCircle2 className="h-[11px] w-[11px]"
-                      style={{ color: check ? '#23766a' : 'var(--rp-text-faint)' }} />
+                      style={{ color: check ? '#183153' : 'var(--rp-text-faint)' }} />
                     {label}
                   </p>
                 ))}
@@ -360,7 +360,7 @@ export default function ProfilePage() {
             style={confirmPwd && confirmPwd !== newPwd
               ? { borderColor: '#f87171', boxShadow: '0 0 0 2px rgba(248,113,113,0.2)' }
               : confirmPwd && confirmPwd === newPwd && newPwd
-              ? { borderColor: '#23766a', boxShadow: '0 0 0 2px rgba(35,118,106,0.15)' }
+              ? { borderColor: '#183153', boxShadow: '0 0 0 2px rgba(24,49,83,0.15)' }
               : {}}
           />
           {confirmPwd && confirmPwd !== newPwd && (
@@ -369,12 +369,12 @@ export default function ProfilePage() {
         </div>
 
         <div className="flex items-center justify-between gap-4 pt-1">
-          <p className="text-[11.5px] text-[#8aa29a]">Changing your password signs you out on other devices.</p>
+          <p className="text-[11.5px] text-[#64748b]">Changing your password signs you out on other devices.</p>
           <button
             onClick={handleChangePassword}
             disabled={savingPwd || !currentPwd || !newPwd || !confirmPwd}
             className="shrink-0 flex items-center gap-1.5 rounded-[9px] border px-5 py-[8px] text-[13px] font-medium transition-colors disabled:opacity-40"
-            style={{ borderColor: 'rgba(35,118,106,0.3)', color: '#23766a', background: 'var(--rp-teal-bg)' }}
+            style={{ borderColor: 'rgba(24,49,83,0.3)', color: '#183153', background: 'var(--rp-teal-bg)' }}
           >
             {savingPwd ? 'Changing…' : 'Change Password'}
           </button>

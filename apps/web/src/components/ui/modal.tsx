@@ -33,18 +33,18 @@ export function Modal({ open, onClose, title, description, children, className }
 
   return createPortal(
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(27,52,47,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(24,49,83,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
         className={`relative w-full max-w-lg max-h-[90vh] flex flex-col rounded-[18px] bg-white shadow-2xl overflow-hidden ${className ?? ''}`}
-        style={{ boxShadow: '0 24px 64px rgba(27,52,47,0.28)' }}
+        style={{ boxShadow: '0 24px 64px rgba(24,49,83,0.28)' }}
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-start justify-between px-6 py-4 shrink-0"
           style={{ background: 'var(--rp-btn-accent)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <div>
-            <h2 className="font-display text-[17px] font-medium text-[#dfd9d0]">{title}</h2>
+            <h2 className="font-display text-[17px] font-medium text-[#f8fafc]">{title}</h2>
             {description && <p className="mt-0.5 text-[12.5px]" style={{ color: 'rgba(255,255,255,0.45)' }}>{description}</p>}
           </div>
           <button onClick={onClose}
@@ -86,14 +86,14 @@ export function ConfirmModal({ open, onClose, onConfirm, title, description, con
 
   return createPortal(
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(27,52,47,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(24,49,83,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="w-full max-w-sm rounded-[18px] bg-white overflow-hidden"
-        style={{ boxShadow: '0 24px 64px rgba(27,52,47,0.28)' }}
+        style={{ boxShadow: '0 24px 64px rgba(24,49,83,0.28)' }}
         onClick={e => e.stopPropagation()}>
         <div className="px-6 py-4" style={{ background: 'var(--rp-btn-accent)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <h2 className="font-display text-[17px] font-medium text-[#dfd9d0]">{title}</h2>
+          <h2 className="font-display text-[17px] font-medium text-[#f8fafc]">{title}</h2>
         </div>
         <div className="px-6 pt-5 pb-6">
           <p className="text-[13.5px]" style={{ color: 'var(--rp-text-accent)' }}>{description}</p>

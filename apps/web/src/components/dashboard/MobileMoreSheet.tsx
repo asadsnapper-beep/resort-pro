@@ -57,11 +57,11 @@ export function MobileMoreSheet({ open, onClose }: { open: boolean; onClose: () 
         <div className="flex items-center justify-between px-5 pb-2 pt-3">
           <div>
             <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-black/15 dark:bg-white/20" />
-            <p className="text-[15px] font-bold text-[#18231f] dark:text-[#dfd9d0]">{tenant?.name ?? 'Menu'}</p>
-            <p className="text-[11.5px] text-[#8aa29a]">{user?.firstName} {user?.lastName} · {user?.role?.toLowerCase()}</p>
+            <p className="text-[15px] font-bold text-[#183153] dark:text-[#f8fafc]">{tenant?.name ?? 'Menu'}</p>
+            <p className="text-[11.5px] text-[#64748b]">{user?.firstName} {user?.lastName} · {user?.role?.toLowerCase()}</p>
           </div>
           <button onClick={onClose} aria-label="Close menu"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-black/5 text-[#4a6e66] dark:bg-white/10 dark:text-[#94b8b0]">
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-black/5 text-[#475569] dark:bg-white/10 dark:text-[#a9c1d0]">
             <X className="h-4.5 w-4.5" />
           </button>
         </div>
@@ -70,7 +70,7 @@ export function MobileMoreSheet({ open, onClose }: { open: boolean; onClose: () 
         <div className="flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+16px)]">
           {Object.entries(groups).map(([group, items]) => (
             <div key={group} className="mb-4">
-              <p className="mb-1.5 px-1 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[#8aa29a]">{group}</p>
+              <p className="mb-1.5 px-1 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[#64748b]">{group}</p>
               <div className="grid grid-cols-3 gap-2">
                 {items.map(({ href, labelKey, labelFallback, icon: Icon }) => {
                   const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
@@ -78,11 +78,11 @@ export function MobileMoreSheet({ open, onClose }: { open: boolean; onClose: () 
                     <button key={href} onClick={() => go(href)}
                       className="flex flex-col items-center gap-1.5 rounded-[12px] border p-3 text-center transition-colors"
                       style={active
-                        ? { background: 'var(--rp-teal-bg, #e7f2ef)', borderColor: 'rgba(35,118,106,0.3)' }
+                        ? { background: 'var(--rp-teal-bg, #e5f0f7)', borderColor: 'rgba(24,49,83,0.3)' }
                         : { background: 'white', borderColor: 'rgba(0,0,0,0.06)' }}>
-                      <Icon className="h-5 w-5" style={{ color: active ? '#23766a' : '#6b8880' }} />
+                      <Icon className="h-5 w-5" style={{ color: active ? '#183153' : '#64748b' }} />
                       <span className="text-[11px] font-medium leading-tight"
-                        style={{ color: active ? '#23766a' : '#3f4a47' }}>
+                        style={{ color: active ? '#183153' : '#475569' }}>
                         {label(labelKey, labelFallback)}
                       </span>
                     </button>

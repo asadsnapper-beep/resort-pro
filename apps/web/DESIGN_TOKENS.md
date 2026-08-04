@@ -41,11 +41,11 @@ of a `light dark:` pair.
 ### Text
 | Token | Light | Dark |
 |---|---|---|
-| `rp-text` | `#18231f` | `#dfd9d0` |
-| `rp-muted` | `#8aa29a` | `#94b8b0` |
-| `rp-subtle` | `#6b8880` | `#94b8b0` |
-| `rp-faint` | `#c5bdb4` | `#6e8580` |
-| `rp-accent` | `#4a6e66` | `#6d9990` |
+| `rp-text` | `#183153` | `#f8fafc` |
+| `rp-muted` | `#64748b` | `#a9c1d0` |
+| `rp-subtle` | `#64748b` | `#a9c1d0` |
+| `rp-faint` | `#94a3b8` | `#7f99ab` |
+| `rp-accent` | `#475569` | `#9db4c4` |
 
 ### Surfaces & borders
 | Token | Light | Dark |
@@ -64,9 +64,9 @@ keep that exact behaviour.
 
 | Token | Value | Note |
 |---|---|---|
-| `rp-brand` | `#23766a` | = `resort-600`. Primary actions, links, active icons |
-| `rp-brand-hover` | `#1e5f57` | = `resort-700` |
-| `rp-brand-deep` | `#19403b` | = `resort-900`. Headings, dark sections |
+| `rp-brand` | `#183153` | = `resort-600`. Primary actions, links, active icons |
+| `rp-brand-hover` | `#122846` | = `resort-700` |
+| `rp-brand-deep` | `#0e223c` | = `resort-900`. Headings, dark sections |
 | `rp-gold` | `#b89040` | ⚠️ tailwind `gold-600` is `#b8893f` — see Known drift |
 | `rp-gold-bright` | `#d4a853` | = `gold-500` |
 | `rp-danger` | `#c43c3c` | |
@@ -97,8 +97,8 @@ have dark variants.
 | Token | Value |
 |---|---|
 | `rp-card` | `0 1px 6px rgba(0,0,0,.04)` — the card elevation (was inlined 106×) |
-| `rp-pop` | `0 4px 24px rgba(35,118,106,.12)` |
-| `rp-sheet` | `-8px 0 40px rgba(27,52,47,.15)` |
+| `rp-pop` | `0 4px 24px rgba(24,49,83,.12)` |
+| `rp-sheet` | `-8px 0 40px rgba(24,49,83,.15)` |
 
 ## Type — `text-rp-*`
 
@@ -121,16 +121,17 @@ still available.
 These are inconsistencies the audit surfaced. They are **preserved as-is** so
 nothing shifts visually; fixing them is a deliberate design decision.
 
-1. **Two brand greens** — `#23766a` (444×) and `#1a6b5e` (24×). `rp-brand` is
-   the former. The 24 stragglers should probably become `rp-brand`.
+1. **Legacy green debt** — dashboard code historically used `#23766a` and
+   `#1a6b5e`. The navy migration maps both to `rp-brand` / `#183153`; new code
+   must use the semantic token rather than adding another direct colour.
 2. **Two golds** — pages use `#b89040` (138×) but tailwind `gold-600` is
    `#b8893f`. One should win.
 3. **Half-pixel type steps** — `rp-13-5`, `rp-12-5`, `rp-10-5` exist only to
    preserve current rendering. They are almost certainly drift from their
    neighbours and should collapse into `rp-body` / `rp-meta` / `rp-micro`.
-4. **Dark-mode brand** — `rp-brand` stays `#23766a` on dark backgrounds because
-   that is what pages do today. Whether it should lighten is an open design
-   question.
+4. **Dark-mode brand** — `rp-brand` stays navy on dark backgrounds for action
+   consistency; use `rp-gold-bright` or a dedicated status token where a
+   stronger dark-mode contrast is required.
 5. **The `!important` dark patches** at the bottom of `globals.css` can be
    deleted once the pages they cover are migrated to tokens.
 

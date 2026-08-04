@@ -46,20 +46,20 @@ const CATEGORIES = ['', 'FURNITURE', 'ELECTRONICS', 'APPLIANCE', 'KITCHEN_EQUIPM
 const STATUSES = ['IN_USE', 'IN_REPAIR', 'IN_STORAGE', 'RETIRED'] as const;
 
 const STATUS_META: Record<string, { bg: string; text: string; label: string }> = {
-  IN_USE:     { bg: 'var(--rp-teal-bg)', text: '#23766a', label: 'In Use' },
+  IN_USE:     { bg: 'var(--rp-teal-bg)', text: '#183153', label: 'In Use' },
   IN_REPAIR:  { bg: 'var(--rp-amber-bg)', text: '#b89040', label: 'In Repair' },
   IN_STORAGE: { bg: 'var(--rp-surface-3)', text: 'var(--rp-text-muted)', label: 'In Storage' },
   RETIRED:    { bg: 'var(--rp-red-bg)', text: '#c43c3c', label: 'Retired' },
 };
 
 const LOG_META: Record<string, { bg: string; text: string; Icon: typeof Wrench }> = {
-  SERVICE:     { bg: 'var(--rp-teal-bg)', text: '#23766a', Icon: Wrench },
+  SERVICE:     { bg: 'var(--rp-teal-bg)', text: '#183153', Icon: Wrench },
   REPAIR:      { bg: 'var(--rp-red-bg)', text: '#c43c3c', Icon: Wrench },
   INSPECTION:  { bg: 'var(--rp-amber-bg)', text: '#b89040', Icon: ShieldAlert },
 };
 
-const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30';
-const labelCls = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
+const labelCls = 'block text-[11.5px] font-medium text-[#64748b] mb-1.5';
 
 function daysUntil(dateStr?: string | null): number | null {
   if (!dateStr) return null;
@@ -167,7 +167,7 @@ function AssetModal({ open, onClose, loading, onSubmit, asset, vendors, rooms }:
           <div>
             <label className={labelCls}>Purchase Price</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px]" style={{ color: '#9bbdb7' }}>৳</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px]" style={{ color: '#aac0d0' }}>৳</span>
               <input value={form.purchasePrice} onChange={e => set('purchasePrice', e.target.value)} type="number" min="0" step="0.01" className={inputCls + ' pl-6'} />
             </div>
           </div>
@@ -279,11 +279,11 @@ function HistoryModal({ open, onClose, asset }: { open: boolean; onClose: () => 
         </div>
       }>
       {isLoading ? (
-        <div className="flex h-24 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" style={{ color: '#9bbdb7' }} /></div>
+        <div className="flex h-24 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" style={{ color: '#aac0d0' }} /></div>
       ) : logs.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-10 gap-2">
-          <Clock className="h-9 w-9" style={{ color: '#c5bdb4' }} />
-          <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No maintenance logged yet</p>
+          <Clock className="h-9 w-9" style={{ color: '#94a3b8' }} />
+          <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">No maintenance logged yet</p>
         </div>
       ) : (
         <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
@@ -297,13 +297,13 @@ function HistoryModal({ open, onClose, asset }: { open: boolean; onClose: () => 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="rounded-[6px] px-[7px] py-[2px] text-[10.5px] font-semibold" style={{ background: m.bg, color: m.text }}>{l.type}</span>
-                    {l.cost != null && <span className="text-[12.5px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{formatCurrency(l.cost)}</span>}
+                    {l.cost != null && <span className="text-[12.5px] font-medium text-[#183153] dark:text-[#f8fafc]">{formatCurrency(l.cost)}</span>}
                   </div>
                   {(l.performedBy || l.notes) && (
-                    <p className="text-[12px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">{[l.performedBy, l.notes].filter(Boolean).join(' — ')}</p>
+                    <p className="text-[12px] mt-0.5 text-[#64748b] dark:text-[#a9c1d0]">{[l.performedBy, l.notes].filter(Boolean).join(' — ')}</p>
                   )}
                 </div>
-                <p className="text-[11.5px] shrink-0 text-[#c5bdb4] dark:text-[#6e8580]">
+                <p className="text-[11.5px] shrink-0 text-[#94a3b8] dark:text-[#7f99ab]">
                   {new Date(l.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                 </p>
               </div>
@@ -378,27 +378,27 @@ export default function AssetsPage() {
 
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Total Assets', value: stats.total, Icon: Archive, iconBg: 'var(--rp-teal-bg)', iconColor: '#23766a' },
-          { label: 'In Repair', value: stats.inRepair, Icon: Wrench, iconBg: stats.inRepair > 0 ? 'var(--rp-amber-bg)' : 'var(--rp-teal-bg)', iconColor: stats.inRepair > 0 ? '#b89040' : '#23766a' },
-          { label: 'Total Value', value: formatCurrency(stats.totalValue), Icon: ShieldAlert, iconBg: 'var(--rp-teal-bg)', iconColor: '#23766a' },
+          { label: 'Total Assets', value: stats.total, Icon: Archive, iconBg: 'var(--rp-teal-bg)', iconColor: '#183153' },
+          { label: 'In Repair', value: stats.inRepair, Icon: Wrench, iconBg: stats.inRepair > 0 ? 'var(--rp-amber-bg)' : 'var(--rp-teal-bg)', iconColor: stats.inRepair > 0 ? '#b89040' : '#183153' },
+          { label: 'Total Value', value: formatCurrency(stats.totalValue), Icon: ShieldAlert, iconBg: 'var(--rp-teal-bg)', iconColor: '#183153' },
         ].map(({ label, value, Icon, iconBg, iconColor }) => (
           <div key={label} className="rounded-[14px] border bg-white p-4" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
             <div className="flex items-center gap-2.5 mb-3">
               <div className="flex h-[36px] w-[36px] items-center justify-center rounded-[9px]" style={{ background: iconBg }}>
                 <Icon className="h-[16px] w-[16px]" style={{ color: iconColor }} />
               </div>
-              <p className="text-[12.5px] font-medium text-[#8aa29a] dark:text-[#94b8b0]">{label}</p>
+              <p className="text-[12.5px] font-medium text-[#64748b] dark:text-[#a9c1d0]">{label}</p>
             </div>
-            <p className="text-[26px] font-semibold leading-none text-[#18231f] dark:text-[#dfd9d0]">{value}</p>
+            <p className="text-[26px] font-semibold leading-none text-[#183153] dark:text-[#f8fafc]">{value}</p>
           </div>
         ))}
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center flex-wrap">
         <div className="relative max-w-sm flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: '#9bbdb7' }} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: '#aac0d0' }} />
           <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Search name or tag…"
-            className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-[9px] pl-9 pr-3 text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30" />
+            className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-[9px] pl-9 pr-3 text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30" />
         </div>
         <div className="flex gap-2 flex-wrap">
           {STATUSES.map(s => (
@@ -430,12 +430,12 @@ export default function AssetsPage() {
         ) : assets.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'var(--rp-teal-bg)' }}>
-              <Archive className="h-7 w-7" style={{ color: '#23766a' }} />
+              <Archive className="h-7 w-7" style={{ color: '#183153' }} />
             </div>
-            <p className="text-[13.5px] font-medium text-[#18231f] dark:text-[#dfd9d0]">
+            <p className="text-[13.5px] font-medium text-[#183153] dark:text-[#f8fafc]">
               {search || catFilter || statusFilter ? 'No assets found' : 'No assets yet'}
             </p>
-            <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+            <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">
               {search || catFilter || statusFilter ? 'Try adjusting filters' : 'Add your first piece of resort property'}
             </p>
             {!search && !catFilter && !statusFilter && (
@@ -451,7 +451,7 @@ export default function AssetsPage() {
               <thead>
                 <tr style={{ background: 'var(--rp-surface-2)', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
                   {['Asset', 'Category', 'Location', 'Value', 'Vendor', 'Status', 'Actions'].map(h => (
-                    <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] dark:text-[#94b8b0]">{h}</th>
+                    <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] dark:text-[#a9c1d0]">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -465,11 +465,11 @@ export default function AssetsPage() {
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-2.5">
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px]" style={{ background: 'var(--rp-teal-bg)' }}>
-                            <Archive className="h-4 w-4" style={{ color: '#23766a' }} />
+                            <Archive className="h-4 w-4" style={{ color: '#183153' }} />
                           </div>
                           <div>
-                            <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{a.name}</p>
-                            <p className="text-[11.5px] text-[#c5bdb4] dark:text-[#6e8580]">{a.assetTag}</p>
+                            <p className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{a.name}</p>
+                            <p className="text-[11.5px] text-[#94a3b8] dark:text-[#7f99ab]">{a.assetTag}</p>
                             {warrantySoon && (
                               <p className="text-[11px] flex items-center gap-0.5" style={{ color: '#c43c3c' }}>
                                 <AlertTriangle className="h-3 w-3" /> Warranty expires in {warrantyDays}d
@@ -478,28 +478,28 @@ export default function AssetsPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-[12.5px] text-[#4a6e66] dark:text-[#6d9990]">{a.category.replace(/_/g, ' ')}</td>
-                      <td className="px-5 py-4 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">
+                      <td className="px-5 py-4 text-[12.5px] text-[#475569] dark:text-[#9db4c4]">{a.category.replace(/_/g, ' ')}</td>
+                      <td className="px-5 py-4 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">
                         {a.locationRoom ? `${a.locationRoom.name} (${a.locationRoom.number})` : a.locationLabel || '—'}
                       </td>
-                      <td className="px-5 py-4 text-[13px] text-[#18231f] dark:text-[#dfd9d0]">{a.purchasePrice != null ? formatCurrency(a.purchasePrice) : '—'}</td>
-                      <td className="px-5 py-4 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{a.vendor?.name ?? '—'}</td>
+                      <td className="px-5 py-4 text-[13px] text-[#183153] dark:text-[#f8fafc]">{a.purchasePrice != null ? formatCurrency(a.purchasePrice) : '—'}</td>
+                      <td className="px-5 py-4 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">{a.vendor?.name ?? '—'}</td>
                       <td className="px-5 py-4">
                         <span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: sm.bg, color: sm.text }}>{sm.label}</span>
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-1">
                           <button onClick={() => setLogAsset(a)}
-                            className="flex items-center gap-1 rounded-[7px] border px-2 py-1 text-[11.5px] font-medium transition-colors hover:bg-[#e3f2ef]"
-                            style={{ borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                            className="flex items-center gap-1 rounded-[7px] border px-2 py-1 text-[11.5px] font-medium transition-colors hover:bg-[#e5f0f7]"
+                            style={{ borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
                             <Wrench className="h-3 w-3" /> Log
                           </button>
                           <button onClick={() => setHistoryAsset(a)}
-                            className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#f4ecda] text-[#c5bdb4] dark:text-[#6e8580]" title="History">
+                            className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#f4ecda] text-[#94a3b8] dark:text-[#7f99ab]" title="History">
                             <History className="h-3.5 w-3.5" />
                           </button>
                           <button onClick={() => setEditAsset(a)}
-                            className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#e3f2ef]" style={{ color: '#9bbdb7' }}>
+                            className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#e5f0f7]" style={{ color: '#aac0d0' }}>
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
                         </div>
@@ -515,7 +515,7 @@ export default function AssetsPage() {
 
       {pagination && pagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">Showing {(page - 1) * 30 + 1}–{Math.min(page * 30, pagination.total)} of {pagination.total}</p>
+          <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">Showing {(page - 1) * 30 + 1}–{Math.min(page * 30, pagination.total)} of {pagination.total}</p>
           <div className="flex gap-2">
             <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
               className="flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12.5px] font-medium transition-colors hover:bg-[#f4f1eb] disabled:opacity-40"

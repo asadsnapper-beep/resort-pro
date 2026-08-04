@@ -39,8 +39,8 @@ interface Props {
   onClose: () => void;
 }
 
-const inp = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30';
-const lbl = 'block text-[11px] font-semibold uppercase tracking-[0.06em] mb-1.5 text-[#8aa29a]';
+const inp = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
+const lbl = 'block text-[11px] font-semibold uppercase tracking-[0.06em] mb-1.5 text-[#64748b]';
 
 export function WalkInModal({ onClose }: Props) {
   const { resolvedTheme } = useTheme();
@@ -117,9 +117,9 @@ export function WalkInModal({ onClose }: Props) {
   if (!mounted) return null;
 
   return createPortal(
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(27,52,47,0.5)', backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)' }}
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(24,49,83,0.5)', backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)' }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ position: 'relative', width: '100%', maxWidth: '660px', maxHeight: 'calc(100vh - 40px)', display: 'flex', flexDirection: 'column', borderRadius: '18px', background: isDark ? '#1a2e2a' : 'var(--rp-surface)', boxShadow: '0 32px 80px rgba(27,52,47,0.35)', overflow: 'hidden' }}
+      <div style={{ position: 'relative', width: '100%', maxWidth: '660px', maxHeight: 'calc(100vh - 40px)', display: 'flex', flexDirection: 'column', borderRadius: '18px', background: isDark ? '#10243f' : 'var(--rp-surface)', boxShadow: '0 32px 80px rgba(24,49,83,0.35)', overflow: 'hidden' }}
         onClick={e => e.stopPropagation()}>
 
         {/* Header */}
@@ -157,7 +157,7 @@ export function WalkInModal({ onClose }: Props) {
           <div>
             <label className={lbl}>
               Room
-              {roomsLoading && <span style={{ marginLeft: '6px', color: '#23766a', textTransform: 'none', fontWeight: 400 }}>Loading…</span>}
+              {roomsLoading && <span style={{ marginLeft: '6px', color: '#183153', textTransform: 'none', fontWeight: 400 }}>Loading…</span>}
               {!roomsLoading && rooms.length === 0 && form.checkIn && form.checkOut && (
                 <span style={{ marginLeft: '6px', color: '#c43c3c', textTransform: 'none', fontWeight: 400 }}>No rooms available</span>
               )}
@@ -168,16 +168,16 @@ export function WalkInModal({ onClose }: Props) {
                   const active = form.roomId === room.id;
                   return (
                     <button key={room.id} type="button" onClick={() => set('roomId', room.id)}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '10px', border: `2px solid ${active ? '#23766a' : 'var(--rp-border-md)'}`, background: active ? 'var(--rp-teal-soft)' : 'var(--rp-surface-2)', padding: '10px 14px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.12s' }}>
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '10px', border: `2px solid ${active ? '#183153' : 'var(--rp-border-md)'}`, background: active ? 'var(--rp-teal-soft)' : 'var(--rp-surface-2)', padding: '10px 14px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.12s' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <BedDouble style={{ width: '15px', height: '15px', color: active ? '#23766a' : 'var(--rp-text-faint)' }} />
+                        <BedDouble style={{ width: '15px', height: '15px', color: active ? '#183153' : 'var(--rp-text-faint)' }} />
                         <div>
                           <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--rp-text)', margin: 0 }}>{room.name}</p>
                           <p style={{ fontSize: '11.5px', color: 'var(--rp-text-muted)', margin: 0 }}>#{room.number} · Max {room.maxOccupancy}</p>
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <p style={{ fontSize: '13px', fontWeight: 700, color: active ? '#23766a' : 'var(--rp-text)', margin: 0 }}>{formatCurrency(Number(room.basePrice))}</p>
+                        <p style={{ fontSize: '13px', fontWeight: 700, color: active ? '#183153' : 'var(--rp-text)', margin: 0 }}>{formatCurrency(Number(room.basePrice))}</p>
                         <p style={{ fontSize: '11.5px', color: 'var(--rp-text-faint)', margin: 0 }}>/night</p>
                       </div>
                     </button>
@@ -228,7 +228,7 @@ export function WalkInModal({ onClose }: Props) {
                 const active = form.paymentMethod === method;
                 return (
                   <button key={method} type="button" onClick={() => set('paymentMethod', method)}
-                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', borderRadius: '9px', border: `2px solid ${active ? '#23766a' : 'var(--rp-border-md)'}`, background: active ? 'var(--rp-teal-soft)' : 'var(--rp-surface-2)', padding: '9px', fontSize: '12.5px', fontWeight: 600, color: active ? '#23766a' : 'var(--rp-text-muted)', cursor: 'pointer', transition: 'all 0.12s' }}>
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', borderRadius: '9px', border: `2px solid ${active ? '#183153' : 'var(--rp-border-md)'}`, background: active ? 'var(--rp-teal-soft)' : 'var(--rp-surface-2)', padding: '9px', fontSize: '12.5px', fontWeight: 600, color: active ? '#183153' : 'var(--rp-text-muted)', cursor: 'pointer', transition: 'all 0.12s' }}>
                     {method === 'CASH' && <Banknote style={{ width: '14px', height: '14px' }} />}
                     {method === 'CARD' && <CreditCard style={{ width: '14px', height: '14px' }} />}
                     {method === 'PENDING' && <Clock style={{ width: '14px', height: '14px' }} />}
@@ -247,7 +247,7 @@ export function WalkInModal({ onClose }: Props) {
             ].map(({ key, label, sub }) => (
               <label key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer' }}>
                 <input type="checkbox" checked={form[key] as boolean} onChange={e => set(key, e.target.checked)}
-                  style={{ marginTop: '2px', width: '15px', height: '15px', accentColor: '#23766a' }} />
+                  style={{ marginTop: '2px', width: '15px', height: '15px', accentColor: '#183153' }} />
                 <div>
                   <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--rp-text)', margin: 0 }}>{label}</p>
                   <p style={{ fontSize: '11.5px', color: 'var(--rp-text-muted)', marginTop: '2px' }}>{sub}</p>
@@ -258,14 +258,14 @@ export function WalkInModal({ onClose }: Props) {
 
           {/* Summary */}
           {selectedRoom && (
-            <div style={{ borderRadius: '12px', border: '1px solid rgba(35,118,106,0.2)', background: 'var(--rp-teal-soft)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ borderRadius: '12px', border: '1px solid rgba(24,49,83,0.2)', background: 'var(--rp-teal-soft)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontSize: '13px', color: 'var(--rp-text-accent)' }}>
                 <span style={{ fontWeight: 600, color: 'var(--rp-text)' }}>{selectedRoom.name}</span>
                 {' · '}{nights} night{nights !== 1 ? 's' : ''}
                 {' · '}{form.paymentMethod === 'PENDING' ? 'Pay later' : form.paymentMethod.charAt(0) + form.paymentMethod.slice(1).toLowerCase()}
               </div>
               <div style={{ textAlign: 'right' }}>
-                <p style={{ fontSize: '17px', fontWeight: 700, color: '#23766a', margin: 0 }}>{formatCurrency(totalAmount)}</p>
+                <p style={{ fontSize: '17px', fontWeight: 700, color: '#183153', margin: 0 }}>{formatCurrency(totalAmount)}</p>
                 <p style={{ fontSize: '11.5px', color: 'var(--rp-text-muted)', margin: 0 }}>{form.paymentMethod !== 'PENDING' ? 'Paid in full' : 'Balance due'}</p>
               </div>
             </div>
@@ -279,7 +279,7 @@ export function WalkInModal({ onClose }: Props) {
             Cancel
           </button>
           <button disabled={!isValid || isPending || rooms.length === 0} onClick={() => mutate()}
-            style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', borderRadius: '9px', border: 'none', background: isValid && !isPending && rooms.length > 0 ? '#1b342f' : 'var(--rp-text-faint)', color: 'var(--rp-btn-accent-text)', fontSize: '13px', fontWeight: 500, padding: '9px', cursor: isValid && !isPending ? 'pointer' : 'not-allowed' }}>
+            style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', borderRadius: '9px', border: 'none', background: isValid && !isPending && rooms.length > 0 ? '#183153' : 'var(--rp-text-faint)', color: 'var(--rp-btn-accent-text)', fontSize: '13px', fontWeight: 500, padding: '9px', cursor: isValid && !isPending ? 'pointer' : 'not-allowed' }}>
             {isPending ? <Loader2 style={{ width: '14px', height: '14px', animation: 'spin 1s linear infinite' }} /> : <CheckCircle2 style={{ width: '14px', height: '14px' }} />}
             {isPending ? 'Creating…' : form.autoCheckIn ? 'Book & Check In' : 'Create Booking'}
           </button>

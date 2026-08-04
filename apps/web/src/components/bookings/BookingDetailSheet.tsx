@@ -646,7 +646,7 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
               {booking.guest.id && (
                 <button
                   onClick={() => setShowIdScan(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#1a6b5e]/30 text-[#1a6b5e] hover:bg-[#f0faf8] text-xs font-medium transition-colors shrink-0"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#183153]/30 text-[#183153] hover:bg-[#f2f7fb] text-xs font-medium transition-colors shrink-0"
                   title="Scan guest ID / passport"
                 >
                   <ScanLine className="w-3.5 h-3.5" /> Scan ID
@@ -942,9 +942,9 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
                   justifyContent: 'center',
                   gap: '6px',
                   borderRadius: '9px',
-                  border: '1px solid #d1e5e0',
+                  border: '1px solid #d4e4ef',
                   background: 'transparent',
-                  color: '#1a6b5e',
+                  color: '#183153',
                   fontSize: '13px',
                   fontWeight: 500,
                   padding: '9px 12px',

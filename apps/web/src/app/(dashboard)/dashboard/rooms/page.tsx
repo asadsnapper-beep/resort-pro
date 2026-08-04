@@ -29,7 +29,7 @@ const ROOM_TYPE_LABELS: Record<string, string> = {
 };
 
 const ROOM_STATUS_PILL: Record<string, { bg: string; border: string; text: string; label: string }> = {
-  AVAILABLE:   { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Available'   },
+  AVAILABLE:   { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153', label: 'Available'   },
   OCCUPIED:    { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'Occupied'    },
   CLEANING:    { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a', label: 'Cleaning'    },
   MAINTENANCE: { bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)', text: '#c43c3c', label: 'Maintenance' },
@@ -38,10 +38,10 @@ const ROOM_STATUS_PILL: Record<string, { bg: string; border: string; text: strin
 
 const ROOM_TYPE_STYLE: Record<string, { bg: string; text: string }> = {
   STANDARD: { bg: 'var(--rp-surface-3)', text: '#6b7280' },
-  DELUXE:   { bg: 'var(--rp-teal-bg)', text: '#23766a' },
+  DELUXE:   { bg: 'var(--rp-teal-bg)', text: '#183153' },
   SUITE:    { bg: '#f5f0fe', text: '#7846c8' },
-  VILLA:    { bg: 'var(--rp-teal-bg)', text: '#23766a' },
-  COTTAGE:  { bg: 'var(--rp-teal-bg)', text: '#23766a' },
+  VILLA:    { bg: 'var(--rp-teal-bg)', text: '#183153' },
+  COTTAGE:  { bg: 'var(--rp-teal-bg)', text: '#183153' },
   BUNGALOW: { bg: 'var(--rp-amber-bg)', text: '#b89040' },
 };
 
@@ -50,7 +50,7 @@ const TYPE_FILTERS   = ['', 'STANDARD', 'DELUXE', 'SUITE', 'VILLA', 'COTTAGE', '
 
 const STAT_FILTERS: { label: string; key: keyof typeof stats_default; filter: string; bg: string; border: string; text: string }[] = [
   { label: 'Total',       key: 'total',       filter: '',            bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',       text: 'var(--rp-text)' },
-  { label: 'Available',   key: 'available',   filter: 'AVAILABLE',   bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',   text: '#23766a' },
+  { label: 'Available',   key: 'available',   filter: 'AVAILABLE',   bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',   text: '#183153' },
   { label: 'Occupied',    key: 'occupied',    filter: 'OCCUPIED',    bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',   text: '#b89040' },
   { label: 'Cleaning',    key: 'cleaning',    filter: 'CLEANING',    bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',   text: '#b8724a' },
   { label: 'Maintenance', key: 'maintenance', filter: 'MAINTENANCE', bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)',  text: '#c43c3c' },
@@ -142,7 +142,7 @@ export default function RoomsPage() {
         actions={
           <button
             onClick={() => setAddOpen(true)}
-            className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
+            className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#f8fafc] transition-opacity hover:opacity-80"
             style={{ background: 'var(--rp-btn-accent)' }}
           >
             <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} /> Add Room
@@ -165,8 +165,8 @@ export default function RoomsPage() {
                 boxShadow: active ? `0 0 0 2px ${border}` : '0 1px 6px rgba(0,0,0,0.04)',
               }}
             >
-              <p className="text-[10px] font-semibold uppercase tracking-[0.07em]" style={{ color: active ? text : isDark ? '#94b8b0' : 'var(--rp-text-muted)' }}>{label}</p>
-              <p className="mt-[4px] text-[26px] font-semibold leading-none tracking-[-0.02em]" style={{ color: active ? text : isDark ? '#dfd9d0' : 'var(--rp-text)' }}>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.07em]" style={{ color: active ? text : isDark ? '#a9c1d0' : 'var(--rp-text-muted)' }}>{label}</p>
+              <p className="mt-[4px] text-[26px] font-semibold leading-none tracking-[-0.02em]" style={{ color: active ? text : isDark ? '#f8fafc' : 'var(--rp-text)' }}>
                 {(stats as typeof stats_default)[key]}
               </p>
             </button>
@@ -177,34 +177,34 @@ export default function RoomsPage() {
       {/* Filters */}
       <div className="space-y-2">
         <div className="relative max-w-xs">
-          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8aa29a]" />
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#64748b]" />
           <input
             value={searchInput}
             onChange={e => { setSearchInput(e.target.value); setPage(1); }}
             placeholder="Search by name or room #…"
-            className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-[8px] pl-9 pr-4 text-[13px] text-[#18231f] placeholder:text-[#8aa29a] focus:outline-none focus:ring-1 focus:ring-resort-600/20"
+            className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-[8px] pl-9 pr-4 text-[13px] text-[#183153] placeholder:text-[#64748b] focus:outline-none focus:ring-1 focus:ring-resort-600/20"
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.07em] text-[#8aa29a]">Status:</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.07em] text-[#64748b]">Status:</span>
           {STATUS_FILTERS.map(s => (
             <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
               className="rounded-[8px] border px-[11px] py-[5px] text-[12px] font-medium transition-colors"
               style={statusFilter === s
-                ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', borderColor: '#1b342f' }
-                : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', color: isDark ? '#94b8b0' : 'var(--rp-text-subtle)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)' }}>
+                ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', borderColor: '#183153' }
+                : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', color: isDark ? '#a9c1d0' : 'var(--rp-text-subtle)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)' }}>
               {s.replace(/_/g, ' ') || 'All'}
             </button>
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.07em] text-[#8aa29a]">Type:</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.07em] text-[#64748b]">Type:</span>
           {TYPE_FILTERS.map(t => (
             <button key={t} onClick={() => { setTypeFilter(t); setPage(1); }}
               className="rounded-[8px] border px-[11px] py-[5px] text-[12px] font-medium transition-colors"
               style={typeFilter === t
-                ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', borderColor: '#1b342f' }
-                : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', color: isDark ? '#94b8b0' : 'var(--rp-text-subtle)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)' }}>
+                ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', borderColor: '#183153' }
+                : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', color: isDark ? '#a9c1d0' : 'var(--rp-text-subtle)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)' }}>
               {t ? getRoomTypeLabel(t) : 'All'}
             </button>
           ))}
@@ -221,11 +221,11 @@ export default function RoomsPage() {
       ) : rooms.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 rounded-[14px] border py-20 bg-white dark:bg-white/5" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#f5f4f1]">
-            <BedDouble className="h-7 w-7 text-[#c5bdb4]" />
+            <BedDouble className="h-7 w-7 text-[#94a3b8]" />
           </div>
           <div className="text-center">
-            <p className="text-[14px] font-medium text-[#18231f]">No rooms found</p>
-            <p className="mt-1 text-[13px] text-[#8aa29a]">
+            <p className="text-[14px] font-medium text-[#183153]">No rooms found</p>
+            <p className="mt-1 text-[13px] text-[#64748b]">
               {searchInput || statusFilter || typeFilter ? 'Try changing your filters' : 'Add your first room to get started'}
             </p>
           </div>
@@ -236,7 +236,7 @@ export default function RoomsPage() {
             </button>
           ) : (
             <button onClick={() => setAddOpen(true)}
-              className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0]"
+              className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#f8fafc]"
               style={{ background: 'var(--rp-btn-accent)' }}>
               <Plus className="h-[13px] w-[13px]" /> Add Room
             </button>
@@ -262,8 +262,8 @@ export default function RoomsPage() {
                         onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }} />
                     </div>
                   ) : (
-                    <div className="flex aspect-video w-full items-center justify-center" style={{ background: '#e8f4f2' }}>
-                      <BedDouble className="h-10 w-10 text-[#9bbdb7]" strokeWidth={1.5} />
+                    <div className="flex aspect-video w-full items-center justify-center" style={{ background: '#e5f0f7' }}>
+                      <BedDouble className="h-10 w-10 text-[#aac0d0]" strokeWidth={1.5} />
                     </div>
                   )}
 
@@ -271,13 +271,13 @@ export default function RoomsPage() {
                     <div className="flex items-start justify-between mb-[10px]">
                       <div>
                         <div className="mb-[5px] flex items-center gap-2">
-                          <span className="font-mono text-[11px] font-bold text-[#8aa29a]">#{room.number}</span>
+                          <span className="font-mono text-[11px] font-bold text-[#64748b]">#{room.number}</span>
                           <span className="rounded-[6px] px-[8px] py-[3px] text-[11px] font-semibold"
                             style={{ background: typeStyle.bg, color: typeStyle.text }}>
                             {getRoomTypeLabel(room.type)}
                           </span>
                         </div>
-                        <p className="text-[14px] font-semibold text-[#18231f]">{room.name}</p>
+                        <p className="text-[14px] font-semibold text-[#183153]">{room.name}</p>
                       </div>
                       <span className="shrink-0 rounded-[7px] border px-[9px] py-[4px] text-[11px] font-semibold"
                         style={{ background: statusStyle.bg, borderColor: statusStyle.border, color: statusStyle.text }}>
@@ -285,7 +285,7 @@ export default function RoomsPage() {
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-4 text-[12.5px] text-[#8aa29a]">
+                    <div className="flex items-center gap-4 text-[12.5px] text-[#64748b]">
                       <span className="flex items-center gap-1">
                         <Users className="h-3.5 w-3.5" /> {room.maxOccupancy}
                       </span>
@@ -308,8 +308,8 @@ export default function RoomsPage() {
                     )}
 
                     {room.videos && room.videos.length > 0 && (
-                      <p className="mt-2 text-[11.5px] text-[#8aa29a]">
-                        <span className="text-[#23766a]">▶</span> {room.videos.length} video{room.videos.length !== 1 ? 's' : ''}
+                      <p className="mt-2 text-[11.5px] text-[#64748b]">
+                        <span className="text-[#183153]">▶</span> {room.videos.length} video{room.videos.length !== 1 ? 's' : ''}
                       </p>
                     )}
                   </div>
@@ -321,7 +321,7 @@ export default function RoomsPage() {
           {/* Pagination */}
           {pagination.totalPages > 1 && (
             <div className="flex items-center justify-between pt-1">
-              <p className="text-[12.5px] text-[#8aa29a]">
+              <p className="text-[12.5px] text-[#64748b]">
                 Showing {(page - 1) * pagination.limit + 1}–{Math.min(page * pagination.limit, pagination.total)} of {pagination.total} rooms
               </p>
               <div className="flex items-center gap-1.5">
@@ -336,8 +336,8 @@ export default function RoomsPage() {
                     <button key={n} onClick={() => setPage(n)}
                       className="h-8 w-8 rounded-[8px] text-[12.5px] font-medium transition-colors"
                       style={n === page
-                        ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', border: '1px solid #1b342f' }
-                        : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', color: isDark ? '#dfd9d0' : 'var(--rp-text)', border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.09)' }}>
+                        ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', border: '1px solid #183153' }
+                        : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', color: isDark ? '#f8fafc' : 'var(--rp-text)', border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.09)' }}>
                       {n}
                     </button>
                   );

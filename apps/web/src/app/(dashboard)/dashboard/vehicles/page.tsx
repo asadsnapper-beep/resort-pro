@@ -49,20 +49,20 @@ const VEHICLE_TYPES = ['CAR', 'BIKE', 'SCOOTY', 'BICYCLE', 'VAN', 'OTHER'] as co
 const TYPE_ICON: Record<string, typeof Car> = { CAR: Car, VAN: Car, BIKE: Bike, SCOOTY: Bike, BICYCLE: Bike, OTHER: Car };
 
 const AVAIL_META: Record<string, { bg: string; text: string; label: string }> = {
-  AVAILABLE:   { bg: 'var(--rp-teal-bg)', text: '#23766a', label: 'Available' },
+  AVAILABLE:   { bg: 'var(--rp-teal-bg)', text: '#183153', label: 'Available' },
   RENTED:      { bg: 'var(--rp-red-bg)', text: '#c43c3c', label: 'Rented' },
   MAINTENANCE: { bg: 'var(--rp-amber-bg)', text: '#b89040', label: 'Maintenance' },
 };
 
 const RENTAL_STATUS_META: Record<string, { bg: string; text: string }> = {
   RESERVED:  { bg: 'var(--rp-amber-bg)', text: '#b89040' },
-  OUT:       { bg: 'var(--rp-teal-bg)', text: '#23766a' },
+  OUT:       { bg: 'var(--rp-teal-bg)', text: '#183153' },
   RETURNED:  { bg: 'var(--rp-surface-3)', text: 'var(--rp-text-muted)' },
   CANCELLED: { bg: 'var(--rp-red-bg)', text: '#c43c3c' },
 };
 
-const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30';
-const labelCls = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
+const labelCls = 'block text-[11.5px] font-medium text-[#64748b] mb-1.5';
 
 function formatType(t: string) { return t.charAt(0) + t.slice(1).toLowerCase(); }
 
@@ -184,7 +184,7 @@ function FleetTab() {
         <div className="h-32 animate-pulse rounded-[14px]" style={{ background: 'var(--rp-surface-2)' }} />
       ) : vehicles.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-[14px] border bg-white py-14 text-center" style={{ borderColor: 'var(--rp-border)' }}>
-          <Car className="h-10 w-10" style={{ color: '#c5bdb4' }} />
+          <Car className="h-10 w-10" style={{ color: '#94a3b8' }} />
           <p className="text-[13px]" style={{ color: 'var(--rp-text-muted)' }}>No vehicles in the fleet yet</p>
         </div>
       ) : (
@@ -197,11 +197,11 @@ function FleetTab() {
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2.5">
                     <div className="flex h-9 w-9 items-center justify-center rounded-[9px]" style={{ background: 'var(--rp-teal-bg)' }}>
-                      <Icon className="h-4 w-4" style={{ color: '#23766a' }} />
+                      <Icon className="h-4 w-4" style={{ color: '#183153' }} />
                     </div>
                     <div>
-                      <p className="text-[14px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">{v.name}</p>
-                      <p className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">{formatType(v.type)}{v.registrationNumber ? ` · ${v.registrationNumber}` : ''}</p>
+                      <p className="text-[14px] font-semibold text-[#183153] dark:text-[#f8fafc]">{v.name}</p>
+                      <p className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">{formatType(v.type)}{v.registrationNumber ? ` · ${v.registrationNumber}` : ''}</p>
                     </div>
                   </div>
                   <span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: am.bg, color: am.text }}>{am.label}</span>
@@ -303,7 +303,7 @@ function NewRentalModal({ open, onClose, vehicles, activeBookings, loading, onSu
             {(['HOURLY', 'DAILY'] as const).map(r => (
               <button key={r} type="button" onClick={() => set('rateType', r)}
                 className="rounded-[9px] border-2 p-2.5 text-[12.5px] font-medium"
-                style={form.rateType === r ? { background: 'var(--rp-teal-bg)', borderColor: '#23766a', color: '#23766a' } : { background: 'var(--rp-surface-2)', borderColor: 'var(--rp-border)', color: 'var(--rp-text-muted)' }}>
+                style={form.rateType === r ? { background: 'var(--rp-teal-bg)', borderColor: '#183153', color: '#183153' } : { background: 'var(--rp-surface-2)', borderColor: 'var(--rp-border)', color: 'var(--rp-text-muted)' }}>
                 {r === 'HOURLY' ? 'Hourly' : 'Daily'}
               </button>
             ))}
@@ -490,14 +490,14 @@ function RentalsTab() {
           <div className="h-32 animate-pulse" style={{ background: 'var(--rp-surface-2)' }} />
         ) : rentals.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
-            <Car className="h-10 w-10" style={{ color: '#c5bdb4' }} />
-            <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No rentals yet</p>
+            <Car className="h-10 w-10" style={{ color: '#94a3b8' }} />
+            <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">No rentals yet</p>
           </div>
         ) : (
           <table className="w-full">
             <thead>
               <tr style={{ background: 'var(--rp-surface-2)' }}>
-                {['Vehicle', 'Guest', 'Period', 'Amount', 'Status', 'Billed', ''].map(h => <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]">{h}</th>)}
+                {['Vehicle', 'Guest', 'Period', 'Amount', 'Status', 'Billed', ''].map(h => <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">{h}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -506,20 +506,20 @@ function RentalsTab() {
                 const vehicle = vehicles.find(v => v.id === r.vehicleId);
                 return (
                   <tr key={r.id} className="hover:bg-[#faf9f7] dark:hover:bg-white/5" style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
-                    <td className="px-5 py-3.5 text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{r.vehicle.name}</td>
-                    <td className="px-5 py-3.5 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{r.guestName}</td>
-                    <td className="px-5 py-3.5 text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">{new Date(r.startAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} → {new Date(r.endAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
-                    <td className="px-5 py-3.5 text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{r.totalAmount != null ? formatCurrency(r.totalAmount) : '—'}</td>
+                    <td className="px-5 py-3.5 text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{r.vehicle.name}</td>
+                    <td className="px-5 py-3.5 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">{r.guestName}</td>
+                    <td className="px-5 py-3.5 text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">{new Date(r.startAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} → {new Date(r.endAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                    <td className="px-5 py-3.5 text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{r.totalAmount != null ? formatCurrency(r.totalAmount) : '—'}</td>
                     <td className="px-5 py-3.5"><span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: sm.bg, color: sm.text }}>{r.status}</span></td>
                     <td className="px-5 py-3.5">
-                      {r.billed ? <span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: 'var(--rp-teal-bg)', color: '#23766a' }}>Billed</span>
+                      {r.billed ? <span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: 'var(--rp-teal-bg)', color: '#183153' }}>Billed</span>
                         : <span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: 'var(--rp-surface-3)', color: 'var(--rp-text-muted)' }}>Pending</span>}
                     </td>
                     <td className="px-5 py-3.5">
                       <div className="flex gap-1 flex-wrap">
                         {r.status === 'RESERVED' && (
                           <>
-                            <button onClick={() => setPickupRental(r)} className="flex items-center gap-1 rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e3f2ef]" style={{ borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                            <button onClick={() => setPickupRental(r)} className="flex items-center gap-1 rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e5f0f7]" style={{ borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
                               <LogOut className="h-3 w-3" /> Pickup
                             </button>
                             <button onClick={() => cancelMutation.mutate(r.id)} className="rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#faf0ee]" style={{ borderColor: 'rgba(200,60,60,0.2)', color: '#c43c3c' }}>
@@ -528,12 +528,12 @@ function RentalsTab() {
                           </>
                         )}
                         {r.status === 'OUT' && (
-                          <button onClick={() => setReturnRental(r)} className="flex items-center gap-1 rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e3f2ef]" style={{ borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                          <button onClick={() => setReturnRental(r)} className="flex items-center gap-1 rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e5f0f7]" style={{ borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
                             <LogIn className="h-3 w-3" /> Return
                           </button>
                         )}
                         {!r.billed && r.bookingId && r.status === 'RETURNED' && (
-                          <button onClick={() => billMutation.mutate(r)} className="flex items-center gap-1 rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e3f2ef]" style={{ borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                          <button onClick={() => billMutation.mutate(r)} className="flex items-center gap-1 rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e5f0f7]" style={{ borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
                             <Receipt className="h-3 w-3" /> Bill
                           </button>
                         )}
@@ -565,7 +565,7 @@ export default function VehiclesPage() {
     <PageShell gap={6}>
       <div className="flex items-center gap-3">
         <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px]" style={{ background: 'var(--rp-teal-bg)' }}>
-          <Car className="h-4 w-4" style={{ color: '#23766a' }} />
+          <Car className="h-4 w-4" style={{ color: '#183153' }} />
         </div>
         <PageHeader
           title="Vehicle Rental"

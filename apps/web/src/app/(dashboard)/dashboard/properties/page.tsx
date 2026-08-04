@@ -104,7 +104,7 @@ export default function PropertiesPage() {
           </p>
         </div>
         {!isForbidden && (
-          <button onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: '#1a6b5e', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+          <button onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: '#183153', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
             <Plus size={16} /> Add Property
           </button>
         )}
@@ -120,7 +120,7 @@ export default function PropertiesPage() {
           <p style={{ fontSize: 14, color: 'var(--rp-text-muted)', marginBottom: 24 }}>
             Manage multiple resort locations from one account. Upgrade to Enterprise to unlock.
           </p>
-          <a href="/dashboard/billing" style={{ display: 'inline-block', padding: '10px 24px', background: '#1a6b5e', color: '#fff', borderRadius: 8, fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>
+          <a href="/dashboard/billing" style={{ display: 'inline-block', padding: '10px 24px', background: '#183153', color: '#fff', borderRadius: 8, fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>
             Upgrade to Enterprise
           </a>
         </div>
@@ -141,7 +141,7 @@ export default function PropertiesPage() {
           <Building2 size={40} color="var(--rp-text-muted)" style={{ margin: '0 auto 16px' }} />
           <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--rp-text)', margin: '0 0 8px' }}>No properties yet</h2>
           <p style={{ fontSize: 13, color: 'var(--rp-text-muted)', marginBottom: 20 }}>Add your first property to get started.</p>
-          <button onClick={openCreate} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px 20px', background: '#1a6b5e', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={openCreate} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px 20px', background: '#183153', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>
             <Plus size={14} /> Add Property
           </button>
         </div>
@@ -155,14 +155,14 @@ export default function PropertiesPage() {
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ width: 36, height: 36, background: 'var(--rp-teal-bg)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Building2 size={18} color="#1a6b5e" />
+                    <Building2 size={18} color="#183153" />
                   </div>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--rp-text)' }}>{p.name}</div>
                     <div style={{ fontSize: 11, color: 'var(--rp-text-muted)' }}>{p.slug}</div>
                   </div>
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: p.isActive ? 'var(--rp-teal-bg)' : 'var(--rp-surface-2)', color: p.isActive ? '#1a6b5e' : 'var(--rp-text-muted)', border: `1px solid ${p.isActive ? 'rgba(26,107,94,0.2)' : 'var(--rp-border)'}` }}>
+                <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: p.isActive ? 'var(--rp-teal-bg)' : 'var(--rp-surface-2)', color: p.isActive ? '#183153' : 'var(--rp-text-muted)', border: `1px solid ${p.isActive ? 'rgba(24,49,83,0.2)' : 'var(--rp-border)'}` }}>
                   {p.isActive ? 'Active' : 'Inactive'}
                 </span>
               </div>
@@ -189,7 +189,7 @@ export default function PropertiesPage() {
               {p._count && p._count.rooms > 0 && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {[
-                    { key: 'AVAILABLE',   label: 'Available',   color: '#1a6b5e', bg: 'var(--rp-teal-bg)' },
+                    { key: 'AVAILABLE',   label: 'Available',   color: '#183153', bg: 'var(--rp-teal-bg)' },
                     { key: 'OCCUPIED',    label: 'Occupied',    color: '#b89040', bg: 'var(--rp-amber-bg)' },
                     { key: 'CLEANING',    label: 'Cleaning',    color: '#b8724a', bg: 'var(--rp-coral-bg)' },
                     { key: 'MAINTENANCE', label: 'Maint.',      color: '#c43c3c', bg: 'var(--rp-red-bg)' },
@@ -224,7 +224,7 @@ export default function PropertiesPage() {
         footer={
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
             <button onClick={closeModal} style={{ padding: '8px 16px', background: 'var(--rp-surface-2)', border: '1px solid var(--rp-border)', borderRadius: 8, cursor: 'pointer', color: 'var(--rp-text)', fontSize: 13 }}>Cancel</button>
-            <button onClick={handleSubmit} disabled={createMut.isPending || updateMut.isPending} style={{ padding: '8px 20px', background: '#1a6b5e', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer', opacity: (createMut.isPending || updateMut.isPending) ? 0.6 : 1 }}>
+            <button onClick={handleSubmit} disabled={createMut.isPending || updateMut.isPending} style={{ padding: '8px 20px', background: '#183153', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer', opacity: (createMut.isPending || updateMut.isPending) ? 0.6 : 1 }}>
               {(createMut.isPending || updateMut.isPending) ? 'Saving…' : (editingId ? 'Save Changes' : 'Create Property')}
             </button>
           </div>

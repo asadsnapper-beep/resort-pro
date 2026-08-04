@@ -84,8 +84,8 @@ const TABS = [
 
 type Tab = typeof TABS[number]['id'];
 
-const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30';
-const labelCls = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
+const labelCls = 'block text-[11.5px] font-medium text-[#64748b] mb-1.5';
 const cardCls  = 'rounded-[14px] border bg-white p-5 space-y-4';
 const cardStyle = { borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' };
 
@@ -127,7 +127,7 @@ export default function WebsitePage() {
     heroTitle: '', heroSubtitle: '', heroImage: '',
     aboutTitle: '', aboutText: '', aboutImage: '',
     galleryImages: [], seoTitle: '', seoDescription: '',
-    primaryColor: '#1a6b5e', accentColor: '#d4a853',
+    primaryColor: '#183153', accentColor: '#d4a853',
     testimonials: [], templateId: 'luxe',
     facebookUrl: '', instagramUrl: '', twitterUrl: '',
     tiktokUrl: '', youtubeUrl: '', whatsappNumber: '',
@@ -149,7 +149,7 @@ export default function WebsitePage() {
         galleryImages:    content.galleryImages    ?? [],
         seoTitle:         content.seoTitle         ?? '',
         seoDescription:   content.seoDescription  ?? '',
-        primaryColor:     content.primaryColor     ?? '#1a6b5e',
+        primaryColor:     content.primaryColor     ?? '#183153',
         accentColor:      content.accentColor      ?? '#d4a853',
         testimonials:     content.testimonials     ?? [],
         templateId:       content.templateId       ?? 'luxe',
@@ -292,12 +292,12 @@ export default function WebsitePage() {
         style={{ borderBottom: '1px solid rgba(0,0,0,0.07)', background: 'var(--rp-surface-2)' }}>
         <div className="flex items-center gap-3 min-w-0">
           <div>
-            <h1 className="font-display text-[18px] font-medium tracking-[-0.01em] leading-none text-[#18231f] dark:text-[#dfd9d0]">Website Builder</h1>
-            <p className="text-[11.5px] mt-0.5 hidden sm:block text-[#7a9890] dark:text-[#94b8b0]">Design and publish your public resort website</p>
+            <h1 className="font-display text-[18px] font-medium tracking-[-0.01em] leading-none text-[#183153] dark:text-[#f8fafc]">Website Builder</h1>
+            <p className="text-[11.5px] mt-0.5 hidden sm:block text-[#64748b] dark:text-[#a9c1d0]">Design and publish your public resort website</p>
           </div>
           {publicUrl && (
             <span className="hidden sm:flex items-center gap-1.5 rounded-full border px-[9px] py-[3px] text-[11px] font-semibold"
-              style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+              style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
               <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: '#4ade80' }} /> Live
             </span>
           )}
@@ -307,7 +307,7 @@ export default function WebsitePage() {
           <button onClick={() => setShowPreview(v => !v)} title={showPreview ? 'Hide preview' : 'Show preview'}
             className="hidden lg:flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12px] font-medium transition-colors"
             style={showPreview
-              ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }
+              ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }
               : { background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
             {showPreview ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRight className="h-3.5 w-3.5" />}
             {showPreview ? 'Hide Preview' : 'Show Preview'}
@@ -338,7 +338,7 @@ export default function WebsitePage() {
               <button key={id} onClick={() => setTab(id)}
                 className="flex items-center gap-1.5 px-3 py-2.5 text-[12px] font-medium border-b-2 -mb-px transition-colors whitespace-nowrap"
                 style={tab === id
-                  ? { borderColor: '#23766a', color: '#23766a' }
+                  ? { borderColor: '#183153', color: '#183153' }
                   : { borderColor: 'transparent', color: 'var(--rp-text-muted)' }}>
                 <Icon className="h-3.5 w-3.5" /> {label}
               </button>
@@ -351,10 +351,10 @@ export default function WebsitePage() {
             {/* Live URL banner — canonical public address + copy */}
             {publicUrl && tenant?.slug && (
               <div className="flex items-center gap-2 rounded-[10px] border px-3 py-2"
-                style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)' }}>
-                <Globe className="h-3.5 w-3.5 shrink-0" style={{ color: '#23766a' }} />
+                style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)' }}>
+                <Globe className="h-3.5 w-3.5 shrink-0" style={{ color: '#183153' }} />
                 <a href={publicUrl} target="_blank" rel="noopener noreferrer"
-                  className="text-[12px] font-semibold truncate hover:underline" style={{ color: '#23766a' }}>
+                  className="text-[12px] font-semibold truncate hover:underline" style={{ color: '#183153' }}>
                   {tenant.slug}.resortpro.site
                 </a>
                 <button
@@ -365,7 +365,7 @@ export default function WebsitePage() {
                   }}
                   title="Copy site address"
                   className="ml-auto flex shrink-0 items-center gap-1 rounded-[7px] border px-2 py-1 text-[11px] font-semibold transition-colors hover:bg-white/60"
-                  style={{ borderColor: 'rgba(35,118,106,0.25)', color: '#23766a' }}>
+                  style={{ borderColor: 'rgba(24,49,83,0.25)', color: '#183153' }}>
                   {urlCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                   {urlCopied ? 'Copied' : 'Copy'}
                 </button>
@@ -373,7 +373,7 @@ export default function WebsitePage() {
                   onClick={() => window.open(publicUrl, '_blank')}
                   title="Open site"
                   className="flex shrink-0 items-center gap-1 rounded-[7px] border px-2 py-1 text-[11px] font-semibold transition-colors hover:bg-white/60"
-                  style={{ borderColor: 'rgba(35,118,106,0.25)', color: '#23766a' }}>
+                  style={{ borderColor: 'rgba(24,49,83,0.25)', color: '#183153' }}>
                   <ExternalLink className="h-3 w-3" /> Open
                 </button>
               </div>
@@ -384,14 +384,14 @@ export default function WebsitePage() {
               <div className={cardCls} style={cardStyle}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-[13.5px] font-bold text-[#18231f]">Your site is {checklistPct}% ready</h3>
-                    <p className="text-[11.5px] text-[#8aa29a]">Finish these to make a great first impression</p>
+                    <h3 className="text-[13.5px] font-bold text-[#183153]">Your site is {checklistPct}% ready</h3>
+                    <p className="text-[11.5px] text-[#64748b]">Finish these to make a great first impression</p>
                   </div>
-                  <span className="text-[12px] font-bold" style={{ color: '#23766a' }}>{checklistDone}/{checklist.length}</span>
+                  <span className="text-[12px] font-bold" style={{ color: '#183153' }}>{checklistDone}/{checklist.length}</span>
                 </div>
                 <div className="h-1.5 w-full overflow-hidden rounded-full" style={{ background: 'var(--rp-surface-3)' }}>
                   <div className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${checklistPct}%`, background: '#23766a' }} />
+                    style={{ width: `${checklistPct}%`, background: '#183153' }} />
                 </div>
                 <ul className="space-y-1.5">
                   {checklist.map(item => (
@@ -401,12 +401,12 @@ export default function WebsitePage() {
                         disabled={item.done}
                         className="flex w-full items-center gap-2 rounded-[8px] px-2 py-1.5 text-left text-[12.5px] transition-colors disabled:cursor-default enabled:hover:bg-black/[0.03]">
                         {item.done
-                          ? <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: '#23766a' }} />
+                          ? <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: '#183153' }} />
                           : <span className="h-4 w-4 shrink-0 rounded-full border-2" style={{ borderColor: 'rgba(0,0,0,0.15)' }} />}
-                        <span style={item.done ? { color: '#8aa29a', textDecoration: 'line-through' } : { color: '#18231f' }}>
+                        <span style={item.done ? { color: '#64748b', textDecoration: 'line-through' } : { color: '#183153' }}>
                           {item.label}
                         </span>
-                        {!item.done && <span className="ml-auto text-[11px] font-semibold" style={{ color: '#23766a' }}>Fix →</span>}
+                        {!item.done && <span className="ml-auto text-[11px] font-semibold" style={{ color: '#183153' }}>Fix →</span>}
                       </button>
                     </li>
                   ))}
@@ -431,9 +431,9 @@ export default function WebsitePage() {
             {tab === 'hero' && (
               <div className="space-y-4">
                 <div className={cardCls} style={cardStyle}>
-                  <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">
+                  <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                     <div className="flex h-7 w-7 items-center justify-center rounded-[7px]" style={{ background: 'var(--rp-teal-bg)' }}>
-                      <Globe className="h-3.5 w-3.5" style={{ color: '#23766a' }} />
+                      <Globe className="h-3.5 w-3.5" style={{ color: '#183153' }} />
                     </div>
                     Hero Section
                   </h3>
@@ -458,7 +458,7 @@ export default function WebsitePage() {
                 </div>
 
                 <div className={cardCls} style={cardStyle}>
-                  <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">
+                  <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                     <div className="flex h-7 w-7 items-center justify-center rounded-[7px]" style={{ background: 'var(--rp-amber-bg)' }}>
                       <FileText className="h-3.5 w-3.5" style={{ color: '#b89040' }} />
                     </div>
@@ -491,13 +491,13 @@ export default function WebsitePage() {
             {tab === 'gallery' && (
               <div className={cardCls} style={cardStyle}>
                 <div className="flex items-center justify-between">
-                  <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">
+                  <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                     <div className="flex h-7 w-7 items-center justify-center rounded-[7px]" style={{ background: 'var(--rp-coral-bg)' }}>
                       <Image className="h-3.5 w-3.5" style={{ color: '#b8724a' }} />
                     </div>
                     Gallery Images
                   </h3>
-                  <span className="text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">{(form.galleryImages ?? []).length} photos</span>
+                  <span className="text-[12px] text-[#64748b] dark:text-[#a9c1d0]">{(form.galleryImages ?? []).length} photos</span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {(form.galleryImages ?? []).map((url, i) => (
@@ -508,7 +508,7 @@ export default function WebsitePage() {
                       <button
                         onClick={() => set('galleryImages', (form.galleryImages ?? []).filter((_, idx) => idx !== i))}
                         className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100"
-                        style={{ background: 'rgba(27,52,47,0.7)', color: 'var(--rp-btn-accent-text)' }}>
+                        style={{ background: 'rgba(24,49,83,0.7)', color: 'var(--rp-btn-accent-text)' }}>
                         <Trash2 className="h-3 w-3" />
                       </button>
                     </div>
@@ -529,7 +529,7 @@ export default function WebsitePage() {
             {tab === 'testimonials' && (
               <div className={cardCls} style={cardStyle}>
                 <div className="flex items-center justify-between">
-                  <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">
+                  <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                     <div className="flex h-7 w-7 items-center justify-center rounded-[7px]" style={{ background: 'var(--rp-amber-bg)' }}>
                       <Star className="h-3.5 w-3.5" style={{ color: '#b89040' }} />
                     </div>
@@ -546,7 +546,7 @@ export default function WebsitePage() {
                   <div className="flex flex-col items-center justify-center py-12 rounded-[12px] border-2 border-dashed"
                     style={{ borderColor: 'rgba(184,144,64,0.25)', background: '#fdfbf6' }}>
                     <Star className="h-9 w-9 mb-3" style={{ color: '#e8d5a0' }} />
-                    <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No testimonials yet</p>
+                    <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">No testimonials yet</p>
                     <button onClick={addTestimonial}
                       className="mt-3 flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-[12.5px] font-medium hover:opacity-90"
                       style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
@@ -559,9 +559,9 @@ export default function WebsitePage() {
                       <div key={i} className="rounded-[12px] border p-4 space-y-3"
                         style={{ borderColor: 'var(--rp-border)', background: 'var(--rp-surface-2)' }}>
                         <div className="flex items-center justify-between">
-                          <span className="text-[12.5px] font-medium text-[#6b8880] dark:text-[#94b8b0]">Testimonial #{i + 1}</span>
+                          <span className="text-[12.5px] font-medium text-[#64748b] dark:text-[#a9c1d0]">Testimonial #{i + 1}</span>
                           <button onClick={() => removeTestimonial(i)}
-                            className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#fef2f2] text-[#c5bdb4] dark:text-[#6e8580]">
+                            className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#fef2f2] text-[#94a3b8] dark:text-[#7f99ab]">
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
@@ -596,9 +596,9 @@ export default function WebsitePage() {
             {tab === 'seo' && (
               <div className="space-y-4">
                 <div className={cardCls} style={cardStyle}>
-                  <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">
+                  <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                     <div className="flex h-7 w-7 items-center justify-center rounded-[7px]" style={{ background: 'var(--rp-teal-bg)' }}>
-                      <FileText className="h-3.5 w-3.5" style={{ color: '#23766a' }} />
+                      <FileText className="h-3.5 w-3.5" style={{ color: '#183153' }} />
                     </div>
                     SEO Settings
                   </h3>
@@ -606,44 +606,44 @@ export default function WebsitePage() {
                     <label className={labelCls}>SEO Title</label>
                     <input value={form.seoTitle ?? ''} onChange={e => set('seoTitle', e.target.value)}
                       placeholder="Palm Paradise Resort — Luxury Stays" className={inputCls} />
-                    <p className="mt-1 text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">{(form.seoTitle ?? '').length}/60 characters recommended</p>
+                    <p className="mt-1 text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">{(form.seoTitle ?? '').length}/60 characters recommended</p>
                   </div>
                   <div>
                     <label className={labelCls}>Meta Description</label>
                     <textarea value={form.seoDescription ?? ''} onChange={e => set('seoDescription', e.target.value)}
                       rows={3} placeholder="Experience luxury like never before…"
                       className={inputCls + ' resize-none'} />
-                    <p className="mt-1 text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">{(form.seoDescription ?? '').length}/160 characters recommended</p>
+                    <p className="mt-1 text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">{(form.seoDescription ?? '').length}/160 characters recommended</p>
                   </div>
                   <div>
                     <label className={labelCls}>Google Analytics ID</label>
                     <input value={form.googleAnalyticsId ?? ''} onChange={e => set('googleAnalyticsId', e.target.value)}
                       placeholder="G-XXXXXXXXXX" className={inputCls} />
-                    <p className="mt-1 text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+                    <p className="mt-1 text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">
                       Your GA4 Measurement ID — find it in{' '}
                       <a href="https://analytics.google.com" target="_blank" rel="noopener noreferrer"
-                        className="underline" style={{ color: '#23766a' }}>Google Analytics</a>
+                        className="underline" style={{ color: '#183153' }}>Google Analytics</a>
                       {' '}→ Admin → Data Streams.
                     </p>
                   </div>
                 </div>
 
                 <div className={cardCls} style={cardStyle}>
-                  <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">
+                  <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                     <div className="flex h-7 w-7 items-center justify-center rounded-[7px]" style={{ background: 'var(--rp-amber-bg)' }}>
                       <Palette className="h-3.5 w-3.5" style={{ color: '#b89040' }} />
                     </div>
                     Brand Colors
                   </h3>
-                  <p className="text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">These colors apply to your selected template.</p>
+                  <p className="text-[12px] text-[#64748b] dark:text-[#a9c1d0]">These colors apply to your selected template.</p>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className={labelCls}>Primary Color</label>
                       <div className="flex gap-2 items-center">
-                        <input type="color" value={form.primaryColor ?? '#1a6b5e'} onChange={e => set('primaryColor', e.target.value)}
+                        <input type="color" value={form.primaryColor ?? '#183153'} onChange={e => set('primaryColor', e.target.value)}
                           className="h-9 w-12 cursor-pointer rounded-[6px] border border-black/10" />
                         <input value={form.primaryColor ?? ''} onChange={e => set('primaryColor', e.target.value)}
-                          placeholder="#1a6b5e" className={inputCls + ' font-mono'} />
+                          placeholder="#183153" className={inputCls + ' font-mono'} />
                       </div>
                     </div>
                     <div>
@@ -657,7 +657,7 @@ export default function WebsitePage() {
                     </div>
                   </div>
                   <div className="rounded-[10px] overflow-hidden border" style={{ borderColor: 'var(--rp-border)' }}>
-                    <div className="p-3 text-[13px] font-semibold text-white" style={{ background: form.primaryColor ?? '#1a6b5e' }}>
+                    <div className="p-3 text-[13px] font-semibold text-white" style={{ background: form.primaryColor ?? '#183153' }}>
                       Primary — Hero, Nav & Buttons
                     </div>
                     <div className="p-3 text-[13px] font-semibold" style={{ background: form.accentColor ?? '#d4a853' }}>
@@ -682,13 +682,13 @@ export default function WebsitePage() {
               const byId = Object.fromEntries(SITE_SECTIONS.map(s => [s.id, s]));
               return (
                 <div className={cardCls} style={cardStyle}>
-                  <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">
+                  <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                     <div className="flex h-7 w-7 items-center justify-center rounded-[7px]" style={{ background: 'var(--rp-teal-bg)' }}>
-                      <LayoutGrid className="h-3.5 w-3.5" style={{ color: '#23766a' }} />
+                      <LayoutGrid className="h-3.5 w-3.5" style={{ color: '#183153' }} />
                     </div>
                     Page Sections
                   </h3>
-                  <p className="text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">
+                  <p className="text-[12px] text-[#64748b] dark:text-[#a9c1d0]">
                     Use the arrows to change the order sections appear on your website. Toggle to show or hide a section.
                   </p>
                   <div className="space-y-2.5">
@@ -706,35 +706,35 @@ export default function WebsitePage() {
                           className="flex items-center gap-3 rounded-[10px] border p-3 transition-all"
                           style={isHidden
                             ? { background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border)', opacity: 0.65 }
-                            : { background: 'var(--rp-teal-soft)', borderColor: 'rgba(35,118,106,0.18)' }}>
+                            : { background: 'var(--rp-teal-soft)', borderColor: 'rgba(24,49,83,0.18)' }}>
                           {/* Reorder arrows */}
                           <div className="flex flex-col">
                             <button type="button" onClick={() => move(sec.id, -1)} disabled={idx === 0}
                               title="Move up"
                               className="flex h-5 w-6 items-center justify-center rounded-[5px] transition-colors disabled:opacity-25 enabled:hover:bg-black/[0.06]">
-                              <ChevronUp className="h-3.5 w-3.5" style={{ color: '#23766a' }} />
+                              <ChevronUp className="h-3.5 w-3.5" style={{ color: '#183153' }} />
                             </button>
                             <button type="button" onClick={() => move(sec.id, 1)} disabled={idx === order.length - 1}
                               title="Move down"
                               className="flex h-5 w-6 items-center justify-center rounded-[5px] transition-colors disabled:opacity-25 enabled:hover:bg-black/[0.06]">
-                              <ChevronDown className="h-3.5 w-3.5" style={{ color: '#23766a' }} />
+                              <ChevronDown className="h-3.5 w-3.5" style={{ color: '#183153' }} />
                             </button>
                           </div>
                           <div className="flex-1">
                             <p className="text-[13px] font-medium" style={{ color: isHidden ? 'var(--rp-text-muted)' : 'var(--rp-text)', textDecoration: isHidden ? 'line-through' : undefined }}>
                               {sec.label}
                             </p>
-                            <p className="text-[11.5px] mt-0.5 text-[#c5bdb4] dark:text-[#6e8580]">{sec.desc}</p>
+                            <p className="text-[11.5px] mt-0.5 text-[#94a3b8] dark:text-[#7f99ab]">{sec.desc}</p>
                           </div>
                           {sec.fixed ? (
                             <span className="shrink-0 rounded-full border px-2 py-0.5 text-[10.5px] font-semibold"
-                              style={{ borderColor: 'rgba(35,118,106,0.25)', color: '#23766a' }}>
+                              style={{ borderColor: 'rgba(24,49,83,0.25)', color: '#183153' }}>
                               Always shown
                             </span>
                           ) : (
                             <button type="button" onClick={e => { e.stopPropagation(); toggle(); }}
                               className="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors"
-                              style={{ background: isHidden ? '#d6d0c8' : '#23766a' }}>
+                              style={{ background: isHidden ? '#d6d0c8' : '#183153' }}>
                               <span className="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
                                 style={{ transform: isHidden ? 'translateX(4px)' : 'translateX(24px)' }} />
                             </button>
@@ -744,7 +744,7 @@ export default function WebsitePage() {
                     })}
                   </div>
                   <button type="button" onClick={() => set('sectionOrder', [])}
-                    className="text-[12px] font-medium underline-offset-2 hover:underline" style={{ color: '#8aa29a' }}>
+                    className="text-[12px] font-medium underline-offset-2 hover:underline" style={{ color: '#64748b' }}>
                     Reset to default order
                   </button>
                 </div>
@@ -755,13 +755,13 @@ export default function WebsitePage() {
             {tab === 'social' && (
               <div className="space-y-4">
                 <div className={cardCls} style={cardStyle}>
-                  <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">
+                  <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                     <div className="flex h-7 w-7 items-center justify-center rounded-[7px]" style={{ background: 'var(--rp-teal-bg)' }}>
-                      <Share2 className="h-3.5 w-3.5" style={{ color: '#23766a' }} />
+                      <Share2 className="h-3.5 w-3.5" style={{ color: '#183153' }} />
                     </div>
                     Social Profiles
                   </h3>
-                  <p className="text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">These links appear in your website footer. Leave blank to hide.</p>
+                  <p className="text-[12px] text-[#64748b] dark:text-[#a9c1d0]">These links appear in your website footer. Leave blank to hide.</p>
                   {[
                     { key: 'facebookUrl',   label: 'Facebook',    placeholder: 'https://facebook.com/yourresort',   emoji: '📘' },
                     { key: 'instagramUrl',  label: 'Instagram',   placeholder: 'https://instagram.com/yourresort',  emoji: '📸' },
@@ -782,19 +782,19 @@ export default function WebsitePage() {
                 </div>
 
                 <div className={cardCls} style={cardStyle}>
-                  <h3 className="text-[13.5px] font-semibold flex items-center gap-2 text-[#18231f] dark:text-[#dfd9d0]">
+                  <h3 className="text-[13.5px] font-semibold flex items-center gap-2 text-[#183153] dark:text-[#f8fafc]">
                     <span className="text-[16px]">💬</span> WhatsApp
                   </h3>
-                  <p className="text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">A floating "Chat with us" button will appear on your public website.</p>
+                  <p className="text-[12px] text-[#64748b] dark:text-[#a9c1d0]">A floating "Chat with us" button will appear on your public website.</p>
                   <div>
                     <label className={labelCls}>WhatsApp Number</label>
                     <input value={form.whatsappNumber ?? ''} onChange={e => set('whatsappNumber', e.target.value)}
                       placeholder="+8801XXXXXXXXX" className={inputCls} />
-                    <p className="mt-1 text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">Include country code. E.g. +8801712345678</p>
+                    <p className="mt-1 text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">Include country code. E.g. +8801712345678</p>
                   </div>
                   {form.whatsappNumber && (
-                    <div className="rounded-[10px] border p-4" style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)' }}>
-                      <p className="text-[12px] font-medium mb-2" style={{ color: '#23766a' }}>Preview</p>
+                    <div className="rounded-[10px] border p-4" style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)' }}>
+                      <p className="text-[12px] font-medium mb-2" style={{ color: '#183153' }}>Preview</p>
                       <a href={`https://wa.me/${form.whatsappNumber.replace(/\D/g, '')}`}
                         target="_blank" rel="noopener noreferrer"
                         className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-medium text-white hover:opacity-90 transition-colors"
@@ -818,15 +818,15 @@ export default function WebsitePage() {
 
                 {tenant?.slug && (
                   <div className="flex items-start gap-3 rounded-[12px] border p-4"
-                    style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)' }}>
-                    <Globe className="h-5 w-5 mt-0.5 shrink-0" style={{ color: '#23766a' }} />
+                    style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)' }}>
+                    <Globe className="h-5 w-5 mt-0.5 shrink-0" style={{ color: '#183153' }} />
                     <div>
-                      <p className="text-[13px] font-semibold mb-0.5" style={{ color: '#1b342f' }}>Your free subdomain</p>
+                      <p className="text-[13px] font-semibold mb-0.5" style={{ color: '#183153' }}>Your free subdomain</p>
                       <a href={`https://${tenant.slug}.resortpro.site`} target="_blank" rel="noopener noreferrer"
-                        className="text-[12.5px] font-mono flex items-center gap-1 hover:underline" style={{ color: '#23766a' }}>
+                        className="text-[12.5px] font-mono flex items-center gap-1 hover:underline" style={{ color: '#183153' }}>
                         {tenant.slug}.resortpro.site <ExternalLink className="h-3 w-3" />
                       </a>
-                      <p className="mt-1 text-[11.5px] text-[#4a6e66] dark:text-[#6d9990]">This always works — no setup required.</p>
+                      <p className="mt-1 text-[11.5px] text-[#475569] dark:text-[#9db4c4]">This always works — no setup required.</p>
                     </div>
                   </div>
                 )}
@@ -834,11 +834,11 @@ export default function WebsitePage() {
                 <div className={cardCls} style={cardStyle}>
                   <div className="flex items-center gap-2">
                     <div className="flex h-7 w-7 items-center justify-center rounded-[7px]" style={{ background: 'var(--rp-surface-3)' }}>
-                      <Link2 className="h-3.5 w-3.5 text-[#6b8880] dark:text-[#94b8b0]" />
+                      <Link2 className="h-3.5 w-3.5 text-[#64748b] dark:text-[#a9c1d0]" />
                     </div>
-                    <h3 className="text-[13.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">Connect a Custom Domain</h3>
+                    <h3 className="text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">Connect a Custom Domain</h3>
                   </div>
-                  <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+                  <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">
                     Use your own domain (e.g.{' '}
                     <code className="rounded-[5px] px-1 py-0.5 text-[11px] font-mono"
                       style={{ background: 'var(--rp-surface-3)', color: 'var(--rp-text-subtle)' }}>www.sunsetresort.com</code>
@@ -848,20 +848,20 @@ export default function WebsitePage() {
                   {domainInfo?.customDomain && (
                     <div className="flex items-center gap-3 rounded-[10px] border p-3"
                       style={domainInfo.domainVerified
-                        ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)' }
+                        ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)' }
                         : { background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.25)' }}>
                       {domainInfo.domainVerified
-                        ? <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: '#23766a' }} />
+                        ? <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: '#183153' }} />
                         : <AlertTriangle className="h-5 w-5 shrink-0" style={{ color: '#b89040' }} />}
                       <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold font-mono truncate text-[#18231f] dark:text-[#dfd9d0]">{domainInfo.customDomain}</p>
-                        <p className="text-[11.5px]" style={{ color: domainInfo.domainVerified ? '#23766a' : '#b89040' }}>
+                        <p className="text-[13px] font-semibold font-mono truncate text-[#183153] dark:text-[#f8fafc]">{domainInfo.customDomain}</p>
+                        <p className="text-[11.5px]" style={{ color: domainInfo.domainVerified ? '#183153' : '#b89040' }}>
                           {domainInfo.domainVerified ? 'Verified & live' : 'Pending DNS verification'}
                         </p>
                       </div>
                       {domainInfo.domainVerified && (
                         <a href={`https://${domainInfo.customDomain}`} target="_blank" rel="noopener noreferrer"
-                          style={{ color: '#23766a' }}>
+                          style={{ color: '#183153' }}>
                           <ExternalLink className="h-4 w-4" />
                         </a>
                       )}
@@ -882,7 +882,7 @@ export default function WebsitePage() {
                         {domainInput ? 'Save' : 'Remove'}
                       </button>
                     </div>
-                    <p className="mt-1 text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">Enter the exact domain with www or without — whichever you want to use.</p>
+                    <p className="mt-1 text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">Enter the exact domain with www or without — whichever you want to use.</p>
                   </div>
 
                   {domainInfo?.customDomain && !domainInfo.domainVerified && (
@@ -905,15 +905,15 @@ export default function WebsitePage() {
 
                 {domainInfo?.customDomain && !domainInfo.domainVerified && (
                   <div className={cardCls} style={cardStyle}>
-                    <h4 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">
-                      <FileText className="h-4 w-4 text-[#8aa29a] dark:text-[#94b8b0]" /> DNS Setup Instructions
+                    <h4 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">
+                      <FileText className="h-4 w-4 text-[#64748b] dark:text-[#a9c1d0]" /> DNS Setup Instructions
                     </h4>
-                    <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+                    <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">
                       Add <strong>one</strong> of these records in your DNS provider (Cloudflare, GoDaddy, Namecheap, etc.):
                     </p>
                     <div className="rounded-[10px] border p-4 space-y-3"
                       style={{ background: 'var(--rp-surface-2)', borderColor: 'var(--rp-border)' }}>
-                      <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-[#8aa29a] dark:text-[#94b8b0]">Option 1 — CNAME (recommended)</p>
+                      <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-[#64748b] dark:text-[#a9c1d0]">Option 1 — CNAME (recommended)</p>
                       <div className="grid grid-cols-3 gap-3">
                         {[
                           { label: 'Type',          value: 'CNAME' },
@@ -921,13 +921,13 @@ export default function WebsitePage() {
                           { label: 'Value / Target', value: domainInfo.cnameTarget ?? `${tenant?.slug}.resortpro.site` },
                         ].map(({ label, value }) => (
                           <div key={label}>
-                            <p className="text-[10.5px] mb-1 text-[#8aa29a] dark:text-[#94b8b0]">{label}</p>
-                            <code className="block rounded-[6px] border px-2 py-1 text-[11px] font-mono break-all bg-white dark:bg-white/5" style={{ borderColor: 'var(--rp-border)', color: '#23766a' }}>{value}</code>
+                            <p className="text-[10.5px] mb-1 text-[#64748b] dark:text-[#a9c1d0]">{label}</p>
+                            <code className="block rounded-[6px] border px-2 py-1 text-[11px] font-mono break-all bg-white dark:bg-white/5" style={{ borderColor: 'var(--rp-border)', color: '#183153' }}>{value}</code>
                           </div>
                         ))}
                       </div>
                     </div>
-                    <p className="text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">
+                    <p className="text-[12px] text-[#64748b] dark:text-[#a9c1d0]">
                       DNS changes can take up to <strong>48 hours</strong> to propagate. Once set, click <strong>Verify Domain</strong> above.
                     </p>
                     <div className="rounded-[10px] border p-3" style={{ background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.2)' }}>
@@ -940,19 +940,19 @@ export default function WebsitePage() {
 
                 {domainInfo?.domainVerified && (
                   <div className="flex items-start gap-3 rounded-[12px] border p-5"
-                    style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)' }}>
-                    <CheckCircle2 className="h-6 w-6 mt-0.5 shrink-0" style={{ color: '#23766a' }} />
+                    style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)' }}>
+                    <CheckCircle2 className="h-6 w-6 mt-0.5 shrink-0" style={{ color: '#183153' }} />
                     <div>
-                      <p className="text-[14px] font-semibold" style={{ color: '#1b342f' }}>Domain is live!</p>
-                      <p className="text-[12.5px] mt-0.5 text-[#4a6e66] dark:text-[#6d9990]">
+                      <p className="text-[14px] font-semibold" style={{ color: '#183153' }}>Domain is live!</p>
+                      <p className="text-[12.5px] mt-0.5 text-[#475569] dark:text-[#9db4c4]">
                         Your website is accessible at{' '}
                         <a href={`https://${domainInfo.customDomain}`} target="_blank" rel="noopener noreferrer"
-                          className="font-semibold underline" style={{ color: '#23766a' }}>
+                          className="font-semibold underline" style={{ color: '#183153' }}>
                           {domainInfo.customDomain}
                         </a>
                       </p>
                       {domainInfo.domainVerifiedAt && (
-                        <p className="text-[11.5px] mt-1 text-[#8aa29a] dark:text-[#94b8b0]">
+                        <p className="text-[11.5px] mt-1 text-[#64748b] dark:text-[#a9c1d0]">
                           Verified on {new Date(domainInfo.domainVerifiedAt).toLocaleDateString()}
                         </p>
                       )}
@@ -979,7 +979,7 @@ export default function WebsitePage() {
             {/* Preview toolbar */}
             <div className="flex items-center gap-2 px-4 py-2 flex-shrink-0"
               style={{ borderBottom: '1px solid rgba(0,0,0,0.07)', background: 'var(--rp-surface-2)' }}>
-              <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[#4a6e66] dark:text-[#6d9990]">
+              <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[#475569] dark:text-[#9db4c4]">
                 <span className="h-2 w-2 rounded-full animate-pulse" style={{ background: '#f59e0b' }} />
                 Live Preview
               </span>
@@ -991,23 +991,23 @@ export default function WebsitePage() {
                 <button onClick={() => setMobileView(false)} title="Desktop view"
                   className="flex h-[26px] w-[26px] items-center justify-center rounded-[6px] transition-colors"
                   style={!mobileView
-                    ? { background: 'var(--rp-teal-bg)', color: '#23766a' }
+                    ? { background: 'var(--rp-teal-bg)', color: '#183153' }
                     : { color: 'var(--rp-text-faint)' }}>
                   <Monitor className="h-3.5 w-3.5" />
                 </button>
                 <button onClick={() => setMobileView(true)} title="Mobile view"
                   className="flex h-[26px] w-[26px] items-center justify-center rounded-[6px] transition-colors"
                   style={mobileView
-                    ? { background: 'var(--rp-teal-bg)', color: '#23766a' }
+                    ? { background: 'var(--rp-teal-bg)', color: '#183153' }
                     : { color: 'var(--rp-text-faint)' }}>
                   <Smartphone className="h-3.5 w-3.5" />
                 </button>
                 <button onClick={() => setPreviewKey(k => k + 1)} title="Reload preview"
-                  className="flex h-[26px] w-[26px] items-center justify-center rounded-[6px] ml-1 transition-colors hover:opacity-70 text-[#8aa29a] dark:text-[#94b8b0]">
+                  className="flex h-[26px] w-[26px] items-center justify-center rounded-[6px] ml-1 transition-colors hover:opacity-70 text-[#64748b] dark:text-[#a9c1d0]">
                   <RefreshCw className="h-3.5 w-3.5" />
                 </button>
                 <a href={previewUrl} target="_blank" rel="noopener noreferrer" title="Open in new tab"
-                  className="flex h-[26px] w-[26px] items-center justify-center rounded-[6px] transition-colors hover:opacity-70 text-[#8aa29a] dark:text-[#94b8b0]">
+                  className="flex h-[26px] w-[26px] items-center justify-center rounded-[6px] transition-colors hover:opacity-70 text-[#64748b] dark:text-[#a9c1d0]">
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               </div>
@@ -1059,7 +1059,7 @@ export default function WebsitePage() {
         <div className="space-y-3">
           <p className="text-[13px] leading-relaxed" style={{ color: 'var(--rp-text-muted)' }}>
             Guests will see the updated site at{' '}
-            <span className="font-semibold" style={{ color: '#23766a' }}>{tenant?.slug}.resortpro.site</span>{' '}
+            <span className="font-semibold" style={{ color: '#183153' }}>{tenant?.slug}.resortpro.site</span>{' '}
             as soon as you publish.
           </p>
           {checklistPct < 100 && (

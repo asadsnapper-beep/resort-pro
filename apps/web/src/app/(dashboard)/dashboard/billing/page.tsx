@@ -46,7 +46,7 @@ function StatusPill({ status, trialDaysLeft }: { status: string; trialDaysLeft: 
   );
   if (status === 'active') return (
     <span className="inline-flex items-center gap-1.5 rounded-[7px] border px-[9px] py-[3px] text-[11.5px] font-semibold"
-      style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+      style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
       <CheckCircle2 className="h-3 w-3" /> Active
     </span>
   );
@@ -87,14 +87,14 @@ function PlanCard({ plan, currentPlan, onSelect, onBkash, loading, bkashEnabled,
   return (
     <div className="relative flex flex-col gap-4 rounded-[16px] border-2 p-6 transition-all"
       style={isPro
-        ? { borderColor: '#23766a', boxShadow: '0 4px 24px rgba(35,118,106,0.12)' }
+        ? { borderColor: '#183153', boxShadow: '0 4px 24px rgba(24,49,83,0.12)' }
         : isCurrent
         ? { borderColor: 'rgba(184,144,64,0.4)', background: isDark ? 'rgba(184,144,64,0.05)' : '#fffdf6' }
         : { borderColor: 'var(--rp-border-md)' }}>
       {isPro && (
         <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
           <span className="rounded-full px-3 py-1 text-[11px] font-bold"
-            style={{ background: '#23766a', color: 'var(--rp-btn-accent-text)' }}>MOST POPULAR</span>
+            style={{ background: '#183153', color: 'var(--rp-btn-accent-text)' }}>MOST POPULAR</span>
         </div>
       )}
       {isCurrent && (
@@ -105,26 +105,26 @@ function PlanCard({ plan, currentPlan, onSelect, onBkash, loading, bkashEnabled,
       )}
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-[10px]"
-          style={isPro ? { background: '#23766a', color: 'var(--rp-btn-accent-text)' } : { background: 'var(--rp-surface-3)', color: 'var(--rp-text-muted)' }}>
+          style={isPro ? { background: '#183153', color: 'var(--rp-btn-accent-text)' } : { background: 'var(--rp-surface-3)', color: 'var(--rp-text-muted)' }}>
           {iconMap[planKey] ?? <Zap className="h-5 w-5" />}
         </div>
         <div>
-          <h3 className="font-bold text-[15px] text-[#18231f] dark:text-[#dfd9d0]">{plan.name}</h3>
-          <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+          <h3 className="font-bold text-[15px] text-[#183153] dark:text-[#f8fafc]">{plan.name}</h3>
+          <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">
             {plan.roomLimit === -1 ? 'Unlimited rooms' : `Up to ${plan.roomLimit} rooms`}
           </p>
         </div>
       </div>
       <div className="flex items-end gap-1">
-        <span className="text-[36px] font-bold leading-none text-[#18231f] dark:text-[#dfd9d0]">
+        <span className="text-[36px] font-bold leading-none text-[#183153] dark:text-[#f8fafc]">
           {plan.price === 0 ? 'Free' : `$${plan.price}`}
         </span>
-        {plan.price > 0 && <span className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0] mb-1">/month</span>}
+        {plan.price > 0 && <span className="text-[13px] text-[#64748b] dark:text-[#a9c1d0] mb-1">/month</span>}
       </div>
       <ul className="flex flex-1 flex-col gap-2">
         {plan.features.map(f => (
-          <li key={f} className="flex items-center gap-2 text-[13px] text-[#4a6e66] dark:text-[#6d9990]">
-            <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: '#23766a' }} />
+          <li key={f} className="flex items-center gap-2 text-[13px] text-[#475569] dark:text-[#9db4c4]">
+            <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: '#183153' }} />
             {f}
           </li>
         ))}
@@ -136,7 +136,7 @@ function PlanCard({ plan, currentPlan, onSelect, onBkash, loading, bkashEnabled,
             ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }
             : isCurrent
             ? { background: 'var(--rp-surface-3)', color: 'var(--rp-text-faint)', cursor: 'not-allowed' }
-            : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', border: isDark ? '2px solid #3a9a8b' : '2px solid #23766a', color: isDark ? '#5bbfb0' : '#23766a' }}>
+            : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', border: isDark ? '2px solid #5f8fb5' : '2px solid #183153', color: isDark ? '#9db4c4' : '#183153' }}>
           {loading === planKey
             ? <Loader2 className="h-4 w-4 animate-spin" />
             : <ArrowRight className="h-4 w-4" />}
@@ -220,7 +220,7 @@ export default function BillingPage() {
 
   if (pageLoading) return (
     <div className="flex min-h-[60vh] items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin" style={{ color: '#23766a' }} />
+      <Loader2 className="h-8 w-8 animate-spin" style={{ color: '#183153' }} />
     </div>
   );
 
@@ -240,22 +240,22 @@ export default function BillingPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-[10px]" style={{ background: 'var(--rp-teal-bg)' }}>
-              <Building2 className="h-6 w-6" style={{ color: '#23766a' }} />
+              <Building2 className="h-6 w-6" style={{ color: '#183153' }} />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-[17px] font-semibold capitalize text-[#18231f] dark:text-[#dfd9d0]">
+                <h2 className="text-[17px] font-semibold capitalize text-[#183153] dark:text-[#f8fafc]">
                   {currentPlan.toLowerCase()} Plan
                 </h2>
                 {billing && <StatusPill status={billing.planStatus} trialDaysLeft={billing.trialDaysLeft} />}
               </div>
               {billing?.currentPeriodEnd && billing.isActive && (
-                <p className="text-[12.5px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">
+                <p className="text-[12.5px] mt-0.5 text-[#64748b] dark:text-[#a9c1d0]">
                   Renews on {new Date(billing.currentPeriodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                 </p>
               )}
               {billing?.isTrialing && billing.trialEndsAt && (
-                <p className="text-[12.5px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">
+                <p className="text-[12.5px] mt-0.5 text-[#64748b] dark:text-[#a9c1d0]">
                   Trial ends {new Date(billing.trialEndsAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                 </p>
               )}
@@ -302,11 +302,11 @@ export default function BillingPage() {
 
       {/* Test mode notice */}
       <div className="flex items-start gap-3 rounded-[10px] border p-4"
-        style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)' }}>
-        <CreditCard className="h-5 w-5 shrink-0 mt-0.5" style={{ color: '#23766a' }} />
+        style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)' }}>
+        <CreditCard className="h-5 w-5 shrink-0 mt-0.5" style={{ color: '#183153' }} />
         <div>
-          <p className="text-[13px] font-semibold" style={{ color: '#1b342f' }}>Test Mode Active</p>
-          <p className="text-[12.5px] mt-0.5 text-[#4a6e66] dark:text-[#6d9990]">
+          <p className="text-[13px] font-semibold" style={{ color: '#183153' }}>Test Mode Active</p>
+          <p className="text-[12.5px] mt-0.5 text-[#475569] dark:text-[#9db4c4]">
             Use test card <strong>4242 4242 4242 4242</strong>, any future expiry, any 3-digit CVC. No real charges will be made.
           </p>
         </div>
@@ -314,8 +314,8 @@ export default function BillingPage() {
 
       {/* Plans */}
       <div>
-        <h2 className="font-display text-[19px] font-semibold mb-1 text-[#18231f] dark:text-[#dfd9d0]">Choose Your Plan</h2>
-        <p className="text-[13px] mb-6 text-[#8aa29a] dark:text-[#94b8b0]">All plans include a 3-month free trial. Cancel anytime.</p>
+        <h2 className="font-display text-[19px] font-semibold mb-1 text-[#183153] dark:text-[#f8fafc]">Choose Your Plan</h2>
+        <p className="text-[13px] mb-6 text-[#64748b] dark:text-[#a9c1d0]">All plans include a 3-month free trial. Cancel anytime.</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {(billing?.planConfigs ?? [])
             .filter(p => p.key !== 'FREE')
@@ -330,14 +330,14 @@ export default function BillingPage() {
       {/* Invoice history */}
       {invoices.length > 0 && (
         <div>
-          <h2 className="font-display text-[19px] font-semibold mb-4 text-[#18231f] dark:text-[#dfd9d0]">Invoice History</h2>
+          <h2 className="font-display text-[19px] font-semibold mb-4 text-[#183153] dark:text-[#f8fafc]">Invoice History</h2>
           <div className="rounded-[14px] border bg-white overflow-hidden"
             style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
             <table className="w-full">
               <thead>
                 <tr style={{ background: 'var(--rp-surface-2)', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
                   {['Invoice', 'Date', 'Amount', 'Status', ''].map(h => (
-                    <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] dark:text-[#94b8b0]">{h}</th>
+                    <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] dark:text-[#a9c1d0]">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -345,19 +345,19 @@ export default function BillingPage() {
                 {invoices.map(inv => (
                   <tr key={inv.id} className="hover:bg-[#fafaf8] transition-colors"
                     style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
-                    <td className="px-5 py-3.5 text-[12.5px] font-mono text-[#6b8880] dark:text-[#94b8b0]">
+                    <td className="px-5 py-3.5 text-[12.5px] font-mono text-[#64748b] dark:text-[#a9c1d0]">
                       {inv.number || inv.id.slice(0, 8)}
                     </td>
-                    <td className="px-5 py-3.5 text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+                    <td className="px-5 py-3.5 text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">
                       {new Date(inv.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </td>
-                    <td className="px-5 py-3.5 text-[13px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">
+                    <td className="px-5 py-3.5 text-[13px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                       {inv.currency} {inv.amount}
                     </td>
                     <td className="px-5 py-3.5">
                       <span className="inline-flex items-center rounded-[7px] border px-[8px] py-[3px] text-[11px] font-semibold capitalize"
                         style={inv.status === 'paid'
-                          ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }
+                          ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }
                           : inv.status === 'open'
                           ? { background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.2)', color: '#b89040' }
                           : { background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-muted)' }}>
@@ -368,7 +368,7 @@ export default function BillingPage() {
                       {inv.pdfUrl && (
                         <a href={inv.pdfUrl} target="_blank" rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 text-[12.5px] hover:underline"
-                          style={{ color: '#23766a' }}>
+                          style={{ color: '#183153' }}>
                           <Receipt className="h-3.5 w-3.5" /> PDF
                         </a>
                       )}
@@ -385,7 +385,7 @@ export default function BillingPage() {
         <div className="flex flex-col items-center gap-2 rounded-[14px] border p-10 text-center"
           style={{ background: 'var(--rp-surface-2)', borderColor: 'var(--rp-border)' }}>
           <Receipt className="h-10 w-10" style={{ color: '#e0dbd3' }} />
-          <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">
+          <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">
             No invoices yet. They will appear here after your first payment.
           </p>
         </div>

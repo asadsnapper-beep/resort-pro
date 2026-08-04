@@ -63,7 +63,7 @@ export default function ShareholdersPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px]" style={{ background: 'var(--rp-teal-bg)' }}>
-            <PieChart className="h-4 w-4" style={{ color: '#23766a' }} />
+            <PieChart className="h-4 w-4" style={{ color: '#183153' }} />
           </div>
           <PageHeader
             title="Shareholders"
@@ -83,10 +83,10 @@ export default function ShareholdersPage() {
       {/* Allocation bar */}
       <div className="rounded-[14px] border bg-white p-5" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[13px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">
+          <span className="text-[13px] font-semibold text-[#183153] dark:text-[#f8fafc]">
             Ownership Allocated: {totalAllocated.toFixed(1)}%
           </span>
-          <span className="text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">{remaining.toFixed(1)}% remaining</span>
+          <span className="text-[12px] text-[#64748b] dark:text-[#a9c1d0]">{remaining.toFixed(1)}% remaining</span>
         </div>
         <div className="h-2.5 w-full overflow-hidden rounded-full" style={{ background: 'var(--rp-surface-3)' }}>
           <div
@@ -108,8 +108,8 @@ export default function ShareholdersPage() {
             {pendingInvites.map((inv) => (
               <div key={inv.id} className="flex items-center gap-4 px-5 py-3.5" style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium truncate text-[#18231f] dark:text-[#dfd9d0]">{inv.email}</p>
-                  <p className="text-[11.5px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">
+                  <p className="text-[13px] font-medium truncate text-[#183153] dark:text-[#f8fafc]">{inv.email}</p>
+                  <p className="text-[11.5px] mt-0.5 text-[#64748b] dark:text-[#a9c1d0]">
                     {inv.ownershipPercent}% ownership · invited {new Date(inv.createdAt).toLocaleDateString('en-GB', { dateStyle: 'medium' })} · expires {new Date(inv.expiresAt).toLocaleDateString('en-GB', { dateStyle: 'medium' })}
                   </p>
                 </div>
@@ -130,14 +130,14 @@ export default function ShareholdersPage() {
       {/* List */}
       {isLoading ? (
         <div className="flex h-40 items-center justify-center">
-          <Loader2 className="h-7 w-7 animate-spin" style={{ color: '#9bbdb7' }} />
+          <Loader2 className="h-7 w-7 animate-spin" style={{ color: '#aac0d0' }} />
         </div>
       ) : shareholders.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-[14px] border bg-white py-14 text-center" style={{ borderColor: 'var(--rp-border)' }}>
           <div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'var(--rp-surface-3)' }}>
-            <Users className="h-7 w-7 text-[#c5bdb4] dark:text-[#6e8580]" />
+            <Users className="h-7 w-7 text-[#94a3b8] dark:text-[#7f99ab]" />
           </div>
-          <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">এখনো কোনো shareholder যোগ করা হয়নি।</p>
+          <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">এখনো কোনো shareholder যোগ করা হয়নি।</p>
         </div>
       ) : (
         <div className="rounded-[14px] border bg-white overflow-hidden" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
@@ -148,12 +148,12 @@ export default function ShareholdersPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="text-[13.5px] font-medium truncate text-[#18231f] dark:text-[#dfd9d0]">{s.user.firstName} {s.user.lastName}</p>
-                  <span className="rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ background: 'var(--rp-teal-bg)', color: '#23766a' }}>
+                  <p className="text-[13.5px] font-medium truncate text-[#183153] dark:text-[#f8fafc]">{s.user.firstName} {s.user.lastName}</p>
+                  <span className="rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ background: 'var(--rp-teal-bg)', color: '#183153' }}>
                     {s.ownershipPercent}%
                   </span>
                 </div>
-                <p className="text-[12px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">
+                <p className="text-[12px] mt-0.5 text-[#64748b] dark:text-[#a9c1d0]">
                   {s.user.email} · Joined {new Date(s.joinedAt).toLocaleDateString('en-GB', { dateStyle: 'medium' })}
                   {s.lastPayout && (
                     <span> · Last payout: ৳{s.lastPayout.amount.toLocaleString()} ({new Date(s.lastPayout.paidAt).toLocaleDateString('en-GB', { dateStyle: 'medium' })})</span>
@@ -256,7 +256,7 @@ function AddShareholderModal({ remaining, onClose, onDone }: { remaining: number
     >
       <div className="space-y-4">
         <div>
-          <label className="mb-1.5 block text-[12.5px] font-medium text-[#4a6e66] dark:text-[#94b8b0]">Email</label>
+          <label className="mb-1.5 block text-[12.5px] font-medium text-[#475569] dark:text-[#a9c1d0]">Email</label>
           <input
             type="email" value={email} onChange={(e) => setEmail(e.target.value)}
             placeholder="shareholder@email.com"
@@ -265,14 +265,14 @@ function AddShareholderModal({ remaining, onClose, onDone }: { remaining: number
           />
         </div>
         <div>
-          <label className="mb-1.5 block text-[12.5px] font-medium text-[#4a6e66] dark:text-[#94b8b0]">Ownership %</label>
+          <label className="mb-1.5 block text-[12.5px] font-medium text-[#475569] dark:text-[#a9c1d0]">Ownership %</label>
           <input
             type="number" min={0.01} max={remaining} step={0.01} value={pct} onChange={(e) => setPct(e.target.value)}
             placeholder="15"
             className="w-full rounded-[9px] border px-3.5 py-2.5 text-[13.5px] outline-none"
             style={{ borderColor: 'var(--rp-border-md)', background: 'var(--rp-surface)' }}
           />
-          <p className="mt-1 text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">{remaining.toFixed(1)}% remaining — max allowed</p>
+          <p className="mt-1 text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">{remaining.toFixed(1)}% remaining — max allowed</p>
         </div>
       </div>
     </ModalShell>
@@ -311,16 +311,16 @@ function EditShareholderModal({ shareholder, remaining, onClose, onDone }: { sha
     >
       <div className="space-y-4">
         <div>
-          <label className="mb-1.5 block text-[12.5px] font-medium text-[#4a6e66] dark:text-[#94b8b0]">Ownership %</label>
+          <label className="mb-1.5 block text-[12.5px] font-medium text-[#475569] dark:text-[#a9c1d0]">Ownership %</label>
           <input
             type="number" min={0.01} max={remaining} step={0.01} value={pct} onChange={(e) => setPct(e.target.value)}
             className="w-full rounded-[9px] border px-3.5 py-2.5 text-[13.5px] outline-none"
             style={{ borderColor: 'var(--rp-border-md)', background: 'var(--rp-surface)' }}
           />
-          <p className="mt-1 text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">{remaining.toFixed(1)}% max (including current)</p>
+          <p className="mt-1 text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">{remaining.toFixed(1)}% max (including current)</p>
         </div>
         <div>
-          <label className="mb-1.5 block text-[12.5px] font-medium text-[#4a6e66] dark:text-[#94b8b0]">Notes (owner-only)</label>
+          <label className="mb-1.5 block text-[12.5px] font-medium text-[#475569] dark:text-[#a9c1d0]">Notes (owner-only)</label>
           <textarea
             value={notes} onChange={(e) => setNotes(e.target.value)} rows={3}
             className="w-full rounded-[9px] border px-3.5 py-2.5 text-[13.5px] outline-none"
@@ -367,7 +367,7 @@ function RecordPayoutModal({ shareholder, onClose, onDone }: { shareholder: Shar
     >
       <div className="space-y-4">
         <div>
-          <label className="mb-1.5 block text-[12.5px] font-medium text-[#4a6e66] dark:text-[#94b8b0]">Amount (৳)</label>
+          <label className="mb-1.5 block text-[12.5px] font-medium text-[#475569] dark:text-[#a9c1d0]">Amount (৳)</label>
           <input
             type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)}
             className="w-full rounded-[9px] border px-3.5 py-2.5 text-[13.5px] outline-none"
@@ -376,7 +376,7 @@ function RecordPayoutModal({ shareholder, onClose, onDone }: { shareholder: Shar
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1.5 block text-[12.5px] font-medium text-[#4a6e66] dark:text-[#94b8b0]">Date</label>
+            <label className="mb-1.5 block text-[12.5px] font-medium text-[#475569] dark:text-[#a9c1d0]">Date</label>
             <input
               type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)}
               className="w-full rounded-[9px] border px-3.5 py-2.5 text-[13.5px] outline-none"
@@ -384,7 +384,7 @@ function RecordPayoutModal({ shareholder, onClose, onDone }: { shareholder: Shar
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-[12.5px] font-medium text-[#4a6e66] dark:text-[#94b8b0]">Method</label>
+            <label className="mb-1.5 block text-[12.5px] font-medium text-[#475569] dark:text-[#a9c1d0]">Method</label>
             <select
               value={method} onChange={(e) => setMethod(e.target.value)}
               className="w-full rounded-[9px] border px-3.5 py-2.5 text-[13.5px] outline-none"
@@ -395,7 +395,7 @@ function RecordPayoutModal({ shareholder, onClose, onDone }: { shareholder: Shar
           </div>
         </div>
         <div>
-          <label className="mb-1.5 block text-[12.5px] font-medium text-[#4a6e66] dark:text-[#94b8b0]">Note (optional)</label>
+          <label className="mb-1.5 block text-[12.5px] font-medium text-[#475569] dark:text-[#a9c1d0]">Note (optional)</label>
           <input
             type="text" value={note} onChange={(e) => setNote(e.target.value)}
             placeholder="e.g. Q1 distribution"
@@ -457,10 +457,10 @@ function PayoutHistoryModal({ shareholder, onClose }: { shareholder: Shareholder
     >
       {isLoading ? (
         <div className="flex h-24 items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin" style={{ color: '#9bbdb7' }} />
+          <Loader2 className="h-6 w-6 animate-spin" style={{ color: '#aac0d0' }} />
         </div>
       ) : payouts.length === 0 ? (
-        <p className="py-8 text-center text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">Ekhono kono payout record kora hoyni.</p>
+        <p className="py-8 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Ekhono kono payout record kora hoyni.</p>
       ) : (
         <div className="space-y-2">
           {payouts.map((p) => (
@@ -469,8 +469,8 @@ function PayoutHistoryModal({ shareholder, onClose }: { shareholder: Shareholder
                 <Banknote className="h-4 w-4" style={{ color: '#b89040' }} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[13.5px] font-medium text-[#18231f] dark:text-[#dfd9d0]">৳{p.amount.toLocaleString()}</p>
-                <p className="text-[12px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">
+                <p className="text-[13.5px] font-medium text-[#183153] dark:text-[#f8fafc]">৳{p.amount.toLocaleString()}</p>
+                <p className="text-[12px] mt-0.5 text-[#64748b] dark:text-[#a9c1d0]">
                   {new Date(p.paidAt).toLocaleDateString('en-GB', { dateStyle: 'medium' })} · {METHOD_LABEL[p.method] ?? p.method}
                   {p.note && <span> · {p.note}</span>}
                 </p>

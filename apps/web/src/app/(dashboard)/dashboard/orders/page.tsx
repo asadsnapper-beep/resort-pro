@@ -131,9 +131,9 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
     });
   };
 
-  const selectCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[8px] text-[13px] text-[#18231f] focus:outline-none focus:ring-1 focus:ring-resort-600/20';
-  const inputCls  = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#8aa29a] focus:outline-none focus:ring-1 focus:ring-resort-600/20';
-  const labelCls  = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+  const selectCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[8px] text-[13px] text-[#183153] focus:outline-none focus:ring-1 focus:ring-resort-600/20';
+  const inputCls  = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#64748b] focus:outline-none focus:ring-1 focus:ring-resort-600/20';
+  const labelCls  = 'block text-[11.5px] font-medium text-[#64748b] mb-1.5';
 
   return (
     <Modal open={open} onClose={onClose} title="New F&B Order" description="Create a food & beverage order" className="max-w-2xl">
@@ -159,49 +159,49 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
             {menuItems.map((item: MenuItem) => (
               <div key={item.id} className="flex items-center justify-between px-3 py-2 hover:bg-[#faf9f7] dark:hover:bg-white/5">
                 <div>
-                  <span className="text-[13px] font-medium text-[#18231f]">{item.name}</span>
-                  <span className="ml-2 text-[11.5px] text-[#8aa29a]">{item.category}</span>
+                  <span className="text-[13px] font-medium text-[#183153]">{item.name}</span>
+                  <span className="ml-2 text-[11.5px] text-[#64748b]">{item.category}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[13px] font-semibold text-[#23766a]">{formatCurrency(Number(item.price))}</span>
+                  <span className="text-[13px] font-semibold text-[#183153]">{formatCurrency(Number(item.price))}</span>
                   <button type="button" onClick={() => addToCart(item)}
                     className="rounded-[7px] border px-[9px] py-[4px] text-[11.5px] font-medium transition-colors"
-                    style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                    style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
                     + Add
                   </button>
                 </div>
               </div>
             ))}
-            {menuItems.length === 0 && <p className="py-4 text-center text-[13px] text-[#8aa29a]">No available menu items</p>}
+            {menuItems.length === 0 && <p className="py-4 text-center text-[13px] text-[#64748b]">No available menu items</p>}
           </div>
         </div>
         {cart.length > 0 && (
           <div className="rounded-[10px] border overflow-hidden" style={{ borderColor: 'var(--rp-border)' }}>
-            <div className="px-3 py-2 border-b text-[10.5px] font-semibold uppercase tracking-[0.07em] text-[#8aa29a]"
+            <div className="px-3 py-2 border-b text-[10.5px] font-semibold uppercase tracking-[0.07em] text-[#64748b]"
               style={{ borderColor: 'var(--rp-border)', background: 'var(--rp-surface-2)' }}>Order Summary</div>
             <div className="divide-y" style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
               {cart.map(item => (
                 <div key={item.menuItemId} className="flex items-center gap-3 px-3 py-2">
-                  <span className="flex-1 text-[13px] font-medium text-[#18231f]">{item.name}</span>
+                  <span className="flex-1 text-[13px] font-medium text-[#183153]">{item.name}</span>
                   <div className="flex items-center gap-1">
                     <button type="button" onClick={() => updateQty(item.menuItemId, item.quantity - 1)}
                       className="flex h-6 w-6 items-center justify-center rounded-[6px] border text-[12px] hover:bg-[#f4f1eb]"
                       style={{ borderColor: 'var(--rp-border-md)' }}>−</button>
-                    <span className="w-6 text-center text-[13px] font-medium text-[#18231f]">{item.quantity}</span>
+                    <span className="w-6 text-center text-[13px] font-medium text-[#183153]">{item.quantity}</span>
                     <button type="button" onClick={() => updateQty(item.menuItemId, item.quantity + 1)}
                       className="flex h-6 w-6 items-center justify-center rounded-[6px] border text-[12px] hover:bg-[#f4f1eb]"
                       style={{ borderColor: 'var(--rp-border-md)' }}>+</button>
                   </div>
-                  <span className="w-16 text-right text-[13px] font-semibold text-[#18231f]">{formatCurrency(item.price * item.quantity)}</span>
-                  <button type="button" onClick={() => updateQty(item.menuItemId, 0)} className="text-[#c5bdb4] hover:text-[#c43c3c]">
+                  <span className="w-16 text-right text-[13px] font-semibold text-[#183153]">{formatCurrency(item.price * item.quantity)}</span>
+                  <button type="button" onClick={() => updateQty(item.menuItemId, 0)} className="text-[#94a3b8] hover:text-[#c43c3c]">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
               ))}
             </div>
             <div className="flex items-center justify-between px-3 py-2 border-t" style={{ borderColor: 'var(--rp-border)', background: 'var(--rp-surface-2)' }}>
-              <span className="text-[13px] font-semibold text-[#18231f]">Total</span>
-              <span className="text-[13px] font-bold text-[#23766a]">{formatCurrency(total)}</span>
+              <span className="text-[13px] font-semibold text-[#183153]">Total</span>
+              <span className="text-[13px] font-bold text-[#183153]">{formatCurrency(total)}</span>
             </div>
           </div>
         )}
@@ -211,12 +211,12 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
         </div>
         <div className="flex gap-3 justify-end pt-2 border-t" style={{ borderColor: 'var(--rp-border)' }}>
           <button type="button" onClick={onClose}
-            className="rounded-[9px] border px-4 py-[8px] text-[13px] font-medium text-[#6b8880] hover:bg-[#f4f1eb]"
+            className="rounded-[9px] border px-4 py-[8px] text-[13px] font-medium text-[#64748b] hover:bg-[#f4f1eb]"
             style={{ borderColor: 'var(--rp-border-md)' }}>
             Cancel
           </button>
           <button type="submit" disabled={loading || cart.length === 0}
-            className="rounded-[9px] px-4 py-[8px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80 disabled:opacity-40"
+            className="rounded-[9px] px-4 py-[8px] text-[13px] font-medium text-[#f8fafc] transition-opacity hover:opacity-80 disabled:opacity-40"
             style={{ background: 'var(--rp-btn-accent)' }}>
             {loading ? 'Placing…' : `Place Order (${cart.length} item${cart.length !== 1 ? 's' : ''} · ${formatCurrency(total)})`}
           </button>
@@ -229,8 +229,8 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
 const ORDER_STATUS_PILL: Record<string, { bg: string; border: string; text: string; label: string }> = {
   PENDING:   { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'Pending' },
   PREPARING: { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a', label: 'Preparing' },
-  READY:     { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Ready' },
-  DELIVERED: { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Delivered' },
+  READY:     { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153', label: 'Ready' },
+  DELIVERED: { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153', label: 'Delivered' },
   CANCELLED: { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)', label: 'Cancelled' },
 };
 
@@ -263,20 +263,20 @@ function OrderCard({ order, expanded, onToggleExpand }: {
                 {cfg.label}
               </span>
               {order.guest && (
-                <span className="text-[13.5px] font-medium text-[#18231f]">
+                <span className="text-[13.5px] font-medium text-[#183153]">
                   {order.guest.firstName} {order.guest.lastName}
                 </span>
               )}
               {order.tableNumber && (
-                <span className="rounded-[6px] border px-[8px] py-[3px] text-[11.5px] text-[#6b8880]"
+                <span className="rounded-[6px] border px-[8px] py-[3px] text-[11.5px] text-[#64748b]"
                   style={{ background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border)' }}>
                   📍 {order.tableNumber}
                 </span>
               )}
-              <span className="text-[12px] text-[#8aa29a] ml-auto">{formatDate(order.createdAt)}</span>
+              <span className="text-[12px] text-[#64748b] ml-auto">{formatDate(order.createdAt)}</span>
             </div>
             <button className="mt-1 text-left" onClick={onToggleExpand}>
-              <p className="text-[12px] text-[#23766a] hover:underline">
+              <p className="text-[12px] text-[#183153] hover:underline">
                 {order.items.length} item{order.items.length !== 1 ? 's' : ''} · {formatCurrency(Number(order.totalAmount))}
                 {expanded ? ' ▲' : ' ▼'}
               </p>
@@ -307,11 +307,11 @@ function OrderCard({ order, expanded, onToggleExpand }: {
           <div className="mt-3 pt-3 border-t space-y-1.5" style={{ borderColor: 'var(--rp-border)' }}>
             {order.items.map(item => (
               <div key={item.id} className="flex items-center justify-between">
-                <span className="text-[13px] text-[#18231f]">{item.quantity}× {item.menuItem.name}</span>
-                <span className="text-[13px] font-medium text-[#18231f]">{formatCurrency(Number(item.unitPrice) * item.quantity)}</span>
+                <span className="text-[13px] text-[#183153]">{item.quantity}× {item.menuItem.name}</span>
+                <span className="text-[13px] font-medium text-[#183153]">{formatCurrency(Number(item.unitPrice) * item.quantity)}</span>
               </div>
             ))}
-            {order.notes && <p className="text-[11.5px] text-[#8aa29a] mt-1 italic">📝 {order.notes}</p>}
+            {order.notes && <p className="text-[11.5px] text-[#64748b] mt-1 italic">📝 {order.notes}</p>}
           </div>
         )}
       </div>
@@ -631,7 +631,7 @@ export default function OrdersPage() {
         actions={
           <button
             onClick={() => setAddOpen(true)}
-            className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
+            className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#f8fafc] transition-opacity hover:opacity-80"
             style={{ background: 'var(--rp-btn-accent)' }}>
             <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} /> New Order
           </button>
@@ -641,18 +641,18 @@ export default function OrdersPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          { label: 'Total Orders', value: total,                icon: ShoppingBag, bg: 'var(--rp-teal-bg)', color: '#23766a' },
+          { label: 'Total Orders', value: total,                icon: ShoppingBag, bg: 'var(--rp-teal-bg)', color: '#183153' },
           { label: 'Pending',      value: stats.pending   ?? 0, icon: Clock,       bg: 'var(--rp-amber-bg)', color: '#b89040' },
           { label: 'Preparing',    value: stats.preparing ?? 0, icon: ChefHat,     bg: 'var(--rp-coral-bg)', color: '#b8724a' },
-          { label: 'Ready',        value: stats.ready     ?? 0, icon: CheckCircle2,bg: 'var(--rp-teal-bg)', color: '#23766a' },
+          { label: 'Ready',        value: stats.ready     ?? 0, icon: CheckCircle2,bg: 'var(--rp-teal-bg)', color: '#183153' },
         ].map(({ label, value, icon: Icon, bg, color }) => (
           <div key={label} className="flex items-center gap-[11px] rounded-[12px] border px-[18px] py-[15px] bg-white dark:bg-white/5" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
             <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px]" style={{ background: bg }}>
               <Icon className="h-[14px] w-[14px]" strokeWidth={2} style={{ color }} />
             </div>
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.07em] text-[#8aa29a]">{label}</div>
-              <div className="text-[22px] font-semibold leading-none tracking-[-0.02em] text-[#18231f]">{value}</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.07em] text-[#64748b]">{label}</div>
+              <div className="text-[22px] font-semibold leading-none tracking-[-0.02em] text-[#183153]">{value}</div>
             </div>
           </div>
         ))}
@@ -664,8 +664,8 @@ export default function OrdersPage() {
           <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
             className="rounded-[8px] border px-[12px] py-[7px] text-[12px] font-medium transition-colors"
             style={statusFilter === s
-              ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', borderColor: '#1b342f' }
-              : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', color: isDark ? '#94b8b0' : 'var(--rp-text-subtle)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)' }}>
+              ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', borderColor: '#183153' }
+              : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', color: isDark ? '#a9c1d0' : 'var(--rp-text-subtle)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)' }}>
             {s ? ORDER_STATUS_PILL[s]?.label ?? s : 'All'}
           </button>
         ))}
@@ -681,20 +681,20 @@ export default function OrdersPage() {
           <div className="flex flex-col items-center justify-center gap-3 py-20 text-center rounded-[14px] border-2 border-dashed"
             style={{ borderColor: 'var(--rp-border)' }}>
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#f5f4f1]">
-              <ShoppingBag className="h-7 w-7 text-[#c5bdb4]" />
+              <ShoppingBag className="h-7 w-7 text-[#94a3b8]" />
             </div>
             <div>
-              <p className="text-[14px] font-medium text-[#18231f]">
+              <p className="text-[14px] font-medium text-[#183153]">
                 {statusFilter ? 'No orders with this status' : 'No orders yet'}
               </p>
-              <p className="mt-1 text-[12.5px] text-[#8aa29a]">
+              <p className="mt-1 text-[12.5px] text-[#64748b]">
                 {statusFilter ? 'Try a different filter' : 'Place your first food order'}
               </p>
             </div>
             {!statusFilter && (
               <button
                 onClick={() => setAddOpen(true)}
-                className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0]"
+                className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#f8fafc]"
                 style={{ background: 'var(--rp-btn-accent)' }}>
                 <Plus className="h-[13px] w-[13px]" /> New Order
               </button>
@@ -711,7 +711,7 @@ export default function OrdersPage() {
       {/* Pagination */}
       {pagination && pagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-[12.5px] text-[#8aa29a]">Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} of {total}</p>
+          <p className="text-[12.5px] text-[#64748b]">Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} of {total}</p>
           <div className="flex items-center gap-1.5">
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
               className="flex h-8 items-center gap-1 rounded-[8px] border px-3 text-[12.5px] font-medium disabled:opacity-40"

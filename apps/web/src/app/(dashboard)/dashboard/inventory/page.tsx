@@ -66,17 +66,17 @@ interface PurchaseOrder {
 const CATEGORIES = ['', 'LINEN', 'TOILETRIES', 'CLEANING', 'FOOD_BEVERAGE', 'MAINTENANCE', 'OFFICE', 'OTHER'] as const;
 
 const CAT_META: Record<string, { bg: string; border: string; text: string }> = {
-  LINEN:        { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a' },
+  LINEN:        { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153' },
   TOILETRIES:   { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.15)', text: '#b8724a' },
-  CLEANING:     { bg: 'var(--rp-teal-soft)', border: 'rgba(35,118,106,0.15)', text: 'var(--rp-text-accent)' },
+  CLEANING:     { bg: 'var(--rp-teal-soft)', border: 'rgba(24,49,83,0.15)', text: 'var(--rp-text-accent)' },
   FOOD_BEVERAGE:{ bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
   MAINTENANCE:  { bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)', text: '#c43c3c' },
-  OFFICE:       { bg: '#1b342f', border: 'rgba(27,52,47,0.4)',    text: '#dfd9d0' },
+  OFFICE:       { bg: '#183153', border: 'rgba(24,49,83,0.4)',    text: '#f8fafc' },
   OTHER:        { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)' },
 };
 
 const MOVEMENT_META = {
-  IN:         { label: 'Stock In',    Icon: TrendingUp,   bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a' },
+  IN:         { label: 'Stock In',    Icon: TrendingUp,   bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153' },
   OUT:        { label: 'Stock Out',   Icon: TrendingDown, bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)', text: '#c43c3c' },
   ADJUSTMENT: { label: 'Adjustment', Icon: ArrowUpDown,  bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
 };
@@ -84,12 +84,12 @@ const MOVEMENT_META = {
 const PO_STATUS_META: Record<string, { bg: string; text: string }> = {
   DRAFT:     { bg: 'var(--rp-surface-3)', text: 'var(--rp-text-muted)' },
   SENT:      { bg: 'var(--rp-amber-bg)', text: '#b89040' },
-  RECEIVED:  { bg: 'var(--rp-teal-bg)', text: '#23766a' },
+  RECEIVED:  { bg: 'var(--rp-teal-bg)', text: '#183153' },
   CANCELLED: { bg: 'var(--rp-red-bg)', text: '#c43c3c' },
 };
 
-const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30';
-const labelCls = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
+const labelCls = 'block text-[11.5px] font-medium text-[#64748b] mb-1.5';
 
 // ── Item Modal ────────────────────────────────────────────────────────────────
 function ItemModal({ open, onClose, loading, onSubmit, item, vendors }: {
@@ -166,7 +166,7 @@ function ItemModal({ open, onClose, loading, onSubmit, item, vendors }: {
           <div>
             <label className={labelCls}>Unit Cost</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px]" style={{ color: '#9bbdb7' }}>$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px]" style={{ color: '#aac0d0' }}>$</span>
               <input value={form.unitCost} onChange={e => set('unitCost', e.target.value)} className={inputCls + ' pl-6'} type="number" min="0" step="0.01" />
             </div>
           </div>
@@ -245,7 +245,7 @@ function MovementModal({ open, onClose, item, loading, onSubmit }: {
         <div>
           <label className={labelCls}>
             Quantity ({item?.unit})
-            {item && <span className="ml-2 text-[#c5bdb4] dark:text-[#6e8580]">Current: {item.currentStock}</span>}
+            {item && <span className="ml-2 text-[#94a3b8] dark:text-[#7f99ab]">Current: {item.currentStock}</span>}
           </label>
           <input value={quantity} onChange={e => setQuantity(e.target.value)} type="number" min="0" step="0.01" placeholder="0" className={inputCls} />
         </div>
@@ -295,10 +295,10 @@ function HistoryModal({ open, onClose, item }: {
       ) : movements.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 gap-2">
           <div className="flex h-12 w-12 items-center justify-center rounded-full" style={{ background: 'var(--rp-surface-3)' }}>
-            <Clock className="h-6 w-6 text-[#c5bdb4] dark:text-[#6e8580]" />
+            <Clock className="h-6 w-6 text-[#94a3b8] dark:text-[#7f99ab]" />
           </div>
-          <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">No movements yet</p>
-          <p className="text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">Record a stock movement to see history here</p>
+          <p className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">No movements yet</p>
+          <p className="text-[12px] text-[#64748b] dark:text-[#a9c1d0]">Record a stock movement to see history here</p>
         </div>
       ) : (
         <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
@@ -317,13 +317,13 @@ function HistoryModal({ open, onClose, item }: {
                       style={{ background: cfg.bg, borderColor: cfg.border, color: cfg.text }}>
                       {cfg.label}
                     </span>
-                    <span className="text-[13px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">
+                    <span className="text-[13px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                       {m.type === 'OUT' ? '-' : m.type === 'IN' ? '+' : ''}{m.quantity} {item?.unit}
                     </span>
                   </div>
-                  {m.reason && <p className="text-[12px] mt-0.5 truncate text-[#8aa29a] dark:text-[#94b8b0]">{m.reason}</p>}
+                  {m.reason && <p className="text-[12px] mt-0.5 truncate text-[#64748b] dark:text-[#a9c1d0]">{m.reason}</p>}
                 </div>
-                <p className="text-[11.5px] shrink-0 text-[#c5bdb4] dark:text-[#6e8580]">
+                <p className="text-[11.5px] shrink-0 text-[#94a3b8] dark:text-[#7f99ab]">
                   {new Date(m.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                 </p>
               </div>
@@ -498,7 +498,7 @@ function CreatePOModal({ open, onClose, vendors, loading, onSubmit }: {
         <div>
           <label className={labelCls}>Items to reorder</label>
           {isLoading ? (
-            <div className="flex h-20 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin" style={{ color: '#9bbdb7' }} /></div>
+            <div className="flex h-20 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin" style={{ color: '#aac0d0' }} /></div>
           ) : lowStockItems.length === 0 ? (
             <p className="text-[12.5px]" style={{ color: 'var(--rp-text-muted)' }}>No items are currently below their minimum stock.</p>
           ) : (
@@ -509,13 +509,13 @@ function CreatePOModal({ open, onClose, vendors, loading, onSubmit }: {
                   <div key={item.id} className="flex items-center gap-3 rounded-[10px] border p-3" style={{ borderColor: 'var(--rp-border)' }}>
                     <input type="checkbox" checked={line.checked} onChange={() => toggle(item.id)} className="h-4 w-4 cursor-pointer" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{item.name}</p>
-                      <p className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">Current: {item.currentStock} {item.unit} · Min: {item.minimumStock}</p>
+                      <p className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{item.name}</p>
+                      <p className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">Current: {item.currentStock} {item.unit} · Min: {item.minimumStock}</p>
                     </div>
                     <input value={line.qty} onChange={e => setLine(item.id, 'qty', e.target.value)} type="number" min="0" step="0.01"
                       className="w-20 rounded-[7px] border border-black/5 bg-[#f4f1eb] px-2 py-1.5 text-[12.5px] text-center" placeholder="Qty" />
                     <div className="relative w-24">
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[12px]" style={{ color: '#9bbdb7' }}>$</span>
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[12px]" style={{ color: '#aac0d0' }}>$</span>
                       <input value={line.cost} onChange={e => setLine(item.id, 'cost', e.target.value)} type="number" min="0" step="0.01"
                         className="w-full rounded-[7px] border border-black/5 bg-[#f4f1eb] pl-5 pr-2 py-1.5 text-[12.5px]" />
                     </div>
@@ -597,15 +597,15 @@ function PODetailModal({ open, onClose, poId, onSend, onCancel, onReceive, sendi
         </div>
       }>
       {isLoading || !order ? (
-        <div className="flex h-32 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" style={{ color: '#9bbdb7' }} /></div>
+        <div className="flex h-32 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" style={{ color: '#aac0d0' }} /></div>
       ) : (
         <div className="space-y-3">
           {order.notes && <p className="text-[12.5px] italic" style={{ color: 'var(--rp-text-muted)' }}>&ldquo;{order.notes}&rdquo;</p>}
           {order.items.map((line: { id: string; inventoryItemId: string; quantityOrdered: number; quantityReceived: number; unitCost: number; inventoryItem: { name: string; unit: string } }) => (
             <div key={line.id} className="flex items-center gap-3 rounded-[10px] border p-3" style={{ borderColor: 'var(--rp-border)' }}>
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{line.inventoryItem.name}</p>
-                <p className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+                <p className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{line.inventoryItem.name}</p>
+                <p className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">
                   Ordered: {line.quantityOrdered} {line.inventoryItem.unit} · {formatCurrency(line.unitCost)}/unit
                   {line.quantityReceived > 0 && ` · Received: ${line.quantityReceived}`}
                 </p>
@@ -657,30 +657,30 @@ function VendorsTab() {
           <div className="h-32 animate-pulse" style={{ background: 'var(--rp-surface-2)' }} />
         ) : vendors.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
-            <Truck className="h-10 w-10" style={{ color: '#c5bdb4' }} />
-            <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">No vendors yet</p>
-            <p className="text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">Add a supplier to start creating purchase orders</p>
+            <Truck className="h-10 w-10" style={{ color: '#94a3b8' }} />
+            <p className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">No vendors yet</p>
+            <p className="text-[12px] text-[#64748b] dark:text-[#a9c1d0]">Add a supplier to start creating purchase orders</p>
           </div>
         ) : (
           <table className="w-full">
             <thead>
               <tr style={{ background: 'var(--rp-surface-2)' }}>
                 {['Vendor', 'Contact', 'Phone', 'Email', 'Items', 'POs', ''].map(h => (
-                  <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] dark:text-[#94b8b0]">{h}</th>
+                  <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] dark:text-[#a9c1d0]">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {vendors.map(v => (
                 <tr key={v.id} className="transition-colors hover:bg-[#faf9f7] dark:hover:bg-white/5" style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
-                  <td className="px-5 py-3.5 text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{v.name}</td>
-                  <td className="px-5 py-3.5 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{v.contactName ?? '—'}</td>
-                  <td className="px-5 py-3.5 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{v.phone ?? '—'}</td>
-                  <td className="px-5 py-3.5 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{v.email ?? '—'}</td>
-                  <td className="px-5 py-3.5 text-[13px] text-[#18231f] dark:text-[#dfd9d0]">{v._count?.items ?? 0}</td>
-                  <td className="px-5 py-3.5 text-[13px] text-[#18231f] dark:text-[#dfd9d0]">{v._count?.purchaseOrders ?? 0}</td>
+                  <td className="px-5 py-3.5 text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{v.name}</td>
+                  <td className="px-5 py-3.5 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">{v.contactName ?? '—'}</td>
+                  <td className="px-5 py-3.5 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">{v.phone ?? '—'}</td>
+                  <td className="px-5 py-3.5 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">{v.email ?? '—'}</td>
+                  <td className="px-5 py-3.5 text-[13px] text-[#183153] dark:text-[#f8fafc]">{v._count?.items ?? 0}</td>
+                  <td className="px-5 py-3.5 text-[13px] text-[#183153] dark:text-[#f8fafc]">{v._count?.purchaseOrders ?? 0}</td>
                   <td className="px-5 py-3.5">
-                    <button onClick={() => setEditVendor(v)} className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#e3f2ef]" style={{ color: '#9bbdb7' }}>
+                    <button onClick={() => setEditVendor(v)} className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#e5f0f7]" style={{ color: '#aac0d0' }}>
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
                   </td>
@@ -749,16 +749,16 @@ function PurchaseOrdersTab() {
           <div className="h-32 animate-pulse" style={{ background: 'var(--rp-surface-2)' }} />
         ) : orders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
-            <ClipboardList className="h-10 w-10" style={{ color: '#c5bdb4' }} />
-            <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">No purchase orders yet</p>
-            <p className="text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">Create one from your low-stock items</p>
+            <ClipboardList className="h-10 w-10" style={{ color: '#94a3b8' }} />
+            <p className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">No purchase orders yet</p>
+            <p className="text-[12px] text-[#64748b] dark:text-[#a9c1d0]">Create one from your low-stock items</p>
           </div>
         ) : (
           <table className="w-full">
             <thead>
               <tr style={{ background: 'var(--rp-surface-2)' }}>
                 {['PO Number', 'Vendor', 'Items', 'Total', 'Status', 'Created', ''].map(h => (
-                  <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] dark:text-[#94b8b0]">{h}</th>
+                  <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] dark:text-[#a9c1d0]">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -767,18 +767,18 @@ function PurchaseOrdersTab() {
                 const sm = PO_STATUS_META[o.status];
                 return (
                   <tr key={o.id} className="transition-colors hover:bg-[#faf9f7] dark:hover:bg-white/5" style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
-                    <td className="px-5 py-3.5 text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{o.poNumber}</td>
-                    <td className="px-5 py-3.5 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{o.vendorName}</td>
-                    <td className="px-5 py-3.5 text-[13px] text-[#18231f] dark:text-[#dfd9d0]">{o.itemCount}</td>
-                    <td className="px-5 py-3.5 text-[13px] text-[#18231f] dark:text-[#dfd9d0]">{formatCurrency(o.totalCost)}</td>
+                    <td className="px-5 py-3.5 text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{o.poNumber}</td>
+                    <td className="px-5 py-3.5 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">{o.vendorName}</td>
+                    <td className="px-5 py-3.5 text-[13px] text-[#183153] dark:text-[#f8fafc]">{o.itemCount}</td>
+                    <td className="px-5 py-3.5 text-[13px] text-[#183153] dark:text-[#f8fafc]">{formatCurrency(o.totalCost)}</td>
                     <td className="px-5 py-3.5">
                       <span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: sm.bg, color: sm.text }}>{o.status}</span>
                     </td>
-                    <td className="px-5 py-3.5 text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">{new Date(o.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
+                    <td className="px-5 py-3.5 text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">{new Date(o.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
                     <td className="px-5 py-3.5">
                       <button onClick={() => setDetailId(o.id)}
-                        className="rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium transition-colors hover:bg-[#e3f2ef]"
-                        style={{ borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                        className="rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium transition-colors hover:bg-[#e5f0f7]"
+                        style={{ borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
                         View
                       </button>
                     </td>
@@ -979,8 +979,8 @@ export default function InventoryPage() {
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4">
             {[
-              { label: 'Total Items',  value: totalItems,                Icon: Package,       iconBg: 'var(--rp-teal-bg)', iconColor: '#23766a' },
-              { label: 'Low Stock',    value: lowStockCount,             Icon: AlertTriangle, iconBg: lowStockCount > 0 ? 'var(--rp-red-bg)' : 'var(--rp-teal-bg)', iconColor: lowStockCount > 0 ? '#c43c3c' : '#23766a' },
+              { label: 'Total Items',  value: totalItems,                Icon: Package,       iconBg: 'var(--rp-teal-bg)', iconColor: '#183153' },
+              { label: 'Low Stock',    value: lowStockCount,             Icon: AlertTriangle, iconBg: lowStockCount > 0 ? 'var(--rp-red-bg)' : 'var(--rp-teal-bg)', iconColor: lowStockCount > 0 ? '#c43c3c' : '#183153' },
               { label: 'Stock Value',  value: formatCurrency(totalValue), Icon: TrendingUp,   iconBg: 'var(--rp-amber-bg)', iconColor: '#b89040' },
             ].map(({ label, value, Icon, iconBg, iconColor }) => (
               <div key={label} className="rounded-[14px] border bg-white p-4"
@@ -990,9 +990,9 @@ export default function InventoryPage() {
                     style={{ background: iconBg }}>
                     <Icon className="h-[16px] w-[16px]" style={{ color: iconColor }} />
                   </div>
-                  <p className="text-[12.5px] font-medium text-[#8aa29a] dark:text-[#94b8b0]">{label}</p>
+                  <p className="text-[12.5px] font-medium text-[#64748b] dark:text-[#a9c1d0]">{label}</p>
                 </div>
-                <p className="text-[26px] font-semibold leading-none text-[#18231f] dark:text-[#dfd9d0]">{value}</p>
+                <p className="text-[26px] font-semibold leading-none text-[#183153] dark:text-[#f8fafc]">{value}</p>
               </div>
             ))}
           </div>
@@ -1000,9 +1000,9 @@ export default function InventoryPage() {
           {/* Filters */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center flex-wrap">
             <div className="relative max-w-sm flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: '#9bbdb7' }} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: '#aac0d0' }} />
               <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Search items or supplier…"
-                className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-[9px] pl-9 pr-3 text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30" />
+                className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-[9px] pl-9 pr-3 text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30" />
             </div>
             <button onClick={() => { setLowStockOnly(v => !v); setPage(1); }}
               className="flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12px] font-medium transition-colors"
@@ -1043,12 +1043,12 @@ export default function InventoryPage() {
             ) : items.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 gap-3">
                 <div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'var(--rp-teal-bg)' }}>
-                  <Package className="h-7 w-7" style={{ color: '#23766a' }} />
+                  <Package className="h-7 w-7" style={{ color: '#183153' }} />
                 </div>
-                <p className="text-[13.5px] font-medium text-[#18231f] dark:text-[#dfd9d0]">
+                <p className="text-[13.5px] font-medium text-[#183153] dark:text-[#f8fafc]">
                   {search || catFilter || lowStockOnly ? 'No items found' : 'No inventory yet'}
                 </p>
-                <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+                <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">
                   {search || catFilter ? 'Try adjusting filters' : 'Add your first inventory item'}
                 </p>
                 {!search && !catFilter && !lowStockOnly && (
@@ -1065,7 +1065,7 @@ export default function InventoryPage() {
                   <thead>
                     <tr style={{ background: 'var(--rp-surface-2)', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
                       {['Item', 'Category', 'Stock', 'Unit Cost', 'Total Value', 'Vendor', 'Actions'].map(h => (
-                        <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] dark:text-[#94b8b0]">
+                        <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] dark:text-[#a9c1d0]">
                           {h}
                         </th>
                       ))}
@@ -1082,10 +1082,10 @@ export default function InventoryPage() {
                             <div className="flex items-center gap-2.5">
                               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px]"
                                 style={{ background: isLow ? 'var(--rp-red-bg)' : 'var(--rp-teal-bg)' }}>
-                                <Package className="h-4 w-4" style={{ color: isLow ? '#c43c3c' : '#23766a' }} />
+                                <Package className="h-4 w-4" style={{ color: isLow ? '#c43c3c' : '#183153' }} />
                               </div>
                               <div>
-                                <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{item.name}</p>
+                                <p className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{item.name}</p>
                                 {isLow && (
                                   <p className="text-[11.5px] flex items-center gap-0.5" style={{ color: '#c43c3c' }}>
                                     <AlertTriangle className="h-3 w-3" /> Low stock
@@ -1101,35 +1101,35 @@ export default function InventoryPage() {
                             </span>
                           </td>
                           <td className="px-5 py-4">
-                            <p className="text-[13px] font-semibold" style={{ color: isLow ? '#c43c3c' : isDark ? '#dfd9d0' : 'var(--rp-text)' }}>
+                            <p className="text-[13px] font-semibold" style={{ color: isLow ? '#c43c3c' : isDark ? '#f8fafc' : 'var(--rp-text)' }}>
                               {item.currentStock} {item.unit}
                             </p>
-                            <p className="text-[11.5px] text-[#c5bdb4] dark:text-[#6e8580]">Min: {item.minimumStock}</p>
+                            <p className="text-[11.5px] text-[#94a3b8] dark:text-[#7f99ab]">Min: {item.minimumStock}</p>
                             {item.daysUntilStockout !== null && item.daysUntilStockout !== undefined && (
-                              <p className="text-[11px]" style={{ color: item.daysUntilStockout <= 7 ? '#c43c3c' : '#8aa29a' }}>
+                              <p className="text-[11px]" style={{ color: item.daysUntilStockout <= 7 ? '#c43c3c' : '#64748b' }}>
                                 ~{item.daysUntilStockout} days left
                               </p>
                             )}
                           </td>
-                          <td className="px-5 py-4 text-[13px] text-[#4a6e66] dark:text-[#6d9990]">{formatCurrency(Number(item.unitCost))}</td>
-                          <td className="px-5 py-4 text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">
+                          <td className="px-5 py-4 text-[13px] text-[#475569] dark:text-[#9db4c4]">{formatCurrency(Number(item.unitCost))}</td>
+                          <td className="px-5 py-4 text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">
                             {formatCurrency(Number(item.currentStock) * Number(item.unitCost))}
                           </td>
-                          <td className="px-5 py-4 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{item.vendor?.name ?? item.supplier ?? '—'}</td>
+                          <td className="px-5 py-4 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">{item.vendor?.name ?? item.supplier ?? '—'}</td>
                           <td className="px-5 py-4">
                             <div className="flex items-center gap-1">
                               <button onClick={() => setMovementItem(item)}
-                                className="flex items-center gap-1 rounded-[7px] border px-2 py-1 text-[11.5px] font-medium transition-colors hover:bg-[#e3f2ef]"
-                                style={{ borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                                className="flex items-center gap-1 rounded-[7px] border px-2 py-1 text-[11.5px] font-medium transition-colors hover:bg-[#e5f0f7]"
+                                style={{ borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
                                 <ArrowUpDown className="h-3 w-3" /> Stock
                               </button>
                               <button onClick={() => setHistoryItem(item)}
-                                className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#f4ecda] text-[#c5bdb4] dark:text-[#6e8580]" title="View history">
+                                className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#f4ecda] text-[#94a3b8] dark:text-[#7f99ab]" title="View history">
                                 <History className="h-3.5 w-3.5" />
                               </button>
                               <button onClick={() => setEditItem(item)}
-                                className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#e3f2ef]"
-                                style={{ color: '#9bbdb7' }}>
+                                className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#e5f0f7]"
+                                style={{ color: '#aac0d0' }}>
                                 <Pencil className="h-3.5 w-3.5" />
                               </button>
                             </div>
@@ -1146,7 +1146,7 @@ export default function InventoryPage() {
           {/* Pagination */}
           {pagination && pagination.totalPages > 1 && (
             <div className="flex items-center justify-between">
-              <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+              <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">
                 Showing {(page - 1) * 30 + 1}–{Math.min(page * 30, pagination.total)} of {pagination.total}
               </p>
               <div className="flex gap-2">

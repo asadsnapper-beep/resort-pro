@@ -108,7 +108,7 @@ export function ImageUpload({
           <button
             type="button"
             onClick={() => { setUrlMode(v => !v); setError(null); }}
-            className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#1a6b5e] transition-colors"
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#183153] transition-colors"
           >
             <Link2 className="h-3 w-3" />
             {urlMode ? 'Upload file' : 'Use URL'}
@@ -125,13 +125,13 @@ export function ImageUpload({
             onChange={e => setUrlInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleUrlSubmit()}
             placeholder="https://example.com/image.jpg"
-            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#1a6b5e] focus:outline-none focus:ring-2 focus:ring-[#1a6b5e]/20"
+            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#183153] focus:outline-none focus:ring-2 focus:ring-[#183153]/20"
           />
           <button
             type="button"
             onClick={handleUrlSubmit}
             disabled={!urlInput.trim()}
-            className="rounded-lg bg-[#1a6b5e] px-3 py-2 text-xs font-semibold text-white disabled:opacity-40 hover:bg-[#145a4f]"
+            className="rounded-lg bg-[#183153] px-3 py-2 text-xs font-semibold text-white disabled:opacity-40 hover:bg-[#122846]"
           >
             Apply
           </button>
@@ -147,7 +147,7 @@ export function ImageUpload({
             'relative overflow-hidden rounded-xl border-2 border-dashed transition-all cursor-pointer',
             aspectClass,
             !value && 'flex items-center justify-center',
-            dragging ? 'border-[#1a6b5e] bg-[#f0faf8] scale-[1.01]' : 'border-gray-200 hover:border-[#1a6b5e]/50 hover:bg-gray-50',
+            dragging ? 'border-[#183153] bg-[#f0faf8] scale-[1.01]' : 'border-gray-200 hover:border-[#183153]/50 hover:bg-gray-50',
             (disabled || uploading) && 'cursor-not-allowed opacity-60',
           )}
         >
@@ -179,7 +179,7 @@ export function ImageUpload({
 
           {/* Upload state */}
           {uploading && (
-            <div className="flex flex-col items-center gap-2 p-6 text-[#1a6b5e]">
+            <div className="flex flex-col items-center gap-2 p-6 text-[#183153]">
               <Loader2 className="h-8 w-8 animate-spin" />
               <p className="text-xs font-medium">Uploading…</p>
             </div>
@@ -190,8 +190,8 @@ export function ImageUpload({
             <div className="flex flex-col items-center gap-2 p-6 text-gray-400 select-none">
               {dragging ? (
                 <>
-                  <ImageIcon className="h-8 w-8 text-[#1a6b5e]" />
-                  <p className="text-xs font-medium text-[#1a6b5e]">Drop to upload</p>
+                  <ImageIcon className="h-8 w-8 text-[#183153]" />
+                  <p className="text-xs font-medium text-[#183153]">Drop to upload</p>
                 </>
               ) : (
                 <>

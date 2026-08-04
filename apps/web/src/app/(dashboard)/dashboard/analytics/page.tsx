@@ -38,8 +38,8 @@ interface Analytics {
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 
-const ROOM_COLORS = ['#23766a', '#d4a853', '#b8724a', 'var(--rp-text-accent)', '#7a5c2a', '#9bbdb7'];
-const SOURCE_COLORS = ['#23766a', '#d4a853', '#b8724a', 'var(--rp-text-accent)', '#9bbdb7'];
+const ROOM_COLORS = ['#183153', '#d4a853', '#b8724a', 'var(--rp-text-accent)', '#7a5c2a', '#aac0d0'];
+const SOURCE_COLORS = ['#183153', '#d4a853', '#b8724a', 'var(--rp-text-accent)', '#aac0d0'];
 
 const ROOM_TYPE_LABELS: Record<string, string> = {
   STANDARD: 'Standard', DELUXE: 'Deluxe', SUITE: 'Suite',
@@ -50,7 +50,7 @@ const ROOM_TYPE_LABELS: Record<string, string> = {
 
 const tooltipStyle = {
   contentStyle: { background: 'var(--rp-btn-accent)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, fontSize: 12 },
-  labelStyle: { color: '#9bbdb7' },
+  labelStyle: { color: '#aac0d0' },
   itemStyle: { color: 'var(--rp-btn-accent-text)' },
 };
 
@@ -72,18 +72,18 @@ function KpiCard({
         {change !== undefined && (
           <span className="flex items-center gap-0.5 rounded-[7px] border px-[9px] py-[4px] text-[11px] font-semibold"
             style={change >= 0
-              ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }
+              ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }
               : { background: 'var(--rp-red-bg)', borderColor: 'rgba(200,60,60,0.15)', color: '#c43c3c' }}>
             {change >= 0 ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
             {Math.abs(change)}%
           </span>
         )}
       </div>
-      <p className="text-[22px] font-semibold text-[#18231f] tracking-[-0.02em]">
+      <p className="text-[22px] font-semibold text-[#183153] tracking-[-0.02em]">
         {prefix}{value}
       </p>
-      <p className="text-[12px] font-medium text-[#8aa29a] mt-0.5">{label}</p>
-      {sub && <p className="text-[11px] text-[#c5bdb4] mt-0.5">{sub}</p>}
+      <p className="text-[12px] font-medium text-[#64748b] mt-0.5">{label}</p>
+      {sub && <p className="text-[11px] text-[#94a3b8] mt-0.5">{sub}</p>}
     </div>
   );
 }
@@ -95,8 +95,8 @@ function ChartCard({ title, sub, children }: { title: string; sub?: string; chil
     <div className="rounded-[14px] border bg-white p-5"
       style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
       <div className="mb-4">
-        <h3 className="text-[13.5px] font-semibold text-[#18231f]">{title}</h3>
-        {sub && <p className="text-[11.5px] text-[#8aa29a] mt-0.5">{sub}</p>}
+        <h3 className="text-[13.5px] font-semibold text-[#183153]">{title}</h3>
+        {sub && <p className="text-[11.5px] text-[#64748b] mt-0.5">{sub}</p>}
       </div>
       {children}
     </div>
@@ -110,8 +110,8 @@ function RevenueTooltip({ active, payload, label, currency }: any) {
   return (
     <div className="rounded-[10px] border px-3 py-2 text-xs shadow-xl"
       style={{ background: 'var(--rp-btn-accent)', borderColor: 'rgba(255,255,255,0.08)' }}>
-      <p className="text-[#9bbdb7] mb-1">{label}</p>
-      <p className="text-[#dfd9d0] font-semibold">{formatCurrency(payload[0].value, currency)}</p>
+      <p className="text-[#aac0d0] mb-1">{label}</p>
+      <p className="text-[#f8fafc] font-semibold">{formatCurrency(payload[0].value, currency)}</p>
     </div>
   );
 }
@@ -141,7 +141,7 @@ export default function AnalyticsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#23766a' }} />
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#183153' }} />
       </div>
     );
   }
@@ -184,24 +184,24 @@ export default function AnalyticsPage() {
 
       {/* ── KPI Grid — Revenue & Operations ── */}
       <div>
-        <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] mb-3">Revenue & Operations</p>
+        <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] mb-3">Revenue & Operations</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          <KpiCard icon={Banknote} color="#23766a"
+          <KpiCard icon={Banknote} color="#183153"
             label="Revenue YTD" value={formatCurrency(kpis.ytdRevenue, currency)}
             sub={`${formatCurrency(kpis.mtdRevenue, currency)} this month`} change={kpis.revenueGrowth} />
-          <KpiCard icon={BedDouble} color="#1b342f"
+          <KpiCard icon={BedDouble} color="#183153"
             label="Occupancy Rate" value={`${kpis.occupancyRate}%`} sub="Currently occupied" />
           <KpiCard icon={TrendingUp} color="#b89040"
             label="ADR" value={formatCurrency(kpis.adr, currency)} sub="Avg daily rate (90d)" />
           <KpiCard icon={Star} color="var(--rp-text-accent)"
             label="RevPAR" value={formatCurrency(kpis.revpar, currency)} sub="Revenue per avail. room" />
-          <KpiCard icon={CalendarCheck} color="#23766a"
+          <KpiCard icon={CalendarCheck} color="#183153"
             label="Bookings (30d)" value={kpis.totalBookings30}
             sub={`${kpis.confirmedBookings} active now`} change={kpis.bookingGrowth} />
           <KpiCard icon={Users} color="#b8724a"
             label="Total Guests" value={kpis.totalGuests.toLocaleString()}
             sub={`+${kpis.newGuests30} new this month`} />
-          <KpiCard icon={Clock} color="#23766a"
+          <KpiCard icon={Clock} color="#183153"
             label="Avg Stay" value={`${kpis.avgStayDays}d`} sub="Last 90 days" />
           <KpiCard icon={Globe} color="#7a5c2a"
             label="Nationalities" value={topNationalities.length} sub="Countries represented" />
@@ -210,7 +210,7 @@ export default function AnalyticsPage() {
 
       {/* ── KPI Grid — Expenses & Profitability ── */}
       <div>
-        <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] mb-3">Expenses & Profitability</p>
+        <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] mb-3">Expenses & Profitability</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <KpiCard icon={Receipt} color="#c43c3c"
             label="Expenses (MTD)" value={formatCurrency(kpis.mtdExpenses ?? 0, currency)}
@@ -218,7 +218,7 @@ export default function AnalyticsPage() {
             change={kpis.expenseGrowth !== undefined ? -(kpis.expenseGrowth) : undefined} />
           <KpiCard
             icon={kpis.profitMarginMTD >= 0 ? PiggyBank : TrendingDown}
-            color={kpis.profitMarginMTD >= 0 ? '#23766a' : '#c43c3c'}
+            color={kpis.profitMarginMTD >= 0 ? '#183153' : '#c43c3c'}
             label="Net Profit (MTD)" value={formatCurrency((kpis.mtdRevenue ?? 0) - (kpis.mtdExpenses ?? 0), currency)}
             sub="Revenue minus expenses" />
           <KpiCard icon={BarChart2} color="var(--rp-text-accent)"
@@ -232,8 +232,8 @@ export default function AnalyticsPage() {
           <AreaChart data={revenueByMonth} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
             <defs>
               <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#23766a" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="#23766a" stopOpacity={0} />
+                <stop offset="5%" stopColor="#183153" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="#183153" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--rp-surface-4)" />
@@ -245,7 +245,7 @@ export default function AnalyticsPage() {
                 return `${s}${v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}`;
               }} />
             <Tooltip content={<RevenueTooltip currency={currency} />} />
-            <Area type="monotone" dataKey="revenue" stroke="#23766a" strokeWidth={2} fill="url(#revGrad)" dot={false} />
+            <Area type="monotone" dataKey="revenue" stroke="#183153" strokeWidth={2} fill="url(#revGrad)" dot={false} />
           </AreaChart>
         </ResponsiveContainer>
       </ChartCard>
@@ -264,7 +264,7 @@ export default function AnalyticsPage() {
                 formatter={(v) => [`${v}%`, 'Occupancy']}
                 {...tooltipStyle}
               />
-              <Line type="monotone" dataKey="rate" stroke="#23766a" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="rate" stroke="#183153" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -408,9 +408,9 @@ export default function AnalyticsPage() {
               <div key={r.type} className="rounded-[10px] border p-3 text-center"
                 style={{ background: 'var(--rp-surface-2)', borderColor: 'var(--rp-border)' }}>
                 <div className="w-3 h-3 rounded-full mx-auto mb-2" style={{ background: ROOM_COLORS[i % ROOM_COLORS.length] }} />
-                <p className="text-[18px] font-semibold text-[#18231f]">{r.bookings}</p>
-                <p className="text-[11.5px] text-[#8aa29a] mt-0.5">{ROOM_TYPE_LABELS[r.type] ?? r.type}</p>
-                <p className="text-[10.5px] text-[#c5bdb4] mt-0.5">{formatCurrency(r.revenue, currency)}</p>
+                <p className="text-[18px] font-semibold text-[#183153]">{r.bookings}</p>
+                <p className="text-[11.5px] text-[#64748b] mt-0.5">{ROOM_TYPE_LABELS[r.type] ?? r.type}</p>
+                <p className="text-[10.5px] text-[#94a3b8] mt-0.5">{formatCurrency(r.revenue, currency)}</p>
               </div>
             ))}
           </div>

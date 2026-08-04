@@ -21,14 +21,14 @@ const EVENT_ICONS: Record<string, string> = {
 };
 const STATUS_META: Record<string, { bg: string; border: string; text: string; label: string }> = {
   TENTATIVE:   { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)', label: 'Tentative' },
-  CONFIRMED:   { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Confirmed' },
-  CHECKED_IN:  { bg: '#1b342f', border: 'rgba(27,52,47,0.5)',    text: '#dfd9d0', label: 'Checked In' },
+  CONFIRMED:   { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153', label: 'Confirmed' },
+  CHECKED_IN:  { bg: '#183153', border: 'rgba(24,49,83,0.5)',    text: '#f8fafc', label: 'Checked In' },
   CHECKED_OUT: { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'Checked Out' },
   CANCELLED:   { bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)', text: '#c43c3c', label: 'Cancelled' },
 };
 
-const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30';
-const labelCls = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
+const labelCls = 'block text-[11.5px] font-medium text-[#64748b] mb-1.5';
 
 function StatusPill({ status }: { status: string }) {
   const m = STATUS_META[status] ?? STATUS_META.TENTATIVE;
@@ -158,7 +158,7 @@ function GroupModal({ group, onClose }: { group?: any; onClose: () => void }) {
 
             {/* Group Info */}
             <div>
-              <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] mb-3">Group Information</p>
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] mb-3">Group Information</p>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className={labelCls}>Group Name *</label>
@@ -183,7 +183,7 @@ function GroupModal({ group, onClose }: { group?: any; onClose: () => void }) {
 
             {/* Contact */}
             <div>
-              <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] mb-3">Contact Person</p>
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] mb-3">Contact Person</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>Name *</label>
@@ -205,7 +205,7 @@ function GroupModal({ group, onClose }: { group?: any; onClose: () => void }) {
 
             {/* Dates */}
             <div>
-              <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] mb-3">Stay Period</p>
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] mb-3">Stay Period</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>Check-in *</label>
@@ -218,7 +218,7 @@ function GroupModal({ group, onClose }: { group?: any; onClose: () => void }) {
                 {nights > 0 && (
                   <div className="col-span-2">
                     <span className="rounded-[7px] border px-[9px] py-[3px] text-[11px] font-semibold"
-                      style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                      style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
                       📅 {nights} night{nights !== 1 ? 's' : ''}
                     </span>
                   </div>
@@ -228,7 +228,7 @@ function GroupModal({ group, onClose }: { group?: any; onClose: () => void }) {
 
             {/* Discount */}
             <div>
-              <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] mb-3">Group Discount</p>
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] mb-3">Group Discount</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>Type</label>
@@ -242,7 +242,7 @@ function GroupModal({ group, onClose }: { group?: any; onClose: () => void }) {
                   <div>
                     <label className={labelCls}>{discountType === 'PERCENTAGE' ? 'Percentage' : 'Amount'} *</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">
                         {discountType === 'PERCENTAGE' ? '%' : '$'}
                       </span>
                       <input type="number" min="0" step="0.01" value={discountValue}
@@ -259,17 +259,17 @@ function GroupModal({ group, onClose }: { group?: any; onClose: () => void }) {
               <label className={labelCls}>Internal Notes</label>
               <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
                 placeholder="Special arrangements, VIP requirements..."
-                className="w-full resize-none rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30" />
+                className="w-full resize-none rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30" />
             </div>
 
             {/* Room entries — create only */}
             {!isEdit && (
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]">Rooms & Guests</p>
+                  <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">Rooms & Guests</p>
                   <button type="button" onClick={addRoom}
                     className="flex items-center gap-1 text-[12px] font-medium transition-colors hover:opacity-80"
-                    style={{ color: '#23766a' }}>
+                    style={{ color: '#183153' }}>
                     <Plus className="h-3.5 w-3.5" /> Add Room
                   </button>
                 </div>
@@ -278,7 +278,7 @@ function GroupModal({ group, onClose }: { group?: any; onClose: () => void }) {
                     <div key={entry.key} className="rounded-[12px] border p-4 space-y-3"
                       style={{ borderColor: 'var(--rp-border)', background: 'var(--rp-surface-2)' }}>
                       <div className="flex items-center justify-between">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#8aa29a] dark:text-[#94b8b0]">Room {i + 1}</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#64748b] dark:text-[#a9c1d0]">Room {i + 1}</p>
                         {roomEntries.length > 1 && (
                           <button type="button" onClick={() => removeRoom(entry.key)}
                             className="rounded-[6px] p-1 transition-colors hover:bg-[#fef2f2]">
@@ -334,7 +334,7 @@ function GroupModal({ group, onClose }: { group?: any; onClose: () => void }) {
                         if (discountType === 'PERCENTAGE' && dv > 0) amt = amt * (1 - dv / 100);
                         else if (discountType === 'FLAT' && dv > 0) amt = Math.max(0, amt - dv);
                         return (
-                          <div className="flex justify-between text-[12px] font-medium" style={{ color: '#23766a' }}>
+                          <div className="flex justify-between text-[12px] font-medium" style={{ color: '#183153' }}>
                             <span>Room total ({nights}n)</span>
                             <span>{formatCurrency(amt)}</span>
                           </div>
@@ -343,7 +343,7 @@ function GroupModal({ group, onClose }: { group?: any; onClose: () => void }) {
                     </div>
                   ))}
                 </div>
-                <p className="mt-2 text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+                <p className="mt-2 text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">
                   Rooms without a guest email will be skipped. You can add more rooms after creating the group.
                 </p>
               </div>
@@ -389,10 +389,10 @@ function GroupDetailDrawer({ group, onClose, onEdit }: { group: any; onClose: ()
   return createPortal((
     <>
       <div className="fixed inset-0 z-40"
-        style={{ background: 'rgba(27,52,47,0.3)', backdropFilter: 'blur(3px)' }}
+        style={{ background: 'rgba(24,49,83,0.3)', backdropFilter: 'blur(3px)' }}
         onClick={onClose} />
       <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[460px] flex-col bg-white dark:bg-white/5 shadow-2xl"
-        style={{ boxShadow: '-8px 0 40px rgba(27,52,47,0.15)' }}>
+        style={{ boxShadow: '-8px 0 40px rgba(24,49,83,0.15)' }}>
 
         {/* Header */}
         <div className="flex items-center justify-between border-b px-6 py-4 shrink-0"
@@ -400,19 +400,19 @@ function GroupDetailDrawer({ group, onClose, onEdit }: { group: any; onClose: ()
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className="text-xl">{EVENT_ICONS[group.eventType] ?? '📋'}</span>
-              <p className="font-display text-[16px] font-semibold truncate text-[#18231f] dark:text-[#dfd9d0]">{group.name}</p>
+              <p className="font-display text-[16px] font-semibold truncate text-[#183153] dark:text-[#f8fafc]">{group.name}</p>
             </div>
             {group.organization && (
-              <p className="text-[12px] mt-0.5 truncate text-[#8aa29a] dark:text-[#94b8b0]">{group.organization}</p>
+              <p className="text-[12px] mt-0.5 truncate text-[#64748b] dark:text-[#a9c1d0]">{group.organization}</p>
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <StatusPill status={group.status} />
             <button onClick={onEdit} className="rounded-[8px] p-1.5 transition-colors hover:bg-[#f4f1eb]">
-              <Pencil className="h-4 w-4 text-[#8aa29a] dark:text-[#94b8b0]" />
+              <Pencil className="h-4 w-4 text-[#64748b] dark:text-[#a9c1d0]" />
             </button>
             <button onClick={onClose} className="rounded-[8px] p-1.5 transition-colors hover:bg-[#f4f1eb]">
-              <X className="h-5 w-5 text-[#8aa29a] dark:text-[#94b8b0]" />
+              <X className="h-5 w-5 text-[#64748b] dark:text-[#a9c1d0]" />
             </button>
           </div>
         </div>
@@ -429,12 +429,12 @@ function GroupDetailDrawer({ group, onClose, onEdit }: { group: any; onClose: ()
               {/* Stats strip */}
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  { label: 'Rooms',  value: summary.stats.roomCount,                  color: '#23766a', bg: 'var(--rp-teal-bg)' },
+                  { label: 'Rooms',  value: summary.stats.roomCount,                  color: '#183153', bg: 'var(--rp-teal-bg)' },
                   { label: 'Nights', value: summary.stats.nights,                     color: '#b89040', bg: 'var(--rp-amber-bg)' },
-                  { label: 'Total',  value: formatCurrency(summary.stats.totalAmount), color: '#1b342f', bg: 'var(--rp-surface-4)' },
+                  { label: 'Total',  value: formatCurrency(summary.stats.totalAmount), color: '#183153', bg: 'var(--rp-surface-4)' },
                 ].map(({ label, value, color, bg }) => (
                   <div key={label} className="rounded-[10px] p-3 text-center" style={{ background: bg }}>
-                    <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] dark:text-[#94b8b0]">{label}</p>
+                    <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] dark:text-[#a9c1d0]">{label}</p>
                     <p className="text-[15px] font-bold mt-0.5 truncate" style={{ color }}>{value}</p>
                   </div>
                 ))}
@@ -445,17 +445,17 @@ function GroupDetailDrawer({ group, onClose, onEdit }: { group: any; onClose: ()
                 style={{ borderColor: 'var(--rp-border)', background: 'var(--rp-surface-2)' }}>
                 <div className="flex justify-between text-[13px]">
                   <span style={{ color: 'var(--rp-text-muted)' }}>Total Paid</span>
-                  <span className="font-semibold" style={{ color: '#23766a' }}>{formatCurrency(summary.stats.paidAmount)}</span>
+                  <span className="font-semibold" style={{ color: '#183153' }}>{formatCurrency(summary.stats.paidAmount)}</span>
                 </div>
                 <div className="flex justify-between text-[13px]">
                   <span style={{ color: 'var(--rp-text-muted)' }}>Outstanding</span>
-                  <span className="font-semibold" style={{ color: summary.stats.outstanding > 0 ? '#c43c3c' : '#23766a' }}>
+                  <span className="font-semibold" style={{ color: summary.stats.outstanding > 0 ? '#c43c3c' : '#183153' }}>
                     {summary.stats.outstanding > 0 ? formatCurrency(summary.stats.outstanding) : '✓ Settled'}
                   </span>
                 </div>
                 <div className="h-[6px] w-full rounded-full mt-1" style={{ background: '#e8e5e0' }}>
                   <div className="h-[6px] rounded-full transition-all" style={{
-                    background: '#23766a',
+                    background: '#183153',
                     width: `${summary.stats.totalAmount > 0 ? Math.round((summary.stats.paidAmount / summary.stats.totalAmount) * 100) : 0}%`,
                   }} />
                 </div>
@@ -463,22 +463,22 @@ function GroupDetailDrawer({ group, onClose, onEdit }: { group: any; onClose: ()
 
               {/* Contact */}
               <div>
-                <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] mb-2">Contact</p>
+                <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] mb-2">Contact</p>
                 <div className="rounded-[12px] border overflow-hidden divide-y"
                   style={{ borderColor: 'var(--rp-border)', background: 'var(--rp-surface-2)' }}>
                   <div className="flex items-center gap-2.5 px-4 py-2.5">
-                    <UsersRound className="h-3.5 w-3.5 shrink-0 text-[#8aa29a] dark:text-[#94b8b0]" />
-                    <span className="text-[13px] text-[#18231f] dark:text-[#dfd9d0]">{summary.group.contactName}</span>
+                    <UsersRound className="h-3.5 w-3.5 shrink-0 text-[#64748b] dark:text-[#a9c1d0]" />
+                    <span className="text-[13px] text-[#183153] dark:text-[#f8fafc]">{summary.group.contactName}</span>
                   </div>
                   <div className="flex items-center gap-2.5 px-4 py-2.5">
-                    <Mail className="h-3.5 w-3.5 shrink-0 text-[#8aa29a] dark:text-[#94b8b0]" />
+                    <Mail className="h-3.5 w-3.5 shrink-0 text-[#64748b] dark:text-[#a9c1d0]" />
                     <a href={`mailto:${summary.group.contactEmail}`} className="text-[13px] hover:underline"
-                      style={{ color: '#23766a' }}>{summary.group.contactEmail}</a>
+                      style={{ color: '#183153' }}>{summary.group.contactEmail}</a>
                   </div>
                   {summary.group.contactPhone && (
                     <div className="flex items-center gap-2.5 px-4 py-2.5">
-                      <Phone className="h-3.5 w-3.5 shrink-0 text-[#8aa29a] dark:text-[#94b8b0]" />
-                      <span className="text-[13px] text-[#18231f] dark:text-[#dfd9d0]">{summary.group.contactPhone}</span>
+                      <Phone className="h-3.5 w-3.5 shrink-0 text-[#64748b] dark:text-[#a9c1d0]" />
+                      <span className="text-[13px] text-[#183153] dark:text-[#f8fafc]">{summary.group.contactPhone}</span>
                     </div>
                   )}
                 </div>
@@ -486,24 +486,24 @@ function GroupDetailDrawer({ group, onClose, onEdit }: { group: any; onClose: ()
 
               {/* Stay + Discount */}
               <div>
-                <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] mb-2">Booking Details</p>
+                <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] mb-2">Booking Details</p>
                 <div className="rounded-[12px] border overflow-hidden divide-y"
                   style={{ borderColor: 'var(--rp-border)', background: 'var(--rp-surface-2)' }}>
                   <div className="flex justify-between items-center px-4 py-2.5">
-                    <span className="flex items-center gap-1.5 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">
+                    <span className="flex items-center gap-1.5 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">
                       <Calendar className="h-3.5 w-3.5" /> Check-in
                     </span>
-                    <span className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{formatDate(summary.group.checkIn)}</span>
+                    <span className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{formatDate(summary.group.checkIn)}</span>
                   </div>
                   <div className="flex justify-between items-center px-4 py-2.5">
-                    <span className="flex items-center gap-1.5 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">
+                    <span className="flex items-center gap-1.5 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">
                       <Calendar className="h-3.5 w-3.5" /> Check-out
                     </span>
-                    <span className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{formatDate(summary.group.checkOut)}</span>
+                    <span className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{formatDate(summary.group.checkOut)}</span>
                   </div>
                   {summary.group.discountType !== 'NONE' && (
                     <div className="flex justify-between items-center px-4 py-2.5">
-                      <span className="flex items-center gap-1.5 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">
+                      <span className="flex items-center gap-1.5 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">
                         <Tag className="h-3.5 w-3.5" /> Discount
                       </span>
                       <span className="text-[13px] font-medium" style={{ color: '#b89040' }}>
@@ -518,7 +518,7 @@ function GroupDetailDrawer({ group, onClose, onEdit }: { group: any; onClose: ()
 
               {/* Rooms list */}
               <div>
-                <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] mb-2">
+                <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] mb-2">
                   Rooms ({summary.stats.roomCount})
                 </p>
                 <div className="space-y-2">
@@ -527,15 +527,15 @@ function GroupDetailDrawer({ group, onClose, onEdit }: { group: any; onClose: ()
                       style={{ borderColor: 'var(--rp-border)', background: 'var(--rp-surface-2)' }}>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <BedDouble className="h-3.5 w-3.5 shrink-0 text-[#8aa29a] dark:text-[#94b8b0]" />
-                          <p className="text-[13px] font-medium truncate text-[#18231f] dark:text-[#dfd9d0]">
+                          <BedDouble className="h-3.5 w-3.5 shrink-0 text-[#64748b] dark:text-[#a9c1d0]" />
+                          <p className="text-[13px] font-medium truncate text-[#183153] dark:text-[#f8fafc]">
                             #{b.room.number} — {b.room.name}
                           </p>
                         </div>
-                        <p className="text-[12px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">
+                        <p className="text-[12px] mt-0.5 text-[#64748b] dark:text-[#a9c1d0]">
                           {b.guest.firstName} {b.guest.lastName} · {b.adults}A{b.children > 0 ? `+${b.children}C` : ''}
                         </p>
-                        <p className="text-[12px] font-medium" style={{ color: '#23766a' }}>
+                        <p className="text-[12px] font-medium" style={{ color: '#183153' }}>
                           {formatCurrency(Number(b.totalAmount))}
                         </p>
                       </div>
@@ -562,7 +562,7 @@ function GroupDetailDrawer({ group, onClose, onEdit }: { group: any; onClose: ()
           {summary?.stats.confirmed > 0 && (
             <button onClick={() => bulkCheckIn.mutate()} disabled={bulkCheckIn.isPending}
               className="w-full flex items-center justify-center gap-2 rounded-[10px] py-2.5 text-[13px] font-semibold transition-colors disabled:opacity-50"
-              style={{ background: '#23766a', color: 'var(--rp-btn-accent-text)' }}>
+              style={{ background: '#183153', color: 'var(--rp-btn-accent-text)' }}>
               {bulkCheckIn.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
               Bulk Check-In ({summary.stats.confirmed} room{summary.stats.confirmed !== 1 ? 's' : ''})
             </button>
@@ -576,7 +576,7 @@ function GroupDetailDrawer({ group, onClose, onEdit }: { group: any; onClose: ()
             </button>
           )}
           {summary?.stats.checkedOut === summary?.stats.roomCount && summary?.stats.roomCount > 0 && (
-            <div className="flex items-center justify-center gap-2 text-[13px] py-1" style={{ color: '#23766a' }}>
+            <div className="flex items-center justify-center gap-2 text-[13px] py-1" style={{ color: '#183153' }}>
               <CheckCircle2 className="h-4 w-4" /> All rooms checked out
             </div>
           )}
@@ -609,20 +609,20 @@ function GroupCard({ group, onClick }: { group: any; onClick: () => void }) {
           <div className="flex items-start gap-2.5 min-w-0">
             <span className="text-2xl mt-0.5 shrink-0">{EVENT_ICONS[group.eventType] ?? '📋'}</span>
             <div className="min-w-0">
-              <p className="text-[14px] font-semibold truncate text-[#18231f] dark:text-[#dfd9d0]">{group.name}</p>
+              <p className="text-[14px] font-semibold truncate text-[#183153] dark:text-[#f8fafc]">{group.name}</p>
               {group.organization && (
-                <p className="text-[12px] truncate text-[#8aa29a] dark:text-[#94b8b0]">{group.organization}</p>
+                <p className="text-[12px] truncate text-[#64748b] dark:text-[#a9c1d0]">{group.organization}</p>
               )}
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <StatusPill status={group.status} />
-            <ChevronRight className="h-4 w-4 text-[#c5bdb4] dark:text-[#6e8580]" />
+            <ChevronRight className="h-4 w-4 text-[#94a3b8] dark:text-[#7f99ab]" />
           </div>
         </div>
 
         {/* Date row */}
-        <div className="flex items-center gap-1.5 mb-3 text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">
+        <div className="flex items-center gap-1.5 mb-3 text-[12px] text-[#64748b] dark:text-[#a9c1d0]">
           <Calendar className="h-3.5 w-3.5 shrink-0" />
           {formatDate(group.checkIn)} → {formatDate(group.checkOut)}
           <span style={{ color: 'var(--rp-text-faint)' }}>·</span>
@@ -632,14 +632,14 @@ function GroupCard({ group, onClick }: { group: any; onClick: () => void }) {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-2 mb-3">
           {[
-            { label: 'Rooms',   value: group._count.bookings,        color: '#23766a', bg: 'var(--rp-teal-bg)' },
-            { label: 'Revenue', value: formatCurrency(totalAmount),  color: '#1b342f', bg: 'var(--rp-surface-4)' },
+            { label: 'Rooms',   value: group._count.bookings,        color: '#183153', bg: 'var(--rp-teal-bg)' },
+            { label: 'Revenue', value: formatCurrency(totalAmount),  color: '#183153', bg: 'var(--rp-surface-4)' },
             { label: 'Balance', value: outstanding > 0 ? formatCurrency(outstanding) : '✓',
-              color: outstanding > 0 ? '#c43c3c' : '#23766a',
+              color: outstanding > 0 ? '#c43c3c' : '#183153',
               bg: outstanding > 0 ? 'var(--rp-red-bg)' : 'var(--rp-teal-bg)' },
           ].map(({ label, value, color, bg }) => (
             <div key={label} className="rounded-[9px] py-2 px-1 text-center" style={{ background: bg }}>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-[#8aa29a] dark:text-[#94b8b0]">{label}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-[#64748b] dark:text-[#a9c1d0]">{label}</p>
               <p className="text-[13px] font-bold mt-0.5 truncate" style={{ color }}>{value}</p>
             </div>
           ))}
@@ -648,12 +648,12 @@ function GroupCard({ group, onClick }: { group: any; onClick: () => void }) {
         {/* Progress bar */}
         {group._count.bookings > 0 && (
           <div>
-            <div className="flex justify-between text-[11px] mb-1 text-[#8aa29a] dark:text-[#94b8b0]">
+            <div className="flex justify-between text-[11px] mb-1 text-[#64748b] dark:text-[#a9c1d0]">
               <span>{checkedIn} in · {checkedOut} out · {group._count.bookings - checkedIn - checkedOut} pending</span>
             </div>
             <div className="h-[5px] w-full rounded-full" style={{ background: '#e8e5e0' }}>
               <div className="h-[5px] rounded-full transition-all" style={{
-                background: '#23766a',
+                background: '#183153',
                 width: `${Math.round(((checkedIn + checkedOut) / group._count.bookings) * 100)}%`,
               }} />
             </div>
@@ -661,7 +661,7 @@ function GroupCard({ group, onClick }: { group: any; onClick: () => void }) {
         )}
 
         {/* Contact */}
-        <div className="mt-3 flex items-center gap-1.5 text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">
+        <div className="mt-3 flex items-center gap-1.5 text-[12px] text-[#64748b] dark:text-[#a9c1d0]">
           <UsersRound className="h-3 w-3 shrink-0" />
           {group.contactName}
           {group.contactEmail && (
@@ -713,8 +713,8 @@ export default function GroupBookingsPage() {
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-3">
         {[
-          { label: 'Active Groups',      value: activeGroups,               icon: UsersRound, color: '#23766a', bg: 'var(--rp-teal-bg)' },
-          { label: 'Total Rooms Booked', value: totalRooms,                 icon: BedDouble,  color: '#1b342f', bg: 'var(--rp-teal-bg)' },
+          { label: 'Active Groups',      value: activeGroups,               icon: UsersRound, color: '#183153', bg: 'var(--rp-teal-bg)' },
+          { label: 'Total Rooms Booked', value: totalRooms,                 icon: BedDouble,  color: '#183153', bg: 'var(--rp-teal-bg)' },
           { label: 'Group Revenue',      value: formatCurrency(totalRevenue), icon: Banknote, color: '#b89040', bg: 'var(--rp-amber-bg)' },
         ].map(({ label, value, icon: Icon, color, bg }) => (
           <div key={label} className="flex items-center gap-4 rounded-[14px] border bg-white dark:bg-white/5 p-5"
@@ -723,8 +723,8 @@ export default function GroupBookingsPage() {
               <Icon className="h-[18px] w-[18px]" style={{ color }} />
             </div>
             <div>
-              <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] dark:text-[#94b8b0]">{label}</p>
-              <p className="text-[22px] font-semibold tracking-[-0.02em] text-[#18231f] dark:text-[#dfd9d0]">{value}</p>
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] dark:text-[#a9c1d0]">{label}</p>
+              <p className="text-[22px] font-semibold tracking-[-0.02em] text-[#183153] dark:text-[#f8fafc]">{value}</p>
             </div>
           </div>
         ))}
@@ -733,10 +733,10 @@ export default function GroupBookingsPage() {
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8aa29a] dark:text-[#94b8b0]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#64748b] dark:text-[#a9c1d0]" />
           <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder="Search groups, contacts…"
-            className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] pl-9 pr-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30" />
+            className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] pl-9 pr-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30" />
         </div>
         <div className="flex gap-1.5 flex-wrap">
           {STATUS_OPTIONS.map((s) => (
@@ -761,11 +761,11 @@ export default function GroupBookingsPage() {
       ) : groups.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
           <div className="flex h-20 w-20 items-center justify-center rounded-full" style={{ background: 'var(--rp-teal-bg)' }}>
-            <UsersRound className="h-10 w-10" style={{ color: '#23766a' }} />
+            <UsersRound className="h-10 w-10" style={{ color: '#183153' }} />
           </div>
           <div>
-            <p className="text-[14px] font-medium text-[#18231f] dark:text-[#dfd9d0]">No group bookings yet</p>
-            <p className="text-[12.5px] mt-1 text-[#8aa29a] dark:text-[#94b8b0]">
+            <p className="text-[14px] font-medium text-[#183153] dark:text-[#f8fafc]">No group bookings yet</p>
+            <p className="text-[12.5px] mt-1 text-[#64748b] dark:text-[#a9c1d0]">
               {search || statusFilter ? 'Try clearing your filters' : 'Create your first group booking for weddings, events, or corporate stays'}
             </p>
           </div>

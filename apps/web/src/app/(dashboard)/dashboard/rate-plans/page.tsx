@@ -33,18 +33,18 @@ interface RatePlan {
 // ── Constants ─────────────────────────────────────────────────────────────────
 const TYPE_META: Record<RatePlanType, { label: string; bg: string; border: string; text: string; description: string }> = {
   STANDARD:    { label: 'Standard',    bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)', description: 'Default year-round rate' },
-  SEASONAL:    { label: 'Seasonal',    bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a', description: 'Specific date range pricing' },
+  SEASONAL:    { label: 'Seasonal',    bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153', description: 'Specific date range pricing' },
   WEEKEND:     { label: 'Weekend',     bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040', description: 'Friday–Sunday rates' },
   PROMO:       { label: 'Promo',       bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)',  text: '#c43c3c', description: 'Highest priority — overrides all' },
   EARLY_BIRD:  { label: 'Early Bird',  bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)', text: '#b8724a', description: 'Book early discount' },
-  LAST_MINUTE: { label: 'Last Minute', bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.15)',text: 'var(--rp-text-accent)', description: 'Fill rooms last-minute' },
+  LAST_MINUTE: { label: 'Last Minute', bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.15)',text: 'var(--rp-text-accent)', description: 'Fill rooms last-minute' },
 };
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const PRIORITY_ORDER: RatePlanType[] = ['PROMO', 'SEASONAL', 'WEEKEND', 'EARLY_BIRD', 'LAST_MINUTE', 'STANDARD'];
 
-const inputCls = 'w-full rounded-[8px] border border-black/5 dark:border-white/10 bg-[#f4f1eb] dark:bg-white/10 px-3 py-[9px] text-[13px] text-[#18231f] dark:text-[#dfd9d0] placeholder:text-[#b5afa7] dark:placeholder:text-[#6e8580] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30';
-const labelCls = 'block text-[11px] font-semibold uppercase tracking-[0.07em] text-[#8aa29a] mb-1.5';
+const inputCls = 'w-full rounded-[8px] border border-black/5 dark:border-white/10 bg-[#f4f1eb] dark:bg-white/10 px-3 py-[9px] text-[13px] text-[#183153] dark:text-[#f8fafc] placeholder:text-[#94a3b8] dark:placeholder:text-[#7f99ab] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
+const labelCls = 'block text-[11px] font-semibold uppercase tracking-[0.07em] text-[#64748b] mb-1.5';
 
 // ── Plan Modal ────────────────────────────────────────────────────────────────
 interface PlanFormData {
@@ -158,7 +158,7 @@ function PlanModal({ plan, rooms, onClose }: {
                 );
               })}
             </div>
-            <p className="mt-1.5 flex items-center gap-1 text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+            <p className="mt-1.5 flex items-center gap-1 text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">
               <Info className="h-3 w-3" />{meta.description}
             </p>
           </div>
@@ -221,14 +221,14 @@ function PlanModal({ plan, rooms, onClose }: {
                     <button key={i} type="button" onClick={() => toggleDay(i)}
                       className="flex-1 rounded-[7px] py-1.5 text-[12px] font-semibold transition-all"
                       style={active
-                        ? { background: '#23766a', color: 'var(--rp-btn-accent-text)' }
+                        ? { background: '#183153', color: 'var(--rp-btn-accent-text)' }
                         : { background: 'var(--rp-surface-3)', color: 'var(--rp-text-muted)' }}>
                       {day.slice(0, 1)}
                     </button>
                   );
                 })}
               </div>
-              <p className="mt-1 text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+              <p className="mt-1 text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">
                 {form.daysOfWeek.length === 0
                   ? "No days selected — rate won't apply"
                   : DAYS.filter((_, i) => form.daysOfWeek.includes(i)).join(', ')}
@@ -240,13 +240,13 @@ function PlanModal({ plan, rooms, onClose }: {
           <div className="flex items-center justify-between rounded-[10px] border px-4 py-3"
             style={{ background: 'var(--rp-surface-2)', borderColor: 'var(--rp-border)' }}>
             <div>
-              <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">Active</p>
-              <p className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">Inactive plans won't affect pricing</p>
+              <p className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">Active</p>
+              <p className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">Inactive plans won't affect pricing</p>
             </div>
             <button type="button" onClick={() => set('isActive', !form.isActive)}>
               {form.isActive
-                ? <ToggleRight className="h-7 w-7" style={{ color: '#23766a' }} />
-                : <ToggleLeft className="h-7 w-7 text-[#c5bdb4] dark:text-[#6e8580]" />}
+                ? <ToggleRight className="h-7 w-7" style={{ color: '#183153' }} />
+                : <ToggleLeft className="h-7 w-7 text-[#94a3b8] dark:text-[#7f99ab]" />}
             </button>
           </div>
 
@@ -320,7 +320,7 @@ export default function RatePlansPage() {
       <div className="rounded-[14px] border bg-white dark:bg-white/5 p-4"
         style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] mr-1 text-[#8aa29a] dark:text-[#94b8b0]">
+          <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] mr-1 text-[#64748b] dark:text-[#a9c1d0]">
             Priority (highest → lowest):
           </span>
           {PRIORITY_ORDER.map((t, i) => {
@@ -332,13 +332,13 @@ export default function RatePlansPage() {
                   {m.label}
                 </span>
                 {i < PRIORITY_ORDER.length - 1 && (
-                  <span className="text-[12px] text-[#c5bdb4] dark:text-[#6e8580]">›</span>
+                  <span className="text-[12px] text-[#94a3b8] dark:text-[#7f99ab]">›</span>
                 )}
               </div>
             );
           })}
         </div>
-        <p className="mt-2 text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+        <p className="mt-2 text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">
           When multiple plans apply to a booking, the highest priority plan wins. Room-specific plans beat global plans of the same priority.
         </p>
       </div>
@@ -346,8 +346,8 @@ export default function RatePlansPage() {
       {/* Stats row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total Plans',    value: String(plans.length),                                                   color: '#23766a',  bg: 'var(--rp-teal-bg)' },
-          { label: 'Active Plans',   value: String(activePlans.length),                                             color: '#1b342f',  bg: 'var(--rp-teal-bg)' },
+          { label: 'Total Plans',    value: String(plans.length),                                                   color: '#183153',  bg: 'var(--rp-teal-bg)' },
+          { label: 'Active Plans',   value: String(activePlans.length),                                             color: '#183153',  bg: 'var(--rp-teal-bg)' },
           { label: 'Types Used',     value: String(byType.length),                                                  color: '#b89040',  bg: 'var(--rp-amber-bg)' },
           { label: 'Rooms Covered',  value: plans.some(p => !p.roomId) ? 'All' : String(new Set(plans.map(p => p.roomId)).size), color: '#b8724a', bg: 'var(--rp-coral-bg)' },
         ].map(({ label, value, color, bg }) => (
@@ -355,9 +355,9 @@ export default function RatePlansPage() {
             style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
             <div className="flex items-center gap-2 mb-2">
               <div className="h-[8px] w-[8px] rounded-full" style={{ background: color }} />
-              <p className="text-[11px] font-medium text-[#8aa29a] dark:text-[#94b8b0]">{label}</p>
+              <p className="text-[11px] font-medium text-[#64748b] dark:text-[#a9c1d0]">{label}</p>
             </div>
-            <p className="text-[24px] font-semibold tracking-[-0.02em] text-[#18231f] dark:text-[#dfd9d0]">{value}</p>
+            <p className="text-[24px] font-semibold tracking-[-0.02em] text-[#183153] dark:text-[#f8fafc]">{value}</p>
           </div>
         ))}
       </div>
@@ -366,22 +366,22 @@ export default function RatePlansPage() {
       <div className="rounded-[14px] border bg-white dark:bg-white/5 overflow-hidden"
         style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
         <div className="border-b px-5 py-4" style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
-          <h2 className="text-[14px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">All Rate Plans</h2>
+          <h2 className="text-[14px] font-semibold text-[#183153] dark:text-[#f8fafc]">All Rate Plans</h2>
         </div>
 
         {isLoading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin" style={{ color: '#23766a' }} />
+            <Loader2 className="h-6 w-6 animate-spin" style={{ color: '#183153' }} />
           </div>
         ) : plans.length === 0 ? (
           <div className="flex flex-col items-center py-16 gap-3 text-center">
             <div className="flex h-[56px] w-[56px] items-center justify-center rounded-[14px]"
               style={{ background: 'var(--rp-teal-bg)' }}>
-              <Tags className="h-7 w-7" style={{ color: '#23766a' }} />
+              <Tags className="h-7 w-7" style={{ color: '#183153' }} />
             </div>
             <div>
-              <p className="text-[14px] font-medium text-[#18231f] dark:text-[#dfd9d0]">No rate plans yet</p>
-              <p className="text-[12.5px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">
+              <p className="text-[14px] font-medium text-[#183153] dark:text-[#f8fafc]">No rate plans yet</p>
+              <p className="text-[12.5px] mt-0.5 text-[#64748b] dark:text-[#a9c1d0]">
                 Create your first rate plan to start dynamic pricing
               </p>
             </div>
@@ -410,48 +410,48 @@ export default function RatePlansPage() {
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13.5px] font-medium truncate text-[#18231f] dark:text-[#dfd9d0]">{plan.name}</p>
+                    <p className="text-[13.5px] font-medium truncate text-[#183153] dark:text-[#f8fafc]">{plan.name}</p>
                     <div className="flex flex-wrap items-center gap-3 mt-0.5">
-                      <span className="flex items-center gap-1 text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">
+                      <span className="flex items-center gap-1 text-[12px] text-[#64748b] dark:text-[#a9c1d0]">
                         <BedDouble className="h-3 w-3" />
                         {plan.room ? `${plan.room.name} #${plan.room.number}` : 'All Rooms'}
                       </span>
                       {(plan.startDate || plan.endDate) && (
-                        <span className="flex items-center gap-1 text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">
+                        <span className="flex items-center gap-1 text-[12px] text-[#64748b] dark:text-[#a9c1d0]">
                           <CalendarDays className="h-3 w-3" />
                           {plan.startDate ? plan.startDate.slice(0, 10) : '∞'} → {plan.endDate ? plan.endDate.slice(0, 10) : '∞'}
                         </span>
                       )}
                       {plan.daysOfWeek.length > 0 && (
-                        <span className="text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">
+                        <span className="text-[12px] text-[#64748b] dark:text-[#a9c1d0]">
                           {DAYS.filter((_, i) => plan.daysOfWeek.includes(i)).join(', ')}
                         </span>
                       )}
                       {plan.minNights > 1 && (
-                        <span className="text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">Min {plan.minNights}n</span>
+                        <span className="text-[12px] text-[#64748b] dark:text-[#a9c1d0]">Min {plan.minNights}n</span>
                       )}
                     </div>
                   </div>
 
                   {/* Price */}
                   <div className="shrink-0 text-right">
-                    <p className="text-[18px] font-semibold tracking-[-0.02em]" style={{ color: '#23766a' }}>
+                    <p className="text-[18px] font-semibold tracking-[-0.02em]" style={{ color: '#183153' }}>
                       {formatCurrency(plan.price)}
                     </p>
-                    <p className="text-[11px] text-[#8aa29a] dark:text-[#94b8b0]">/ night</p>
+                    <p className="text-[11px] text-[#64748b] dark:text-[#a9c1d0]">/ night</p>
                   </div>
 
                   {/* Actions */}
                   <div className="flex items-center gap-0.5 shrink-0">
                     <button onClick={() => toggleActive(plan)} title={plan.isActive ? 'Deactivate' : 'Activate'}
-                      className="rounded-[7px] p-1.5 transition-colors hover:bg-[#e3f2ef]">
+                      className="rounded-[7px] p-1.5 transition-colors hover:bg-[#e5f0f7]">
                       {plan.isActive
-                        ? <ToggleRight className="h-5 w-5" style={{ color: '#23766a' }} />
-                        : <ToggleLeft className="h-5 w-5 text-[#c5bdb4] dark:text-[#6e8580]" />}
+                        ? <ToggleRight className="h-5 w-5" style={{ color: '#183153' }} />
+                        : <ToggleLeft className="h-5 w-5 text-[#94a3b8] dark:text-[#7f99ab]" />}
                     </button>
                     <button onClick={() => openEdit(plan)} title="Edit"
                       className="rounded-[7px] p-1.5 transition-colors hover:bg-[#f4f1eb]">
-                      <Pencil className="h-4 w-4 text-[#8aa29a] dark:text-[#94b8b0]" />
+                      <Pencil className="h-4 w-4 text-[#64748b] dark:text-[#a9c1d0]" />
                     </button>
                     <button onClick={() => { if (confirm(`Delete "${plan.name}"?`)) deletePlan(plan.id); }}
                       title="Delete" className="rounded-[7px] p-1.5 transition-colors hover:bg-[#fef2f2]">

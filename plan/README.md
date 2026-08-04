@@ -55,6 +55,7 @@ plan/
 | [theme-system.md](./theme-system.md) | Super Admin theme management + complete theme development guide for Claude | ✅ Built — ei session-e heavily rework hoyeche |
 | [theme-studio-and-design-service.md](./theme-studio-and-design-service.md) | 3-tier theme system (config / uploadable HTML template / code) to break the "same skeleton, different paint" ceiling + paid custom-design request pipeline (income) | 📋 Plan only — approval-er opekkhay |
 | [ui-design-plan.md](./ui-design-plan.md) | Full UI redesign plan (11 phases) — use with Claude for design work | 🟡 Partial — ad-hoc kore kisu page redesign hoyeche (sidebar, /try, website builder), systematic 11-phase execution hoy nai |
+| [landing-page-design-instructions.md](./landing-page-design-instructions.md) | Current landing-page source of truth — typography, logo, H1, pricing, and Coastal Coral palette | ✅ Active design instructions |
 | [design-system-migration.md](./design-system-migration.md) | **স্থায়ী সমাধান** "eक page fix = sob page fix" korar jonno — 1475 inline style + 93 hardcoded color-ke 3-tier enforced design system (token → primitive → composite)-e migrate. Incremental + regression-safe | 📋 Plan only — approval-er opekkhay |
 
 ---

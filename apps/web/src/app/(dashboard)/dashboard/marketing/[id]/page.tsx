@@ -27,15 +27,15 @@ const STATUS_META: Record<string, { label: string; bg: string; border: string; t
   draft:     { label: 'Draft',     bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)' },
   scheduled: { label: 'Scheduled', bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
   sending:   { label: 'Sending…',  bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a' },
-  sent:      { label: 'Sent',      bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a' },
+  sent:      { label: 'Sent',      bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153' },
   failed:    { label: 'Failed',    bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)', text: '#c43c3c' },
   cancelled: { label: 'Cancelled', bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-faint)' },
 };
 
 const LOG_STATUS_META: Record<string, { color: string; Icon: React.ElementType }> = {
   queued:    { color: 'var(--rp-text-faint)', Icon: Clock       },
-  sent:      { color: '#23766a', Icon: Send        },
-  delivered: { color: '#23766a', Icon: CheckCircle2 },
+  sent:      { color: '#183153', Icon: Send        },
+  delivered: { color: '#183153', Icon: CheckCircle2 },
   failed:    { color: '#c43c3c', Icon: XCircle     },
 };
 
@@ -69,13 +69,13 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
 
   if (isLoading) return (
     <div className="flex items-center justify-center py-24">
-      <Loader2 className="h-6 w-6 animate-spin" style={{ color: '#9bbdb7' }} />
+      <Loader2 className="h-6 w-6 animate-spin" style={{ color: '#aac0d0' }} />
     </div>
   );
 
   if (!campaign) return (
     <div className="space-y-4">
-      <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">Campaign not found.</p>
+      <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Campaign not found.</p>
       <Link href="/dashboard/marketing">
         <button className="rounded-[9px] border px-4 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]"
           style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>← Back</button>
@@ -94,17 +94,17 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
       <div className="flex items-start justify-between gap-4">
         <div>
           <Link href="/dashboard/marketing"
-            className="flex items-center gap-1 text-[12.5px] mb-2 hover:underline text-[#8aa29a] dark:text-[#94b8b0]">
+            className="flex items-center gap-1 text-[12.5px] mb-2 hover:underline text-[#64748b] dark:text-[#a9c1d0]">
             <ArrowLeft className="h-3.5 w-3.5" /> Back to Campaigns
           </Link>
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="font-display text-[24px] font-medium tracking-[-0.01em] text-[#18231f] dark:text-[#dfd9d0]">
+            <h1 className="font-display text-[24px] font-medium tracking-[-0.01em] text-[#183153] dark:text-[#f8fafc]">
               {campaign.name}
             </h1>
             <span className="inline-flex items-center rounded-[7px] border px-[9px] py-[3px] text-[11.5px] font-semibold"
               style={{ background: sm.bg, borderColor: sm.border, color: sm.text }}>{sm.label}</span>
           </div>
-          <p className="text-[12.5px] mt-1 text-[#8aa29a] dark:text-[#94b8b0]">
+          <p className="text-[12.5px] mt-1 text-[#64748b] dark:text-[#a9c1d0]">
             {channelIcon} {campaign.channel.toUpperCase()} · Created {new Date(campaign.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
           </p>
         </div>
@@ -133,7 +133,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
             { label: 'Recipients', value: campaign.recipientCount, bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text)', Icon: Users        },
-            { label: 'Delivered',  value: campaign.deliveredCount, bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a', Icon: CheckCircle2 },
+            { label: 'Delivered',  value: campaign.deliveredCount, bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153', Icon: CheckCircle2 },
             { label: 'Failed',     value: campaign.failedCount,    bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)', text: '#c43c3c', Icon: XCircle      },
             { label: 'Delivery %', value: `${deliveryPct}%`,       bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040', Icon: Send         },
           ].map(s => (
@@ -155,10 +155,10 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
           style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           <div className="flex items-center justify-between text-[13px]">
             <span style={{ color: 'var(--rp-text-subtle)' }}>Delivery Rate</span>
-            <span className="font-semibold text-[#18231f] dark:text-[#dfd9d0]">{deliveryPct}%</span>
+            <span className="font-semibold text-[#183153] dark:text-[#f8fafc]">{deliveryPct}%</span>
           </div>
           <div className="h-2.5 rounded-full overflow-hidden" style={{ background: '#e8e5e0' }}>
-            <div className="h-full rounded-full transition-all" style={{ width: `${deliveryPct}%`, background: '#23766a' }} />
+            <div className="h-full rounded-full transition-all" style={{ width: `${deliveryPct}%`, background: '#183153' }} />
           </div>
         </div>
       )}
@@ -166,8 +166,8 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
       {/* Message preview */}
       <div className="rounded-[14px] border bg-white p-5 space-y-3"
         style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
-        <p className="flex items-center gap-2 text-[13.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">
-          <MessageSquare className="h-4 w-4" style={{ color: '#9bbdb7' }} /> Message
+        <p className="flex items-center gap-2 text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">
+          <MessageSquare className="h-4 w-4" style={{ color: '#aac0d0' }} /> Message
         </p>
         <div className="rounded-[10px] border p-4 text-[13px] whitespace-pre-wrap font-mono"
           style={{ background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border)', color: 'var(--rp-text)' }}>
@@ -180,7 +180,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
           </p>
         )}
         {campaign.sentAt && (
-          <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+          <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">
             Sent on {new Date(campaign.sentAt).toLocaleString('en-GB')}
           </p>
         )}
@@ -192,15 +192,15 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
           style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           <div className="flex items-center justify-between px-5 py-4"
             style={{ background: 'var(--rp-surface-2)', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-            <p className="text-[13.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">Recipient Log</p>
-            <span className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">{campaign.logs.length} entries</span>
+            <p className="text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">Recipient Log</p>
+            <span className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">{campaign.logs.length} entries</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr style={{ background: 'var(--rp-surface-2)', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
                   {['Guest', 'Phone', 'Ch', 'Status'].map(h => (
-                    <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] dark:text-[#94b8b0]">{h}</th>
+                    <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] dark:text-[#a9c1d0]">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -210,8 +210,8 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
                   return (
                     <tr key={log.id} className="transition-colors hover:bg-[#fafaf8]"
                       style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
-                      <td className="px-5 py-3 text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{log.guestName ?? '—'}</td>
-                      <td className="px-5 py-3 text-[12px] font-mono text-[#8aa29a] dark:text-[#94b8b0]">{log.phone}</td>
+                      <td className="px-5 py-3 text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{log.guestName ?? '—'}</td>
+                      <td className="px-5 py-3 text-[12px] font-mono text-[#64748b] dark:text-[#a9c1d0]">{log.phone}</td>
                       <td className="px-5 py-3 text-center text-[15px]">{log.channel === 'sms' ? '📱' : '💬'}</td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-1.5">

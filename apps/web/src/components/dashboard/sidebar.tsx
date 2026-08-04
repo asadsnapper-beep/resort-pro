@@ -245,7 +245,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="flex h-full w-60 flex-col bg-[#1b342f]">
+    <aside className="flex h-full w-60 flex-col bg-[#183153]">
       {/* Logo */}
       <div className="flex h-14 items-center gap-3 border-b border-white/[0.07] px-[18px]">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-resort-600">
@@ -255,7 +255,7 @@ export function Sidebar() {
           <p className="truncate font-display text-[14px] font-medium text-[#ece7df]">
             {tenant?.name || 'ResortPro'}
           </p>
-          <p className="text-[10.5px] text-[#62847c] capitalize">
+          <p className="text-[10.5px] text-[#698599] capitalize">
             {role === 'OWNER' ? `${tenant?.plan?.toLowerCase() || 'free'} plan` : roleConfig.label}
           </p>
         </div>
@@ -280,13 +280,13 @@ export function Sidebar() {
                     'flex items-center gap-2.5 rounded-r-lg py-[7px] pl-3 pr-3 text-[13.5px] font-medium transition-colors',
                     active
                       ? 'border-l-2 border-gold-500 bg-white/[0.08] pl-[10px] text-[#ece7df] font-medium'
-                      : 'border-l-2 border-transparent text-[#9bbdb7] font-normal hover:bg-white/5 hover:text-[#ece7df]',
+                      : 'border-l-2 border-transparent text-[#aac0d0] font-normal hover:bg-white/5 hover:text-[#ece7df]',
                   )}
                 >
-                  <Icon className={`h-4 w-4 shrink-0 ${active ? 'text-[#ece7df]' : 'text-[#6a9990]'}`} />
+                  <Icon className={`h-4 w-4 shrink-0 ${active ? 'text-[#ece7df]' : 'text-[#91adbf]'}`} />
                   <span className="flex-1">{label}</span>
                   {badge !== undefined && (
-                    <span className="rounded-full bg-gold-500/90 px-1.5 py-0.5 text-[10px] font-bold leading-none text-[#1b342f]">
+                    <span className="rounded-full bg-gold-500/90 px-1.5 py-0.5 text-[10px] font-bold leading-none text-[#183153]">
                       {badge}
                     </span>
                   )}
@@ -307,7 +307,7 @@ export function Sidebar() {
                 onClick={() => toggleGroup(group)}
                 className="flex w-full items-center justify-between px-4 py-1.5 text-left"
               >
-                <span className="text-[9px] font-semibold uppercase tracking-[0.15em] text-[#4a6e66]">
+                <span className="text-[9px] font-semibold uppercase tracking-[0.15em] text-[#475569]">
                   {groupLabel}
                 </span>
                 <ChevronDown
@@ -337,10 +337,10 @@ export function Sidebar() {
                             'flex items-center gap-2.5 rounded-r-lg py-[7px] pl-3 pr-3 text-[13.5px] font-medium transition-colors',
                             active
                               ? 'border-l-2 border-gold-500 bg-white/[0.08] pl-[10px] text-[#ece7df] font-medium'
-                              : 'border-l-2 border-transparent text-[#9bbdb7] font-normal hover:bg-white/5 hover:text-[#ece7df]',
+                              : 'border-l-2 border-transparent text-[#aac0d0] font-normal hover:bg-white/5 hover:text-[#ece7df]',
                           )}
                         >
-                          <Icon className={`h-4 w-4 shrink-0 ${active ? 'text-[#ece7df]' : 'text-[#6a9990]'}`} />
+                          <Icon className={`h-4 w-4 shrink-0 ${active ? 'text-[#ece7df]' : 'text-[#91adbf]'}`} />
                           {label}
                         </Link>
                       </li>
@@ -358,7 +358,7 @@ export function Sidebar() {
         <Link
           href="/docs"
           target="_blank"
-          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-normal text-[#9bbdb7] transition-colors hover:bg-white/5 hover:text-[#ece7df]"
+          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-normal text-[#aac0d0] transition-colors hover:bg-white/5 hover:text-[#ece7df]"
         >
           <LifeBuoy className="h-4 w-4 shrink-0 opacity-80" />
           {t('helpDocs')}
@@ -384,7 +384,7 @@ export function Sidebar() {
               {user ? `${user.firstName} ${user.lastName}` : 'User'}
             </p>
             {role === 'OWNER' ? (
-              <span className="text-[11px] text-[#8fa8a1] truncate">
+              <span className="text-[11px] text-[#94aab9] truncate">
                 {tenant?.plan?.toLowerCase() || 'free'} plan
               </span>
             ) : (
@@ -400,7 +400,7 @@ export function Sidebar() {
           </Link>
           <button
             onClick={handleLogout}
-            className="text-[#8fa8a1] transition-colors hover:text-white"
+            className="text-[#94aab9] transition-colors hover:text-white"
             title="Logout"
           >
             <LogOut className="h-4 w-4" />

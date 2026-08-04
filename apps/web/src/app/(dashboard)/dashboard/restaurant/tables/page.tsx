@@ -19,8 +19,8 @@ interface RestaurantTable {
 
 const WEB = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
-const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30';
-const labelCls = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
+const labelCls = 'block text-[11.5px] font-medium text-[#64748b] mb-1.5';
 
 export default function TablesPage() {
   const { tenant } = useAuthStore();
@@ -80,13 +80,13 @@ export default function TablesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#18231f] flex items-center gap-2.5">
+          <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[#183153] flex items-center gap-2.5">
             <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px]" style={{ background: 'var(--rp-teal-bg)' }}>
-              <LayoutGrid className="h-4 w-4" style={{ color: '#23766a' }} />
+              <LayoutGrid className="h-4 w-4" style={{ color: '#183153' }} />
             </div>
             Restaurant Tables
           </h1>
-          <p className="mt-[4px] text-[13px] text-[#7a9890]">Each table gets a URL — open it on the tablet for self-ordering</p>
+          <p className="mt-[4px] text-[13px] text-[#64748b]">Each table gets a URL — open it on the tablet for self-ordering</p>
         </div>
         <button onClick={openCreate}
           className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors hover:opacity-90"
@@ -97,9 +97,9 @@ export default function TablesPage() {
 
       {/* Setup hint */}
       <div className="flex items-start gap-3 rounded-[12px] border px-4 py-3"
-        style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)' }}>
-        <QrCode className="h-4 w-4 mt-0.5 shrink-0" style={{ color: '#23766a' }} />
-        <p className="text-[12.5px]" style={{ color: '#1b342f' }}>
+        style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)' }}>
+        <QrCode className="h-4 w-4 mt-0.5 shrink-0" style={{ color: '#183153' }} />
+        <p className="text-[12.5px]" style={{ color: '#183153' }}>
           <strong>Tablet setup:</strong> Open the table URL on the Android tablet → enable Android Screen Pinning (Settings → Security → Screen Pinning). Customers can only use the ordering page.
         </p>
       </div>
@@ -113,34 +113,34 @@ export default function TablesPage() {
         </div>
       ) : tables.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 rounded-[14px] gap-3"
-          style={{ borderColor: 'rgba(35,118,106,0.2)', borderStyle: 'dashed', border: '1.5px dashed rgba(35,118,106,0.25)', background: 'var(--rp-surface-2)' }}>
+          style={{ borderColor: 'rgba(24,49,83,0.2)', borderStyle: 'dashed', border: '1.5px dashed rgba(24,49,83,0.25)', background: 'var(--rp-surface-2)' }}>
           <div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'var(--rp-teal-bg)' }}>
-            <QrCode className="h-7 w-7" style={{ color: '#23766a' }} />
+            <QrCode className="h-7 w-7" style={{ color: '#183153' }} />
           </div>
-          <p className="text-[13.5px] font-medium text-[#18231f] dark:text-[#dfd9d0]">No tables yet</p>
-          <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">Add tables and place tablets on each one</p>
+          <p className="text-[13.5px] font-medium text-[#183153] dark:text-[#f8fafc]">No tables yet</p>
+          <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">Add tables and place tablets on each one</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {tables.map(t => (
             <div key={t.id} className="rounded-[14px] border bg-white p-4 space-y-3 transition-all hover:shadow-md"
               style={{
-                borderColor: t.isActive ? 'rgba(35,118,106,0.25)' : 'var(--rp-border)',
-                boxShadow: t.isActive ? '0 0 0 1px rgba(35,118,106,0.08)' : '0 1px 6px rgba(0,0,0,0.04)',
+                borderColor: t.isActive ? 'rgba(24,49,83,0.25)' : 'var(--rp-border)',
+                boxShadow: t.isActive ? '0 0 0 1px rgba(24,49,83,0.08)' : '0 1px 6px rgba(0,0,0,0.04)',
                 background: t.isActive ? 'var(--rp-surface)' : 'var(--rp-surface-2)',
               }}>
               {/* Number + toggle */}
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-[32px] font-bold leading-none" style={{ color: t.isActive ? '#1b342f' : 'var(--rp-text-faint)' }}>
+                  <p className="text-[32px] font-bold leading-none" style={{ color: t.isActive ? '#183153' : 'var(--rp-text-faint)' }}>
                     {t.tableNumber}
                   </p>
-                  <p className="text-[12px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">{t.label || `Table ${t.tableNumber}`}</p>
+                  <p className="text-[12px] mt-0.5 text-[#64748b] dark:text-[#a9c1d0]">{t.label || `Table ${t.tableNumber}`}</p>
                 </div>
                 <button onClick={() => toggleMutation.mutate(t)}
                   className="rounded-[7px] border px-[9px] py-[3px] text-[11.5px] font-semibold transition-colors hover:opacity-80"
                   style={t.isActive
-                    ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }
+                    ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }
                     : { background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-muted)' }}>
                   {t.isActive ? 'Active' : 'Inactive'}
                 </button>
@@ -148,18 +148,18 @@ export default function TablesPage() {
 
               {/* URL */}
               <div className="flex items-center gap-2 rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-2">
-                <span className="text-[11.5px] truncate flex-1 font-mono text-[#6b8880] dark:text-[#94b8b0]">{tableUrl(t)}</span>
+                <span className="text-[11.5px] truncate flex-1 font-mono text-[#64748b] dark:text-[#a9c1d0]">{tableUrl(t)}</span>
                 <button onClick={() => copyUrl(t)}
-                  className="shrink-0 transition-colors hover:opacity-70" style={{ color: '#9bbdb7' }}>
+                  className="shrink-0 transition-colors hover:opacity-70" style={{ color: '#aac0d0' }}>
                   {copiedId === t.id
-                    ? <Check className="h-3.5 w-3.5" style={{ color: '#23766a' }} />
+                    ? <Check className="h-3.5 w-3.5" style={{ color: '#183153' }} />
                     : <Copy className="h-3.5 w-3.5" />}
                 </button>
               </div>
 
               {/* Orders count */}
               {t._count && (
-                <p className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">{t._count.foodOrders} orders total</p>
+                <p className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">{t._count.foodOrders} orders total</p>
               )}
 
               {/* Actions */}

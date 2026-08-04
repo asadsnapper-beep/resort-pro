@@ -2,6 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { PLAN_PRICING } from '@resort-pro/types';
+
+const bnTaka = (n: number) => '৳' + n.toLocaleString('bn-BD');
+const bnNum = (n: number) => n.toLocaleString('bn-BD');
 
 // ─────────────────────────────────────────────
 // Data — Bengali
@@ -96,12 +100,14 @@ const STEPS = [
   },
 ];
 
+// Prices/limits @resort-pro/types থেকে আসে (single source of truth) —
+// দেখুন plan/launch-pricing-and-trial-abuse-prevention.md
 const PLANS = [
   {
     name: 'STARTER',
-    price: '৳৪,৯০০',
-    rooms: 'সর্বোচ্চ ২০টি Room',
-    staff: '৩ জন User',
+    price: bnTaka(PLAN_PRICING.STARTER.monthlyBdt),
+    rooms: `সর্বোচ্চ ${bnNum(PLAN_PRICING.STARTER.roomLimit)}টি Room`,
+    staff: `${bnNum(PLAN_PRICING.STARTER.staffLimit)} জন User`,
     features: ['Room ও Booking Management', 'বিকাশ ও Stripe Payment', 'Guest CRM', 'Embed Widget', '২৪/৭ Email Support'],
     cta: 'Free Trial শুরু করুন',
     ctaHref: '/auth/register',
@@ -109,9 +115,9 @@ const PLANS = [
   },
   {
     name: 'PROFESSIONAL',
-    price: '৳৯,৯০০',
-    rooms: 'সর্বোচ্চ ১০০টি Room',
-    staff: '১০ জন User',
+    price: bnTaka(PLAN_PRICING.PROFESSIONAL.monthlyBdt),
+    rooms: `সর্বোচ্চ ${bnNum(PLAN_PRICING.PROFESSIONAL.roomLimit)}টি Room`,
+    staff: `${bnNum(PLAN_PRICING.PROFESSIONAL.staffLimit)} জন User`,
     features: ['Starter-এর সব কিছু', 'Advanced Analytics ও Reports', 'Rate Plan ও Channel Sync', 'Restaurant ও Room Service', 'Priority Support'],
     cta: 'Free Trial শুরু করুন',
     ctaHref: '/auth/register',
@@ -119,12 +125,12 @@ const PLANS = [
   },
   {
     name: 'ENTERPRISE',
-    price: '৳১৯,৯০০',
-    rooms: 'সীমাহীন Room',
-    staff: 'সীমাহীন User',
-    features: ['Professional-এর সব কিছু', 'White-label Branding', 'SSO ও SAML', 'Dedicated Account Manager', 'SLA গ্যারান্টি'],
-    cta: 'Sales Team-এর সাথে কথা বলুন',
-    ctaHref: '/contact',
+    price: bnTaka(PLAN_PRICING.ENTERPRISE.monthlyBdt),
+    rooms: `সর্বোচ্চ ${bnNum(PLAN_PRICING.ENTERPRISE.roomLimit)}টি Room`,
+    staff: `${bnNum(PLAN_PRICING.ENTERPRISE.staffLimit)} জন User`,
+    features: [`Professional-এর সব কিছু`, `সর্বোচ্চ ${bnNum(PLAN_PRICING.ENTERPRISE.propertyLimit)}টি Property`, 'Revenue Intelligence', 'Priority Support'],
+    cta: 'Free Trial শুরু করুন',
+    ctaHref: '/auth/register',
     highlight: false,
   },
 ];

@@ -19,9 +19,9 @@ interface ModalShellProps {
  * ModalShell — standard modal for all ResortPro modals.
  *
  * Style spec (matches RoomModal):
- *   Backdrop  : rgba(27,52,47,0.5) + blur(5px)
- *   Container : white (light) / #1a2e2a (dark), border-radius 18px
- *   Header    : #1b342f, title #dfd9d0, subtitle rgba(255,255,255,0.4)
+ *   Backdrop  : rgba(24,49,83,0.5) + blur(5px)
+ *   Container : white (light) / #10243f (dark), border-radius 18px
+ *   Header    : #183153, title #f8fafc, subtitle rgba(255,255,255,0.4)
  *   Body      : scrollable, padding 24px
  *   Footer    : var(--rp-surface-2) bg, top border rgba(255,255,255,0.08) dark / rgba(0,0,0,0.06) light
  */
@@ -66,7 +66,7 @@ export function ModalShell({
         position: 'fixed', inset: 0, zIndex: 9999,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: '16px',
-        background: 'rgba(27,52,47,0.5)',
+        background: 'rgba(24,49,83,0.5)',
         backdropFilter: 'blur(5px)',
         WebkitBackdropFilter: 'blur(5px)',
       }}
@@ -81,8 +81,8 @@ export function ModalShell({
           display: 'flex',
           flexDirection: 'column',
           borderRadius: '18px',
-          background: isDark ? '#1a2e2a' : '#ffffff',
-          boxShadow: '0 32px 80px rgba(27,52,47,0.35)',
+          background: isDark ? '#10243f' : '#ffffff',
+          boxShadow: '0 32px 80px rgba(24,49,83,0.35)',
           overflow: 'hidden',
         }}
         onClick={e => e.stopPropagation()}

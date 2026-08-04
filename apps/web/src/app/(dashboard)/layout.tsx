@@ -142,18 +142,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
           return (
             <a key={href} href={href} className="flex flex-col items-center gap-1 px-4 py-2">
-              <svg className={`h-5 w-5 ${active ? 'text-gold-400' : 'text-[#8fa8a1]'}`} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+              <svg className={`h-5 w-5 ${active ? 'text-gold-400' : 'text-[#94aab9]'}`} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d={icon} />
               </svg>
-              <span className={`text-[10px] font-medium ${active ? 'text-gold-400' : 'text-[#8fa8a1]'}`}>{label}</span>
+              <span className={`text-[10px] font-medium ${active ? 'text-gold-400' : 'text-[#94aab9]'}`}>{label}</span>
             </a>
           );
         })}
         <button onClick={() => setMoreOpen(true)} className="flex flex-col items-center gap-1 px-4 py-2" aria-label="Open full menu">
-          <svg className={`h-5 w-5 ${moreOpen ? 'text-gold-400' : 'text-[#8fa8a1]'}`} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+          <svg className={`h-5 w-5 ${moreOpen ? 'text-gold-400' : 'text-[#94aab9]'}`} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
-          <span className={`text-[10px] font-medium ${moreOpen ? 'text-gold-400' : 'text-[#8fa8a1]'}`}>More</span>
+          <span className={`text-[10px] font-medium ${moreOpen ? 'text-gold-400' : 'text-[#94aab9]'}`}>More</span>
         </button>
       </nav>
 

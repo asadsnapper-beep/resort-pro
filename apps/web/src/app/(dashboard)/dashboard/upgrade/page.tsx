@@ -4,24 +4,27 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import { billingApi } from '@/lib/api';
+import { PLAN_PRICING } from '@resort-pro/types';
 import {
   CheckCircle2, Zap, Building2, Crown, ArrowRight,
   Loader2, Shield, Users, BarChart3, Headphones, Star,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// Prices/limits come from @resort-pro/types — see
+// plan/launch-pricing-and-trial-abuse-prevention.md.
 const PLANS = [
   {
     key: 'STARTER',
-    name: 'Starter',
-    price: 49,
+    name: PLAN_PRICING.STARTER.displayName,
+    price: PLAN_PRICING.STARTER.monthlyUsd,
     icon: Zap,
     color: 'from-emerald-500 to-teal-600',
     borderColor: 'border-emerald-500/30',
     bgColor: 'bg-emerald-500/5',
     badgeColor: 'bg-emerald-100 text-emerald-700',
     features: [
-      'Up to 20 rooms',
+      `Up to ${PLAN_PRICING.STARTER.roomLimit} rooms`,
       'Full booking management',
       'Guest CRM & profiles',
       'Website builder',
@@ -31,8 +34,8 @@ const PLANS = [
   },
   {
     key: 'PROFESSIONAL',
-    name: 'Professional',
-    price: 99,
+    name: PLAN_PRICING.PROFESSIONAL.displayName,
+    price: PLAN_PRICING.PROFESSIONAL.monthlyUsd,
     icon: Building2,
     color: 'from-blue-500 to-indigo-600',
     borderColor: 'border-blue-500/40',
@@ -40,7 +43,7 @@ const PLANS = [
     badgeColor: 'bg-blue-100 text-blue-700',
     popular: true,
     features: [
-      'Up to 100 rooms',
+      `Up to ${PLAN_PRICING.PROFESSIONAL.roomLimit} rooms`,
       'Everything in Starter',
       'Staff invites & roles',
       'Advanced analytics',
@@ -50,20 +53,19 @@ const PLANS = [
   },
   {
     key: 'ENTERPRISE',
-    name: 'Enterprise',
-    price: 199,
+    name: PLAN_PRICING.ENTERPRISE.displayName,
+    price: PLAN_PRICING.ENTERPRISE.monthlyUsd,
     icon: Crown,
     color: 'from-amber-500 to-orange-600',
     borderColor: 'border-amber-500/30',
     bgColor: 'bg-amber-500/5',
     badgeColor: 'bg-amber-100 text-amber-700',
     features: [
-      'Unlimited rooms',
+      `Up to ${PLAN_PRICING.ENTERPRISE.roomLimit} rooms`,
       'Everything in Professional',
-      'Custom integrations',
-      'Dedicated account manager',
-      'SLA guarantee (99.9%)',
-      'White-label option',
+      `Up to ${PLAN_PRICING.ENTERPRISE.propertyLimit} properties`,
+      'Revenue intelligence',
+      'Priority support + SLA',
     ],
   },
 ];

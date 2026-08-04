@@ -50,9 +50,9 @@ interface GanttData {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<string, { bg: string; text: string; border: string; bar: string; label: string }> = {
-  CONFIRMED:   { bg: 'var(--rp-teal-bg)', text: '#23766a', border: 'rgba(35,118,106,0.2)',  bar: '#23766a', label: 'Confirmed' },
-  CHECKED_IN:  { bg: '#1b342f', text: '#dfd9d0', border: 'rgba(27,52,47,0.5)',   bar: '#1b342f', label: 'Checked In' },
-  CHECKED_OUT: { bg: 'var(--rp-surface-3)', text: 'var(--rp-text-muted)', border: 'var(--rp-border-md)',     bar: '#9bbdb7', label: 'Checked Out' },
+  CONFIRMED:   { bg: 'var(--rp-teal-bg)', text: '#183153', border: 'rgba(24,49,83,0.2)',  bar: '#183153', label: 'Confirmed' },
+  CHECKED_IN:  { bg: '#183153', text: '#f8fafc', border: 'rgba(24,49,83,0.5)',   bar: '#183153', label: 'Checked In' },
+  CHECKED_OUT: { bg: 'var(--rp-surface-3)', text: 'var(--rp-text-muted)', border: 'var(--rp-border-md)',     bar: '#aac0d0', label: 'Checked Out' },
   PENDING:     { bg: 'var(--rp-amber-bg)', text: '#b89040', border: 'rgba(184,144,64,0.2)', bar: '#d4a853', label: 'Pending' },
   CONFLICT:    { bg: 'var(--rp-red-bg)', text: '#c43c3c', border: 'rgba(200,60,60,0.2)',  bar: '#c43c3c', label: '⚠ Conflict' },
 };
@@ -111,12 +111,12 @@ function GanttRow({
         <div className="flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-[8px] text-[10px] font-bold"
           style={isMaintenance
             ? { background: 'var(--rp-coral-bg)', color: '#b8724a' }
-            : { background: 'var(--rp-teal-bg)', color: '#23766a' }}>
+            : { background: 'var(--rp-teal-bg)', color: '#183153' }}>
           {isMaintenance ? '🔧' : (ROOM_TYPE_SHORT[room.type] ?? room.type.slice(0, 3))}
         </div>
         <div className="min-w-0">
-          <p className="text-[12px] font-semibold truncate text-[#18231f] dark:text-[#dfd9d0]">Room {room.number}</p>
-          <p className="text-[10px] truncate text-[#8aa29a] dark:text-[#94b8b0]">{room.name || room.type}</p>
+          <p className="text-[12px] font-semibold truncate text-[#183153] dark:text-[#f8fafc]">Room {room.number}</p>
+          <p className="text-[10px] truncate text-[#64748b] dark:text-[#a9c1d0]">{room.name || room.type}</p>
         </div>
       </div>
 
@@ -208,12 +208,12 @@ function Legend() {
       {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
         <div key={key} className="flex items-center gap-1.5">
           <span className="h-[10px] w-[10px] rounded-[3px]" style={{ background: cfg.bar }} />
-          <span className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">{cfg.label}</span>
+          <span className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">{cfg.label}</span>
         </div>
       ))}
       <div className="flex items-center gap-1.5">
         <span className="h-[10px] w-[10px] rounded-[3px] border" style={{ background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.3)' }} />
-        <span className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">Today</span>
+        <span className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">Today</span>
       </div>
     </div>
   );
@@ -290,7 +290,7 @@ export default function BookingCalendarPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#23766a' }} />
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#183153' }} />
       </div>
     );
   }
@@ -334,8 +334,8 @@ export default function BookingCalendarPage() {
       {/* Quick stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total Rooms',      value: rooms.length,                                      bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a' },
-          { label: 'Occupied Today',   value: occupiedToday,                                     bg: '#1b342f', border: 'rgba(27,52,47,0.5)',    text: '#dfd9d0' },
+          { label: 'Total Rooms',      value: rooms.length,                                      bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153' },
+          { label: 'Occupied Today',   value: occupiedToday,                                     bg: '#183153', border: 'rgba(24,49,83,0.5)',    text: '#f8fafc' },
           { label: 'Maintenance',      value: rooms.filter(r => r.status === 'MAINTENANCE').length, bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)', text: '#b8724a' },
           { label: 'Bookings in View', value: totalBookings,                                     bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
         ].map(({ label, value, bg, border, text }) => (
@@ -355,17 +355,17 @@ export default function BookingCalendarPage() {
         <div className="flex items-center justify-between border-b px-4 py-3"
           style={{ borderColor: 'var(--rp-border)' }}>
           <button onClick={() => navigate('prev')}
-            className="rounded-[8px] p-1.5 transition-colors hover:bg-[#f4f1eb] text-[#6b8880] dark:text-[#94b8b0]">
+            className="rounded-[8px] p-1.5 transition-colors hover:bg-[#f4f1eb] text-[#64748b] dark:text-[#a9c1d0]">
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div className="text-center">
-            <p className="text-[13.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">
+            <p className="text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">
               {formatMonthTitle(fromDate, toDate)}
             </p>
-            <p className="text-[11px] text-[#8aa29a] dark:text-[#94b8b0]">{fromDate} → {toDate}</p>
+            <p className="text-[11px] text-[#64748b] dark:text-[#a9c1d0]">{fromDate} → {toDate}</p>
           </div>
           <button onClick={() => navigate('next')}
-            className="rounded-[8px] p-1.5 transition-colors hover:bg-[#f4f1eb] text-[#6b8880] dark:text-[#94b8b0]">
+            className="rounded-[8px] p-1.5 transition-colors hover:bg-[#f4f1eb] text-[#64748b] dark:text-[#a9c1d0]">
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>
@@ -379,7 +379,7 @@ export default function BookingCalendarPage() {
               style={{ background: 'var(--rp-surface-2)', borderColor: 'var(--rp-border)' }}>
               <div className="w-44 shrink-0 border-r px-3 py-2.5"
                 style={{ borderColor: 'var(--rp-border)' }}>
-                <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] dark:text-[#94b8b0]">Room</p>
+                <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] dark:text-[#a9c1d0]">Room</p>
               </div>
               <div className="flex-1 flex">
                 {dates.map(date => {
@@ -394,15 +394,15 @@ export default function BookingCalendarPage() {
                         background: isToday ? 'var(--rp-amber-bg)' : undefined,
                       }}>
                       <p className="text-[10px] font-semibold uppercase tracking-[0.06em]"
-                        style={{ color: isToday ? '#b89040' : isWeekend ? '#23766a' : 'var(--rp-text-muted)' }}>
+                        style={{ color: isToday ? '#b89040' : isWeekend ? '#183153' : 'var(--rp-text-muted)' }}>
                         {day}
                       </p>
                       <p className="text-[12px] font-bold"
-                        style={{ color: isToday ? '#b89040' : isWeekend ? '#23766a' : 'var(--rp-text)' }}>
+                        style={{ color: isToday ? '#b89040' : isWeekend ? '#183153' : 'var(--rp-text)' }}>
                         {d}
                       </p>
                       {(d === 1 || date === dates[0]) && (
-                        <p className="text-[9px] text-[#c5bdb4] dark:text-[#6e8580]">{month}</p>
+                        <p className="text-[9px] text-[#94a3b8] dark:text-[#7f99ab]">{month}</p>
                       )}
                     </div>
                   );
@@ -413,8 +413,8 @@ export default function BookingCalendarPage() {
             {/* Room rows */}
             {rooms.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <BedDouble className="w-10 h-10 text-[#c5bdb4] dark:text-[#6e8580]" />
-                <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No rooms found. Add rooms first.</p>
+                <BedDouble className="w-10 h-10 text-[#94a3b8] dark:text-[#7f99ab]" />
+                <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">No rooms found. Add rooms first.</p>
               </div>
             ) : (
               rooms.map(room => (
@@ -439,10 +439,10 @@ export default function BookingCalendarPage() {
 
       {/* Active booking detail panel */}
       {activeBooking && createPortal((
-        <div className="fixed inset-0 z-40" style={{ background: 'rgba(27,52,47,0.35)', backdropFilter: 'blur(4px)' }}
+        <div className="fixed inset-0 z-40" style={{ background: 'rgba(24,49,83,0.35)', backdropFilter: 'blur(4px)' }}
           onClick={() => setActiveBooking(null)}>
           <div className="absolute right-4 top-20 w-[300px] rounded-[18px] border bg-white dark:bg-white/5 p-5 shadow-2xl"
-            style={{ borderColor: 'var(--rp-border)', boxShadow: '0 20px 60px rgba(27,52,47,0.25)' }}
+            style={{ borderColor: 'var(--rp-border)', boxShadow: '0 20px 60px rgba(24,49,83,0.25)' }}
             onClick={e => e.stopPropagation()}>
 
             {/* Status + close */}
@@ -456,15 +456,15 @@ export default function BookingCalendarPage() {
                 {STATUS_CONFIG[activeBooking.status]?.label ?? activeBooking.status}
               </span>
               <button onClick={() => setActiveBooking(null)}
-                className="flex h-[26px] w-[26px] items-center justify-center rounded-full transition-colors hover:bg-[#f4f1eb] text-[#8aa29a] dark:text-[#94b8b0]">
+                className="flex h-[26px] w-[26px] items-center justify-center rounded-full transition-colors hover:bg-[#f4f1eb] text-[#64748b] dark:text-[#a9c1d0]">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <h3 className="font-display text-[18px] font-medium text-[#18231f] dark:text-[#dfd9d0]">
+            <h3 className="font-display text-[18px] font-medium text-[#183153] dark:text-[#f8fafc]">
               {activeBooking.guestName}
             </h3>
-            <p className="text-[12px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">
+            <p className="text-[12px] mt-0.5 text-[#64748b] dark:text-[#a9c1d0]">
               #{activeBooking.confirmationNumber}
             </p>
 
@@ -477,13 +477,13 @@ export default function BookingCalendarPage() {
               ].map(({ label, value }) => (
                 <div key={label} className="flex justify-between text-[13px]">
                   <span style={{ color: 'var(--rp-text-muted)' }}>{label}</span>
-                  <span className="font-medium text-[#18231f] dark:text-[#dfd9d0]">{value}</span>
+                  <span className="font-medium text-[#183153] dark:text-[#f8fafc]">{value}</span>
                 </div>
               ))}
               <div className="flex justify-between border-t pt-2.5 text-[13px]"
                 style={{ borderColor: 'var(--rp-border)' }}>
                 <span style={{ color: 'var(--rp-text-muted)' }}>Total</span>
-                <span className="font-semibold text-[15px] text-[#18231f] dark:text-[#dfd9d0]">
+                <span className="font-semibold text-[15px] text-[#183153] dark:text-[#f8fafc]">
                   {formatCurrency(activeBooking.totalAmount)}
                 </span>
               </div>

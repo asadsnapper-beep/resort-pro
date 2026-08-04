@@ -341,12 +341,12 @@ export default function SettingsPage() {
       {/* Tenant Info Banner */}
       {tenant && (
         <div className="flex items-center gap-3 rounded-[10px] border px-5 py-3"
-          style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.18)' }}>
-          <Info className="h-4 w-4 shrink-0" style={{ color: '#23766a' }} />
-          <p className="text-[13px]" style={{ color: '#23766a' }}>
+          style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.18)' }}>
+          <Info className="h-4 w-4 shrink-0" style={{ color: '#183153' }} />
+          <p className="text-[13px]" style={{ color: '#183153' }}>
             Managing <strong>{tenant.name}</strong> — slug:{' '}
             <code className="font-mono rounded-[5px] px-1.5 py-0.5 text-[12px]"
-              style={{ background: 'rgba(35,118,106,0.12)', color: '#1a5e54' }}>{tenant.slug}</code>
+              style={{ background: 'rgba(24,49,83,0.12)', color: '#183153' }}>{tenant.slug}</code>
           </p>
         </div>
       )}
@@ -358,7 +358,7 @@ export default function SettingsPage() {
         <aside className="hidden md:flex flex-col gap-5 w-48 flex-shrink-0 sticky top-4">
           {TAB_GROUPS.map(({ group, items }) => (
             <div key={group}>
-              <p className="mb-1.5 px-3 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]">
+              <p className="mb-1.5 px-3 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">
                 {group}
               </p>
               <nav className="flex flex-col gap-0.5">
@@ -368,11 +368,11 @@ export default function SettingsPage() {
                     onClick={() => setTab(id)}
                     className="flex items-center gap-2.5 rounded-[8px] px-3 py-[8px] text-[13px] font-medium transition-colors text-left w-full"
                     style={tab === id
-                      ? { background: 'var(--rp-teal-bg)', color: '#23766a' }
+                      ? { background: 'var(--rp-teal-bg)', color: '#183153' }
                       : { color: 'var(--rp-text-subtle)' }}
                   >
                     <Icon className="h-[15px] w-[15px] flex-shrink-0"
-                      style={{ color: tab === id ? '#23766a' : '#9bbdb7' }} />
+                      style={{ color: tab === id ? '#183153' : '#aac0d0' }} />
                     {label}
                   </button>
                 ))}
@@ -802,7 +802,7 @@ export default function SettingsPage() {
                   ].map(({ n, text }) => (
                     <div key={n} className="flex items-start gap-3">
                       <span className="h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 mt-0.5"
-                        style={{ backgroundColor: '#1a6b5e' }}>{n}</span>
+                        style={{ backgroundColor: '#183153' }}>{n}</span>
                       <p className="text-sm text-gray-600">{text}</p>
                     </div>
                   ))}
@@ -2477,13 +2477,13 @@ function DiscoveryMapTab() {
   ];
 
   if (isLoading) {
-    return <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-[#1a6b5e]" /></div>;
+    return <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-[#183153]" /></div>;
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="rounded-2xl bg-gradient-to-r from-[#1a6b5e] to-[#145a4f] text-white p-5">
+      <div className="rounded-2xl bg-gradient-to-r from-[#183153] to-[#122846] text-white p-5">
         <div className="flex items-center gap-3 mb-2">
           <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
             <MapPin className="w-5 h-5" />
@@ -2516,10 +2516,10 @@ function DiscoveryMapTab() {
         <button
           onClick={() => setForm(f => ({ ...f, mapVisible: !f.mapVisible }))}
           className={`flex items-center gap-2 text-sm font-semibold transition-colors ${
-            form.mapVisible ? 'text-[#1a6b5e]' : 'text-gray-400'
+            form.mapVisible ? 'text-[#183153]' : 'text-gray-400'
           }`}>
           {form.mapVisible
-            ? <ToggleRight className="w-8 h-8 text-[#1a6b5e]" />
+            ? <ToggleRight className="w-8 h-8 text-[#183153]" />
             : <ToggleLeft  className="w-8 h-8 text-gray-300" />}
         </button>
       </div>
@@ -2530,11 +2530,11 @@ function DiscoveryMapTab() {
           <Card>
             <CardContent className="pt-5 space-y-4">
               <h3 className="font-semibold text-gray-700 flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-[#1a6b5e]" /> Map Location
+                <MapPin className="w-4 h-4 text-[#183153]" /> Map Location
               </h3>
               <p className="text-xs text-gray-400">
                 Get your coordinates from{' '}
-                <a href="https://www.latlong.net" target="_blank" rel="noopener noreferrer" className="text-[#1a6b5e] underline">
+                <a href="https://www.latlong.net" target="_blank" rel="noopener noreferrer" className="text-[#183153] underline">
                   latlong.net
                 </a>
               </p>
@@ -2570,7 +2570,7 @@ function DiscoveryMapTab() {
                   <select
                     value={form.resortCategory}
                     onChange={e => setForm(f => ({ ...f, resortCategory: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a6b5e]/30">
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#183153]/30">
                     <option value="">Select category</option>
                     {CATEGORIES.map(c => (
                       <option key={c.value} value={c.value}>{c.label}</option>
@@ -2594,7 +2594,7 @@ function DiscoveryMapTab() {
                   placeholder="A peaceful eco resort nestled in the hills of Bandarban..."
                   value={form.shortDescription}
                   onChange={e => setForm(f => ({ ...f, shortDescription: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1a6b5e]/30"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#183153]/30"
                 />
               </div>
 
@@ -2668,7 +2668,7 @@ function DiscoveryMapTab() {
                   <select
                     value={form.affiliateSource}
                     onChange={e => setForm(f => ({ ...f, affiliateSource: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a6b5e]/30">
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#183153]/30">
                     <option value="">Select source</option>
                     {AFFILIATE_SOURCES.map(s => (
                       <option key={s.value} value={s.value}>{s.label}</option>
@@ -2686,7 +2686,7 @@ function DiscoveryMapTab() {
               </div>
 
               {form.affiliateUrl && (
-                <div className="flex items-center gap-2 p-2.5 bg-[#f0faf8] rounded-lg text-xs text-[#1a6b5e]">
+                <div className="flex items-center gap-2 p-2.5 bg-[#f2f7fb] rounded-lg text-xs text-[#183153]">
                   <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
                   <span className="truncate">Travelers will be sent to: <strong>{form.affiliateUrl}</strong></span>
                 </div>
@@ -2761,7 +2761,7 @@ function DiscoveryMapTab() {
               {amenitiesArr.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {amenitiesArr.map((item, i) => (
-                    <span key={i} className="inline-flex items-center gap-1 bg-[#f0faf8] border border-[#b2ddd6] text-[#1a6b5e] text-xs font-medium px-2.5 py-1 rounded-full">
+                    <span key={i} className="inline-flex items-center gap-1 bg-[#f2f7fb] border border-[#d4e4ef] text-[#183153] text-xs font-medium px-2.5 py-1 rounded-full">
                       {item}
                       <button onClick={() => removeAmenity(item)} className="ml-0.5 hover:text-red-500 transition-colors">×</button>
                     </span>

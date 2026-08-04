@@ -42,19 +42,19 @@ interface Analytics {
 /* ── Config ───────────────────────────────────────────────────────────────── */
 const TIER_CONFIG: Record<string, { label: string; text: string; bg: string; border: string; barColor: string; Icon: React.ElementType }> = {
   STANDARD: { label: 'Standard', text: 'var(--rp-text-muted)', bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      barColor: 'var(--rp-text-faint)', Icon: Users  },
-  SILVER:   { label: 'Silver',   text: 'var(--rp-text-muted)', bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      barColor: '#9bbdb7', Icon: Award  },
+  SILVER:   { label: 'Silver',   text: 'var(--rp-text-muted)', bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      barColor: '#aac0d0', Icon: Award  },
   GOLD:     { label: 'Gold',     text: '#b89040', bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  barColor: '#d4a853', Icon: Medal  },
-  PLATINUM: { label: 'Platinum', text: '#dfd9d0', bg: '#1b342f', border: 'rgba(27,52,47,0.5)',    barColor: '#23766a', Icon: Crown  },
+  PLATINUM: { label: 'Platinum', text: '#f8fafc', bg: '#183153', border: 'rgba(24,49,83,0.5)',    barColor: '#183153', Icon: Crown  },
 };
 
 const STATUS_META: Record<string, { bg: string; border: string; text: string }> = {
   DRAFT:     { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)' },
   SCHEDULED: { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
   SENDING:   { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a' },
-  SENT:      { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a' },
+  SENT:      { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153' },
   PAUSED:    { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
   CANCELLED: { bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)', text: '#c43c3c' },
-  ACTIVE:    { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a' },
+  ACTIVE:    { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153' },
   ARCHIVED:  { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-faint)' },
 };
 
@@ -69,8 +69,8 @@ const TRIGGER_LABELS: Record<string, string> = {
   MANUAL:            '🔧 Manual',
 };
 
-const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30';
-const labelCls = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
+const labelCls = 'block text-[11.5px] font-medium text-[#64748b] mb-1.5';
 
 function StatusPill({ status }: { status: string }) {
   const m = STATUS_META[status] ?? STATUS_META.DRAFT;
@@ -108,7 +108,7 @@ export default function CRMPage() {
           <button key={id} onClick={() => setTab(id as typeof tab)}
             className="flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-medium transition-colors border-b-2 -mb-px"
             style={tab === id
-              ? { borderColor: '#23766a', color: '#23766a' }
+              ? { borderColor: '#183153', color: '#183153' }
               : { borderColor: 'transparent', color: 'var(--rp-text-muted)' }}>
             <Icon className="h-3.5 w-3.5" /> {label}
           </button>
@@ -158,7 +158,7 @@ function ContactsTab({ token }: { token: string }) {
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: '#9bbdb7' }} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: '#aac0d0' }} />
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search by name or email…" className={inputCls + ' pl-9'} />
         </div>
@@ -173,23 +173,23 @@ function ContactsTab({ token }: { token: string }) {
         </button>
       </div>
 
-      <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">
-        <span className="font-semibold text-[#18231f] dark:text-[#dfd9d0]">{total}</span> total contacts
+      <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">
+        <span className="font-semibold text-[#183153] dark:text-[#f8fafc]">{total}</span> total contacts
       </p>
 
       <div className="rounded-[14px] border bg-white overflow-hidden"
         style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
         {loading ? (
-          <div className="py-16 text-center text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">Loading contacts…</div>
+          <div className="py-16 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Loading contacts…</div>
         ) : guests.length === 0 ? (
-          <div className="py-16 text-center text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No contacts found</div>
+          <div className="py-16 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">No contacts found</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr style={{ background: 'var(--rp-surface-2)', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
                   {['Guest', 'Tier', 'Score', 'Stays', 'Tags', 'Email', ''].map(h => (
-                    <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] dark:text-[#94b8b0]">{h}</th>
+                    <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] dark:text-[#a9c1d0]">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -204,12 +204,12 @@ function ContactsTab({ token }: { token: string }) {
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-3">
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-bold"
-                            style={{ background: 'var(--rp-teal-bg)', color: '#23766a' }}>
+                            style={{ background: 'var(--rp-teal-bg)', color: '#183153' }}>
                             {g.firstName[0]}{g.lastName[0]}
                           </div>
                           <div>
-                            <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{g.firstName} {g.lastName}</p>
-                            <p className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">{g.email}</p>
+                            <p className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{g.firstName} {g.lastName}</p>
+                            <p className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">{g.email}</p>
                           </div>
                         </div>
                       </td>
@@ -222,12 +222,12 @@ function ContactsTab({ token }: { token: string }) {
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2">
                           <div className="w-14 h-1.5 rounded-full overflow-hidden" style={{ background: '#e8e5e0' }}>
-                            <div className="h-full rounded-full" style={{ width: `${g.score?.score ?? 0}%`, background: '#23766a' }} />
+                            <div className="h-full rounded-full" style={{ width: `${g.score?.score ?? 0}%`, background: '#183153' }} />
                           </div>
-                          <span className="text-[12px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{g.score?.score ?? 0}</span>
+                          <span className="text-[12px] font-medium text-[#183153] dark:text-[#f8fafc]">{g.score?.score ?? 0}</span>
                         </div>
                       </td>
-                      <td className="px-5 py-3 text-[13px] text-[#4a6e66] dark:text-[#6d9990]">{g._count.bookings}</td>
+                      <td className="px-5 py-3 text-[13px] text-[#475569] dark:text-[#9db4c4]">{g._count.bookings}</td>
                       <td className="px-5 py-3">
                         <div className="flex gap-1 flex-wrap">
                           {g.tags.slice(0, 3).map(tr => (
@@ -240,12 +240,12 @@ function ContactsTab({ token }: { token: string }) {
                       </td>
                       <td className="px-5 py-3">
                         {subscribed
-                          ? <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: '#23766a' }}><CheckCircle className="h-3 w-3" /> Subscribed</span>
-                          : <span className="inline-flex items-center gap-1 text-[12px] text-[#c5bdb4] dark:text-[#6e8580]"><X className="h-3 w-3" /> Unsubscribed</span>}
+                          ? <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: '#183153' }}><CheckCircle className="h-3 w-3" /> Subscribed</span>
+                          : <span className="inline-flex items-center gap-1 text-[12px] text-[#94a3b8] dark:text-[#7f99ab]"><X className="h-3 w-3" /> Unsubscribed</span>}
                       </td>
                       <td className="px-5 py-3">
                         <button onClick={() => recalcScore(g.id)} title="Recalculate score"
-                          className="transition-colors hover:opacity-70 text-[#c5bdb4] dark:text-[#6e8580]">
+                          className="transition-colors hover:opacity-70 text-[#94a3b8] dark:text-[#7f99ab]">
                           <RefreshCw className="h-3.5 w-3.5" />
                         </button>
                       </td>
@@ -325,9 +325,9 @@ function CampaignsTab({ token }: { token: string }) {
         <div className="rounded-[14px] border bg-white p-6 space-y-4"
           style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           <div className="flex items-center justify-between">
-            <h3 className="text-[14px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">New Campaign</h3>
+            <h3 className="text-[14px] font-semibold text-[#183153] dark:text-[#f8fafc]">New Campaign</h3>
             <button onClick={() => setShowNew(false)}
-              className="flex h-[26px] w-[26px] items-center justify-center rounded-full hover:bg-[#f4f1eb] text-[#8aa29a] dark:text-[#94b8b0]"><X className="h-4 w-4" /></button>
+              className="flex h-[26px] w-[26px] items-center justify-center rounded-full hover:bg-[#f4f1eb] text-[#64748b] dark:text-[#a9c1d0]"><X className="h-4 w-4" /></button>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -365,12 +365,12 @@ function CampaignsTab({ token }: { token: string }) {
 
       <div className="space-y-3">
         {loading ? (
-          <div className="py-12 text-center text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">Loading campaigns…</div>
+          <div className="py-12 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Loading campaigns…</div>
         ) : campaigns.length === 0 ? (
           <div className="py-16 text-center rounded-[14px] border bg-white"
             style={{ borderColor: 'var(--rp-border)' }}>
-            <Megaphone className="h-10 w-10 mx-auto mb-3 text-[#c5bdb4] dark:text-[#6e8580]" />
-            <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No campaigns yet. Create your first one!</p>
+            <Megaphone className="h-10 w-10 mx-auto mb-3 text-[#94a3b8] dark:text-[#7f99ab]" />
+            <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">No campaigns yet. Create your first one!</p>
           </div>
         ) : (
           campaigns.map(c => (
@@ -379,11 +379,11 @@ function CampaignsTab({ token }: { token: string }) {
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-[13.5px] font-semibold truncate text-[#18231f] dark:text-[#dfd9d0]">{c.name}</h3>
+                    <h3 className="text-[13.5px] font-semibold truncate text-[#183153] dark:text-[#f8fafc]">{c.name}</h3>
                     <StatusPill status={c.status} />
                   </div>
-                  <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">Subject: {c.subject}</p>
-                  {c.sentAt && <p className="text-[12px] mt-1 text-[#c5bdb4] dark:text-[#6e8580]">Sent {new Date(c.sentAt).toLocaleDateString()}</p>}
+                  <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">Subject: {c.subject}</p>
+                  {c.sentAt && <p className="text-[12px] mt-1 text-[#94a3b8] dark:text-[#7f99ab]">Sent {new Date(c.sentAt).toLocaleDateString()}</p>}
                 </div>
                 {c.stats && (
                   <div className="flex gap-5 text-center shrink-0">
@@ -393,9 +393,9 @@ function CampaignsTab({ token }: { token: string }) {
                       { label: 'Clicked', val: c.stats.clicked, rate: c.stats.sent ? Math.round(c.stats.clicked / c.stats.sent * 100) : 0 },
                     ].map(s => (
                       <div key={s.label}>
-                        <p className="text-[17px] font-bold text-[#18231f] dark:text-[#dfd9d0]">{s.val}</p>
-                        <p className="text-[11px] text-[#8aa29a] dark:text-[#94b8b0]">{s.label}</p>
-                        {'rate' in s && s.rate > 0 && <p className="text-[11px] font-medium" style={{ color: '#23766a' }}>{s.rate}%</p>}
+                        <p className="text-[17px] font-bold text-[#183153] dark:text-[#f8fafc]">{s.val}</p>
+                        <p className="text-[11px] text-[#64748b] dark:text-[#a9c1d0]">{s.label}</p>
+                        {'rate' in s && s.rate > 0 && <p className="text-[11px] font-medium" style={{ color: '#183153' }}>{s.rate}%</p>}
                       </div>
                     ))}
                   </div>
@@ -410,7 +410,7 @@ function CampaignsTab({ token }: { token: string }) {
                   )}
                   {['DRAFT', 'SCHEDULED'].includes(c.status) && (
                     <button onClick={() => deleteCampaign(c.id)}
-                      className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#fef2f2] text-[#c5bdb4] dark:text-[#6e8580]">
+                      className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#fef2f2] text-[#94a3b8] dark:text-[#7f99ab]">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   )}
@@ -484,9 +484,9 @@ function SequencesTab({ token }: { token: string }) {
         <div className="rounded-[14px] border bg-white p-5 space-y-4"
           style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           <div className="flex items-center justify-between">
-            <h3 className="text-[14px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">New Automation Sequence</h3>
+            <h3 className="text-[14px] font-semibold text-[#183153] dark:text-[#f8fafc]">New Automation Sequence</h3>
             <button onClick={() => setShowNew(false)}
-              className="flex h-[26px] w-[26px] items-center justify-center rounded-full hover:bg-[#f4f1eb] text-[#8aa29a] dark:text-[#94b8b0]"><X className="h-4 w-4" /></button>
+              className="flex h-[26px] w-[26px] items-center justify-center rounded-full hover:bg-[#f4f1eb] text-[#64748b] dark:text-[#a9c1d0]"><X className="h-4 w-4" /></button>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -519,11 +519,11 @@ function SequencesTab({ token }: { token: string }) {
 
       <div className="space-y-3">
         {loading ? (
-          <div className="py-12 text-center text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">Loading sequences…</div>
+          <div className="py-12 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Loading sequences…</div>
         ) : sequences.length === 0 ? (
           <div className="py-16 text-center rounded-[14px] border bg-white" style={{ borderColor: 'var(--rp-border)' }}>
-            <GitBranch className="h-10 w-10 mx-auto mb-3 text-[#c5bdb4] dark:text-[#6e8580]" />
-            <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No sequences yet. Automate your guest communication!</p>
+            <GitBranch className="h-10 w-10 mx-auto mb-3 text-[#94a3b8] dark:text-[#7f99ab]" />
+            <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">No sequences yet. Automate your guest communication!</p>
           </div>
         ) : (
           sequences.map(seq => (
@@ -533,24 +533,24 @@ function SequencesTab({ token }: { token: string }) {
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-[10px]"
                     style={{ background: 'var(--rp-teal-bg)' }}>
-                    <GitBranch className="h-5 w-5" style={{ color: '#23766a' }} />
+                    <GitBranch className="h-5 w-5" style={{ color: '#183153' }} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="text-[13.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">{seq.name}</h3>
+                      <h3 className="text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">{seq.name}</h3>
                       <StatusPill status={seq.status} />
                     </div>
-                    <p className="text-[12.5px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">{TRIGGER_LABELS[seq.trigger]}</p>
+                    <p className="text-[12.5px] mt-0.5 text-[#64748b] dark:text-[#a9c1d0]">{TRIGGER_LABELS[seq.trigger]}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-5">
                   <div className="text-center">
-                    <p className="text-[16px] font-bold text-[#18231f] dark:text-[#dfd9d0]">{seq.steps.length}</p>
-                    <p className="text-[11px] text-[#8aa29a] dark:text-[#94b8b0]">steps</p>
+                    <p className="text-[16px] font-bold text-[#183153] dark:text-[#f8fafc]">{seq.steps.length}</p>
+                    <p className="text-[11px] text-[#64748b] dark:text-[#a9c1d0]">steps</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-[16px] font-bold text-[#18231f] dark:text-[#dfd9d0]">{seq._count.enrollments}</p>
-                    <p className="text-[11px] text-[#8aa29a] dark:text-[#94b8b0]">enrolled</p>
+                    <p className="text-[16px] font-bold text-[#183153] dark:text-[#f8fafc]">{seq._count.enrollments}</p>
+                    <p className="text-[11px] text-[#64748b] dark:text-[#a9c1d0]">enrolled</p>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => toggleStatus(seq)}
@@ -577,19 +577,19 @@ function SequencesTab({ token }: { token: string }) {
                           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11.5px] font-bold"
                             style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>{i + 1}</span>
                           <div className="flex-1">
-                            <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{step.subject}</p>
-                            <p className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+                            <p className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{step.subject}</p>
+                            <p className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">
                               Send {step.delayDays === 0 ? 'immediately' : `after ${step.delayDays} day${step.delayDays !== 1 ? 's' : ''}`}
                             </p>
                           </div>
-                          <ArrowRight className="h-4 w-4 text-[#c5bdb4] dark:text-[#6e8580]" />
+                          <ArrowRight className="h-4 w-4 text-[#94a3b8] dark:text-[#7f99ab]" />
                         </div>
                       ))}
                     </div>
                   )}
                   <div className="rounded-[10px] border-2 border-dashed p-4 space-y-3"
-                    style={{ borderColor: 'rgba(35,118,106,0.25)' }}>
-                    <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] dark:text-[#94b8b0]">Add Step</p>
+                    style={{ borderColor: 'rgba(24,49,83,0.25)' }}>
+                    <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] dark:text-[#a9c1d0]">Add Step</p>
                     <div className="grid grid-cols-3 gap-3">
                       <div className="col-span-2">
                         <input value={stepForm.subject} onChange={e => setStepForm(p => ({ ...p, subject: e.target.value }))}
@@ -669,9 +669,9 @@ function TemplatesTab({ token }: { token: string }) {
         <div className="rounded-[14px] border bg-white p-6 space-y-4"
           style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           <div className="flex items-center justify-between">
-            <h3 className="text-[14px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">New Email Template</h3>
+            <h3 className="text-[14px] font-semibold text-[#183153] dark:text-[#f8fafc]">New Email Template</h3>
             <button onClick={() => setShowNew(false)}
-              className="flex h-[26px] w-[26px] items-center justify-center rounded-full hover:bg-[#f4f1eb] text-[#8aa29a] dark:text-[#94b8b0]"><X className="h-4 w-4" /></button>
+              className="flex h-[26px] w-[26px] items-center justify-center rounded-full hover:bg-[#f4f1eb] text-[#64748b] dark:text-[#a9c1d0]"><X className="h-4 w-4" /></button>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -713,11 +713,11 @@ function TemplatesTab({ token }: { token: string }) {
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         {loading ? (
-          <div className="col-span-3 py-12 text-center text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">Loading templates…</div>
+          <div className="col-span-3 py-12 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Loading templates…</div>
         ) : templates.length === 0 ? (
           <div className="col-span-3 py-16 text-center rounded-[14px] border bg-white" style={{ borderColor: 'var(--rp-border)' }}>
-            <Mail className="h-10 w-10 mx-auto mb-3 text-[#c5bdb4] dark:text-[#6e8580]" />
-            <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No templates yet</p>
+            <Mail className="h-10 w-10 mx-auto mb-3 text-[#94a3b8] dark:text-[#7f99ab]" />
+            <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">No templates yet</p>
           </div>
         ) : (
           templates.map(t => (
@@ -726,16 +726,16 @@ function TemplatesTab({ token }: { token: string }) {
               <div className="flex items-start justify-between mb-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px]"
                   style={{ background: 'var(--rp-teal-bg)' }}>
-                  <Mail className="h-5 w-5" style={{ color: '#23766a' }} />
+                  <Mail className="h-5 w-5" style={{ color: '#183153' }} />
                 </div>
                 <button onClick={() => deleteTemplate(t.id)}
-                  className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#fef2f2] text-[#c5bdb4] dark:text-[#6e8580]">
+                  className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#fef2f2] text-[#94a3b8] dark:text-[#7f99ab]">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
-              <h3 className="text-[13.5px] font-semibold mb-1 text-[#18231f] dark:text-[#dfd9d0]">{t.name}</h3>
-              <p className="text-[12.5px] mb-3 flex-1 line-clamp-2 text-[#8aa29a] dark:text-[#94b8b0]">{t.subject}</p>
-              <p className="text-[11.5px] text-[#c5bdb4] dark:text-[#6e8580]">{new Date(t.createdAt).toLocaleDateString()}</p>
+              <h3 className="text-[13.5px] font-semibold mb-1 text-[#183153] dark:text-[#f8fafc]">{t.name}</h3>
+              <p className="text-[12.5px] mb-3 flex-1 line-clamp-2 text-[#64748b] dark:text-[#a9c1d0]">{t.subject}</p>
+              <p className="text-[11.5px] text-[#94a3b8] dark:text-[#7f99ab]">{new Date(t.createdAt).toLocaleDateString()}</p>
             </div>
           ))
         )}
@@ -768,8 +768,8 @@ function AnalyticsTab({ token }: { token: string }) {
     setAutomating(false);
   };
 
-  if (loading) return <div className="py-16 text-center text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">Loading analytics…</div>;
-  if (!data)   return <div className="py-16 text-center text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">Failed to load analytics</div>;
+  if (loading) return <div className="py-16 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Loading analytics…</div>;
+  if (!data)   return <div className="py-16 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Failed to load analytics</div>;
 
   const totalSent = data.campaignStats.reduce((s, c) => s + c.sent, 0);
   const openRate  = data.campaignStats.reduce((s, c) => s + c.opened, 0);
@@ -779,19 +779,19 @@ function AnalyticsTab({ token }: { token: string }) {
     <div className="space-y-6">
       {/* Automation runner */}
       <div className="flex items-start justify-between gap-4 rounded-[14px] border p-5"
-        style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)' }}>
+        style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)' }}>
         <div>
-          <p className="text-[13.5px] font-semibold flex items-center gap-2" style={{ color: '#1b342f' }}>
+          <p className="text-[13.5px] font-semibold flex items-center gap-2" style={{ color: '#183153' }}>
             🤖 Daily Automation
           </p>
-          <p className="text-[12.5px] mt-0.5 text-[#4a6e66] dark:text-[#6d9990]">
+          <p className="text-[12.5px] mt-0.5 text-[#475569] dark:text-[#9db4c4]">
             Sends birthday greetings (🎂) and resort anniversary emails (🏖️) to qualifying guests.
             Run daily via cron, or manually here for testing.
           </p>
           {autoResult && (
             <div className="mt-3 flex gap-4 text-[12.5px]">
-              <span className="font-medium" style={{ color: '#1b342f' }}>🎂 Birthday: {autoResult.birthday.sent}/{autoResult.birthday.found} sent</span>
-              <span className="font-medium" style={{ color: '#23766a' }}>🏖️ Anniversary: {autoResult.anniversary.sent}/{autoResult.anniversary.found} sent</span>
+              <span className="font-medium" style={{ color: '#183153' }}>🎂 Birthday: {autoResult.birthday.sent}/{autoResult.birthday.found} sent</span>
+              <span className="font-medium" style={{ color: '#183153' }}>🏖️ Anniversary: {autoResult.anniversary.sent}/{autoResult.anniversary.found} sent</span>
             </div>
           )}
         </div>
@@ -805,21 +805,21 @@ function AnalyticsTab({ token }: { token: string }) {
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Contacts', val: data.totalContacts, Icon: Users,       iconBg: 'var(--rp-teal-bg)', iconColor: '#23766a' },
-          { label: 'Subscribed',     val: data.subscribed,    Icon: CheckCircle, iconBg: 'var(--rp-teal-bg)', iconColor: '#23766a' },
+          { label: 'Total Contacts', val: data.totalContacts, Icon: Users,       iconBg: 'var(--rp-teal-bg)', iconColor: '#183153' },
+          { label: 'Subscribed',     val: data.subscribed,    Icon: CheckCircle, iconBg: 'var(--rp-teal-bg)', iconColor: '#183153' },
           { label: 'Open Rate',      val: totalSent > 0 ? `${Math.round(openRate / totalSent * 100)}%` : '—', Icon: Mail, iconBg: 'var(--rp-amber-bg)', iconColor: '#b89040' },
           { label: 'Click Rate',     val: totalSent > 0 ? `${Math.round(clickRate / totalSent * 100)}%` : '—', Icon: TrendingUp, iconBg: 'var(--rp-surface-3)', iconColor: 'var(--rp-text-subtle)' },
         ].map(({ label, val, Icon, iconBg, iconColor }) => (
           <div key={label} className="rounded-[14px] border bg-white p-5"
             style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
             <div className="flex items-center justify-between mb-3">
-              <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">{label}</p>
+              <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">{label}</p>
               <div className="flex h-[32px] w-[32px] items-center justify-center rounded-[9px]"
                 style={{ background: iconBg }}>
                 <Icon className="h-4 w-4" style={{ color: iconColor }} />
               </div>
             </div>
-            <p className="text-[24px] font-bold text-[#18231f] dark:text-[#dfd9d0]">{val}</p>
+            <p className="text-[24px] font-bold text-[#183153] dark:text-[#f8fafc]">{val}</p>
           </div>
         ))}
       </div>
@@ -828,7 +828,7 @@ function AnalyticsTab({ token }: { token: string }) {
         {/* Tier breakdown */}
         <div className="rounded-[14px] border bg-white p-5"
           style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
-          <h3 className="text-[14px] font-semibold mb-4 text-[#18231f] dark:text-[#dfd9d0]">Guest Tier Breakdown</h3>
+          <h3 className="text-[14px] font-semibold mb-4 text-[#183153] dark:text-[#f8fafc]">Guest Tier Breakdown</h3>
           <div className="space-y-3">
             {Object.entries(TIER_CONFIG).map(([tier, cfg]) => {
               const count = data.tierCounts.find(t => t.tier === tier)?._count.tier ?? 0;
@@ -842,7 +842,7 @@ function AnalyticsTab({ token }: { token: string }) {
                   <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: '#e8e5e0' }}>
                     <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: cfg.barColor }} />
                   </div>
-                  <span className="text-[13px] font-semibold w-8 text-right text-[#18231f] dark:text-[#dfd9d0]">{count}</span>
+                  <span className="text-[13px] font-semibold w-8 text-right text-[#183153] dark:text-[#f8fafc]">{count}</span>
                 </div>
               );
             })}
@@ -852,26 +852,26 @@ function AnalyticsTab({ token }: { token: string }) {
         {/* Top guests */}
         <div className="rounded-[14px] border bg-white p-5"
           style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
-          <h3 className="text-[14px] font-semibold mb-4 text-[#18231f] dark:text-[#dfd9d0]">Top Guests by Score</h3>
+          <h3 className="text-[14px] font-semibold mb-4 text-[#183153] dark:text-[#f8fafc]">Top Guests by Score</h3>
           <div className="space-y-3">
             {data.topGuests.length === 0 ? (
-              <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">No scored guests yet. Run "Recalc Score" on contacts.</p>
+              <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">No scored guests yet. Run "Recalc Score" on contacts.</p>
             ) : (
               data.topGuests.map((g, i) => {
                 const tier = TIER_CONFIG[g.tier ?? 'STANDARD'];
                 return (
                   <div key={i} className="flex items-center gap-3">
-                    <span className="text-[12px] font-bold w-4 shrink-0 text-[#c5bdb4] dark:text-[#6e8580]">{i + 1}</span>
+                    <span className="text-[12px] font-bold w-4 shrink-0 text-[#94a3b8] dark:text-[#7f99ab]">{i + 1}</span>
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-bold"
-                      style={{ background: 'var(--rp-teal-bg)', color: '#23766a' }}>
+                      style={{ background: 'var(--rp-teal-bg)', color: '#183153' }}>
                       {g.guest.firstName[0]}{g.guest.lastName[0]}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{g.guest.firstName} {g.guest.lastName}</p>
-                      <p className="text-[11.5px] truncate text-[#8aa29a] dark:text-[#94b8b0]">{g.guest.email}</p>
+                      <p className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{g.guest.firstName} {g.guest.lastName}</p>
+                      <p className="text-[11.5px] truncate text-[#64748b] dark:text-[#a9c1d0]">{g.guest.email}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[13px] font-bold" style={{ color: '#23766a' }}>{g.score}</span>
+                      <span className="text-[13px] font-bold" style={{ color: '#183153' }}>{g.score}</span>
                       <span className="inline-flex items-center gap-1 rounded-[6px] border px-[7px] py-[2px] text-[10.5px] font-semibold"
                         style={{ background: tier.bg, borderColor: tier.border, color: tier.text }}>
                         <tier.Icon className="h-3 w-3" />
@@ -889,23 +889,23 @@ function AnalyticsTab({ token }: { token: string }) {
       {data.campaignStats.length > 0 && (
         <div className="rounded-[14px] border bg-white p-5"
           style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
-          <h3 className="text-[14px] font-semibold mb-4 text-[#18231f] dark:text-[#dfd9d0]">Recent Campaign Performance</h3>
+          <h3 className="text-[14px] font-semibold mb-4 text-[#183153] dark:text-[#f8fafc]">Recent Campaign Performance</h3>
           <div className="space-y-3">
             {data.campaignStats.map((cs, i) => (
               <div key={i} className="flex items-center gap-4 py-2.5"
                 style={{ borderBottom: i < data.campaignStats.length - 1 ? '1px solid rgba(0,0,0,0.05)' : undefined }}>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{cs.campaign.name}</p>
-                  {cs.campaign.sentAt && <p className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">{new Date(cs.campaign.sentAt).toLocaleDateString()}</p>}
+                  <p className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{cs.campaign.name}</p>
+                  {cs.campaign.sentAt && <p className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">{new Date(cs.campaign.sentAt).toLocaleDateString()}</p>}
                 </div>
                 {[
                   { label: 'Sent',    val: cs.sent,    color: 'var(--rp-text-muted)' },
-                  { label: 'Opened',  val: cs.opened,  color: '#23766a' },
+                  { label: 'Opened',  val: cs.opened,  color: '#183153' },
                   { label: 'Clicked', val: cs.clicked, color: '#b89040' },
                 ].map(s => (
                   <div key={s.label} className="text-center w-16">
                     <p className="text-[15px] font-bold" style={{ color: s.color }}>{s.val}</p>
-                    <p className="text-[11px] text-[#c5bdb4] dark:text-[#6e8580]">{s.label}</p>
+                    <p className="text-[11px] text-[#94a3b8] dark:text-[#7f99ab]">{s.label}</p>
                   </div>
                 ))}
               </div>

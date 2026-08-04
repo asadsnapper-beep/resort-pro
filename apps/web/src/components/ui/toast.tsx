@@ -41,12 +41,12 @@ const toastVariants = cva(
 // Per-variant inline styles applied in Toaster
 export const TOAST_VARIANT_STYLES = {
   default: {
-    wrapper:  { background: 'var(--rp-btn-accent)', borderColor: 'rgba(255,255,255,0.08)', boxShadow: '0 8px 32px rgba(27,52,47,0.35)' },
-    icon:     { background: 'rgba(255,255,255,0.1)', color: '#9bbdb7' },
+    wrapper:  { background: 'var(--rp-btn-accent)', borderColor: 'rgba(255,255,255,0.08)', boxShadow: '0 8px 32px rgba(24,49,83,0.35)' },
+    icon:     { background: 'rgba(255,255,255,0.1)', color: '#aac0d0' },
     title:    { color: 'var(--rp-btn-accent-text)' },
-    desc:     { color: '#9bbdb7' },
+    desc:     { color: '#aac0d0' },
     close:    { color: 'rgba(255,255,255,0.4)' },
-    progress: '#23766a',
+    progress: '#183153',
   },
   destructive: {
     wrapper:  { background: 'var(--rp-surface)', borderColor: 'rgba(200,60,60,0.2)', boxShadow: '0 8px 32px rgba(196,60,60,0.12)' },
@@ -57,12 +57,12 @@ export const TOAST_VARIANT_STYLES = {
     progress: '#c43c3c',
   },
   success: {
-    wrapper:  { background: 'var(--rp-surface)', borderColor: 'rgba(35,118,106,0.2)', boxShadow: '0 8px 32px rgba(35,118,106,0.1)' },
-    icon:     { background: 'var(--rp-teal-bg)', color: '#23766a' },
+    wrapper:  { background: 'var(--rp-surface)', borderColor: 'rgba(24,49,83,0.2)', boxShadow: '0 8px 32px rgba(24,49,83,0.1)' },
+    icon:     { background: 'var(--rp-teal-bg)', color: '#183153' },
     title:    { color: 'var(--rp-text)' },
     desc:     { color: 'var(--rp-text-muted)' },
     close:    { color: 'var(--rp-text-faint)' },
-    progress: '#23766a',
+    progress: '#183153',
   },
   warning: {
     wrapper:  { background: 'var(--rp-surface)', borderColor: 'rgba(184,144,64,0.2)', boxShadow: '0 8px 32px rgba(184,144,64,0.1)' },

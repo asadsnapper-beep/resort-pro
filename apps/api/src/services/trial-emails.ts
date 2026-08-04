@@ -12,6 +12,7 @@
  */
 
 import { prisma } from '@resort-pro/database';
+import { PLAN_PRICING } from '@resort-pro/types';
 import { sendEmail } from './email';
 
 const APP_URL = process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:3000';
@@ -83,7 +84,7 @@ function trialWarning3(ownerName: string, resortName: string, trialEndsAt: Date)
       After expiry, your dashboard will be locked (your data stays safe, but you won't be able to accept new bookings).
     </p>
     <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:20px;margin:24px 0;text-align:center">
-      <p style="margin:0 0 4px;color:#92400e;font-size:28px;font-weight:800">Starting at $49/mo</p>
+      <p style="margin:0 0 4px;color:#92400e;font-size:28px;font-weight:800">Starting at $${PLAN_PRICING.STARTER.monthlyUsd}/mo</p>
       <p style="margin:0;color:#b45309;font-size:14px">Cancel anytime • 30-day money-back guarantee</p>
     </div>
     ${ctaButton('Upgrade now — takes 2 minutes', `${APP_URL}/dashboard/upgrade`)}
@@ -129,7 +130,7 @@ function trialExpired(ownerName: string, resortName: string): string {
       Upgrade now to get back to business instantly.
     </p>
     <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:20px;margin:24px 0;text-align:center">
-      <p style="margin:0 0 8px;color:#166534;font-size:22px;font-weight:800">Starter Plan: $49/month</p>
+      <p style="margin:0 0 8px;color:#166534;font-size:22px;font-weight:800">${PLAN_PRICING.STARTER.displayName} Plan: $${PLAN_PRICING.STARTER.monthlyUsd}/month</p>
       <p style="margin:0;color:#15803d;font-size:13px">30-day money back • Cancel anytime • All data restored</p>
     </div>
     ${ctaButton('Reactivate My Account →', `${APP_URL}/dashboard/upgrade`)}

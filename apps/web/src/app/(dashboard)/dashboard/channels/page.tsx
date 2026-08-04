@@ -42,15 +42,15 @@ function detectSource(name: string): 'booking' | 'airbnb' | 'agoda' | 'expedia' 
 }
 
 const SOURCE_META: Record<string, { bg: string; border: string; text: string }> = {
-  booking:  { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a' },
+  booking:  { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153' },
   airbnb:   { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a' },
   agoda:    { bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)', text: '#c43c3c' },
   expedia:  { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
   other:    { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)' },
 };
 
-const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30';
-const labelCls = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
+const labelCls = 'block text-[11.5px] font-medium text-[#64748b] mb-1.5';
 
 function AddCalendarModal({ rooms, preselectedRoom, onClose, onSaved }: {
   rooms: Room[]; preselectedRoom?: Room | null;
@@ -145,7 +145,7 @@ function AddCalendarModal({ rooms, preselectedRoom, onClose, onSaved }: {
                   className="rounded-[8px] border px-3 py-1 text-[12px] font-medium transition-colors"
                   style={name === p
                     ? { background: 'var(--rp-btn-accent)', borderColor: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }
-                    : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)', color: isDark ? '#94b8b0' : 'var(--rp-text-subtle)' }}>
+                    : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)', color: isDark ? '#a9c1d0' : 'var(--rp-text-subtle)' }}>
                   {p}
                 </button>
               ))}
@@ -171,7 +171,7 @@ function AddCalendarModal({ rooms, preselectedRoom, onClose, onSaved }: {
             {testResult && (
               <div className="mt-2 flex items-center gap-2 rounded-[9px] border px-3 py-2 text-[12.5px]"
                 style={testResult.ok
-                  ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }
+                  ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }
                   : { background: 'var(--rp-red-bg)', borderColor: 'rgba(200,60,60,0.15)', color: '#c43c3c' }}>
                 {testResult.ok
                   ? <><CheckCircle2 className="h-4 w-4 shrink-0" /> Valid iCal — {testResult.eventCount} reservation{testResult.eventCount !== 1 ? 's' : ''} found</>
@@ -179,7 +179,7 @@ function AddCalendarModal({ rooms, preselectedRoom, onClose, onSaved }: {
                 }
               </div>
             )}
-            <p className="mt-2 text-[11.5px] text-[#c5bdb4] dark:text-[#6e8580]">
+            <p className="mt-2 text-[11.5px] text-[#94a3b8] dark:text-[#7f99ab]">
               Where to find it: Booking.com Extranet → Calendar → Export → iCal link
             </p>
           </div>
@@ -255,27 +255,27 @@ function CalendarCard({ cal, onSynced }: { cal: ExternalCalendar; onSynced: () =
         <div className="flex items-start gap-3 min-w-0">
           <div className="mt-0.5">
             {!cal.isActive
-              ? <WifiOff className="h-5 w-5 text-[#c5bdb4] dark:text-[#6e8580]" />
+              ? <WifiOff className="h-5 w-5 text-[#94a3b8] dark:text-[#7f99ab]" />
               : hasError
               ? <XCircle className="h-5 w-5" style={{ color: '#c43c3c' }} />
-              : <CheckCircle2 className="h-5 w-5" style={{ color: '#23766a' }} />}
+              : <CheckCircle2 className="h-5 w-5" style={{ color: '#183153' }} />}
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="inline-flex items-center rounded-[7px] border px-[8px] py-[3px] text-[11.5px] font-semibold"
                 style={{ background: sm.bg, borderColor: sm.border, color: sm.text }}>{cal.name}</span>
-              <span className="text-[12px] text-[#c5bdb4] dark:text-[#6e8580]">
+              <span className="text-[12px] text-[#94a3b8] dark:text-[#7f99ab]">
                 {cal.importedCount} booking{cal.importedCount !== 1 ? 's' : ''} imported
               </span>
             </div>
             <div className="flex items-center gap-1 mt-1">
-              <span className="max-w-[240px] truncate font-mono text-[11.5px] text-[#c5bdb4] dark:text-[#6e8580]">{cal.icalUrl}</span>
-              <button onClick={handleCopy} className="shrink-0 transition-opacity hover:opacity-70 text-[#c5bdb4] dark:text-[#6e8580]">
-                {copied ? <Check className="h-3 w-3" style={{ color: '#23766a' }} /> : <Copy className="h-3 w-3" />}
+              <span className="max-w-[240px] truncate font-mono text-[11.5px] text-[#94a3b8] dark:text-[#7f99ab]">{cal.icalUrl}</span>
+              <button onClick={handleCopy} className="shrink-0 transition-opacity hover:opacity-70 text-[#94a3b8] dark:text-[#7f99ab]">
+                {copied ? <Check className="h-3 w-3" style={{ color: '#183153' }} /> : <Copy className="h-3 w-3" />}
               </button>
             </div>
             <div className="flex items-center gap-1 mt-1">
-              <Clock className="h-3 w-3 text-[#c5bdb4] dark:text-[#6e8580]" />
+              <Clock className="h-3 w-3 text-[#94a3b8] dark:text-[#7f99ab]" />
               <span className="text-[11.5px]" style={{ color: hasError ? '#c43c3c' : 'var(--rp-text-muted)' }}>
                 {hasError ? `Error: ${cal.lastError}` : `Last sync: ${timeAgo(cal.lastSyncAt)}`}
               </span>
@@ -284,15 +284,15 @@ function CalendarCard({ cal, onSynced }: { cal: ExternalCalendar; onSynced: () =
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <button onClick={handleSync} disabled={syncing || !cal.isActive} title="Sync now"
-            className="flex h-[30px] w-[30px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#f4f1eb] disabled:opacity-40 text-[#8aa29a] dark:text-[#94b8b0]">
+            className="flex h-[30px] w-[30px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#f4f1eb] disabled:opacity-40 text-[#64748b] dark:text-[#a9c1d0]">
             <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
           </button>
           <button onClick={handleToggle} title={cal.isActive ? 'Pause sync' : 'Resume sync'}
-            className="flex h-[30px] w-[30px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#f4f1eb] text-[#8aa29a] dark:text-[#94b8b0]">
+            className="flex h-[30px] w-[30px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#f4f1eb] text-[#64748b] dark:text-[#a9c1d0]">
             {cal.isActive ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
           </button>
           <button onClick={handleDelete} disabled={deleting} title="Remove"
-            className="flex h-[30px] w-[30px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#fef2f2] disabled:opacity-40 text-[#c5bdb4] dark:text-[#6e8580]">
+            className="flex h-[30px] w-[30px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#fef2f2] disabled:opacity-40 text-[#94a3b8] dark:text-[#7f99ab]">
             {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
           </button>
         </div>
@@ -312,15 +312,15 @@ function RoomGroup({ room, calendars, onAdd, onSynced }: {
     <div className="rounded-[14px] border overflow-hidden"
       style={{ borderColor: 'var(--rp-border-md)' }}>
       <button onClick={() => setOpen(o => !o)}
-        className="flex w-full items-center justify-between px-5 py-3.5 transition-colors hover:bg-[#f5faf9]"
+        className="flex w-full items-center justify-between px-5 py-3.5 transition-colors hover:bg-[#f5f9fc]"
         style={{ background: 'var(--rp-surface-2)', borderBottom: open ? '1px solid rgba(0,0,0,0.06)' : undefined }}>
         <div className="flex items-center gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-[8px]" style={{ background: 'var(--rp-teal-bg)' }}>
-            <span className="text-[11px] font-bold" style={{ color: '#23766a' }}>{room.number}</span>
+            <span className="text-[11px] font-bold" style={{ color: '#183153' }}>{room.number}</span>
           </div>
           <div className="text-left">
-            <p className="text-[13.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">{room.name}</p>
-            <p className="text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">
+            <p className="text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">{room.name}</p>
+            <p className="text-[12px] text-[#64748b] dark:text-[#a9c1d0]">
               {calendars.length === 0
                 ? 'No external calendars'
                 : `${calendars.length} calendar${calendars.length > 1 ? 's' : ''} connected`}
@@ -328,21 +328,21 @@ function RoomGroup({ room, calendars, onAdd, onSynced }: {
           </div>
           {hasConflict && <AlertTriangle className="h-4 w-4" style={{ color: '#b89040' }} />}
         </div>
-        {open ? <ChevronUp className="h-4 w-4 text-[#c5bdb4] dark:text-[#6e8580]" /> : <ChevronDown className="h-4 w-4 text-[#c5bdb4] dark:text-[#6e8580]" />}
+        {open ? <ChevronUp className="h-4 w-4 text-[#94a3b8] dark:text-[#7f99ab]" /> : <ChevronDown className="h-4 w-4 text-[#94a3b8] dark:text-[#7f99ab]" />}
       </button>
 
       {open && (
         <div className="p-4 space-y-3">
           {calendars.length === 0 ? (
-            <p className="py-2 text-center text-[13px] text-[#c5bdb4] dark:text-[#6e8580]">
+            <p className="py-2 text-center text-[13px] text-[#94a3b8] dark:text-[#7f99ab]">
               No calendars yet — add one to prevent double bookings
             </p>
           ) : (
             calendars.map(cal => <CalendarCard key={cal.id} cal={cal} onSynced={onSynced} />)
           )}
           <button onClick={() => onAdd(room)}
-            className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-dashed py-2.5 text-[13px] transition-colors hover:bg-[#f5faf9]"
-            style={{ borderColor: 'rgba(35,118,106,0.25)', color: 'var(--rp-text-muted)' }}>
+            className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-dashed py-2.5 text-[13px] transition-colors hover:bg-[#f5f9fc]"
+            style={{ borderColor: 'rgba(24,49,83,0.25)', color: 'var(--rp-text-muted)' }}>
             <Plus className="h-4 w-4" /> Add Calendar
           </button>
         </div>
@@ -394,7 +394,7 @@ export default function ChannelsPage() {
       <PageHeader
         icon={
           <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px]" style={{ background: 'var(--rp-teal-bg)' }}>
-            <Link2 className="h-4 w-4" style={{ color: '#23766a' }} />
+            <Link2 className="h-4 w-4" style={{ color: '#183153' }} />
           </div>
         }
         title="Channel Sync"
@@ -411,9 +411,9 @@ export default function ChannelsPage() {
 
       {/* Info banner */}
       <div className="flex items-start gap-3 rounded-[12px] border px-4 py-3"
-        style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)' }}>
-        <ExternalLink className="h-5 w-5 shrink-0 mt-0.5" style={{ color: '#23766a' }} />
-        <p className="text-[12.5px]" style={{ color: '#1b342f' }}>
+        style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)' }}>
+        <ExternalLink className="h-5 w-5 shrink-0 mt-0.5" style={{ color: '#183153' }} />
+        <p className="text-[12.5px]" style={{ color: '#183153' }}>
           <strong>How it works:</strong> Paste the iCal URL from Booking.com/Airbnb — ResortPro syncs every 15 minutes and blocks rooms automatically. No API key needed.
         </p>
       </div>
@@ -423,14 +423,14 @@ export default function ChannelsPage() {
         <div className="grid grid-cols-4 gap-3">
           {[
             { label: 'Connected', value: totalCalendars,  bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text)' },
-            { label: 'Active',    value: activeCalendars, bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a' },
-            { label: 'Imported',  value: totalImported,   bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a' },
+            { label: 'Active',    value: activeCalendars, bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153' },
+            { label: 'Imported',  value: totalImported,   bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153' },
             { label: 'Errors',    value: errored,         bg: errored > 0 ? 'var(--rp-red-bg)' : 'var(--rp-surface-3)', border: errored > 0 ? 'rgba(200,60,60,0.15)' : 'var(--rp-border-md)', text: errored > 0 ? '#c43c3c' : 'var(--rp-text-faint)' },
           ].map(s => (
             <div key={s.label} className="rounded-[12px] border p-3 text-center"
               style={{ background: s.bg, borderColor: s.border }}>
               <p className="text-[22px] font-bold" style={{ color: s.text }}>{s.value}</p>
-              <p className="text-[11.5px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">{s.label}</p>
+              <p className="text-[11.5px] mt-0.5 text-[#64748b] dark:text-[#a9c1d0]">{s.label}</p>
             </div>
           ))}
         </div>
@@ -439,16 +439,16 @@ export default function ChannelsPage() {
       {/* Calendar groups */}
       {isLoading ? (
         <div className="flex justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin" style={{ color: '#9bbdb7' }} />
+          <Loader2 className="h-6 w-6 animate-spin" style={{ color: '#aac0d0' }} />
         </div>
       ) : calendars.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-[14px] border-2 border-dashed p-16 text-center"
-          style={{ borderColor: 'rgba(35,118,106,0.2)', background: 'var(--rp-surface-2)' }}>
+          style={{ borderColor: 'rgba(24,49,83,0.2)', background: 'var(--rp-surface-2)' }}>
           <div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'var(--rp-teal-bg)' }}>
-            <Link2 className="h-7 w-7" style={{ color: '#23766a' }} />
+            <Link2 className="h-7 w-7" style={{ color: '#183153' }} />
           </div>
-          <h3 className="text-[14px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">No external calendars yet</h3>
-          <p className="max-w-xs text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">
+          <h3 className="text-[14px] font-semibold text-[#183153] dark:text-[#f8fafc]">No external calendars yet</h3>
+          <p className="max-w-xs text-[13px] text-[#64748b] dark:text-[#a9c1d0]">
             Connect your Booking.com or Airbnb listing — bookings there will automatically block rooms here.
           </p>
           <button onClick={() => { setPreselectedRoom(null); setShowModal(true); }}

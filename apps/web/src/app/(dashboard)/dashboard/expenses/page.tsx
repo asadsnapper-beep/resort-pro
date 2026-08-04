@@ -24,16 +24,16 @@ import {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const CATEGORIES = [
-  { value: 'SALARIES',       label: 'Salaries & Wages', color: '#23766a' },
+  { value: 'SALARIES',       label: 'Salaries & Wages', color: '#183153' },
   { value: 'UTILITIES',      label: 'Utilities',        color: '#b89040' },
   { value: 'MAINTENANCE',    label: 'Maintenance',      color: '#b8724a' },
   { value: 'CLEANING',       label: 'Cleaning',         color: 'var(--rp-text-accent)' },
   { value: 'FOOD_BEVERAGE',  label: 'Food & Beverage',  color: '#c43c3c' },
   { value: 'SUPPLIES',       label: 'Supplies',         color: '#7a5c2a' },
   { value: 'MARKETING',      label: 'Marketing',        color: '#d4a853' },
-  { value: 'INSURANCE',      label: 'Insurance',        color: '#9bbdb7' },
+  { value: 'INSURANCE',      label: 'Insurance',        color: '#aac0d0' },
   { value: 'RENT',           label: 'Rent / Lease',     color: 'var(--rp-text-subtle)' },
-  { value: 'EQUIPMENT',      label: 'Equipment',        color: '#1b342f' },
+  { value: 'EQUIPMENT',      label: 'Equipment',        color: '#183153' },
   { value: 'TRANSPORTATION', label: 'Transportation',   color: 'var(--rp-text-muted)' },
   { value: 'OTHER',          label: 'Other',            color: 'var(--rp-text-faint)' },
 ] as const;
@@ -83,12 +83,12 @@ const EMPTY_FORM: ExpenseForm = {
 
 const tooltipStyle = {
   contentStyle: { background: 'var(--rp-btn-accent)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, fontSize: 12 },
-  labelStyle: { color: '#9bbdb7' },
+  labelStyle: { color: '#aac0d0' },
   itemStyle: { color: 'var(--rp-btn-accent-text)' },
 };
 
-const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30';
-const labelCls = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
+const labelCls = 'block text-[11.5px] font-medium text-[#64748b] mb-1.5';
 
 // ── Expense Modal ─────────────────────────────────────────────────────────────
 
@@ -163,7 +163,7 @@ function ExpenseModal({ expense, onClose, currency }: {
             <div>
               <label className={labelCls}>Amount *</label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">{currency}</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[12px] text-[#64748b] dark:text-[#a9c1d0]">{currency}</span>
                 <input type="number" min="0" step="0.01" value={form.amount}
                   onChange={e => set('amount', e.target.value)}
                   className={inputCls + ' pl-11'} placeholder="0.00" />
@@ -214,7 +214,7 @@ function ExpenseModal({ expense, onClose, currency }: {
             <label className={labelCls}>Notes</label>
             <textarea value={form.notes} onChange={e => set('notes', e.target.value)}
               rows={2} placeholder="Optional additional details..."
-              className="w-full resize-none rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30" />
+              className="w-full resize-none rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30" />
           </div>
 
           {err && (
@@ -245,16 +245,16 @@ function KpiCard({ label, value, sub, change, icon: Icon, color }: {
         {change !== undefined && (
           <span className="flex items-center gap-0.5 rounded-[7px] border px-[9px] py-[4px] text-[11px] font-semibold"
             style={change <= 0
-              ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }
+              ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }
               : { background: 'var(--rp-red-bg)', borderColor: 'rgba(200,60,60,0.15)', color: '#c43c3c' }}>
             {change > 0 ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
             {Math.abs(change)}%
           </span>
         )}
       </div>
-      <p className="text-[22px] font-semibold tracking-[-0.02em] text-[#18231f]">{value}</p>
-      <p className="text-[12px] font-medium text-[#8aa29a] mt-0.5">{label}</p>
-      {sub && <p className="text-[11px] text-[#c5bdb4] mt-0.5">{sub}</p>}
+      <p className="text-[22px] font-semibold tracking-[-0.02em] text-[#183153]">{value}</p>
+      <p className="text-[12px] font-medium text-[#64748b] mt-0.5">{label}</p>
+      {sub && <p className="text-[11px] text-[#94a3b8] mt-0.5">{sub}</p>}
     </div>
   );
 }
@@ -280,8 +280,8 @@ function ChartCard({ title, sub, children }: { title: string; sub?: string; chil
   return (
     <div className="rounded-[14px] border bg-white dark:bg-white/5 p-5"
       style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
-      <h3 className="text-[13.5px] font-semibold text-[#18231f]">{title}</h3>
-      {sub && <p className="text-[11.5px] text-[#8aa29a] mt-0.5 mb-4">{sub}</p>}
+      <h3 className="text-[13.5px] font-semibold text-[#183153]">{title}</h3>
+      {sub && <p className="text-[11.5px] text-[#64748b] mt-0.5 mb-4">{sub}</p>}
       {children}
     </div>
   );
@@ -360,7 +360,7 @@ export default function ExpensesPage() {
             style={{ borderColor: 'var(--rp-border)', color: 'var(--rp-text-subtle)' }}>
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <span className="min-w-[120px] text-center text-[13px] font-semibold px-1 text-[#18231f] dark:text-[#dfd9d0]">
+          <span className="min-w-[120px] text-center text-[13px] font-semibold px-1 text-[#183153] dark:text-[#f8fafc]">
             {monthLabel(currentMonth)}
           </span>
           <button onClick={nextMonth} disabled={currentMonth >= monthStr(new Date())}
@@ -370,7 +370,7 @@ export default function ExpensesPage() {
           </button>
         </div>
         <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
-          className="rounded-[9px] border border-black/5 bg-[#f4f1eb] px-3 py-2 text-[13px] text-[#18231f] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30">
+          className="rounded-[9px] border border-black/5 bg-[#f4f1eb] px-3 py-2 text-[13px] text-[#183153] focus:outline-none focus:ring-2 focus:ring-[#183153]/30">
           <option value="">All Categories</option>
           {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
         </select>
@@ -388,11 +388,11 @@ export default function ExpensesPage() {
           <KpiCard icon={Receipt} color="#c43c3c"
             label="Total Expenses" value={formatCurrency(summary.totalExpenses, currency)}
             sub={monthLabel(currentMonth)} change={summary.expenseGrowth} />
-          <KpiCard icon={Banknote} color="#23766a"
+          <KpiCard icon={Banknote} color="#183153"
             label="Revenue" value={formatCurrency(summary.totalRevenue, currency)}
             sub="Paid payments this month" />
           <KpiCard icon={summary.profit >= 0 ? TrendingUp : TrendingDown}
-            color={summary.profit >= 0 ? '#1b342f' : '#c43c3c'}
+            color={summary.profit >= 0 ? '#183153' : '#c43c3c'}
             label="Net Profit" value={formatCurrency(Math.abs(summary.profit), currency)}
             sub={summary.profit < 0 ? 'Net loss' : 'After expenses'} />
           <KpiCard icon={BarChart2} color="#b89040"
@@ -407,8 +407,8 @@ export default function ExpensesPage() {
           <button key={t} onClick={() => setActiveTab(t)}
             className="px-4 py-2.5 text-[13px] font-medium border-b-2 transition-colors capitalize"
             style={{
-              borderColor: activeTab === t ? '#23766a' : 'transparent',
-              color: activeTab === t ? '#23766a' : 'var(--rp-text-muted)',
+              borderColor: activeTab === t ? '#183153' : 'transparent',
+              color: activeTab === t ? '#183153' : 'var(--rp-text-muted)',
             }}>
             {t === 'list' ? 'Expense List' : 'Charts & Trends'}
           </button>
@@ -421,15 +421,15 @@ export default function ExpensesPage() {
           style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           {listLoading ? (
             <div className="flex items-center justify-center h-48">
-              <Loader2 className="h-6 w-6 animate-spin" style={{ color: '#23766a' }} />
+              <Loader2 className="h-6 w-6 animate-spin" style={{ color: '#183153' }} />
             </div>
           ) : expenses.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
-              <Receipt className="h-12 w-12 mb-3 text-[#c5bdb4] dark:text-[#6e8580]" />
-              <p className="text-[13.5px] font-medium text-[#18231f] dark:text-[#dfd9d0]">
+              <Receipt className="h-12 w-12 mb-3 text-[#94a3b8] dark:text-[#7f99ab]" />
+              <p className="text-[13.5px] font-medium text-[#183153] dark:text-[#f8fafc]">
                 No expenses for {monthLabel(currentMonth)}
               </p>
-              <p className="text-[12px] mt-1 text-[#8aa29a] dark:text-[#94b8b0]">
+              <p className="text-[12px] mt-1 text-[#64748b] dark:text-[#a9c1d0]">
                 Click "Add Expense" to record your first expense
               </p>
             </div>
@@ -450,7 +450,7 @@ export default function ExpensesPage() {
                     {expenses.map(exp => (
                       <tr key={exp.id} className="border-b hover:bg-[#faf9f7] dark:hover:bg-white/5 transition-colors"
                         style={{ borderColor: 'rgba(0,0,0,0.03)' }}>
-                        <td className="px-4 py-3 text-[13px] whitespace-nowrap text-[#7a9890] dark:text-[#94b8b0]">
+                        <td className="px-4 py-3 text-[13px] whitespace-nowrap text-[#64748b] dark:text-[#a9c1d0]">
                           {fmtDate(exp.date.slice(0, 10))}
                         </td>
                         <td className="px-4 py-3">
@@ -463,13 +463,13 @@ export default function ExpensesPage() {
                             {catLabel(exp.category)}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-[13px] max-w-[200px] truncate text-[#18231f] dark:text-[#dfd9d0]">
+                        <td className="px-4 py-3 text-[13px] max-w-[200px] truncate text-[#183153] dark:text-[#f8fafc]">
                           {exp.description}
                         </td>
-                        <td className="px-4 py-3 text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">
+                        <td className="px-4 py-3 text-[12px] text-[#64748b] dark:text-[#a9c1d0]">
                           {exp.vendor ?? '—'}
                         </td>
-                        <td className="px-4 py-3 text-right text-[13px] font-semibold whitespace-nowrap text-[#18231f] dark:text-[#dfd9d0]">
+                        <td className="px-4 py-3 text-right text-[13px] font-semibold whitespace-nowrap text-[#183153] dark:text-[#f8fafc]">
                           {formatCurrency(Number(exp.amount), currency)}
                         </td>
                         <td className="px-4 py-3 text-right">
@@ -483,7 +483,7 @@ export default function ExpensesPage() {
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1">
                             <button onClick={() => { setEditingExpense(exp); setShowModal(true); }}
-                              className="rounded-[7px] p-1.5 transition-colors hover:bg-[#e3f2ef] text-[#8aa29a] dark:text-[#94b8b0]" title="Edit">
+                              className="rounded-[7px] p-1.5 transition-colors hover:bg-[#e5f0f7] text-[#64748b] dark:text-[#a9c1d0]" title="Edit">
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
                             {deletingId === exp.id ? (
@@ -493,13 +493,13 @@ export default function ExpensesPage() {
                                   Confirm
                                 </button>
                                 <button onClick={() => setDeletingId(null)}
-                                  className="text-[12px] px-1 hover:underline text-[#8aa29a] dark:text-[#94b8b0]">
+                                  className="text-[12px] px-1 hover:underline text-[#64748b] dark:text-[#a9c1d0]">
                                   Cancel
                                 </button>
                               </div>
                             ) : (
                               <button onClick={() => setDeletingId(exp.id)}
-                                className="rounded-[7px] p-1.5 transition-colors hover:bg-[#fef2f2] text-[#8aa29a] dark:text-[#94b8b0]" title="Delete">
+                                className="rounded-[7px] p-1.5 transition-colors hover:bg-[#fef2f2] text-[#64748b] dark:text-[#a9c1d0]" title="Delete">
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             )}
@@ -515,7 +515,7 @@ export default function ExpensesPage() {
               {totalPages > 1 && (
                 <div className="flex items-center justify-between border-t px-5 py-3"
                   style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
-                  <p className="text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">
+                  <p className="text-[12px] text-[#64748b] dark:text-[#a9c1d0]">
                     Page {page} of {totalPages} · {expensesData?.total} expenses
                   </p>
                   <div className="flex gap-2">
@@ -544,7 +544,7 @@ export default function ExpensesPage() {
             {/* Pie */}
             <ChartCard title="Expenses by Category" sub={monthLabel(currentMonth)}>
               {!summary?.byCategory?.length ? (
-                <div className="flex items-center justify-center h-48 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">
+                <div className="flex items-center justify-center h-48 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">
                   No data for this month
                 </div>
               ) : (
@@ -565,8 +565,8 @@ export default function ExpensesPage() {
                     {summary.byCategory.map((c: { category: string; amount: number }) => (
                       <div key={c.category} className="flex items-center gap-2">
                         <div className="w-2.5 h-2.5 rounded-[3px] flex-shrink-0" style={{ background: catColor(c.category) }} />
-                        <span className="flex-1 truncate text-[12px] text-[#7a9890] dark:text-[#94b8b0]">{catLabel(c.category)}</span>
-                        <span className="text-[12px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">
+                        <span className="flex-1 truncate text-[12px] text-[#64748b] dark:text-[#a9c1d0]">{catLabel(c.category)}</span>
+                        <span className="text-[12px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                           {formatCurrency(c.amount, currency)}
                         </span>
                       </div>
@@ -579,7 +579,7 @@ export default function ExpensesPage() {
             {/* Bar */}
             <ChartCard title="Category Comparison" sub={monthLabel(currentMonth)}>
               {!summary?.byCategory?.length ? (
-                <div className="flex items-center justify-center h-48 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No data</div>
+                <div className="flex items-center justify-center h-48 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">No data</div>
               ) : (
                 <div className="mt-4">
                   <ResponsiveContainer width="100%" height={200}>
@@ -606,7 +606,7 @@ export default function ExpensesPage() {
           {/* Revenue vs Expenses trend */}
           <ChartCard title="Revenue vs Expenses — 12 Months" sub="Monthly comparison with profit/loss">
             {!trends?.length ? (
-              <div className="flex items-center justify-center h-52 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">
+              <div className="flex items-center justify-center h-52 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">
                 No trend data yet
               </div>
             ) : (
@@ -615,8 +615,8 @@ export default function ExpensesPage() {
                   <AreaChart data={trends} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
                     <defs>
                       <linearGradient id="revGradExp" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#23766a" stopOpacity={0.2} />
-                        <stop offset="95%" stopColor="#23766a" stopOpacity={0} />
+                        <stop offset="5%" stopColor="#183153" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="#183153" stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="expGradExp" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#c43c3c" stopOpacity={0.2} />
@@ -630,7 +630,7 @@ export default function ExpensesPage() {
                     <Tooltip formatter={(v: number, name: string) => [formatCurrency(v, currency), name.charAt(0).toUpperCase() + name.slice(1)]}
                       {...tooltipStyle} />
                     <Legend wrapperStyle={{ fontSize: 12, color: 'var(--rp-text-muted)' }} />
-                    <Area type="monotone" dataKey="revenue" stroke="#23766a" strokeWidth={2} fill="url(#revGradExp)" dot={false} name="Revenue" />
+                    <Area type="monotone" dataKey="revenue" stroke="#183153" strokeWidth={2} fill="url(#revGradExp)" dot={false} name="Revenue" />
                     <Area type="monotone" dataKey="expenses" stroke="#c43c3c" strokeWidth={2} fill="url(#expGradExp)" dot={false} name="Expenses" />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -651,7 +651,7 @@ export default function ExpensesPage() {
                     <Tooltip formatter={(v: number) => [formatCurrency(v, currency), 'Net Profit']} {...tooltipStyle} />
                     <Bar dataKey="profit" radius={[4, 4, 0, 0]}>
                       {trends.map((t, i) => (
-                        <Cell key={i} fill={t.profit >= 0 ? '#23766a' : '#c43c3c'} />
+                        <Cell key={i} fill={t.profit >= 0 ? '#183153' : '#c43c3c'} />
                       ))}
                     </Bar>
                   </BarChart>

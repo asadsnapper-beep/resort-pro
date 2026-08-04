@@ -131,7 +131,7 @@ export function PrintReceiptButton({ bookingId }: Props) {
       <button
         onClick={handleOpen}
         disabled={loading}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#1a6b5e]/30 text-[#1a6b5e] hover:bg-[#1a6b5e]/5 text-xs font-medium transition-colors disabled:opacity-50"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#183153]/30 text-[#183153] hover:bg-[#183153]/5 text-xs font-medium transition-colors disabled:opacity-50"
       >
         {loading
           ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -170,7 +170,7 @@ export function PrintReceiptButton({ bookingId }: Props) {
                   key={p}
                   onClick={() => { setSP(p); printWithQZ(p); }}
                   className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${
-                    selectedPrinter === p ? 'font-semibold text-[#1a6b5e]' : 'text-gray-700 dark:text-gray-300'
+                    selectedPrinter === p ? 'font-semibold text-[#183153]' : 'text-gray-700 dark:text-gray-300'
                   }`}
                 >
                   <Printer className="w-3.5 h-3.5 flex-shrink-0" />

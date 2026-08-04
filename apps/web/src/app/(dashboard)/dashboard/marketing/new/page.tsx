@@ -24,8 +24,8 @@ interface WizardState {
 const STEPS = ['Channel', 'Audience', 'Message', 'Schedule', 'Review'];
 const CHAR_LIMIT = 160;
 
-const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30';
-const labelCls = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
+const labelCls = 'block text-[11.5px] font-medium text-[#64748b] mb-1.5';
 
 export default function NewCampaignPage() {
   const router = useRouter();
@@ -93,8 +93,8 @@ export default function NewCampaignPage() {
   const smsCount = Math.ceil(form.message.length / CHAR_LIMIT) || 1;
 
   const stepDotCls = (i: number) => {
-    if (i < step)   return { background: '#23766a', color: 'var(--rp-btn-accent-text)' };
-    if (i === step) return { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', boxShadow: '0 0 0 4px rgba(35,118,106,0.18)' };
+    if (i < step)   return { background: '#183153', color: 'var(--rp-btn-accent-text)' };
+    if (i === step) return { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', boxShadow: '0 0 0 4px rgba(24,49,83,0.18)' };
     return { background: '#e8e5e0', color: 'var(--rp-text-muted)' };
   };
 
@@ -104,7 +104,7 @@ export default function NewCampaignPage() {
       <PageHeader
         icon={
           <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px]" style={{ background: 'var(--rp-teal-bg)' }}>
-            <Megaphone className="h-4 w-4" style={{ color: '#23766a' }} />
+            <Megaphone className="h-4 w-4" style={{ color: '#183153' }} />
           </div>
         }
         title="New Campaign"
@@ -120,10 +120,10 @@ export default function NewCampaignPage() {
               {i < step ? <Check className="h-3.5 w-3.5" /> : i + 1}
             </div>
             <span className="text-[12px] font-medium hidden sm:block"
-              style={{ color: i === step ? '#23766a' : 'var(--rp-text-faint)' }}>{label}</span>
+              style={{ color: i === step ? '#183153' : 'var(--rp-text-faint)' }}>{label}</span>
             {i < STEPS.length - 1 && (
               <div className="h-0.5 w-6 rounded"
-                style={{ background: i < step ? '#23766a' : '#e8e5e0' }} />
+                style={{ background: i < step ? '#183153' : '#e8e5e0' }} />
             )}
           </div>
         ))}
@@ -149,11 +149,11 @@ export default function NewCampaignPage() {
                   onClick={() => set({ channel: opt.val as Channel })}
                   className="flex flex-col items-center gap-2 rounded-[12px] border-2 p-4 text-center transition-all"
                   style={form.channel === opt.val
-                    ? { borderColor: '#23766a', background: 'var(--rp-teal-soft)', boxShadow: '0 0 0 3px rgba(35,118,106,0.1)' }
+                    ? { borderColor: '#183153', background: 'var(--rp-teal-soft)', boxShadow: '0 0 0 3px rgba(24,49,83,0.1)' }
                     : { borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)', background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)' }}>
                   <span className="text-2xl">{opt.icon}</span>
-                  <p className="text-[12.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">{opt.label}</p>
-                  <p className="text-[11px] text-[#8aa29a] dark:text-[#94b8b0]">{opt.desc}</p>
+                  <p className="text-[12.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">{opt.label}</p>
+                  <p className="text-[11px] text-[#64748b] dark:text-[#a9c1d0]">{opt.desc}</p>
                 </button>
               ))}
             </div>
@@ -176,14 +176,14 @@ export default function NewCampaignPage() {
               <label key={opt.val}
                 className="flex items-start gap-3 rounded-[12px] border-2 p-4 cursor-pointer transition-all"
                 style={form.audienceType === opt.val
-                  ? { borderColor: '#23766a', background: 'var(--rp-teal-soft)' }
+                  ? { borderColor: '#183153', background: 'var(--rp-teal-soft)' }
                   : { borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)', background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)' }}>
-                <input type="radio" className="mt-0.5" style={{ accentColor: '#23766a' }}
+                <input type="radio" className="mt-0.5" style={{ accentColor: '#183153' }}
                   checked={form.audienceType === opt.val}
                   onChange={() => set({ audienceType: opt.val as AudienceType, audienceFilter: {} })} />
                 <div>
-                  <p className="text-[13px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">{opt.icon} {opt.label}</p>
-                  <p className="text-[12px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">{opt.desc}</p>
+                  <p className="text-[13px] font-semibold text-[#183153] dark:text-[#f8fafc]">{opt.icon} {opt.label}</p>
+                  <p className="text-[12px] mt-0.5 text-[#64748b] dark:text-[#a9c1d0]">{opt.desc}</p>
                 </div>
               </label>
             ))}
@@ -191,7 +191,7 @@ export default function NewCampaignPage() {
 
           {form.audienceType === 'upcoming' && (
             <div className="rounded-[12px] border p-4 space-y-2"
-              style={{ background: 'var(--rp-teal-soft)', borderColor: 'rgba(35,118,106,0.2)' }}>
+              style={{ background: 'var(--rp-teal-soft)', borderColor: 'rgba(24,49,83,0.2)' }}>
               <label className={labelCls}>Check-in within how many days?</label>
               <div className="flex gap-2 flex-wrap">
                 {[3, 7, 14, 30].map(d => (
@@ -199,7 +199,7 @@ export default function NewCampaignPage() {
                     className="rounded-[8px] border px-3 py-1.5 text-[12.5px] font-medium transition-colors"
                     style={form.audienceFilter.days === d
                       ? { background: 'var(--rp-btn-accent)', borderColor: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }
-                      : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)', color: isDark ? '#94b8b0' : 'var(--rp-text-subtle)' }}>
+                      : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)', color: isDark ? '#a9c1d0' : 'var(--rp-text-subtle)' }}>
                     {d} days
                   </button>
                 ))}
@@ -209,7 +209,7 @@ export default function NewCampaignPage() {
 
           {form.audienceType === 'date_range' && (
             <div className="rounded-[12px] border p-4 space-y-3"
-              style={{ background: 'var(--rp-teal-soft)', borderColor: 'rgba(35,118,106,0.2)' }}>
+              style={{ background: 'var(--rp-teal-soft)', borderColor: 'rgba(24,49,83,0.2)' }}>
               <p className={labelCls}>Date range (check-in date)</p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -230,7 +230,7 @@ export default function NewCampaignPage() {
 
           {form.audienceType === 'vip' && (
             <div className="rounded-[12px] border p-4 space-y-2"
-              style={{ background: 'var(--rp-teal-soft)', borderColor: 'rgba(35,118,106,0.2)' }}>
+              style={{ background: 'var(--rp-teal-soft)', borderColor: 'rgba(24,49,83,0.2)' }}>
               <label className={labelCls}>Minimum stays</label>
               <div className="flex gap-2">
                 {[2, 3, 5].map(n => (
@@ -238,7 +238,7 @@ export default function NewCampaignPage() {
                     className="rounded-[8px] border px-3 py-1.5 text-[12.5px] font-medium transition-colors"
                     style={form.audienceFilter.minStays === n
                       ? { background: 'var(--rp-btn-accent)', borderColor: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }
-                      : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)', color: isDark ? '#94b8b0' : 'var(--rp-text-subtle)' }}>
+                      : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)', color: isDark ? '#a9c1d0' : 'var(--rp-text-subtle)' }}>
                     {n}+ stays
                   </button>
                 ))}
@@ -249,7 +249,7 @@ export default function NewCampaignPage() {
           <div className="flex items-center gap-2 rounded-[10px] border px-4 py-3 text-[13px] font-medium"
             style={audienceCount === 0
               ? { background: 'var(--rp-red-bg)', borderColor: 'rgba(200,60,60,0.15)', color: '#c43c3c' }
-              : { background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+              : { background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
             {loadingCount
               ? <><Loader2 className="h-4 w-4 animate-spin" /> Counting…</>
               : audienceCount === null
@@ -271,10 +271,10 @@ export default function NewCampaignPage() {
                   .map((t: { id: string; name: string; message: string }) => (
                     <button key={t.id} type="button"
                       onClick={() => set({ message: t.message, templateId: t.id })}
-                      className="w-full text-left rounded-[10px] border p-3 transition-colors hover:bg-[#f5faf9]"
+                      className="w-full text-left rounded-[10px] border p-3 transition-colors hover:bg-[#f5f9fc]"
                       style={{ borderColor: 'var(--rp-border-md)' }}>
-                      <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{t.name}</p>
-                      <p className="text-[12px] mt-0.5 line-clamp-1 text-[#8aa29a] dark:text-[#94b8b0]">{t.message}</p>
+                      <p className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{t.name}</p>
+                      <p className="text-[12px] mt-0.5 line-clamp-1 text-[#64748b] dark:text-[#a9c1d0]">{t.message}</p>
                     </button>
                   ))}
               </div>
@@ -286,7 +286,7 @@ export default function NewCampaignPage() {
             <textarea value={form.message} onChange={e => set({ message: e.target.value })}
               rows={5} placeholder="e.g. Palm Paradise Resort: Special offer this weekend — 20% off 2+ night stays. Book: yourresort.com/offer"
               className={inputCls + ' resize-none'} />
-            <div className="flex items-center justify-between mt-1 text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+            <div className="flex items-center justify-between mt-1 text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">
               <span>
                 Available tokens:{' '}
                 <code className="rounded-[4px] px-1 py-0.5 text-[10.5px]" style={{ background: 'var(--rp-surface-3)', color: 'var(--rp-text-subtle)' }}>{'{guest_name}'}</code>
@@ -320,14 +320,14 @@ export default function NewCampaignPage() {
               <label key={opt.val}
                 className="flex items-start gap-3 rounded-[12px] border-2 p-4 cursor-pointer transition-all"
                 style={form.scheduleMode === opt.val
-                  ? { borderColor: '#23766a', background: 'var(--rp-teal-soft)' }
+                  ? { borderColor: '#183153', background: 'var(--rp-teal-soft)' }
                   : { borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)', background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)' }}>
-                <input type="radio" className="mt-0.5" style={{ accentColor: '#23766a' }}
+                <input type="radio" className="mt-0.5" style={{ accentColor: '#183153' }}
                   checked={form.scheduleMode === opt.val}
                   onChange={() => set({ scheduleMode: opt.val as 'now' | 'later' })} />
                 <div>
-                  <p className="text-[13px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">{opt.icon} {opt.label}</p>
-                  <p className="text-[12px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">{opt.desc}</p>
+                  <p className="text-[13px] font-semibold text-[#183153] dark:text-[#f8fafc]">{opt.icon} {opt.label}</p>
+                  <p className="text-[12px] mt-0.5 text-[#64748b] dark:text-[#a9c1d0]">{opt.desc}</p>
                 </div>
               </label>
             ))}
@@ -368,8 +368,8 @@ export default function NewCampaignPage() {
             ].map(({ label, value }, i, arr) => (
               <div key={label} className="flex items-start justify-between px-4 py-3 text-[13px]"
                 style={{ borderBottom: i < arr.length - 1 ? '1px solid rgba(0,0,0,0.05)' : undefined }}>
-                <span className="w-32 shrink-0 text-[#8aa29a] dark:text-[#94b8b0]">{label}</span>
-                <span className="font-medium text-right text-[#18231f] dark:text-[#dfd9d0]">{value}</span>
+                <span className="w-32 shrink-0 text-[#64748b] dark:text-[#a9c1d0]">{label}</span>
+                <span className="font-medium text-right text-[#183153] dark:text-[#f8fafc]">{value}</span>
               </div>
             ))}
           </div>

@@ -29,15 +29,15 @@ const CATEGORIES = ['', 'BREAKFAST', 'LUNCH', 'DINNER', 'APPETIZER', 'DESSERT', 
 const CAT_META: Record<string, { bg: string; border: string; text: string; icon: React.ElementType }> = {
   BREAKFAST: { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040', icon: Coffee         },
   LUNCH:     { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a', icon: UtensilsCrossed },
-  DINNER:    { bg: '#1b342f', border: 'rgba(27,52,47,0.4)',    text: '#dfd9d0', icon: ChefHat         },
-  APPETIZER: { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)', text: '#23766a', icon: Star            },
+  DINNER:    { bg: '#183153', border: 'rgba(24,49,83,0.4)',    text: '#f8fafc', icon: ChefHat         },
+  APPETIZER: { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)', text: '#183153', icon: Star            },
   DESSERT:   { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.15)', text: '#b8724a', icon: Star            },
-  BEVERAGE:  { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.15)', text: 'var(--rp-text-accent)', icon: Coffee         },
+  BEVERAGE:  { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.15)', text: 'var(--rp-text-accent)', icon: Coffee         },
   SPECIAL:   { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.25)', text: '#b89040', icon: Star            },
 };
 
-const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30';
-const labelCls = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
+const labelCls = 'block text-[11.5px] font-medium text-[#64748b] mb-1.5';
 const errCls   = 'mt-1 text-[11.5px] text-[#c43c3c]';
 
 function MenuItemModal({ open, onClose, loading, onSubmit, item }: {
@@ -92,7 +92,7 @@ function MenuItemModal({ open, onClose, loading, onSubmit, item }: {
           <div>
             <label className={labelCls}>Price *</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px]" style={{ color: '#9bbdb7' }}>$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px]" style={{ color: '#aac0d0' }}>$</span>
               <input value={form.price} onChange={e => set('price', e.target.value)} className={inputCls + ' pl-6'} placeholder="12.50" type="number" step="0.01" min="0" />
             </div>
           </div>
@@ -112,13 +112,13 @@ function MenuItemModal({ open, onClose, loading, onSubmit, item }: {
             <input type="checkbox" id="available" checked={form.isAvailable} onChange={e => set('isAvailable', e.target.checked)}
               className="sr-only peer" />
             <label htmlFor="available"
-              className="flex h-[20px] w-[34px] cursor-pointer items-center rounded-full border transition-colors peer-checked:bg-[#23766a] peer-checked:border-[#23766a]"
+              className="flex h-[20px] w-[34px] cursor-pointer items-center rounded-full border transition-colors peer-checked:bg-[#183153] peer-checked:border-[#183153]"
               style={{ background: form.isAvailable ? undefined : '#e8e5e0', borderColor: form.isAvailable ? undefined : 'rgba(0,0,0,0.1)' }}>
               <span className="ml-[3px] h-[14px] w-[14px] rounded-full bg-white shadow-sm transition-transform"
                 style={{ transform: form.isAvailable ? 'translateX(14px)' : 'translateX(0)' }} />
             </label>
           </div>
-          <label htmlFor="available" className="text-[13px] cursor-pointer text-[#4a6e66] dark:text-[#6d9990]">Available on menu</label>
+          <label htmlFor="available" className="text-[13px] cursor-pointer text-[#475569] dark:text-[#9db4c4]">Available on menu</label>
         </div>
         {err && <p className={errCls}>{err}</p>}
         <div className="flex gap-3 justify-end pt-2" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
@@ -212,8 +212,8 @@ export default function RestaurantPage() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Total Items', value: allItems.length,  Icon: UtensilsCrossed, iconBg: 'var(--rp-teal-bg)', iconColor: '#23766a' },
-          { label: 'Available',   value: availableCount,   Icon: CheckCircle2,    iconBg: 'var(--rp-teal-bg)', iconColor: '#23766a' },
+          { label: 'Total Items', value: allItems.length,  Icon: UtensilsCrossed, iconBg: 'var(--rp-teal-bg)', iconColor: '#183153' },
+          { label: 'Available',   value: availableCount,   Icon: CheckCircle2,    iconBg: 'var(--rp-teal-bg)', iconColor: '#183153' },
           { label: 'Categories',  value: totalCategories,  Icon: ChefHat,         iconBg: 'var(--rp-amber-bg)', iconColor: '#b89040' },
         ].map(({ label, value, Icon, iconBg, iconColor }) => (
           <div key={label} className="rounded-[14px] border bg-white p-4"
@@ -223,9 +223,9 @@ export default function RestaurantPage() {
                 style={{ background: iconBg }}>
                 <Icon className="h-[16px] w-[16px]" style={{ color: iconColor }} />
               </div>
-              <p className="text-[12.5px] font-medium text-[#8aa29a] dark:text-[#94b8b0]">{label}</p>
+              <p className="text-[12.5px] font-medium text-[#64748b] dark:text-[#a9c1d0]">{label}</p>
             </div>
-            <p className="text-[26px] font-semibold leading-none text-[#18231f] dark:text-[#dfd9d0]">{value}</p>
+            <p className="text-[26px] font-semibold leading-none text-[#183153] dark:text-[#f8fafc]">{value}</p>
           </div>
         ))}
       </div>
@@ -233,9 +233,9 @@ export default function RestaurantPage() {
       {/* Filters */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative max-w-sm flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: '#9bbdb7' }} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: '#aac0d0' }} />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search menu items…"
-            className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-[9px] pl-9 pr-3 text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30" />
+            className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-[9px] pl-9 pr-3 text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30" />
         </div>
         <div className="flex gap-2 flex-wrap">
           {CATEGORIES.map(c => (
@@ -259,14 +259,14 @@ export default function RestaurantPage() {
         </div>
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 rounded-[14px] border gap-3"
-          style={{ borderColor: 'rgba(35,118,106,0.2)', borderStyle: 'dashed', background: isDark ? 'rgba(255,255,255,0.03)' : 'var(--rp-surface-2)' }}>
+          style={{ borderColor: 'rgba(24,49,83,0.2)', borderStyle: 'dashed', background: isDark ? 'rgba(255,255,255,0.03)' : 'var(--rp-surface-2)' }}>
           <div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'var(--rp-teal-bg)' }}>
-            <UtensilsCrossed className="h-7 w-7" style={{ color: '#23766a' }} />
+            <UtensilsCrossed className="h-7 w-7" style={{ color: '#183153' }} />
           </div>
-          <p className="text-[13.5px] font-medium text-[#18231f] dark:text-[#dfd9d0]">
+          <p className="text-[13.5px] font-medium text-[#183153] dark:text-[#f8fafc]">
             {search || catFilter ? 'No items found' : 'No menu items yet'}
           </p>
-          <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+          <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">
             {search || catFilter ? 'Try adjusting filters' : 'Add your first menu item to get started'}
           </p>
           {!search && !catFilter && (
@@ -289,7 +289,7 @@ export default function RestaurantPage() {
                     style={{ background: cm.bg, borderColor: cm.border, color: cm.text }}>
                     <CatIcon className="h-3.5 w-3.5" /> {category}
                   </span>
-                  <span className="text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">{catItems.length} item{catItems.length !== 1 ? 's' : ''}</span>
+                  <span className="text-[12px] text-[#64748b] dark:text-[#a9c1d0]">{catItems.length} item{catItems.length !== 1 ? 's' : ''}</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {catItems.map(item => (
@@ -307,19 +307,19 @@ export default function RestaurantPage() {
                       )}
                       {!item.image && (
                         <div className="h-24 flex items-center justify-center"
-                          style={{ background: 'linear-gradient(135deg, #1b342f 0%, #23766a 100%)' }}>
+                          style={{ background: 'linear-gradient(135deg, #183153 0%, #183153 100%)' }}>
                           <CatIcon className="h-8 w-8 opacity-30 text-white" />
                         </div>
                       )}
                       <div className="p-4">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <p className="text-[13.5px] font-semibold truncate text-[#18231f] dark:text-[#dfd9d0]">{item.name}</p>
+                            <p className="text-[13.5px] font-semibold truncate text-[#183153] dark:text-[#f8fafc]">{item.name}</p>
                             {item.description && (
-                              <p className="text-[12px] mt-0.5 line-clamp-2 text-[#8aa29a] dark:text-[#94b8b0]">{item.description}</p>
+                              <p className="text-[12px] mt-0.5 line-clamp-2 text-[#64748b] dark:text-[#a9c1d0]">{item.description}</p>
                             )}
                           </div>
-                          <p className="text-[13.5px] font-bold shrink-0" style={{ color: '#23766a' }}>
+                          <p className="text-[13.5px] font-bold shrink-0" style={{ color: '#183153' }}>
                             {formatCurrency(Number(item.price))}
                           </p>
                         </div>
@@ -328,7 +328,7 @@ export default function RestaurantPage() {
                             onClick={() => toggleMutation.mutate({ id: item.id, isAvailable: !item.isAvailable })}
                             className="flex items-center gap-1.5 rounded-[7px] border px-[9px] py-[3px] text-[11.5px] font-semibold transition-colors hover:opacity-80"
                             style={item.isAvailable
-                              ? { background: isDark ? 'rgba(35,118,106,0.2)' : 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }
+                              ? { background: isDark ? 'rgba(24,49,83,0.2)' : 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }
                               : { background: isDark ? 'rgba(255,255,255,0.05)' : 'var(--rp-surface-3)', borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-border-md)', color: 'var(--rp-text-muted)' }}>
                             {item.isAvailable
                               ? <CheckCircle2 className="h-3 w-3" />
@@ -337,12 +337,12 @@ export default function RestaurantPage() {
                           </button>
                           <div className="flex gap-1">
                             <button onClick={() => setEditItem(item)}
-                              className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#e3f2ef]"
-                              style={{ color: '#9bbdb7' }}>
+                              className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#e5f0f7]"
+                              style={{ color: '#aac0d0' }}>
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
                             <button onClick={() => setDeleteItem(item)}
-                              className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#fef2f2] text-[#c5bdb4] dark:text-[#6e8580]">
+                              className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#fef2f2] text-[#94a3b8] dark:text-[#7f99ab]">
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </div>

@@ -50,7 +50,7 @@ const STATUS_STYLE: Record<string, { bg: string; text: string }> = {
   DRAFT: { bg: 'var(--rp-surface-3)', text: 'var(--rp-text-muted)' },
   SENT: { bg: 'var(--rp-amber-bg)', text: '#b89040' },
   PARTIAL: { bg: 'var(--rp-amber-bg)', text: '#b89040' },
-  PAID: { bg: 'var(--rp-teal-bg)', text: '#23766a' },
+  PAID: { bg: 'var(--rp-teal-bg)', text: '#183153' },
   OVERDUE: { bg: 'var(--rp-red-bg, #fbeceb)', text: '#c43c3c' },
 };
 
@@ -77,7 +77,7 @@ export default function CorporateAccountsPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px]" style={{ background: 'var(--rp-teal-bg)' }}>
-            <Building className="h-4 w-4" style={{ color: '#23766a' }} />
+            <Building className="h-4 w-4" style={{ color: '#183153' }} />
           </div>
           <PageHeader
             title="Corporate Accounts"
@@ -96,36 +96,36 @@ export default function CorporateAccountsPage() {
 
       {!isLoading && accounts.length > 0 && (
         <div className="rounded-[14px] border bg-white p-5" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
-          <p className="text-[13px] text-[#4a6e66] dark:text-[#6d9990]">
-            Total Outstanding: <span className="text-[16px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">৳{totalOutstanding.toLocaleString()}</span> across {accounts.length} compan{accounts.length !== 1 ? 'ies' : 'y'}
+          <p className="text-[13px] text-[#475569] dark:text-[#9db4c4]">
+            Total Outstanding: <span className="text-[16px] font-semibold text-[#183153] dark:text-[#f8fafc]">৳{totalOutstanding.toLocaleString()}</span> across {accounts.length} compan{accounts.length !== 1 ? 'ies' : 'y'}
           </p>
         </div>
       )}
 
       {isLoading ? (
-        <div className="flex h-40 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin" style={{ color: '#9bbdb7' }} /></div>
+        <div className="flex h-40 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin" style={{ color: '#aac0d0' }} /></div>
       ) : accounts.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-[14px] border bg-white py-14 text-center" style={{ borderColor: 'var(--rp-border)' }}>
           <div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'var(--rp-surface-3)' }}>
-            <Building className="h-7 w-7 text-[#c5bdb4] dark:text-[#6e8580]" />
+            <Building className="h-7 w-7 text-[#94a3b8] dark:text-[#7f99ab]" />
           </div>
-          <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">Ekhono kono corporate account add kora hoyni.</p>
+          <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Ekhono kono corporate account add kora hoyni.</p>
         </div>
       ) : (
         <div className="rounded-[14px] border bg-white overflow-hidden" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           {accounts.map((a) => (
             <div key={a.id} className="flex items-center gap-4 px-5 py-4 hover:bg-[#fafaf8] transition-colors" style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
               <div className="flex-1 min-w-0">
-                <p className="text-[13.5px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{a.companyName}</p>
-                <p className="text-[12px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">
+                <p className="text-[13.5px] font-medium text-[#183153] dark:text-[#f8fafc]">{a.companyName}</p>
+                <p className="text-[12px] mt-0.5 text-[#64748b] dark:text-[#a9c1d0]">
                   {a.contactName} · Net-{a.paymentTermDays}{a.discountPercent > 0 && ` · ${a.discountPercent}% corporate rate`} · {a.bookingCount} booking{a.bookingCount !== 1 ? 's' : ''}
                 </p>
               </div>
               <div className="text-right shrink-0">
-                <p className="text-[14px] font-semibold" style={{ color: a.outstanding > 0 ? '#c43c3c' : '#23766a' }}>
+                <p className="text-[14px] font-semibold" style={{ color: a.outstanding > 0 ? '#c43c3c' : '#183153' }}>
                   ৳{a.outstanding.toLocaleString()} {a.outstanding > 0 ? 'due' : 'paid'}
                 </p>
-                {a.unpaidInvoices > 0 && <p className="text-[11px] text-[#8aa29a] dark:text-[#94b8b0]">{a.unpaidInvoices} unpaid invoice{a.unpaidInvoices !== 1 ? 's' : ''}</p>}
+                {a.unpaidInvoices > 0 && <p className="text-[11px] text-[#64748b] dark:text-[#a9c1d0]">{a.unpaidInvoices} unpaid invoice{a.unpaidInvoices !== 1 ? 's' : ''}</p>}
               </div>
               <div className="flex shrink-0 gap-2">
                 <button onClick={() => setEditAccount(a)} className="rounded-[7px] p-1.5 hover:bg-[#f4f1eb]" style={{ color: 'var(--rp-text-subtle)' }}><Pencil className="h-3.5 w-3.5" /></button>
@@ -205,35 +205,35 @@ function AccountFormModal({ account, onClose, onDone }: { account?: CorporateAcc
     >
       <div className="space-y-4">
         <div>
-          <label className="mb-1.5 block text-[12.5px] font-medium text-[#4a6e66] dark:text-[#94b8b0]">Company Name</label>
+          <label className="mb-1.5 block text-[12.5px] font-medium text-[#475569] dark:text-[#a9c1d0]">Company Name</label>
           <input type="text" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="ABC Corporation"
             className="w-full rounded-[9px] border px-3.5 py-2.5 text-[13.5px] outline-none" style={{ borderColor: 'var(--rp-border-md)', background: 'var(--rp-surface)' }} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1.5 block text-[12.5px] font-medium text-[#4a6e66] dark:text-[#94b8b0]">Contact Person</label>
+            <label className="mb-1.5 block text-[12.5px] font-medium text-[#475569] dark:text-[#a9c1d0]">Contact Person</label>
             <input type="text" value={contactName} onChange={(e) => setContactName(e.target.value)}
               className="w-full rounded-[9px] border px-3.5 py-2.5 text-[13.5px] outline-none" style={{ borderColor: 'var(--rp-border-md)', background: 'var(--rp-surface)' }} />
           </div>
           <div>
-            <label className="mb-1.5 block text-[12.5px] font-medium text-[#4a6e66] dark:text-[#94b8b0]">Phone</label>
+            <label className="mb-1.5 block text-[12.5px] font-medium text-[#475569] dark:text-[#a9c1d0]">Phone</label>
             <input type="text" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)}
               className="w-full rounded-[9px] border px-3.5 py-2.5 text-[13.5px] outline-none" style={{ borderColor: 'var(--rp-border-md)', background: 'var(--rp-surface)' }} />
           </div>
         </div>
         <div>
-          <label className="mb-1.5 block text-[12.5px] font-medium text-[#4a6e66] dark:text-[#94b8b0]">Contact Email</label>
+          <label className="mb-1.5 block text-[12.5px] font-medium text-[#475569] dark:text-[#a9c1d0]">Contact Email</label>
           <input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)}
             className="w-full rounded-[9px] border px-3.5 py-2.5 text-[13.5px] outline-none" style={{ borderColor: 'var(--rp-border-md)', background: 'var(--rp-surface)' }} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1.5 block text-[12.5px] font-medium text-[#4a6e66] dark:text-[#94b8b0]">Payment Terms (days)</label>
+            <label className="mb-1.5 block text-[12.5px] font-medium text-[#475569] dark:text-[#a9c1d0]">Payment Terms (days)</label>
             <input type="number" min={0} value={paymentTermDays} onChange={(e) => setPaymentTermDays(e.target.value)}
               className="w-full rounded-[9px] border px-3.5 py-2.5 text-[13.5px] outline-none" style={{ borderColor: 'var(--rp-border-md)', background: 'var(--rp-surface)' }} />
           </div>
           <div>
-            <label className="mb-1.5 block text-[12.5px] font-medium text-[#4a6e66] dark:text-[#94b8b0]">Corporate Discount %</label>
+            <label className="mb-1.5 block text-[12.5px] font-medium text-[#475569] dark:text-[#a9c1d0]">Corporate Discount %</label>
             <input type="number" min={0} max={100} value={discountPercent} onChange={(e) => setDiscountPercent(e.target.value)}
               className="w-full rounded-[9px] border px-3.5 py-2.5 text-[13.5px] outline-none" style={{ borderColor: 'var(--rp-border-md)', background: 'var(--rp-surface)' }} />
           </div>
@@ -300,17 +300,17 @@ function CompanyDetailModal({ account, onClose, onChanged }: { account: Corporat
     >
       <div className="space-y-6">
         <div>
-          <h3 className="mb-2 text-[13px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">Uninvoiced Bookings</h3>
+          <h3 className="mb-2 text-[13px] font-semibold text-[#183153] dark:text-[#f8fafc]">Uninvoiced Bookings</h3>
           {bookingsLoading ? (
-            <div className="flex h-16 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin" style={{ color: '#9bbdb7' }} /></div>
+            <div className="flex h-16 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin" style={{ color: '#aac0d0' }} /></div>
           ) : uninvoiced.length === 0 ? (
-            <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">Kono uninvoiced booking nai.</p>
+            <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">Kono uninvoiced booking nai.</p>
           ) : (
             <div className="space-y-1.5">
               {uninvoiced.map((b) => (
                 <label key={b.id} className="flex items-center gap-3 rounded-[9px] border px-3.5 py-2.5 cursor-pointer" style={{ borderColor: 'var(--rp-border)' }}>
                   <input type="checkbox" checked={selected.has(b.id)} onChange={() => toggle(b.id)} className="h-4 w-4" />
-                  <span className="flex-1 text-[12.5px] text-[#18231f] dark:text-[#dfd9d0]">
+                  <span className="flex-1 text-[12.5px] text-[#183153] dark:text-[#f8fafc]">
                     {b.guest.firstName} {b.guest.lastName} — {b.room.name} — {new Date(b.checkIn).toLocaleDateString('en-GB', { dateStyle: 'medium' })}
                   </span>
                   <span className="text-[12.5px] font-medium">৳{b.totalAmount.toLocaleString()}</span>
@@ -320,7 +320,7 @@ function CompanyDetailModal({ account, onClose, onChanged }: { account: Corporat
                 <div className="mt-3 rounded-[10px] p-3.5 text-[12.5px]" style={{ background: 'var(--rp-surface-3)' }}>
                   <div className="flex justify-between"><span>Subtotal</span><span>৳{selectedTotal.toLocaleString()}</span></div>
                   {account.discountPercent > 0 && (
-                    <div className="flex justify-between text-[#23766a]"><span>Corporate discount ({account.discountPercent}%)</span><span>-৳{discountAmount.toLocaleString()}</span></div>
+                    <div className="flex justify-between text-[#183153]"><span>Corporate discount ({account.discountPercent}%)</span><span>-৳{discountAmount.toLocaleString()}</span></div>
                   )}
                   <div className="flex justify-between mt-1 pt-1 font-semibold" style={{ borderTop: '1px solid rgba(0,0,0,0.08)' }}>
                     <span>Total</span><span>৳{(selectedTotal - discountAmount).toLocaleString()}</span>
@@ -340,19 +340,19 @@ function CompanyDetailModal({ account, onClose, onChanged }: { account: Corporat
         </div>
 
         <div>
-          <h3 className="mb-2 text-[13px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">Invoice History</h3>
+          <h3 className="mb-2 text-[13px] font-semibold text-[#183153] dark:text-[#f8fafc]">Invoice History</h3>
           {invoicesLoading ? (
-            <div className="flex h-16 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin" style={{ color: '#9bbdb7' }} /></div>
+            <div className="flex h-16 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin" style={{ color: '#aac0d0' }} /></div>
           ) : invoices.length === 0 ? (
-            <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">Ekhono kono invoice generate hoyni.</p>
+            <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">Ekhono kono invoice generate hoyni.</p>
           ) : (
             <div className="space-y-1.5">
               {invoices.map((inv) => (
                 <div key={inv.id} className="flex items-center gap-3 rounded-[9px] border px-3.5 py-2.5" style={{ borderColor: 'var(--rp-border)' }}>
-                  <FileText className="h-4 w-4 shrink-0" style={{ color: '#8aa29a' }} />
+                  <FileText className="h-4 w-4 shrink-0" style={{ color: '#64748b' }} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12.5px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{inv.invoiceNumber}</p>
-                    <p className="text-[11px] text-[#8aa29a] dark:text-[#94b8b0]">
+                    <p className="text-[12.5px] font-medium text-[#183153] dark:text-[#f8fafc]">{inv.invoiceNumber}</p>
+                    <p className="text-[11px] text-[#64748b] dark:text-[#a9c1d0]">
                       {inv.bookings.length} booking{inv.bookings.length !== 1 ? 's' : ''} · Due {new Date(inv.dueDate).toLocaleDateString('en-GB', { dateStyle: 'medium' })}
                     </p>
                   </div>

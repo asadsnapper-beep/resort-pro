@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { PLAN_PRICING } from '@resort-pro/types';
 import { adminEndpoints } from '@/lib/admin-api';
 import { useAuthStore } from '@/store/auth';
 import { toast } from '@/hooks/use-toast';
@@ -409,10 +410,10 @@ export default function AdminTenantsPage() {
                   onChange={(e) => setEditPlan(e.target.value)}
                   className="w-full h-10 bg-gray-800 border border-gray-700 rounded-lg px-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 >
-                  <option value="FREE">Free</option>
-                  <option value="STARTER">Starter ($49/mo)</option>
-                  <option value="PROFESSIONAL">Professional ($99/mo)</option>
-                  <option value="ENTERPRISE">Enterprise ($199/mo)</option>
+                  <option value="FREE">{PLAN_PRICING.FREE.displayName}</option>
+                  <option value="STARTER">{PLAN_PRICING.STARTER.displayName} (${PLAN_PRICING.STARTER.monthlyUsd}/mo)</option>
+                  <option value="PROFESSIONAL">{PLAN_PRICING.PROFESSIONAL.displayName} (${PLAN_PRICING.PROFESSIONAL.monthlyUsd}/mo)</option>
+                  <option value="ENTERPRISE">{PLAN_PRICING.ENTERPRISE.displayName} (${PLAN_PRICING.ENTERPRISE.monthlyUsd}/mo)</option>
                 </select>
               </div>
               <div>

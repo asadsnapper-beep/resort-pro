@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { PLAN_PRICING } from '@resort-pro/types';
 import { adminEndpoints } from '@/lib/admin-api';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -52,7 +53,12 @@ type BillingData = {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const planPrices: Record<string, number> = { FREE: 0, STARTER: 49, PROFESSIONAL: 99, ENTERPRISE: 199 };
+const planPrices: Record<string, number> = {
+  FREE: PLAN_PRICING.FREE.monthlyUsd,
+  STARTER: PLAN_PRICING.STARTER.monthlyUsd,
+  PROFESSIONAL: PLAN_PRICING.PROFESSIONAL.monthlyUsd,
+  ENTERPRISE: PLAN_PRICING.ENTERPRISE.monthlyUsd,
+};
 
 const PLAN_COLORS: Record<string, string> = {
   STARTER: '#3b82f6',

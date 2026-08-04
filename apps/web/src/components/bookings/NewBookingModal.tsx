@@ -177,7 +177,7 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
         <form onSubmit={hs1(handleStep1)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-[#94b8b0]">Check-in Date</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-[#a9c1d0]">Check-in Date</label>
               <input
                 {...reg1('checkIn')}
                 type="date"
@@ -196,7 +196,7 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
               {e1.checkIn && <p className="mt-1 text-xs text-red-500">{e1.checkIn.message}</p>}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-[#94b8b0]">Check-out Date</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-[#a9c1d0]">Check-out Date</label>
               <input
                 {...reg1('checkOut')}
                 type="date"
@@ -217,7 +217,7 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-[#94b8b0]">Adults</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-[#a9c1d0]">Adults</label>
               <input
                 {...reg1('adults')}
                 type="number"
@@ -236,7 +236,7 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-[#94b8b0]">Children</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-[#a9c1d0]">Children</label>
               <input
                 {...reg1('children')}
                 type="number"
@@ -593,7 +593,7 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-[#94b8b0]">Special Requests (optional)</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-[#a9c1d0]">Special Requests (optional)</label>
             <textarea
               value={specialRequests}
               onChange={(e) => setSpecialRequests(e.target.value)}

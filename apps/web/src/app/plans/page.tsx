@@ -1,339 +1,391 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Check, ArrowLeft, Zap, Building2, Crown, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ChevronDown, Sparkles } from 'lucide-react';
+import { PLAN_PRICING } from '@resort-pro/types';
 
 const PLANS = [
   {
-    id: 'STARTER',
-    name: 'Starter',
-    icon: Zap,
-    price: 49,
-    currency: '$',
-    period: 'per month',
-    rooms: 'Up to 20 rooms',
-    users: '3 staff accounts',
-    trial: '14-day free trial',
-    highlight: false,
-    badge: null,
-    cta: 'Start free trial',
-    color: '#1a6b5e',
+    id: 'STARTER' as const,
+    eyebrow: 'First 100 resorts',
+    name: PLAN_PRICING.STARTER.displayName,
+    title: 'A confident start for one hands-on property.',
+    price: PLAN_PRICING.STARTER.monthlyUsd,
+    annualPrice: PLAN_PRICING.STARTER.annualUsd,
+    capacity: `1 property · up to ${PLAN_PRICING.STARTER.roomLimit} rooms · ${PLAN_PRICING.STARTER.staffLimit} staff`,
+    badge: 'Founding Resort',
+    featured: true,
+    cta: 'Claim founding access',
     features: [
-      'Room & booking management',
-      'Online check-in / check-out',
-      'bKash & Stripe payments',
-      'Guest CRM & history',
-      'Restaurant & room service',
-      'Public website (3 themes)',
-      'Embed booking widgets',
-      'SMS & WhatsApp notifications',
-      'Basic analytics & reports',
-      '24/7 email support',
+      'Bookings, check-in and check-out',
+      'Guest CRM, payments and invoices',
+      'Restaurant and room-service workflow',
+      'Direct booking website and widgets',
+      'Full operational toolkit for 12 months',
+      'Email support from a real team',
     ],
   },
   {
-    id: 'PROFESSIONAL',
-    name: 'Professional',
-    icon: Crown,
-    price: 99,
-    currency: '$',
-    period: 'per month',
-    rooms: 'Up to 100 rooms',
-    users: '10 staff accounts',
-    trial: '14-day free trial',
-    highlight: true,
-    badge: 'Most Popular',
-    cta: 'Start free trial',
-    color: '#d4a853',
+    id: 'PROFESSIONAL' as const,
+    eyebrow: 'For growing teams',
+    name: PLAN_PRICING.PROFESSIONAL.displayName,
+    title: 'More rooms, more people and deeper oversight.',
+    price: PLAN_PRICING.PROFESSIONAL.monthlyUsd,
+    annualPrice: PLAN_PRICING.PROFESSIONAL.annualUsd,
+    capacity: `1 property · up to ${PLAN_PRICING.PROFESSIONAL.roomLimit} rooms · ${PLAN_PRICING.PROFESSIONAL.staffLimit} staff`,
+    badge: null,
+    featured: false,
+    cta: 'Start with Growing',
     features: [
-      'Everything in Starter',
-      'Advanced analytics & reports',
-      'Rate plans & channel sync',
-      'Loyalty program',
-      'Custom domain (yourresort.com)',
-      'Inventory management',
-      'Maintenance tracking',
-      'Group bookings',
-      'Housekeeping module',
+      'Everything in Small Resort',
+      'Advanced reports and rate plans',
+      'Loyalty, inventory and maintenance',
+      'Group bookings and housekeeping',
+      'Custom domain for direct bookings',
       'Priority support',
     ],
   },
   {
-    id: 'ENTERPRISE',
-    name: 'Enterprise',
-    icon: Building2,
-    price: null,
-    currency: '',
-    period: 'custom pricing',
-    rooms: 'Unlimited rooms',
-    users: 'Unlimited users',
-    trial: null,
-    highlight: false,
+    id: 'ENTERPRISE' as const,
+    eyebrow: 'For resort groups',
+    name: PLAN_PRICING.ENTERPRISE.displayName,
+    title: 'One operating view across your portfolio.',
+    price: PLAN_PRICING.ENTERPRISE.monthlyUsd,
+    annualPrice: PLAN_PRICING.ENTERPRISE.annualUsd,
+    capacity: `Up to ${PLAN_PRICING.ENTERPRISE.propertyLimit} properties · ${PLAN_PRICING.ENTERPRISE.roomLimit} rooms · ${PLAN_PRICING.ENTERPRISE.staffLimit} staff`,
     badge: null,
-    cta: 'Contact sales',
-    color: '#6366f1',
+    featured: false,
+    cta: 'Start with Resort Group',
     features: [
-      'Everything in Professional',
-      'White-label branding',
-      'SSO & SAML authentication',
-      'Dedicated account manager',
-      'SLA guarantee',
-      'Custom integrations',
-      'On-premise deployment option',
-      'Training & onboarding',
-      'Quarterly business reviews',
-      'Custom contract & billing',
+      'Everything in Growing Resort',
+      'Multi-property reporting',
+      'Revenue intelligence dashboard',
+      'Advanced AI allowance',
+      'Onboarding assistance',
+      'Priority support',
     ],
   },
 ];
 
 const COMPARE_ROWS = [
-  { label: 'Rooms',                  starter: 'Up to 20',     pro: 'Up to 100',     ent: 'Unlimited'  },
-  { label: 'Staff accounts',         starter: '3',            pro: '10',            ent: 'Unlimited'  },
-  { label: 'Booking management',     starter: true,           pro: true,            ent: true         },
-  { label: 'Online payments',        starter: true,           pro: true,            ent: true         },
-  { label: 'Guest CRM',              starter: true,           pro: true,            ent: true         },
-  { label: 'Restaurant module',      starter: true,           pro: true,            ent: true         },
-  { label: 'SMS & WhatsApp',         starter: true,           pro: true,            ent: true         },
-  { label: 'Public website',         starter: '3 themes',     pro: '3 themes',      ent: 'Custom'     },
-  { label: 'Advanced analytics',     starter: false,          pro: true,            ent: true         },
-  { label: 'Custom domain',          starter: false,          pro: true,            ent: true         },
-  { label: 'Loyalty program',        starter: false,          pro: true,            ent: true         },
-  { label: 'White-label branding',   starter: false,          pro: false,           ent: true         },
-  { label: 'SSO / SAML',            starter: false,          pro: false,           ent: true         },
-  { label: 'Dedicated support',      starter: false,          pro: false,           ent: true         },
+  {
+    label: 'Properties',
+    starter: '1',
+    pro: '1',
+    group: `Up to ${PLAN_PRICING.ENTERPRISE.propertyLimit}`,
+  },
+  {
+    label: 'Rooms',
+    starter: `Up to ${PLAN_PRICING.STARTER.roomLimit}`,
+    pro: `Up to ${PLAN_PRICING.PROFESSIONAL.roomLimit}`,
+    group: `Up to ${PLAN_PRICING.ENTERPRISE.roomLimit}`,
+  },
+  {
+    label: 'Staff accounts',
+    starter: `${PLAN_PRICING.STARTER.staffLimit}`,
+    pro: `${PLAN_PRICING.PROFESSIONAL.staffLimit}`,
+    group: `${PLAN_PRICING.ENTERPRISE.staffLimit}`,
+  },
+  { label: 'Booking, guests and payments', starter: true, pro: true, group: true },
+  { label: 'Restaurant and room service', starter: true, pro: true, group: true },
+  { label: 'Direct booking website', starter: true, pro: true, group: true },
+  { label: 'SMS and WhatsApp notifications', starter: true, pro: true, group: true },
+  { label: 'Advanced analytics and reports', starter: false, pro: true, group: true },
+  { label: 'Custom domain and loyalty', starter: false, pro: true, group: true },
+  { label: 'Multi-property reporting', starter: false, pro: false, group: true },
+  { label: 'Revenue intelligence', starter: false, pro: false, group: true },
 ];
+
+function BrandMark() {
+  return (
+    <span className="relative block h-7 w-7 overflow-hidden bg-white">
+      <Image
+        src="/brand/resortpro-logo-concept-v2.png"
+        alt="ResortPro"
+        fill
+        sizes="28px"
+        className="translate-y-[5px] scale-[1.8] object-cover mix-blend-multiply"
+      />
+    </span>
+  );
+}
+
+function Price({ plan, billing }: { plan: (typeof PLANS)[number]; billing: 'monthly' | 'annual' }) {
+  const price = billing === 'annual' ? plan.annualPrice : plan.price;
+
+  return (
+    <div className="flex items-end gap-2">
+      <span className="font-display text-5xl font-semibold tracking-[-0.06em] text-[#183153]">
+        ${price}
+      </span>
+      <span className="mb-1.5 text-sm font-bold text-[#64748b]">
+        {billing === 'annual' ? '/ year' : '/ month'}
+      </span>
+    </div>
+  );
+}
 
 export default function PlansPage() {
   const router = useRouter();
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
   const [showCompare, setShowCompare] = useState(false);
 
-  const discount = billing === 'annual' ? 0.8 : 1;
-
-  function handleSelect(plan: typeof PLANS[number]) {
-    if (plan.id === 'ENTERPRISE') {
-      router.push('/contact');
-    } else {
-      router.push(`/auth/register?plan=${plan.id}`);
-    }
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50">
-
-      {/* ── Nav ──────────────────────────────────────────────────── */}
-      <nav className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-lg bg-resort-700 flex items-center justify-center text-white font-bold text-sm">R</div>
-            <span className="font-bold text-gray-900 text-lg">ResortPro</span>
+    <main className="min-h-screen overflow-hidden bg-white text-[#183153]">
+      <header className="border-b-2 border-[#183153] bg-white">
+        <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-5 sm:px-8">
+          <Link href="/" className="flex items-center gap-2.5" aria-label="ResortPro home">
+            <BrandMark />
+            <span className="font-display text-xl font-semibold tracking-[-0.045em]">
+              ResortPro
+            </span>
           </Link>
-          <Link href="/auth/login" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
-            Already have an account? <span className="font-semibold text-resort-700">Sign in</span>
-          </Link>
-        </div>
-      </nav>
-
-      <div className="max-w-7xl mx-auto px-6 py-16">
-
-        {/* ── Header ───────────────────────────────────────────────── */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-resort-50 border border-resort-200 text-resort-700 text-sm font-medium mb-6">
-            <Sparkles className="h-3.5 w-3.5" />
-            14-day free trial on all paid plans · No credit card required
+          <div className="flex items-center gap-3 text-sm font-bold">
+            <Link
+              href="/auth/login"
+              className="hidden text-[#475569] transition-colors hover:text-[#ef725c] sm:block"
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/try"
+              className="border-2 border-[#183153] bg-[#183153] px-4 py-2 text-white transition-colors hover:border-[#ef725c] hover:bg-[#ef725c]"
+            >
+              Try the demo
+            </Link>
           </div>
-          <h1 className="text-5xl font-bold text-gray-900 mb-4 tracking-tight">Choose your plan</h1>
-          <p className="text-xl text-gray-500 max-w-2xl mx-auto">
-            Start free, scale as you grow. Every plan includes full access during the trial.
-          </p>
+        </div>
+      </header>
 
-          {/* Billing toggle */}
-          <div className="flex items-center justify-center gap-3 mt-8">
+      <section className="relative border-b-2 border-[#183153] bg-[#fff1ea]">
+        <div className="pointer-events-none absolute inset-0 opacity-30 [background-image:linear-gradient(#183153_1px,transparent_1px),linear-gradient(90deg,#183153_1px,transparent_1px)] [background-size:48px_48px]" />
+        <div className="relative mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[1fr_330px] lg:items-end lg:py-20">
+          <div>
+            <p className="font-bitcount mb-5 text-[11px] font-medium uppercase tracking-[0.18em] text-[#b2402c]">
+              Simple prices. Serious operations.
+            </p>
+            <h1 className="font-display max-w-3xl text-5xl font-semibold leading-[0.94] tracking-[-0.065em] text-[#183153] sm:text-6xl lg:text-7xl">
+              Pick the plan that matches your next season.
+            </h1>
+            <p className="mt-6 max-w-2xl text-lg leading-8 text-[#475569]">
+              One workspace for bookings, guests, staff and direct revenue. Start small without
+              buying a smaller version of your business.
+            </p>
+          </div>
+          <aside className="border-2 border-[#183153] bg-white p-5 shadow-[8px_8px_0_#183153]">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center bg-[#ef725c] text-white">
+                <Sparkles className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="font-bitcount text-[10px] font-medium uppercase tracking-[0.14em] text-[#b2402c]">
+                  Founding offer
+                </p>
+                <p className="mt-1 text-sm font-extrabold leading-5 text-[#183153]">
+                  First 100 verified resorts get 3 months free.
+                </p>
+              </div>
+            </div>
+            <p className="mt-4 border-t border-[#d9e4ea] pt-4 text-xs leading-5 text-[#64748b]">
+              Your $20 starting price and full operational toolkit are protected for your first 12
+              months.
+            </p>
+          </aside>
+        </div>
+      </section>
+
+      <section className="border-b-2 border-[#183153] bg-white">
+        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-7 sm:px-8 md:flex-row md:items-center md:justify-between">
+          <p className="text-sm font-bold text-[#475569]">
+            No setup fee. No credit card to start. Cancel whenever your season changes.
+          </p>
+          <div className="flex w-fit border-2 border-[#183153] bg-white p-1 text-sm font-extrabold">
             <button
+              type="button"
               onClick={() => setBilling('monthly')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                billing === 'monthly'
-                  ? 'bg-white shadow-sm text-gray-900 border border-gray-200'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}>
+              className={`px-4 py-2 transition-colors ${billing === 'monthly' ? 'bg-[#183153] text-white' : 'text-[#64748b] hover:text-[#183153]'}`}
+            >
               Monthly
             </button>
             <button
+              type="button"
               onClick={() => setBilling('annual')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                billing === 'annual'
-                  ? 'bg-white shadow-sm text-gray-900 border border-gray-200'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}>
-              Annual
-              <span className="text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">Save 20%</span>
+              className={`px-4 py-2 transition-colors ${billing === 'annual' ? 'bg-[#183153] text-white' : 'text-[#64748b] hover:text-[#183153]'}`}
+            >
+              Annual <span className="ml-1 text-[#ef725c]">2 months free</span>
             </button>
           </div>
         </div>
+      </section>
 
-        {/* ── Plan Cards ──────────────────────────────────────────── */}
-        <div className="grid md:grid-cols-3 gap-6 mb-16">
-          {PLANS.map(plan => {
-            const Icon = plan.icon;
-            const monthlyPrice = plan.price ? Math.round(plan.price * discount) : null;
-
-            return (
-              <div
-                key={plan.id}
-                className={`relative rounded-3xl flex flex-col transition-all duration-200 ${
-                  plan.highlight
-                    ? 'bg-resort-900 text-white shadow-2xl scale-105 ring-2 ring-gold-400'
-                    : 'bg-white text-gray-900 shadow-sm border border-gray-200 hover:shadow-md'
-                }`}>
-
-                {/* Badge */}
-                {plan.badge && (
-                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                    <span className="px-4 py-1 rounded-full text-xs font-bold bg-gold-500 text-resort-900 shadow-lg">
-                      {plan.badge}
-                    </span>
-                  </div>
-                )}
-
-                <div className="p-8 flex flex-col flex-1">
-
-                  {/* Plan name & icon */}
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${
-                      plan.highlight ? 'bg-white/10' : 'bg-gray-100'
-                    }`}>
-                      <Icon className="h-5 w-5" style={{ color: plan.highlight ? '#d4a853' : plan.color }} />
-                    </div>
-                    <div>
-                      <h3 className={`font-bold text-lg ${plan.highlight ? 'text-white' : 'text-gray-900'}`}>
-                        {plan.name}
-                      </h3>
-                      <p className={`text-xs ${plan.highlight ? 'text-white/50' : 'text-gray-400'}`}>
-                        {plan.rooms} · {plan.users}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Price */}
-                  <div className="mb-6">
-                    {monthlyPrice ? (
-                      <div className="flex items-end gap-1">
-                        <span className={`text-4xl font-bold tracking-tight ${plan.highlight ? 'text-white' : 'text-gray-900'}`}>
-                          {plan.currency}{monthlyPrice}
-                        </span>
-                        <span className={`text-sm pb-1.5 ${plan.highlight ? 'text-white/60' : 'text-gray-400'}`}>
-                          /mo{billing === 'annual' ? ' · billed annually' : ''}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="text-3xl font-bold text-gray-900">Custom</div>
-                    )}
-                    {plan.trial && (
-                      <p className={`text-xs mt-1.5 font-medium ${
-                        plan.highlight ? 'text-gold-400' : 'text-resort-600'
-                      }`}>
-                        ✦ {plan.trial} — no credit card required
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Features */}
-                  <ul className="space-y-3 flex-1 mb-8">
-                    {plan.features.map(f => (
-                      <li key={f} className="flex items-start gap-2.5">
-                        <Check className={`h-4 w-4 mt-0.5 flex-shrink-0 ${
-                          plan.highlight ? 'text-gold-400' : 'text-resort-600'
-                        }`} />
-                        <span className={`text-sm ${plan.highlight ? 'text-white/80' : 'text-gray-600'}`}>
-                          {f}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  {/* CTA */}
-                  <button
-                    onClick={() => handleSelect(plan)}
-                    className={`w-full py-3.5 rounded-xl font-semibold text-sm transition-all duration-200 ${
-                      plan.highlight
-                        ? 'bg-gold-500 text-resort-900 hover:bg-gold-400 shadow-lg hover:shadow-xl hover:-translate-y-0.5'
-                        : plan.id === 'ENTERPRISE'
-                          ? 'bg-gray-900 text-white hover:bg-gray-800'
-                          : 'bg-resort-700 text-white hover:bg-resort-600'
-                    }`}>
-                    {plan.cta}
-                  </button>
-                </div>
+      <section className="mx-auto max-w-7xl px-5 py-14 sm:px-8 sm:py-20">
+        <div className="grid border-l-2 border-t-2 border-[#183153] lg:grid-cols-3">
+          {PLANS.map((plan) => (
+            <article
+              key={plan.id}
+              className={`relative flex min-w-0 flex-col border-b-2 border-r-2 border-[#183153] p-6 sm:p-8 ${plan.featured ? 'bg-[#e5f0f7]' : plan.id === 'ENTERPRISE' ? 'bg-[#fff1ea]' : 'bg-white'}`}
+            >
+              {plan.badge && (
+                <span className="font-bitcount absolute right-0 top-0 bg-[#ef725c] px-3 py-2 text-[10px] font-medium uppercase tracking-[0.13em] text-white">
+                  {plan.badge}
+                </span>
+              )}
+              <p className="font-bitcount text-[10px] font-medium uppercase tracking-[0.15em] text-[#b2402c]">
+                {plan.eyebrow}
+              </p>
+              <h2 className="font-display mt-3 text-3xl font-semibold tracking-[-0.055em] text-[#183153]">
+                {plan.name}
+              </h2>
+              <p className="mt-3 min-h-12 text-sm leading-6 text-[#475569]">{plan.title}</p>
+              <div className="mt-7 border-y-2 border-[#183153] py-5">
+                <Price plan={plan} billing={billing} />
               </div>
-            );
-          })}
+              <p className="mt-4 text-xs font-bold uppercase tracking-[0.06em] text-[#64748b]">
+                {plan.capacity}
+              </p>
+              <ul className="mt-7 flex flex-1 flex-col gap-3">
+                {plan.features.map((feature) => (
+                  <li key={feature} className="flex gap-2.5 text-sm leading-5 text-[#475569]">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#ef725c]" strokeWidth={3} />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                onClick={() => router.push(`/auth/register?plan=${plan.id}`)}
+                className={`mt-8 flex w-full items-center justify-center gap-2 border-2 border-[#183153] px-4 py-3.5 text-sm font-extrabold transition-colors ${plan.featured ? 'bg-[#183153] text-white hover:border-[#ef725c] hover:bg-[#ef725c]' : 'bg-white text-[#183153] hover:bg-[#183153] hover:text-white'}`}
+              >
+                {plan.cta}
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </article>
+          ))}
         </div>
+        <p className="mt-6 text-center text-sm leading-6 text-[#64748b]">
+          Have more than {PLAN_PRICING.ENTERPRISE.propertyLimit} properties, need SSO, or want
+          white-label support?{' '}
+          <Link
+            href="/contact"
+            className="font-extrabold text-[#b2402c] underline decoration-2 underline-offset-4"
+          >
+            Talk to us
+          </Link>
+          .
+        </p>
+      </section>
 
-        {/* ── Compare table toggle ─────────────────────────────────── */}
-        <div className="text-center mb-6">
-          <button
-            onClick={() => setShowCompare(!showCompare)}
-            className="text-sm font-medium text-resort-700 hover:text-resort-900 underline underline-offset-4 transition-colors">
-            {showCompare ? 'Hide' : 'Show'} full comparison table
-          </button>
+      <section className="border-y-2 border-[#183153] bg-[#183153] text-white">
+        <div className="mx-auto grid max-w-7xl gap-8 px-5 py-12 sm:px-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
+          <div>
+            <p className="font-bitcount text-[10px] font-medium uppercase tracking-[0.16em] text-[#f4c76b]">
+              Built for the day-to-day
+            </p>
+            <h2 className="font-display mt-3 text-4xl font-semibold leading-none tracking-[-0.055em]">
+              Your booking desk, front office and restaurant finally agree.
+            </h2>
+          </div>
+          <div className="grid grid-cols-2 border-l border-white/25 sm:grid-cols-4">
+            {[
+              ['3 months', 'free for founding resorts'],
+              ['1 place', 'for every guest detail'],
+              ['0%', 'setup fee'],
+              ['24/7', 'your operations stay visible'],
+            ].map(([number, label]) => (
+              <div
+                key={number}
+                className="border-b border-r border-t border-white/25 px-4 py-5 sm:border-t-0"
+              >
+                <p className="font-display text-3xl font-semibold tracking-[-0.05em] text-[#f4c76b]">
+                  {number}
+                </p>
+                <p className="mt-2 text-xs leading-5 text-white/60">{label}</p>
+              </div>
+            ))}
+          </div>
         </div>
+      </section>
 
+      <section className="mx-auto max-w-7xl px-5 py-14 sm:px-8 sm:py-20">
+        <button
+          type="button"
+          onClick={() => setShowCompare((value) => !value)}
+          className="flex w-full items-center justify-between border-2 border-[#183153] bg-white px-5 py-5 text-left transition-colors hover:bg-[#e5f0f7]"
+        >
+          <span>
+            <span className="font-bitcount block text-[10px] font-medium uppercase tracking-[0.15em] text-[#b2402c]">
+              No hidden tiers
+            </span>
+            <span className="font-display mt-1 block text-2xl font-semibold tracking-[-0.045em]">
+              Compare every plan in detail
+            </span>
+          </span>
+          <ChevronDown
+            className={`h-5 w-5 shrink-0 transition-transform ${showCompare ? 'rotate-180' : ''}`}
+          />
+        </button>
         {showCompare && (
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-16">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left p-5 font-semibold text-gray-900 w-2/5">Features</th>
-                  <th className="p-5 text-center font-semibold text-gray-700">Starter</th>
-                  <th className="p-5 text-center font-semibold text-white bg-resort-800">Professional</th>
-                  <th className="p-5 text-center font-semibold text-gray-700">Enterprise</th>
+          <div className="overflow-x-auto border-b-2 border-l-2 border-r-2 border-[#183153]">
+            <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+              <thead className="bg-[#e5f0f7]">
+                <tr>
+                  <th className="font-bitcount border-r border-[#183153] px-5 py-4 text-[10px] font-medium uppercase tracking-[0.13em]">
+                    Included
+                  </th>
+                  <th className="border-r border-[#183153] px-5 py-4 font-bold">Small Resort</th>
+                  <th className="border-r border-[#183153] px-5 py-4 font-bold">Growing Resort</th>
+                  <th className="px-5 py-4 font-bold">Resort Group</th>
                 </tr>
               </thead>
               <tbody>
-                {COMPARE_ROWS.map((row, i) => (
-                  <tr key={row.label} className={i % 2 === 0 ? 'bg-gray-50/50' : 'bg-white'}>
-                    <td className="p-4 pl-5 text-gray-700 font-medium">{row.label}</td>
-                    {(['starter', 'pro', 'ent'] as const).map((col, ci) => {
-                      const val = row[col];
-                      return (
-                        <td key={col} className={`p-4 text-center ${ci === 1 ? 'bg-resort-50' : ''}`}>
-                          {val === true ? (
-                            <Check className="h-4 w-4 text-resort-600 mx-auto" />
-                          ) : val === false ? (
-                            <span className="text-gray-300 text-lg">—</span>
-                          ) : (
-                            <span className="text-gray-700 text-xs font-medium">{val as string}</span>
-                          )}
-                        </td>
-                      );
-                    })}
+                {COMPARE_ROWS.map((row) => (
+                  <tr key={row.label} className="border-t border-[#183153]">
+                    <td className="border-r border-[#183153] px-5 py-4 font-bold text-[#475569]">
+                      {row.label}
+                    </td>
+                    {(['starter', 'pro', 'group'] as const).map((tier) => (
+                      <td
+                        key={tier}
+                        className="border-r border-[#183153] px-5 py-4 last:border-r-0"
+                      >
+                        {row[tier] === true ? (
+                          <Check className="h-4 w-4 text-[#ef725c]" strokeWidth={3} />
+                        ) : row[tier] === false ? (
+                          <span className="text-[#94a3b8]">—</span>
+                        ) : (
+                          <span className="text-[#475569]">{row[tier]}</span>
+                        )}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
+      </section>
 
-        {/* ── Trust badges ─────────────────────────────────────────── */}
-        <div className="flex flex-wrap items-center justify-center gap-8 text-sm text-gray-400 py-8 border-t border-gray-200">
-          <span>✓ Cancel anytime</span>
-          <span>✓ No setup fees</span>
-          <span>✓ Data export included</span>
-          <span>✓ GDPR compliant</span>
-          <span>✓ 99.9% uptime SLA</span>
-        </div>
-
-        {/* ── Back link ─────────────────────────────────────────────── */}
-        <div className="text-center">
-          <Link href="/" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-700 transition-colors">
+      <footer className="border-t-2 border-[#183153] bg-[#fff1ea]">
+        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-8 sm:px-8 md:flex-row md:items-center md:justify-between">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-sm font-extrabold text-[#183153] hover:text-[#ef725c]"
+          >
             <ArrowLeft className="h-4 w-4" />
             Back to home
           </Link>
+          <p className="text-xs text-[#64748b]">
+            Questions before you choose?{' '}
+            <Link href="/try" className="font-bold text-[#b2402c] underline underline-offset-4">
+              Explore a live role demo
+            </Link>
+            .
+          </p>
         </div>
-      </div>
-    </div>
+      </footer>
+    </main>
   );
 }

@@ -79,18 +79,18 @@ interface TrainingSession {
 const DEPARTMENTS = ['', 'FRONT_DESK', 'HOUSEKEEPING', 'RESTAURANT', 'MAINTENANCE', 'SECURITY', 'MANAGEMENT'] as const;
 
 const DEPT_META: Record<string, { bg: string; border: string; text: string }> = {
-  FRONT_DESK:   { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a' },
-  HOUSEKEEPING: { bg: 'var(--rp-teal-soft)', border: 'rgba(35,118,106,0.15)', text: 'var(--rp-text-accent)' },
+  FRONT_DESK:   { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153' },
+  HOUSEKEEPING: { bg: 'var(--rp-teal-soft)', border: 'rgba(24,49,83,0.15)', text: 'var(--rp-text-accent)' },
   RESTAURANT:   { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a' },
   MAINTENANCE:  { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
   SECURITY:     { bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)', text: '#c43c3c' },
-  MANAGEMENT:   { bg: '#1b342f', border: 'rgba(27,52,47,0.4)',    text: '#dfd9d0' },
+  MANAGEMENT:   { bg: '#183153', border: 'rgba(24,49,83,0.4)',    text: '#f8fafc' },
 };
 
 const ROLE_META: Record<string, { bg: string; border: string; text: string }> = {
   OWNER:        { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
-  MANAGER:      { bg: '#1b342f', border: 'rgba(27,52,47,0.4)',    text: '#dfd9d0' },
-  RECEPTIONIST: { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)', text: '#23766a' },
+  MANAGER:      { bg: '#183153', border: 'rgba(24,49,83,0.4)',    text: '#f8fafc' },
+  RECEPTIONIST: { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)', text: '#183153' },
   CHEF:         { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a' },
   MARKETER:     { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.15)', text: '#b8724a' },
   DEVELOPER:    { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-subtle)' },
@@ -105,22 +105,22 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const ATTENDANCE_STATUS_META: Record<string, { bg: string; text: string }> = {
-  PRESENT:  { bg: 'var(--rp-teal-bg)', text: '#23766a' },
+  PRESENT:  { bg: 'var(--rp-teal-bg)', text: '#183153' },
   LATE:     { bg: 'var(--rp-amber-bg)', text: '#b89040' },
   ABSENT:   { bg: 'var(--rp-red-bg)', text: '#c43c3c' },
   ON_LEAVE: { bg: 'var(--rp-surface-3)', text: 'var(--rp-text-muted)' },
 };
 
 const ADJ_META: Record<string, { bg: string; text: string }> = {
-  RAISE:      { bg: 'var(--rp-teal-bg)', text: '#23766a' },
+  RAISE:      { bg: 'var(--rp-teal-bg)', text: '#183153' },
   BONUS:      { bg: 'var(--rp-amber-bg)', text: '#b89040' },
   DEDUCTION:  { bg: 'var(--rp-red-bg)', text: '#c43c3c' },
 };
 
 function formatDept(d: string) { return d.replace(/_/g, ' '); }
 
-const selectCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[8px] text-[13px] text-[#18231f] focus:outline-none focus:ring-1 focus:ring-resort-600/20';
-const labelCls  = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+const selectCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[8px] text-[13px] text-[#183153] focus:outline-none focus:ring-1 focus:ring-resort-600/20';
+const labelCls  = 'block text-[11.5px] font-medium text-[#64748b] mb-1.5';
 
 // ── Directory Tab (existing feature, unchanged) ──────────────────────────────
 function DirectoryTab() {
@@ -220,7 +220,7 @@ function DirectoryTab() {
 
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Total Staff',     value: total || 0,                        Icon: Users,     iconBg: 'var(--rp-teal-bg)', iconColor: '#23766a' },
+          { label: 'Total Staff',     value: total || 0,                        Icon: Users,     iconBg: 'var(--rp-teal-bg)', iconColor: '#183153' },
           { label: 'Pending Invites', value: pendingInvites.length,             Icon: Clock,     iconBg: 'var(--rp-amber-bg)', iconColor: '#b89040' },
           { label: 'Departments',     value: DEPARTMENTS.filter(Boolean).length, Icon: Building2, iconBg: 'var(--rp-surface-3)', iconColor: 'var(--rp-text-subtle)' },
         ].map(({ label, value, Icon, iconBg, iconColor }) => (
@@ -231,9 +231,9 @@ function DirectoryTab() {
                 style={{ background: iconBg }}>
                 <Icon className="h-[16px] w-[16px]" style={{ color: iconColor }} />
               </div>
-              <p className="text-[12.5px] font-medium text-[#8aa29a] dark:text-[#94b8b0]">{label}</p>
+              <p className="text-[12.5px] font-medium text-[#64748b] dark:text-[#a9c1d0]">{label}</p>
             </div>
-            <p className="text-[26px] font-semibold leading-none text-[#18231f] dark:text-[#dfd9d0]">{value}</p>
+            <p className="text-[26px] font-semibold leading-none text-[#183153] dark:text-[#f8fafc]">{value}</p>
           </div>
         ))}
       </div>
@@ -262,13 +262,13 @@ function DirectoryTab() {
                       <Clock className="h-3.5 w-3.5" style={{ color: '#b89040' }} />
                     </div>
                     <div>
-                      <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{inv.email}</p>
+                      <p className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{inv.email}</p>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <span className="rounded-[6px] border px-[7px] py-[2px] text-[10.5px] font-semibold"
                           style={{ background: rm.bg, borderColor: rm.border, color: rm.text }}>
                           {ROLE_LABELS[inv.role] ?? inv.role}
                         </span>
-                        <span className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+                        <span className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">
                           Sent {formatDate(inv.createdAt)} · Expires {new Date(inv.expiresAt).toLocaleDateString()}
                         </span>
                       </div>
@@ -276,7 +276,7 @@ function DirectoryTab() {
                   </div>
                   <button onClick={() => cancelInviteMutation.mutate(inv.id)}
                     disabled={cancelInviteMutation.isPending}
-                    className="flex h-[26px] w-[26px] items-center justify-center rounded-full transition-colors hover:bg-[#fef2f2] disabled:opacity-50 text-[#c5bdb4] dark:text-[#6e8580]">
+                    className="flex h-[26px] w-[26px] items-center justify-center rounded-full transition-colors hover:bg-[#fef2f2] disabled:opacity-50 text-[#94a3b8] dark:text-[#7f99ab]">
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -288,12 +288,12 @@ function DirectoryTab() {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative max-w-sm flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: '#9bbdb7' }} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: '#aac0d0' }} />
           <input
             value={searchInput}
             onChange={e => { setSearchInput(e.target.value); setPage(1); }}
             placeholder="Search by name, email, or position…"
-            className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-[9px] pl-9 pr-3 text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30"
+            className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-[9px] pl-9 pr-3 text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30"
           />
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -321,12 +321,12 @@ function DirectoryTab() {
         ) : staff.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'var(--rp-teal-bg)' }}>
-              <Users className="h-7 w-7" style={{ color: '#23766a' }} />
+              <Users className="h-7 w-7" style={{ color: '#183153' }} />
             </div>
-            <p className="text-[13.5px] font-medium text-[#18231f] dark:text-[#dfd9d0]">
+            <p className="text-[13.5px] font-medium text-[#183153] dark:text-[#f8fafc]">
               {searchInput || deptFilter ? 'No staff found' : 'No staff yet'}
             </p>
-            <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+            <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">
               {searchInput || deptFilter ? 'Try adjusting your filters' : 'Add your first team member to get started'}
             </p>
             {!searchInput && !deptFilter && (
@@ -365,17 +365,17 @@ function DirectoryTab() {
                         <div className="flex items-center gap-3">
                           <div className="relative shrink-0">
                             <div className="flex h-9 w-9 items-center justify-center rounded-full text-[13px] font-bold"
-                              style={{ background: 'var(--rp-teal-bg)', color: '#23766a' }}>
+                              style={{ background: 'var(--rp-teal-bg)', color: '#183153' }}>
                               {getInitials(s.user.firstName, s.user.lastName)}
                             </div>
                             <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white"
                               style={{ background: s.isActive ? '#4ade80' : 'var(--rp-text-faint)' }} />
                           </div>
                           <div>
-                            <p className="text-[13px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">
+                            <p className="text-[13px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                               {s.user.firstName} {s.user.lastName}
                             </p>
-                            <p className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">{s.user.email}</p>
+                            <p className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">{s.user.email}</p>
                           </div>
                         </div>
                       </td>
@@ -385,30 +385,30 @@ function DirectoryTab() {
                           {formatDept(s.department)}
                         </span>
                       </td>
-                      <td className="px-5 py-4 text-[13px] text-[#4a6e66] dark:text-[#6d9990]">{s.position}</td>
+                      <td className="px-5 py-4 text-[13px] text-[#475569] dark:text-[#9db4c4]">{s.position}</td>
                       <td className="px-5 py-4 hidden md:table-cell">
                         {hasAccess ? (
                           <div className="flex items-center gap-1.5">
-                            <Monitor className="h-3.5 w-3.5" style={{ color: '#9bbdb7' }} />
+                            <Monitor className="h-3.5 w-3.5" style={{ color: '#aac0d0' }} />
                             <span className="rounded-[6px] border px-[7px] py-[2px] text-[11px] font-semibold"
                               style={{ background: rm.bg, borderColor: rm.border, color: rm.text }}>
                               {ROLE_LABELS[s.user.role ?? ''] ?? s.user.role}
                             </span>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-1.5 text-[#c5bdb4] dark:text-[#6e8580]">
+                          <div className="flex items-center gap-1.5 text-[#94a3b8] dark:text-[#7f99ab]">
                             <ShieldOff className="h-3.5 w-3.5" />
                             <span className="text-[12px]">No access</span>
                           </div>
                         )}
                       </td>
-                      <td className="px-5 py-4 text-[12.5px] hidden lg:table-cell text-[#8aa29a] dark:text-[#94b8b0]">
+                      <td className="px-5 py-4 text-[12.5px] hidden lg:table-cell text-[#64748b] dark:text-[#a9c1d0]">
                         {formatDate(s.hireDate)}
                       </td>
                       <td className="px-5 py-4">
                         <span className="rounded-[7px] border px-[9px] py-[3px] text-[11.5px] font-semibold"
                           style={s.isActive
-                            ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }
+                            ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }
                             : { background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-muted)' }}>
                           {s.isActive ? 'Active' : 'Inactive'}
                         </span>
@@ -424,7 +424,7 @@ function DirectoryTab() {
 
       {pagination && pagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+          <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">
             Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} of {total}
           </p>
           <div className="flex gap-2">
@@ -523,7 +523,7 @@ function DesktopDeviceConfig({ deviceKey }: { deviceKey: string }) {
   };
 
   return (
-    <div className="rounded-[10px] border p-3 space-y-3" style={{ borderColor: 'rgba(35,118,106,0.2)', background: 'var(--rp-teal-soft)' }}>
+    <div className="rounded-[10px] border p-3 space-y-3" style={{ borderColor: 'rgba(24,49,83,0.2)', background: 'var(--rp-teal-soft)' }}>
       <p className="text-[12.5px] font-medium" style={{ color: 'var(--rp-text)' }}>Connect this PC directly to the device</p>
       <div className="grid grid-cols-2 gap-2">
         <input value={ip} onChange={e => setIp(e.target.value)} placeholder="Device IP e.g. 192.168.1.50" className={selectCls} />
@@ -559,7 +559,7 @@ function DeviceKeyModal({ open, onClose }: { open: boolean; onClose: () => void 
     <ModalShell open={open} onClose={onClose} title="Fingerprint Device Setup" description="For a bridge script or the ResortPro Desktop app" maxWidth="560px"
       footer={<div className="flex justify-end"><button onClick={onClose} className="rounded-[9px] border px-4 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>Close</button></div>}>
       {isLoading ? (
-        <div className="flex h-24 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" style={{ color: '#9bbdb7' }} /></div>
+        <div className="flex h-24 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" style={{ color: '#aac0d0' }} /></div>
       ) : (
         <div className="space-y-4">
           {isDesktopApp && <DesktopDeviceConfig deviceKey={deviceKey} />}
@@ -693,7 +693,7 @@ function AttendanceTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <input type="date" value={date} onChange={e => setDate(e.target.value)}
-          className="rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[8px] text-[13px] text-[#18231f]" />
+          className="rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[8px] text-[13px] text-[#183153]" />
         <div className="flex items-center gap-2">
           <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleImportFile} />
           <button onClick={() => setDeviceKeyOpen(true)} className="flex items-center gap-2 rounded-[9px] border px-3 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
@@ -711,14 +711,14 @@ function AttendanceTab() {
           <div className="h-32 animate-pulse" style={{ background: 'var(--rp-surface-2)' }} />
         ) : allStaff.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
-            <Fingerprint className="h-10 w-10" style={{ color: '#c5bdb4' }} />
-            <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No staff yet</p>
+            <Fingerprint className="h-10 w-10" style={{ color: '#94a3b8' }} />
+            <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">No staff yet</p>
           </div>
         ) : (
           <table className="w-full">
             <thead>
               <tr style={{ background: 'var(--rp-surface-2)' }}>
-                {['Staff', 'Clock In', 'Clock Out', 'Hours', 'Status', 'Source', ''].map(h => <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]">{h}</th>)}
+                {['Staff', 'Clock In', 'Clock Out', 'Hours', 'Status', 'Source', ''].map(h => <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">{h}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -727,10 +727,10 @@ function AttendanceTab() {
                 const sm = r ? ATTENDANCE_STATUS_META[r.status] : { bg: 'var(--rp-surface-3)', text: 'var(--rp-text-faint)' };
                 return (
                   <tr key={s.id} className="hover:bg-[#faf9f7] dark:hover:bg-white/5" style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
-                    <td className="px-5 py-3.5 text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{s.user.firstName} {s.user.lastName}</td>
-                    <td className="px-5 py-3.5 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{r?.clockIn ? new Date(r.clockIn).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
-                    <td className="px-5 py-3.5 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{r?.clockOut ? new Date(r.clockOut).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
-                    <td className="px-5 py-3.5 text-[13px] text-[#18231f] dark:text-[#dfd9d0]">{r?.hoursWorked != null ? r.hoursWorked.toFixed(1) : '—'}</td>
+                    <td className="px-5 py-3.5 text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{s.user.firstName} {s.user.lastName}</td>
+                    <td className="px-5 py-3.5 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">{r?.clockIn ? new Date(r.clockIn).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                    <td className="px-5 py-3.5 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">{r?.clockOut ? new Date(r.clockOut).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                    <td className="px-5 py-3.5 text-[13px] text-[#183153] dark:text-[#f8fafc]">{r?.hoursWorked != null ? r.hoursWorked.toFixed(1) : '—'}</td>
                     <td className="px-5 py-3.5">
                       {r ? <span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: sm.bg, color: sm.text }}>{r.status.replace('_', ' ')}</span> : <span className="text-[12px]" style={{ color: 'var(--rp-text-faint)' }}>No record</span>}
                     </td>
@@ -738,7 +738,7 @@ function AttendanceTab() {
                     <td className="px-5 py-3.5">
                       <div className="flex gap-1">
                         {r ? (
-                          <button onClick={() => setCorrectRecord(r)} className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] hover:bg-[#e3f2ef]" style={{ color: '#9bbdb7' }}>
+                          <button onClick={() => setCorrectRecord(r)} className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] hover:bg-[#e5f0f7]" style={{ color: '#aac0d0' }}>
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
                         ) : (
@@ -813,7 +813,7 @@ function AdjustmentModal({ open, onClose, staff, loading, onSubmit }: {
           <div>
             <label className={labelCls}>Amount</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px]" style={{ color: '#9bbdb7' }}>৳</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px]" style={{ color: '#aac0d0' }}>৳</span>
               <input value={amount} onChange={e => setAmount(e.target.value)} type="number" min="0" step="0.01" className={selectCls + ' pl-6'} />
             </div>
           </div>
@@ -868,10 +868,10 @@ function SalaryTab() {
               onMouseEnter={e => { if (selectedId !== s.id) e.currentTarget.style.background = 'var(--rp-surface-2)'; }}
               onMouseLeave={e => { if (selectedId !== s.id) e.currentTarget.style.background = ''; }}>
               <div>
-                <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{s.user.firstName} {s.user.lastName}</p>
-                <p className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">{s.position}</p>
+                <p className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{s.user.firstName} {s.user.lastName}</p>
+                <p className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">{s.position}</p>
               </div>
-              <span className="text-[12.5px] font-medium" style={{ color: '#23766a' }}>{s.baseSalary != null ? formatCurrency(s.baseSalary) : '—'}</span>
+              <span className="text-[12.5px] font-medium" style={{ color: '#183153' }}>{s.baseSalary != null ? formatCurrency(s.baseSalary) : '—'}</span>
             </button>
           ))}
         </div>
@@ -886,8 +886,8 @@ function SalaryTab() {
           <>
             <div className="flex items-center justify-between rounded-[14px] border bg-white p-4" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
               <div>
-                <p className="text-[13px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">{selected.user.firstName} {selected.user.lastName}</p>
-                <p className="text-[20px] font-semibold" style={{ color: '#23766a' }}>{selected.baseSalary != null ? formatCurrency(selected.baseSalary) : 'No base salary set'}</p>
+                <p className="text-[13px] font-semibold text-[#183153] dark:text-[#f8fafc]">{selected.user.firstName} {selected.user.lastName}</p>
+                <p className="text-[20px] font-semibold" style={{ color: '#183153' }}>{selected.baseSalary != null ? formatCurrency(selected.baseSalary) : 'No base salary set'}</p>
               </div>
               <button onClick={() => setAdjustOpen(true)} className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium" style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
                 <Plus className="h-4 w-4" /> Record Adjustment
@@ -898,8 +898,8 @@ function SalaryTab() {
                 <div className="h-24 animate-pulse" style={{ background: 'var(--rp-surface-2)' }} />
               ) : adjustments.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 gap-2">
-                  <DollarSign className="h-8 w-8" style={{ color: '#c5bdb4' }} />
-                  <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No adjustments recorded</p>
+                  <DollarSign className="h-8 w-8" style={{ color: '#94a3b8' }} />
+                  <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">No adjustments recorded</p>
                 </div>
               ) : (
                 <div className="divide-y" style={{ borderColor: 'var(--rp-border)' }}>
@@ -910,11 +910,11 @@ function SalaryTab() {
                         <div className="flex items-center gap-3">
                           <span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: m.bg, color: m.text }}>{a.type}</span>
                           <div>
-                            <p className="text-[13px] text-[#18231f] dark:text-[#dfd9d0]">{a.reason || '—'}</p>
-                            <p className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">{formatDate(a.effectiveDate)}</p>
+                            <p className="text-[13px] text-[#183153] dark:text-[#f8fafc]">{a.reason || '—'}</p>
+                            <p className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">{formatDate(a.effectiveDate)}</p>
                           </div>
                         </div>
-                        <span className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{formatCurrency(a.amount)}</span>
+                        <span className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{formatCurrency(a.amount)}</span>
                       </div>
                     );
                   })}
@@ -1024,7 +1024,7 @@ function SessionDetailModal({ open, onClose, sessionId, allStaff }: {
       description={session ? `${formatDate(session.scheduledDate)}${session.trainer ? ` — ${session.trainer}` : ''}` : ''} maxWidth="560px"
       footer={<div className="flex justify-end"><button onClick={onClose} className="rounded-[9px] border px-4 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>Close</button></div>}>
       {isLoading || !session ? (
-        <div className="flex h-32 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" style={{ color: '#9bbdb7' }} /></div>
+        <div className="flex h-32 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" style={{ color: '#aac0d0' }} /></div>
       ) : (
         <div className="space-y-4">
           {session.description && <p className="text-[12.5px]" style={{ color: 'var(--rp-text-muted)' }}>{session.description}</p>}
@@ -1044,7 +1044,7 @@ function SessionDetailModal({ open, onClose, sessionId, allStaff }: {
             <div className="flex flex-wrap gap-1.5">
               {availableStaff.map(s => (
                 <button key={s.id} onClick={() => inviteMutation.mutate({ staffIds: [s.id] })}
-                  className="rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e3f2ef]" style={{ borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                  className="rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e5f0f7]" style={{ borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
                   + {s.user.firstName} {s.user.lastName}
                 </button>
               ))}
@@ -1056,15 +1056,15 @@ function SessionDetailModal({ open, onClose, sessionId, allStaff }: {
               <p className="text-[12.5px] text-center py-4" style={{ color: 'var(--rp-text-muted)' }}>No attendees invited yet</p>
             ) : session.attendees.map(a => (
               <div key={a.id} className="flex items-center justify-between rounded-[8px] border px-3 py-2" style={{ borderColor: 'var(--rp-border)' }}>
-                <span className="text-[13px] text-[#18231f] dark:text-[#dfd9d0]">{a.staff.user.firstName} {a.staff.user.lastName}</span>
+                <span className="text-[13px] text-[#183153] dark:text-[#f8fafc]">{a.staff.user.firstName} {a.staff.user.lastName}</span>
                 <div className="flex items-center gap-1.5">
                   {a.status === 'INVITED' ? (
                     <>
-                      <button onClick={() => markMutation.mutate({ staffId: a.staffId, status: 'ATTENDED' })} className="rounded-[6px] border px-2 py-1 text-[11px] font-medium hover:bg-[#e3f2ef]" style={{ borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>Attended</button>
+                      <button onClick={() => markMutation.mutate({ staffId: a.staffId, status: 'ATTENDED' })} className="rounded-[6px] border px-2 py-1 text-[11px] font-medium hover:bg-[#e5f0f7]" style={{ borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>Attended</button>
                       <button onClick={() => markMutation.mutate({ staffId: a.staffId, status: 'MISSED' })} className="rounded-[6px] border px-2 py-1 text-[11px] font-medium hover:bg-[#faf0ee]" style={{ borderColor: 'rgba(200,60,60,0.2)', color: '#c43c3c' }}>Missed</button>
                     </>
                   ) : (
-                    <span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={a.status === 'ATTENDED' ? { background: 'var(--rp-teal-bg)', color: '#23766a' } : { background: 'var(--rp-red-bg)', color: '#c43c3c' }}>{a.status}</span>
+                    <span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={a.status === 'ATTENDED' ? { background: 'var(--rp-teal-bg)', color: '#183153' } : { background: 'var(--rp-red-bg)', color: '#c43c3c' }}>{a.status}</span>
                   )}
                 </div>
               </div>
@@ -1104,33 +1104,33 @@ function TrainingTab() {
           <div className="h-32 animate-pulse" style={{ background: 'var(--rp-surface-2)' }} />
         ) : sessions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
-            <GraduationCap className="h-10 w-10" style={{ color: '#c5bdb4' }} />
-            <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No training sessions yet</p>
+            <GraduationCap className="h-10 w-10" style={{ color: '#94a3b8' }} />
+            <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">No training sessions yet</p>
           </div>
         ) : (
           <table className="w-full">
             <thead>
               <tr style={{ background: 'var(--rp-surface-2)' }}>
-                {['Session', 'Date', 'Trainer', 'Department', 'Attendance', ''].map(h => <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]">{h}</th>)}
+                {['Session', 'Date', 'Trainer', 'Department', 'Attendance', ''].map(h => <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">{h}</th>)}
               </tr>
             </thead>
             <tbody>
               {sessions.map(s => (
                 <tr key={s.id} className="hover:bg-[#faf9f7] dark:hover:bg-white/5" style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
                   <td className="px-5 py-3.5">
-                    <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{s.title}</p>
-                    {s.location && <p className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">{s.location}</p>}
+                    <p className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{s.title}</p>
+                    {s.location && <p className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">{s.location}</p>}
                   </td>
-                  <td className="px-5 py-3.5 text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">{formatDate(s.scheduledDate)}</td>
-                  <td className="px-5 py-3.5 text-[13px] text-[#4a6e66] dark:text-[#6d9990]">{s.trainer ?? '—'}</td>
-                  <td className="px-5 py-3.5 text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">{s.department ? formatDept(s.department) : 'Any'}</td>
-                  <td className="px-5 py-3.5 text-[13px] text-[#18231f] dark:text-[#dfd9d0]">
+                  <td className="px-5 py-3.5 text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">{formatDate(s.scheduledDate)}</td>
+                  <td className="px-5 py-3.5 text-[13px] text-[#475569] dark:text-[#9db4c4]">{s.trainer ?? '—'}</td>
+                  <td className="px-5 py-3.5 text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">{s.department ? formatDept(s.department) : 'Any'}</td>
+                  <td className="px-5 py-3.5 text-[13px] text-[#183153] dark:text-[#f8fafc]">
                     <div className="flex items-center gap-1">
-                      <Check className="h-3.5 w-3.5" style={{ color: '#23766a' }} /> {s.attendedCount}/{s.attendeeCount}
+                      <Check className="h-3.5 w-3.5" style={{ color: '#183153' }} /> {s.attendedCount}/{s.attendeeCount}
                     </div>
                   </td>
                   <td className="px-5 py-3.5">
-                    <button onClick={() => setDetailId(s.id)} className="rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e3f2ef]" style={{ borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>Manage</button>
+                    <button onClick={() => setDetailId(s.id)} className="rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e5f0f7]" style={{ borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>Manage</button>
                   </td>
                 </tr>
               ))}

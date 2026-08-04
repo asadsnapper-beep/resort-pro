@@ -72,17 +72,17 @@ export function TopNav() {
             onClick={toggleSidebar}
             title={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
             aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
-            className="hidden md:flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-[#8fa8a1] transition-colors hover:bg-black/5 hover:text-resort-900 dark:hover:bg-white/5 dark:hover:text-white"
+            className="hidden md:flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-[#94aab9] transition-colors hover:bg-black/5 hover:text-resort-900 dark:hover:bg-white/5 dark:hover:text-white"
           >
             {sidebarCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </button>
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8aa29a]" />
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#64748b]" />
             <input
               placeholder="Search rooms, bookings, guests..."
-              className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-1.5 pl-8 pr-16 text-[13px] text-[#18231f] placeholder:text-[#8aa29a] focus:outline-none focus:ring-1 focus:ring-resort-600/20 dark:border-white/10 dark:bg-white/5 dark:text-white"
+              className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-1.5 pl-8 pr-16 text-[13px] text-[#183153] placeholder:text-[#64748b] focus:outline-none focus:ring-1 focus:ring-resort-600/20 dark:border-white/10 dark:bg-white/5 dark:text-white"
             />
-            <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-0.5 rounded bg-white border border-black/8 px-1.5 py-0.5 text-[10px] text-[#8aa29a] font-medium">
+            <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-0.5 rounded bg-white border border-black/8 px-1.5 py-0.5 text-[10px] text-[#64748b] font-medium">
               ⌘K
             </kbd>
           </div>
@@ -95,7 +95,7 @@ export function TopNav() {
             variant="ghost"
             size="icon"
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="h-8 w-8 text-[#8fa8a1] hover:text-resort-900 dark:hover:text-white"
+            className="h-8 w-8 text-[#94aab9] hover:text-resort-900 dark:hover:text-white"
           >
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>

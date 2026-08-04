@@ -30,7 +30,7 @@ interface ReferralData {
 function StatusPill({ status }: { status: ReferralEntry['status'] }) {
   if (status === 'REWARDED') return (
     <span className="inline-flex items-center gap-1 rounded-[7px] border px-[8px] py-[3px] text-[11px] font-semibold"
-      style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+      style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
       <Award className="h-3 w-3" /> Rewarded
     </span>
   );
@@ -89,7 +89,7 @@ export default function ReferralsPage() {
 
   if (isLoading) return (
     <div className="flex h-64 items-center justify-center">
-      <Loader2 className="h-7 w-7 animate-spin" style={{ color: '#9bbdb7' }} />
+      <Loader2 className="h-7 w-7 animate-spin" style={{ color: '#aac0d0' }} />
     </div>
   );
 
@@ -98,7 +98,7 @@ export default function ReferralsPage() {
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px]" style={{ background: 'var(--rp-teal-bg)' }}>
-          <Gift className="h-4 w-4" style={{ color: '#23766a' }} />
+          <Gift className="h-4 w-4" style={{ color: '#183153' }} />
         </div>
         <PageHeader
           title="Referral Program"
@@ -110,13 +110,13 @@ export default function ReferralsPage() {
       {/* Reward banners */}
       {(d?.accountCredit ?? 0) > 0 && (
         <div className="flex items-center gap-3 rounded-[12px] border px-5 py-4"
-          style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)' }}>
-          <CreditCard className="h-5 w-5 shrink-0" style={{ color: '#23766a' }} />
+          style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)' }}>
+          <CreditCard className="h-5 w-5 shrink-0" style={{ color: '#183153' }} />
           <div>
-            <p className="text-[13px] font-semibold" style={{ color: '#1b342f' }}>
+            <p className="text-[13px] font-semibold" style={{ color: '#183153' }}>
               Account Credit: ৳{d!.accountCredit.toLocaleString()}
             </p>
-            <p className="text-[12px] mt-0.5 text-[#4a6e66] dark:text-[#6d9990]">
+            <p className="text-[12px] mt-0.5 text-[#475569] dark:text-[#9db4c4]">
               পরের invoice থেকে automatically deduct হবে।
             </p>
           </div>
@@ -143,7 +143,7 @@ export default function ReferralsPage() {
         {[
           { label: 'Total Referrals', value: d?.stats.total ?? 0,   Icon: Users, bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text)', iconColor: 'var(--rp-text-muted)' },
           { label: 'Pending Reward',  value: d?.stats.pending ?? 0, Icon: Clock, bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040', iconColor: '#b89040' },
-          { label: 'Rewarded',        value: d?.stats.rewarded ?? 0,Icon: Award, bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a', iconColor: '#23766a' },
+          { label: 'Rewarded',        value: d?.stats.rewarded ?? 0,Icon: Award, bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153', iconColor: '#183153' },
         ].map(({ label, value, Icon, bg, border, text, iconColor }) => (
           <div key={label} className="rounded-[14px] border p-5 text-center"
             style={{ background: bg, borderColor: border }}>
@@ -151,7 +151,7 @@ export default function ReferralsPage() {
               <Icon className="h-5 w-5" style={{ color: iconColor }} />
             </div>
             <p className="text-[26px] font-bold" style={{ color: text }}>{value}</p>
-            <p className="text-[12px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">{label}</p>
+            <p className="text-[12px] mt-0.5 text-[#64748b] dark:text-[#a9c1d0]">{label}</p>
           </div>
         ))}
       </div>
@@ -160,8 +160,8 @@ export default function ReferralsPage() {
       <div className="rounded-[14px] border bg-white p-6 space-y-4"
         style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
         <div className="flex items-center gap-2">
-          <Link2 className="h-4 w-4" style={{ color: '#23766a' }} />
-          <h2 className="text-[14px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">Your Referral Link</h2>
+          <Link2 className="h-4 w-4" style={{ color: '#183153' }} />
+          <h2 className="text-[14px] font-semibold text-[#183153] dark:text-[#f8fafc]">Your Referral Link</h2>
         </div>
 
         {link ? (
@@ -169,8 +169,8 @@ export default function ReferralsPage() {
             <div className="flex items-center gap-2">
               <div className="flex flex-1 items-center gap-2 overflow-hidden rounded-[10px] border bg-[#f4f1eb] px-4 py-2.5"
                 style={{ borderColor: 'var(--rp-border)' }}>
-                <ExternalLink className="h-4 w-4 shrink-0 text-[#c5bdb4] dark:text-[#6e8580]" />
-                <span className="truncate font-mono text-[12.5px] text-[#6b8880] dark:text-[#94b8b0]">{link}</span>
+                <ExternalLink className="h-4 w-4 shrink-0 text-[#94a3b8] dark:text-[#7f99ab]" />
+                <span className="truncate font-mono text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">{link}</span>
               </div>
               <button onClick={copyLink}
                 className="flex shrink-0 items-center gap-2 rounded-[9px] px-4 py-2.5 text-[13px] font-semibold hover:opacity-90"
@@ -192,12 +192,12 @@ export default function ReferralsPage() {
               </button>
             </div>
 
-            <p className="text-[12px] pt-1 text-[#8aa29a] dark:text-[#94b8b0]">
+            <p className="text-[12px] pt-1 text-[#64748b] dark:text-[#a9c1d0]">
               কেউ এই link দিয়ে signup করলে admin আপনাকে reward করবে — account credit অথবা plan upgrade।
             </p>
           </>
         ) : (
-          <p className="text-[13px] text-[#c5bdb4] dark:text-[#6e8580]">
+          <p className="text-[13px] text-[#94a3b8] dark:text-[#7f99ab]">
             Referral link generate হয়নি। Support-এ যোগাযোগ করুন।
           </p>
         )}
@@ -206,8 +206,8 @@ export default function ReferralsPage() {
       {/* How it works */}
       <div className="rounded-[14px] border bg-white p-6"
         style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
-        <h2 className="flex items-center gap-2 text-[14px] font-semibold mb-4 text-[#18231f] dark:text-[#dfd9d0]">
-          <Share2 className="h-4 w-4" style={{ color: '#23766a' }} /> কীভাবে কাজ করে?
+        <h2 className="flex items-center gap-2 text-[14px] font-semibold mb-4 text-[#183153] dark:text-[#f8fafc]">
+          <Share2 className="h-4 w-4" style={{ color: '#183153' }} /> কীভাবে কাজ করে?
         </h2>
         <div className="space-y-3">
           {[
@@ -218,10 +218,10 @@ export default function ReferralsPage() {
           ].map((text, i) => (
             <div key={i} className="flex items-start gap-3">
               <span className="flex h-6 w-6 shrink-0 mt-0.5 items-center justify-center rounded-full text-[11px] font-bold"
-                style={{ background: 'var(--rp-teal-bg)', color: '#23766a' }}>
+                style={{ background: 'var(--rp-teal-bg)', color: '#183153' }}>
                 {i + 1}
               </span>
-              <p className="text-[13px] text-[#4a6e66] dark:text-[#6d9990]">{text}</p>
+              <p className="text-[13px] text-[#475569] dark:text-[#9db4c4]">{text}</p>
             </div>
           ))}
         </div>
@@ -231,15 +231,15 @@ export default function ReferralsPage() {
       <div className="rounded-[14px] border bg-white overflow-hidden"
         style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
         <div className="px-5 py-4" style={{ background: 'var(--rp-surface-2)', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-          <h2 className="text-[13.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">Referral History</h2>
+          <h2 className="text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">Referral History</h2>
         </div>
         {!d?.referrals.length ? (
           <div className="flex flex-col items-center gap-2 py-14 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'var(--rp-surface-3)' }}>
-              <Users className="h-7 w-7 text-[#c5bdb4] dark:text-[#6e8580]" />
+              <Users className="h-7 w-7 text-[#94a3b8] dark:text-[#7f99ab]" />
             </div>
-            <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">এখনো কোনো referral নেই।</p>
-            <p className="text-[12px] text-[#c5bdb4] dark:text-[#6e8580]">আপনার link share করুন।</p>
+            <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">এখনো কোনো referral নেই।</p>
+            <p className="text-[12px] text-[#94a3b8] dark:text-[#7f99ab]">আপনার link share করুন।</p>
           </div>
         ) : (
           <div>
@@ -248,14 +248,14 @@ export default function ReferralsPage() {
                 style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
                 <div className="flex h-9 w-9 items-center justify-center rounded-[9px] shrink-0"
                   style={{ background: 'var(--rp-teal-bg)' }}>
-                  <Users className="h-4 w-4" style={{ color: '#23766a' }} />
+                  <Users className="h-4 w-4" style={{ color: '#183153' }} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13.5px] font-medium truncate text-[#18231f] dark:text-[#dfd9d0]">{r.referred.name}</p>
-                  <p className="text-[12px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">
+                  <p className="text-[13.5px] font-medium truncate text-[#183153] dark:text-[#f8fafc]">{r.referred.name}</p>
+                  <p className="text-[12px] mt-0.5 text-[#64748b] dark:text-[#a9c1d0]">
                     Signed up {new Date(r.createdAt).toLocaleDateString('en-GB', { dateStyle: 'medium' })}
                     {r.rewardType && r.rewardType !== 'NONE' && (
-                      <span className="ml-2" style={{ color: '#23766a' }}>· Reward: {rewardDescription(r)}</span>
+                      <span className="ml-2" style={{ color: '#183153' }}>· Reward: {rewardDescription(r)}</span>
                     )}
                   </p>
                 </div>

@@ -35,8 +35,8 @@ const INCLUSION_SUGGESTIONS = [
   'Complimentary Mini Bar',
 ];
 
-const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30';
-const labelCls = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
+const labelCls = 'block text-[11.5px] font-medium text-[#64748b] mb-1.5';
 
 // ── Package Modal ─────────────────────────────────────────────────────────────
 function PackageModal({ pkg, onClose }: { pkg?: PackageItem; onClose: () => void }) {
@@ -116,7 +116,7 @@ function PackageModal({ pkg, onClose }: { pkg?: PackageItem; onClose: () => void
               <label className={labelCls}>Description</label>
               <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2}
                 placeholder="Brief description shown to guests..."
-                className="w-full resize-none rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30" />
+                className="w-full resize-none rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30" />
             </div>
 
             {/* Price + Type */}
@@ -133,7 +133,7 @@ function PackageModal({ pkg, onClose }: { pkg?: PackageItem; onClose: () => void
                     <button key={pt} type="button" onClick={() => setPriceType(pt)}
                       className="flex-1 py-[9px] text-[13px] font-medium transition-colors"
                       style={priceType === pt
-                        ? { background: '#23766a', color: 'var(--rp-btn-accent-text)' }
+                        ? { background: '#183153', color: 'var(--rp-btn-accent-text)' }
                         : { background: 'var(--rp-surface-3)', color: 'var(--rp-text-muted)' }}>
                       {pt === 'PER_STAY' ? 'Per Stay' : 'Per Night'}
                     </button>
@@ -150,7 +150,7 @@ function PackageModal({ pkg, onClose }: { pkg?: PackageItem; onClose: () => void
                 <div className="mb-2.5 flex flex-wrap gap-2">
                   {inclusions.map((inc, i) => (
                     <span key={i} className="flex items-center gap-1.5 rounded-[7px] border px-2.5 py-1 text-[12px] font-medium"
-                      style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                      style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
                       <Check className="h-3 w-3 shrink-0" />
                       {inc}
                       <button type="button" onClick={() => removeInclusion(i)}
@@ -168,7 +168,7 @@ function PackageModal({ pkg, onClose }: { pkg?: PackageItem; onClose: () => void
                   placeholder="Type and press Enter..." className={inputCls + ' flex-1'} />
                 <button type="button" onClick={() => addInclusion(newInclusion)}
                   className="flex items-center justify-center rounded-[8px] px-3 transition-colors"
-                  style={{ background: 'var(--rp-teal-bg)', color: '#23766a' }}>
+                  style={{ background: 'var(--rp-teal-bg)', color: '#183153' }}>
                   <Plus className="h-4 w-4" />
                 </button>
               </div>
@@ -177,7 +177,7 @@ function PackageModal({ pkg, onClose }: { pkg?: PackageItem; onClose: () => void
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {INCLUSION_SUGGESTIONS.filter(s => !inclusions.includes(s)).slice(0, 8).map(s => (
                   <button key={s} type="button" onClick={() => addInclusion(s)}
-                    className="rounded-[7px] border px-2 py-0.5 text-[11.5px] transition-colors hover:border-[#23766a] hover:text-[#23766a]"
+                    className="rounded-[7px] border px-2 py-0.5 text-[11.5px] transition-colors hover:border-[#183153] hover:text-[#183153]"
                     style={{ borderColor: 'var(--rp-border)', color: 'var(--rp-text-muted)' }}>
                     + {s}
                   </button>
@@ -199,13 +199,13 @@ function PackageModal({ pkg, onClose }: { pkg?: PackageItem; onClose: () => void
             <div className="flex items-center justify-between rounded-[10px] border px-4 py-3"
               style={{ background: 'var(--rp-surface-2)', borderColor: 'var(--rp-border)' }}>
               <div>
-                <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">Available for Booking</p>
-                <p className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">Inactive packages won't be offered to guests</p>
+                <p className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">Available for Booking</p>
+                <p className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">Inactive packages won't be offered to guests</p>
               </div>
               <button type="button" onClick={() => setIsActive(!isActive)}>
                 {isActive
-                  ? <ToggleRight className="h-7 w-7" style={{ color: '#23766a' }} />
-                  : <ToggleLeft className="h-7 w-7 text-[#c5bdb4] dark:text-[#6e8580]" />}
+                  ? <ToggleRight className="h-7 w-7" style={{ color: '#183153' }} />
+                  : <ToggleLeft className="h-7 w-7 text-[#94a3b8] dark:text-[#7f99ab]" />}
               </button>
             </div>
           </div>
@@ -233,7 +233,7 @@ function PackageCard({ pkg, onEdit, onDelete, onToggle }: {
         </div>
       ) : (
         <div className="h-24 flex items-center justify-center"
-          style={{ background: 'linear-gradient(135deg, #1b342f 0%, #23766a 100%)' }}>
+          style={{ background: 'linear-gradient(135deg, #183153 0%, #183153 100%)' }}>
           <Gift className="h-10 w-10" style={{ color: 'rgba(255,255,255,0.4)' }} />
         </div>
       )}
@@ -242,14 +242,14 @@ function PackageCard({ pkg, onEdit, onDelete, onToggle }: {
         {/* Name + status */}
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="min-w-0">
-            <h3 className="text-[13.5px] font-semibold truncate leading-tight text-[#18231f] dark:text-[#dfd9d0]">{pkg.name}</h3>
+            <h3 className="text-[13.5px] font-semibold truncate leading-tight text-[#183153] dark:text-[#f8fafc]">{pkg.name}</h3>
             {pkg.description && (
-              <p className="text-[12px] mt-0.5 line-clamp-2 text-[#8aa29a] dark:text-[#94b8b0]">{pkg.description}</p>
+              <p className="text-[12px] mt-0.5 line-clamp-2 text-[#64748b] dark:text-[#a9c1d0]">{pkg.description}</p>
             )}
           </div>
           <span className="shrink-0 rounded-[7px] border px-[8px] py-[3px] text-[11px] font-semibold"
             style={pkg.isActive
-              ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }
+              ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }
               : { background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-muted)' }}>
             {pkg.isActive ? 'Active' : 'Inactive'}
           </span>
@@ -257,10 +257,10 @@ function PackageCard({ pkg, onEdit, onDelete, onToggle }: {
 
         {/* Price */}
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-[18px] font-semibold tracking-[-0.02em]" style={{ color: '#23766a' }}>
+          <span className="text-[18px] font-semibold tracking-[-0.02em]" style={{ color: '#183153' }}>
             {formatCurrency(pkg.price)}
           </span>
-          <span className="text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">
+          <span className="text-[12px] text-[#64748b] dark:text-[#a9c1d0]">
             {pkg.priceType === 'PER_NIGHT' ? '/ night' : '/ stay'}
           </span>
         </div>
@@ -270,12 +270,12 @@ function PackageCard({ pkg, onEdit, onDelete, onToggle }: {
           <div className="mb-3 space-y-1">
             {pkg.inclusions.slice(0, 4).map((inc, i) => (
               <div key={i} className="flex items-center gap-1.5 text-[12px]">
-                <Check className="h-3 w-3 shrink-0" style={{ color: '#23766a' }} />
-                <span className="truncate text-[#7a9890] dark:text-[#94b8b0]">{inc}</span>
+                <Check className="h-3 w-3 shrink-0" style={{ color: '#183153' }} />
+                <span className="truncate text-[#64748b] dark:text-[#a9c1d0]">{inc}</span>
               </div>
             ))}
             {pkg.inclusions.length > 4 && (
-              <p className="text-[11.5px] pl-[18px] text-[#8aa29a] dark:text-[#94b8b0]">
+              <p className="text-[11.5px] pl-[18px] text-[#64748b] dark:text-[#a9c1d0]">
                 +{pkg.inclusions.length - 4} more
               </p>
             )}
@@ -285,19 +285,19 @@ function PackageCard({ pkg, onEdit, onDelete, onToggle }: {
         {/* Footer */}
         <div className="flex items-center justify-between border-t pt-2.5"
           style={{ borderColor: 'var(--rp-border)' }}>
-          <span className="text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">
+          <span className="text-[12px] text-[#64748b] dark:text-[#a9c1d0]">
             {pkg._count?.bookings ?? 0} booking{pkg._count?.bookings !== 1 ? 's' : ''}
           </span>
           <div className="flex items-center gap-0.5">
             <button onClick={onToggle} title={pkg.isActive ? 'Deactivate' : 'Activate'}
-              className="rounded-[7px] p-1.5 transition-colors hover:bg-[#e3f2ef]">
+              className="rounded-[7px] p-1.5 transition-colors hover:bg-[#e5f0f7]">
               {pkg.isActive
-                ? <ToggleRight className="h-4 w-4" style={{ color: '#23766a' }} />
-                : <ToggleLeft className="h-4 w-4 text-[#c5bdb4] dark:text-[#6e8580]" />}
+                ? <ToggleRight className="h-4 w-4" style={{ color: '#183153' }} />
+                : <ToggleLeft className="h-4 w-4 text-[#94a3b8] dark:text-[#7f99ab]" />}
             </button>
             <button onClick={onEdit}
               className="rounded-[7px] p-1.5 transition-colors hover:bg-[#f4f1eb]">
-              <Pencil className="h-4 w-4 text-[#8aa29a] dark:text-[#94b8b0]" />
+              <Pencil className="h-4 w-4 text-[#64748b] dark:text-[#a9c1d0]" />
             </button>
             <button onClick={onDelete}
               className="rounded-[7px] p-1.5 transition-colors hover:bg-[#fef2f2]">
@@ -367,8 +367,8 @@ export default function PackagesPage() {
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-3">
         {[
-          { icon: Gift,        label: 'Total Packages', value: packages.length, color: '#23766a', bg: 'var(--rp-teal-bg)' },
-          { icon: ToggleRight, label: 'Active',         value: activeCount,     color: '#1b342f', bg: 'var(--rp-teal-bg)' },
+          { icon: Gift,        label: 'Total Packages', value: packages.length, color: '#183153', bg: 'var(--rp-teal-bg)' },
+          { icon: ToggleRight, label: 'Active',         value: activeCount,     color: '#183153', bg: 'var(--rp-teal-bg)' },
           { icon: Star,        label: 'Times Applied',  value: totalBookings,   color: '#b89040', bg: 'var(--rp-amber-bg)' },
         ].map(({ icon: Icon, label, value, color, bg }) => (
           <div key={label} className="flex items-center gap-4 rounded-[14px] border bg-white dark:bg-white/5 p-5"
@@ -377,8 +377,8 @@ export default function PackagesPage() {
               <Icon className="h-[18px] w-[18px]" style={{ color }} />
             </div>
             <div>
-              <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a] dark:text-[#94b8b0]">{label}</p>
-              <p className="text-[24px] font-semibold tracking-[-0.02em] text-[#18231f] dark:text-[#dfd9d0]">{value}</p>
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b] dark:text-[#a9c1d0]">{label}</p>
+              <p className="text-[24px] font-semibold tracking-[-0.02em] text-[#183153] dark:text-[#f8fafc]">{value}</p>
             </div>
           </div>
         ))}
@@ -408,13 +408,13 @@ export default function PackagesPage() {
         <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
           <div className="flex h-20 w-20 items-center justify-center rounded-full"
             style={{ background: 'var(--rp-teal-bg)' }}>
-            <Gift className="h-10 w-10" style={{ color: '#23766a' }} />
+            <Gift className="h-10 w-10" style={{ color: '#183153' }} />
           </div>
           <div>
-            <p className="text-[14px] font-medium text-[#18231f] dark:text-[#dfd9d0]">
+            <p className="text-[14px] font-medium text-[#183153] dark:text-[#f8fafc]">
               {filter === 'all' ? 'No packages yet' : `No ${filter} packages`}
             </p>
-            <p className="text-[12.5px] mt-1 text-[#8aa29a] dark:text-[#94b8b0]">
+            <p className="text-[12.5px] mt-1 text-[#64748b] dark:text-[#a9c1d0]">
               {filter === 'all' ? 'Create your first package deal to upsell extras to guests' : ''}
             </p>
           </div>
@@ -440,9 +440,9 @@ export default function PackagesPage() {
       {/* How it works callout */}
       {packages.length > 0 && (
         <div className="rounded-[14px] border p-5"
-          style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)' }}>
-          <p className="text-[13px] font-semibold mb-1" style={{ color: '#1b342f' }}>💡 How to apply packages</p>
-          <p className="text-[12px]" style={{ color: '#23766a' }}>
+          style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)' }}>
+          <p className="text-[13px] font-semibold mb-1" style={{ color: '#183153' }}>💡 How to apply packages</p>
+          <p className="text-[12px]" style={{ color: '#183153' }}>
             Open any booking in the <strong>Bookings</strong> page → click the booking → use the <strong>Packages</strong> tab to add or remove packages. The booking total is updated automatically.
           </p>
         </div>

@@ -6,11 +6,11 @@
  * a page changes no pixels:
  *
  *   text-[26px]     → text-rp-title    (26px)
- *   text-[#18231f]  → text-rp-text     (#18231f light / #dfd9d0 dark)
+ *   text-[#183153]  → text-rp-text     (#183153 light / #f8fafc dark)
  *   text-[13px]     → text-rp-body     (13px)
- *   text-[#7a9890]  → text-rp-muted-2  (#7a9890 light / #94b8b0 dark)
+ *   text-[#64748b]  → text-rp-muted-2  (#64748b light / #a9c1d0 dark)
  *
- * Dark-mode win: pages currently either hand-write `dark:text-[#dfd9d0]` or
+ * Dark-mode win: pages currently either hand-write `dark:text-[#f8fafc]` or
  * rely on the per-hex `!important` patches at the bottom of globals.css. The
  * tokens make it automatic and identical for all of them, and let those
  * patches eventually be deleted.

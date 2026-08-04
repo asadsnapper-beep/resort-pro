@@ -75,7 +75,7 @@ export default function GuestsPage() {
         actions={
           <button
             onClick={() => setAddOpen(true)}
-            className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
+            className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#f8fafc] transition-opacity hover:opacity-80"
             style={{ background: 'var(--rp-btn-accent)' }}
           >
             <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} />
@@ -87,7 +87,7 @@ export default function GuestsPage() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Total Guests',   value: total,       icon: Users, bg: 'var(--rp-teal-bg)', color: '#23766a' },
+          { label: 'Total Guests',   value: total,       icon: Users, bg: 'var(--rp-teal-bg)', color: '#183153' },
           { label: 'With Phone',     value: withPhone,   icon: Phone, bg: 'var(--rp-amber-bg)', color: '#b89040' },
           { label: 'Nationalities',  value: nationalities, icon: Globe, bg: 'var(--rp-coral-bg)', color: '#b8724a' },
         ].map(({ label, value, icon: Icon, bg, color }) => (
@@ -96,8 +96,8 @@ export default function GuestsPage() {
               <Icon className="h-[14px] w-[14px]" strokeWidth={2} style={{ color }} />
             </div>
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.07em] text-[#8aa29a]">{label}</div>
-              <div className="text-[22px] font-semibold leading-none tracking-[-0.02em] text-[#18231f]">{value}</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.07em] text-[#64748b]">{label}</div>
+              <div className="text-[22px] font-semibold leading-none tracking-[-0.02em] text-[#183153]">{value}</div>
             </div>
           </div>
         ))}
@@ -105,12 +105,12 @@ export default function GuestsPage() {
 
       {/* Search */}
       <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8aa29a]" />
+        <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#64748b]" />
         <input
           value={search}
           onChange={(e) => handleSearch(e.target.value)}
           placeholder="Search by name or email..."
-          className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-[8px] pl-9 pr-4 text-[13px] text-[#18231f] placeholder:text-[#8aa29a] focus:outline-none focus:ring-1 focus:ring-resort-600/20"
+          className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-[8px] pl-9 pr-4 text-[13px] text-[#183153] placeholder:text-[#64748b] focus:outline-none focus:ring-1 focus:ring-resort-600/20"
         />
       </div>
 
@@ -125,16 +125,16 @@ export default function GuestsPage() {
         ) : guests.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-20">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#f5f4f1]">
-              <Users className="h-7 w-7 text-[#c5bdb4]" />
+              <Users className="h-7 w-7 text-[#94a3b8]" />
             </div>
             <div className="text-center">
-              <p className="text-[14px] font-medium text-[#18231f]">{debouncedSearch ? 'No guests found' : 'No guests yet'}</p>
-              <p className="mt-1 text-[13px] text-[#8aa29a]">{debouncedSearch ? 'Try a different search' : 'Add your first guest to get started'}</p>
+              <p className="text-[14px] font-medium text-[#183153]">{debouncedSearch ? 'No guests found' : 'No guests yet'}</p>
+              <p className="mt-1 text-[13px] text-[#64748b]">{debouncedSearch ? 'Try a different search' : 'Add your first guest to get started'}</p>
             </div>
             {!debouncedSearch && (
               <button
                 onClick={() => setAddOpen(true)}
-                className="mt-1 flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0]"
+                className="mt-1 flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#f8fafc]"
                 style={{ background: 'var(--rp-btn-accent)' }}
               >
                 <Plus className="h-[13px] w-[13px]" /> Add Guest
@@ -145,7 +145,7 @@ export default function GuestsPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]"
+                <tr className="border-b text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b]"
                   style={{ borderColor: 'var(--rp-border)', background: 'var(--rp-surface-2)' }}>
                   <th className="px-5 py-3 text-left">Guest</th>
                   <th className="px-5 py-3 text-left">Contact</th>
@@ -164,11 +164,11 @@ export default function GuestsPage() {
                   >
                     <td className="px-5 py-[14px]">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-full bg-[#e3f2ef] text-[12px] font-semibold text-[#23766a]">
+                        <div className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-full bg-[#e5f0f7] text-[12px] font-semibold text-[#183153]">
                           {getInitials(guest.firstName, guest.lastName)}
                         </div>
                         <div>
-                          <p className="text-[13.5px] font-medium text-[#18231f]">{guest.firstName} {guest.lastName}</p>
+                          <p className="text-[13.5px] font-medium text-[#183153]">{guest.firstName} {guest.lastName}</p>
                           {guest.notes && (
                             <p className="mt-px max-w-[160px] truncate text-[11.5px] text-[#b89040]">📝 {guest.notes}</p>
                           )}
@@ -176,31 +176,31 @@ export default function GuestsPage() {
                       </div>
                     </td>
                     <td className="px-5 py-[14px]">
-                      <div className="flex items-center gap-1.5 text-[13px] text-[#18231f]">
-                        <Mail className="h-3.5 w-3.5 text-[#8aa29a]" />{guest.email}
+                      <div className="flex items-center gap-1.5 text-[13px] text-[#183153]">
+                        <Mail className="h-3.5 w-3.5 text-[#64748b]" />{guest.email}
                       </div>
                       {guest.phone && (
-                        <div className="mt-[3px] flex items-center gap-1.5 text-[11.5px] text-[#8aa29a]">
+                        <div className="mt-[3px] flex items-center gap-1.5 text-[11.5px] text-[#64748b]">
                           <Phone className="h-3 w-3" />{guest.phone}
                         </div>
                       )}
                     </td>
                     <td className="px-5 py-[14px]">
                       {guest.nationality ? (
-                        <div className="flex items-center gap-1.5 text-[13px] text-[#18231f]">
-                          <Globe className="h-3.5 w-3.5 text-[#8aa29a]" />{guest.nationality}
+                        <div className="flex items-center gap-1.5 text-[13px] text-[#183153]">
+                          <Globe className="h-3.5 w-3.5 text-[#64748b]" />{guest.nationality}
                         </div>
-                      ) : <span className="text-[#c5bdb4]">—</span>}
+                      ) : <span className="text-[#94a3b8]">—</span>}
                     </td>
                     <td className="px-5 py-[14px]">
                       {guest.idType ? (
                         <div>
-                          <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#8aa29a]">{guest.idType.replace('_', ' ')}</p>
-                          <p className="text-[13px] font-medium text-[#18231f]">{guest.idNumber ?? '—'}</p>
+                          <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#64748b]">{guest.idType.replace('_', ' ')}</p>
+                          <p className="text-[13px] font-medium text-[#183153]">{guest.idNumber ?? '—'}</p>
                         </div>
-                      ) : <span className="text-[#c5bdb4]">—</span>}
+                      ) : <span className="text-[#94a3b8]">—</span>}
                     </td>
-                    <td className="px-5 py-[14px] text-[13px] text-[#8aa29a]">{formatDate(guest.createdAt)}</td>
+                    <td className="px-5 py-[14px] text-[13px] text-[#64748b]">{formatDate(guest.createdAt)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -212,7 +212,7 @@ export default function GuestsPage() {
       {/* Pagination */}
       {pagination && pagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-[12.5px] text-[#8aa29a]">
+          <p className="text-[12.5px] text-[#64748b]">
             Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} of {total}
           </p>
           <div className="flex gap-2">

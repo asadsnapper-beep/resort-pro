@@ -12,6 +12,7 @@
  */
 
 import { prisma } from '@resort-pro/database';
+import { PLAN_PRICING } from '@resort-pro/types';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -40,29 +41,29 @@ export interface TenantEntitlement {
 export const DEFAULT_PLAN_CONFIGS: PlanConfig[] = [
   {
     key: 'FREE',
-    name: 'Free',
-    price: 0,
-    roomLimit: 5,
-    staffLimit: 2,
+    name: PLAN_PRICING.FREE.displayName,
+    price: PLAN_PRICING.FREE.monthlyUsd,
+    roomLimit: PLAN_PRICING.FREE.roomLimit,
+    staffLimit: PLAN_PRICING.FREE.staffLimit,
     aiMonthlyTokenCap: 0,
     flags: [],
     features: ['Up to 5 rooms', 'Basic booking management'],
   },
   {
     key: 'STARTER',
-    name: 'Starter',
-    price: 19,
-    annualPrice: 190,
-    roomLimit: 10,
-    staffLimit: 3,
+    name: PLAN_PRICING.STARTER.displayName,
+    price: PLAN_PRICING.STARTER.monthlyUsd,
+    annualPrice: PLAN_PRICING.STARTER.annualUsd,
+    roomLimit: PLAN_PRICING.STARTER.roomLimit,
+    staffLimit: PLAN_PRICING.STARTER.staffLimit,
     aiMonthlyTokenCap: 30000,
     flags: [
       'export_pdf',
       'ai_content',
     ],
     features: [
-      'Up to 10 rooms',
-      '3 staff seats',
+      `Up to ${PLAN_PRICING.STARTER.roomLimit} rooms`,
+      `${PLAN_PRICING.STARTER.staffLimit} staff seats`,
       'Booking website (subdomain)',
       'Invoicing',
       'AI Content Generator (~30/month)',
@@ -71,11 +72,11 @@ export const DEFAULT_PLAN_CONFIGS: PlanConfig[] = [
   },
   {
     key: 'PROFESSIONAL',
-    name: 'Professional',
-    price: 49,
-    annualPrice: 490,
-    roomLimit: 40,
-    staffLimit: 10,
+    name: PLAN_PRICING.PROFESSIONAL.displayName,
+    price: PLAN_PRICING.PROFESSIONAL.monthlyUsd,
+    annualPrice: PLAN_PRICING.PROFESSIONAL.annualUsd,
+    roomLimit: PLAN_PRICING.PROFESSIONAL.roomLimit,
+    staffLimit: PLAN_PRICING.PROFESSIONAL.staffLimit,
     aiMonthlyTokenCap: 300000,
     flags: [
       'export_pdf',
@@ -87,8 +88,8 @@ export const DEFAULT_PLAN_CONFIGS: PlanConfig[] = [
       'beta_analytics',
     ],
     features: [
-      'Up to 40 rooms',
-      '10 staff seats',
+      `Up to ${PLAN_PRICING.PROFESSIONAL.roomLimit} rooms`,
+      `${PLAN_PRICING.PROFESSIONAL.staffLimit} staff seats`,
       'Custom domain (no badge)',
       'F&B + table ordering',
       'CRM + email/SMS marketing',
@@ -99,11 +100,11 @@ export const DEFAULT_PLAN_CONFIGS: PlanConfig[] = [
   },
   {
     key: 'ENTERPRISE',
-    name: 'Enterprise',
-    price: 99,
-    annualPrice: 990,
-    roomLimit: -1,
-    staffLimit: -1,
+    name: PLAN_PRICING.ENTERPRISE.displayName,
+    price: PLAN_PRICING.ENTERPRISE.monthlyUsd,
+    annualPrice: PLAN_PRICING.ENTERPRISE.annualUsd,
+    roomLimit: PLAN_PRICING.ENTERPRISE.roomLimit,
+    staffLimit: PLAN_PRICING.ENTERPRISE.staffLimit,
     aiMonthlyTokenCap: 1500000,
     flags: [
       'export_pdf',
@@ -118,10 +119,11 @@ export const DEFAULT_PLAN_CONFIGS: PlanConfig[] = [
       'multi_property',
     ],
     features: [
-      'Unlimited rooms & staff',
+      `Up to ${PLAN_PRICING.ENTERPRISE.roomLimit} rooms`,
+      `${PLAN_PRICING.ENTERPRISE.staffLimit} staff seats`,
       'Custom domain',
       'All AI features (~1500/month)',
-      'Multi-property',
+      `Up to ${PLAN_PRICING.ENTERPRISE.propertyLimit} properties`,
       'Revenue intelligence',
       'Priority support + SLA',
     ],

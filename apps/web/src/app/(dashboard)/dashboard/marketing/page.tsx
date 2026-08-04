@@ -35,7 +35,7 @@ const STATUS_META: Record<string, { label: string; bg: string; border: string; t
   draft:     { label: 'Draft',     bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)',  Icon: FileText    },
   scheduled: { label: 'Scheduled', bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040',  Icon: Clock       },
   sending:   { label: 'Sending',   bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a',  Icon: Loader2     },
-  sent:      { label: 'Sent',      bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a',  Icon: CheckCircle2 },
+  sent:      { label: 'Sent',      bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153',  Icon: CheckCircle2 },
   failed:    { label: 'Failed',    bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)', text: '#c43c3c',  Icon: XCircle     },
   cancelled: { label: 'Cancelled', bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-faint)',  Icon: XCircle     },
 };
@@ -97,7 +97,7 @@ export default function MarketingPage() {
       <PageHeader
         icon={
           <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px]" style={{ background: 'var(--rp-teal-bg)' }}>
-            <Megaphone className="h-4.5 w-4.5" style={{ color: '#23766a' }} />
+            <Megaphone className="h-4.5 w-4.5" style={{ color: '#183153' }} />
           </div>
         }
         title="SMS & WhatsApp Marketing"
@@ -129,16 +129,16 @@ export default function MarketingPage() {
       {/* Campaign list */}
       {isLoading ? (
         <div className="flex justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin" style={{ color: '#9bbdb7' }} />
+          <Loader2 className="h-6 w-6 animate-spin" style={{ color: '#aac0d0' }} />
         </div>
       ) : campaigns.length === 0 ? (
         <div className="flex flex-col items-center py-20 gap-3 text-center rounded-[14px] border"
           style={{ borderColor: 'var(--rp-border)', background: 'var(--rp-surface-2)' }}>
           <div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'var(--rp-teal-bg)' }}>
-            <MessageSquare className="h-7 w-7" style={{ color: '#23766a' }} />
+            <MessageSquare className="h-7 w-7" style={{ color: '#183153' }} />
           </div>
-          <p className="text-[14px] font-medium text-[#18231f] dark:text-[#dfd9d0]">No campaigns yet</p>
-          <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">Create your first campaign to reach your guests</p>
+          <p className="text-[14px] font-medium text-[#183153] dark:text-[#f8fafc]">No campaigns yet</p>
+          <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Create your first campaign to reach your guests</p>
           <Link href="/dashboard/marketing/new">
             <button className="mt-2 flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium hover:opacity-90"
               style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
@@ -155,19 +155,19 @@ export default function MarketingPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1.5">
                     <Link href={`/dashboard/marketing/${c.id}`}
-                      className="text-[13.5px] font-semibold truncate hover:underline text-[#18231f] dark:text-[#dfd9d0]">
+                      className="text-[13.5px] font-semibold truncate hover:underline text-[#183153] dark:text-[#f8fafc]">
                       {c.name}
                     </Link>
                     <StatusPill status={c.status} />
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">
+                  <div className="flex items-center gap-2 flex-wrap text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">
                     <span>{CHANNEL_ICON[c.channel]} {CHANNEL_LABEL[c.channel]}</span>
                     <span>·</span>
                     <span>{c.recipientCount} recipients</span>
                     {c.status === 'sent' && (
                       <>
                         <span>·</span>
-                        <span style={{ color: '#23766a' }}>{c.deliveredCount} delivered</span>
+                        <span style={{ color: '#183153' }}>{c.deliveredCount} delivered</span>
                         {c.failedCount > 0 && <>
                           <span>·</span>
                           <span style={{ color: '#c43c3c' }}>{c.failedCount} failed</span>
@@ -182,7 +182,7 @@ export default function MarketingPage() {
                     )}
                     {c.sentAt && <><span>·</span><span>{formatDate(c.sentAt)}</span></>}
                   </div>
-                  <p className="text-[12px] mt-1.5 truncate text-[#c5bdb4] dark:text-[#6e8580]">"{c.message}"</p>
+                  <p className="text-[12px] mt-1.5 truncate text-[#94a3b8] dark:text-[#7f99ab]">"{c.message}"</p>
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
@@ -191,15 +191,15 @@ export default function MarketingPage() {
                       <button
                         onClick={() => { setSendingId(c.id); sendMut.mutate(c.id); }}
                         disabled={sendingId !== null && sendingId !== c.id}
-                        className="flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12px] font-medium transition-colors disabled:opacity-40 hover:bg-[#f5faf9]"
-                        style={{ borderColor: 'rgba(35,118,106,0.25)', color: '#23766a' }}>
+                        className="flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12px] font-medium transition-colors disabled:opacity-40 hover:bg-[#f5f9fc]"
+                        style={{ borderColor: 'rgba(24,49,83,0.25)', color: '#183153' }}>
                         {sendingId === c.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
                         Send
                       </button>
                       <button
                         onClick={() => { setDeletingId(c.id); deleteMut.mutate(c.id); }}
                         disabled={deletingId !== null && deletingId !== c.id}
-                        className="flex h-[30px] w-[30px] items-center justify-center rounded-[7px] transition-colors disabled:opacity-40 hover:bg-[#fef2f2] text-[#c5bdb4] dark:text-[#6e8580]">
+                        className="flex h-[30px] w-[30px] items-center justify-center rounded-[7px] transition-colors disabled:opacity-40 hover:bg-[#fef2f2] text-[#94a3b8] dark:text-[#7f99ab]">
                         {deletingId === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                       </button>
                     </>
@@ -225,9 +225,9 @@ export default function MarketingPage() {
               {c.status === 'sent' && c.recipientCount > 0 && (
                 <div className="mt-4 pt-3" style={{ borderTop: '1px solid rgba(0,0,0,0.05)' }}>
                   <div className="h-1.5 rounded-full overflow-hidden" style={{ background: '#e8e5e0' }}>
-                    <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, Math.round(c.deliveredCount / c.recipientCount * 100))}%`, background: '#23766a' }} />
+                    <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, Math.round(c.deliveredCount / c.recipientCount * 100))}%`, background: '#183153' }} />
                   </div>
-                  <p className="text-[11.5px] mt-1 text-[#8aa29a] dark:text-[#94b8b0]">
+                  <p className="text-[11.5px] mt-1 text-[#64748b] dark:text-[#a9c1d0]">
                     {Math.round(c.deliveredCount / c.recipientCount * 100)}% delivery rate
                   </p>
                 </div>

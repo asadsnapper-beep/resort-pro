@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import Stripe from 'stripe';
 import { prisma } from '@resort-pro/database';
+import { PLAN_PRICING } from '@resort-pro/types';
 import { createAdminNotification } from '../utils/notifications';
 import { applyPlanFlagsToTenant, resolveTenantEntitlement, getPlanConfigs } from '../utils/entitlement';
 import { bkashGrantToken, bkashCreatePayment, bkashExecutePayment, type BkashConfig } from '../services/bkash';
@@ -10,44 +11,52 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder'
   apiVersion: '2024-06-20',
 });
 
-// ── Plan definitions ───────────────────────────────────────────────────────
+// ── Plan definitions — prices/limits from @resort-pro/types, the single
+// source of truth (see plan/launch-pricing-and-trial-abuse-prevention.md) ──
 export const PLANS = {
   STARTER: {
-    name: 'Starter',
-    price: 49,
+    name: PLAN_PRICING.STARTER.displayName,
+    price: PLAN_PRICING.STARTER.monthlyUsd,
     currency: 'usd',
     interval: 'month' as const,
     priceId: process.env.STRIPE_PRICE_STARTER || '',
-    features: ['Up to 20 rooms', 'Booking management', 'Guest CRM', 'Email support'],
-    roomLimit: 20,
+    features: [`Up to ${PLAN_PRICING.STARTER.roomLimit} rooms`, 'Booking management', 'Guest CRM', 'Email support'],
+    roomLimit: PLAN_PRICING.STARTER.roomLimit,
   },
   PROFESSIONAL: {
-    name: 'Professional',
-    price: 99,
+    name: PLAN_PRICING.PROFESSIONAL.displayName,
+    price: PLAN_PRICING.PROFESSIONAL.monthlyUsd,
     currency: 'usd',
     interval: 'month' as const,
     priceId: process.env.STRIPE_PRICE_PRO || '',
-    features: ['Up to 100 rooms', 'Everything in Starter', 'Staff invites', 'Priority support', 'Advanced analytics'],
-    roomLimit: 100,
+    features: [`Up to ${PLAN_PRICING.PROFESSIONAL.roomLimit} rooms`, 'Everything in Starter', 'Staff invites', 'Priority support', 'Advanced analytics'],
+    roomLimit: PLAN_PRICING.PROFESSIONAL.roomLimit,
   },
   ENTERPRISE: {
-    name: 'Enterprise',
-    price: 199,
+    name: PLAN_PRICING.ENTERPRISE.displayName,
+    price: PLAN_PRICING.ENTERPRISE.monthlyUsd,
     currency: 'usd',
     interval: 'month' as const,
     priceId: process.env.STRIPE_PRICE_ENTERPRISE || '',
-    features: ['Unlimited rooms', 'Everything in Pro', 'Custom integrations', 'Dedicated support', 'SLA guarantee'],
-    roomLimit: -1,
+    features: [`Up to ${PLAN_PRICING.ENTERPRISE.roomLimit} rooms`, 'Everything in Pro', 'Custom integrations', 'Dedicated support', 'SLA guarantee'],
+    roomLimit: PLAN_PRICING.ENTERPRISE.roomLimit,
   },
 } as const;
 
 // ── bKash subscription pricing (BDT) ───────────────────────────────────────
 // Local-payment prices for owners who pay via bKash. Env-overridable so you can
-// tune without a deploy. These are the amounts YOU charge for the platform.
+// tune without a deploy; default falls back to the canonical @resort-pro/types
+// value, not an independent number.
 const BKASH_PLAN_BDT: Record<'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE', number> = {
-  STARTER: Number(process.env.BKASH_PRICE_STARTER) || 4900,
-  PROFESSIONAL: Number(process.env.BKASH_PRICE_PRO) || 9900,
-  ENTERPRISE: Number(process.env.BKASH_PRICE_ENTERPRISE) || 19900,
+  STARTER: Number(process.env.BKASH_PRICE_STARTER) || PLAN_PRICING.STARTER.monthlyBdt,
+  PROFESSIONAL: Number(process.env.BKASH_PRICE_PRO) || PLAN_PRICING.PROFESSIONAL.monthlyBdt,
+  ENTERPRISE: Number(process.env.BKASH_PRICE_ENTERPRISE) || PLAN_PRICING.ENTERPRISE.monthlyBdt,
+};
+// Annual is an exact figure (2 months free), not a flat percentage off.
+const BKASH_PLAN_ANNUAL_BDT: Record<'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE', number> = {
+  STARTER: Number(process.env.BKASH_PRICE_STARTER_ANNUAL) || PLAN_PRICING.STARTER.annualBdt,
+  PROFESSIONAL: Number(process.env.BKASH_PRICE_PRO_ANNUAL) || PLAN_PRICING.PROFESSIONAL.annualBdt,
+  ENTERPRISE: Number(process.env.BKASH_PRICE_ENTERPRISE_ANNUAL) || PLAN_PRICING.ENTERPRISE.annualBdt,
 };
 
 // Platform bKash merchant account (money comes to YOU). Returns null if unset,
@@ -236,8 +245,7 @@ export async function billingRoutes(app: FastifyInstance) {
         return reply.status(503).send({ success: false, error: 'bKash payments are not available yet. Please contact support.' });
       }
 
-      const monthly = BKASH_PLAN_BDT[planKey];
-      const amountNum = interval === 'year' ? Math.round(monthly * 12 * 0.8) : monthly; // 20% off annual
+      const amountNum = interval === 'year' ? BKASH_PLAN_ANNUAL_BDT[planKey] : BKASH_PLAN_BDT[planKey];
       const amount = amountNum.toFixed(2);
 
       // Same class of bug as file uploads: APP_URL/API_BASE_URL are often unset

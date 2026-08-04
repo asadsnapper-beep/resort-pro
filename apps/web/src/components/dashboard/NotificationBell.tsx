@@ -115,7 +115,7 @@ export function NotificationBell() {
         aria-label="Notifications"
         className={cn(
           'relative flex h-8 w-8 items-center justify-center rounded-rp-ctrl transition-colors',
-          open ? 'bg-rp-surface-3 text-rp-text' : 'text-[#8fa8a1] hover:text-resort-900 dark:hover:text-white',
+          open ? 'bg-rp-surface-3 text-rp-text' : 'text-[#94aab9] hover:text-resort-900 dark:hover:text-white',
         )}
       >
         <Bell className="h-4 w-4" />

@@ -33,14 +33,14 @@ function offerStatus(o: Offer): 'active' | 'scheduled' | 'expired' | 'paused' {
 }
 
 const STATUS_META = {
-  active:    { label: 'Active',    Icon: CheckCircle2,   bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a' },
+  active:    { label: 'Active',    Icon: CheckCircle2,   bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153' },
   scheduled: { label: 'Scheduled', Icon: Clock,          bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
   expired:   { label: 'Expired',   Icon: XCircle,        bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)' },
   paused:    { label: 'Paused',    Icon: AlertTriangle,  bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a' },
 };
 
 const TYPE_META: Record<OfferType, { label: string; Icon: React.ElementType; bg: string; border: string; text: string }> = {
-  PERCENTAGE: { label: '% Off',      Icon: Percent,    bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a' },
+  PERCENTAGE: { label: '% Off',      Icon: Percent,    bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153' },
   FIXED:      { label: 'Fixed Amt',  Icon: Banknote, bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
   FREE_NIGHT: { label: 'Free Night', Icon: MoonStar,   bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.15)', text: '#b8724a' },
 };
@@ -52,8 +52,8 @@ function formatValue(o: Offer) {
   return String(o.value);
 }
 
-const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30';
-const labelCls = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
+const labelCls = 'block text-[11.5px] font-medium text-[#64748b] mb-1.5';
 
 const EMPTY_FORM = {
   title: '', description: '', type: 'PERCENTAGE' as OfferType,
@@ -160,11 +160,11 @@ function OfferModal({ initial, onClose, onSave }: {
                   { key: 'showOnCards', label: 'Room cards' },
                   { key: 'isActive',    label: 'Active' },
                 ].map(({ key, label }) => (
-                  <label key={key} className="flex items-center gap-2 cursor-pointer text-[13px] text-[#18231f] dark:text-[#dfd9d0]">
+                  <label key={key} className="flex items-center gap-2 cursor-pointer text-[13px] text-[#183153] dark:text-[#f8fafc]">
                     <input type="checkbox"
                       checked={!!form[key as keyof typeof EMPTY_FORM]}
                       onChange={e => set(key as keyof typeof EMPTY_FORM, e.target.checked)}
-                      className="h-4 w-4 rounded" style={{ accentColor: '#23766a' }} />
+                      className="h-4 w-4 rounded" style={{ accentColor: '#183153' }} />
                     {label}
                   </label>
                 ))}
@@ -189,31 +189,31 @@ function StatsModal({ offer, onClose }: { offer: Offer; onClose: () => void }) {
     >
       <div className="space-y-4">
           {!stats ? (
-            <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-[#8aa29a] dark:text-[#94b8b0]" /></div>
+            <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-[#64748b] dark:text-[#a9c1d0]" /></div>
           ) : (
             <>
               <div className="grid grid-cols-3 gap-4">
                 {[
-                  { label: 'Total Uses',   value: stats.totalUses ?? 0,                             bg: 'var(--rp-teal-bg)', text: '#23766a' },
+                  { label: 'Total Uses',   value: stats.totalUses ?? 0,                             bg: 'var(--rp-teal-bg)', text: '#183153' },
                   { label: 'Total Saved',  value: `$${(stats.totalSaved ?? 0).toFixed(2)}`,         bg: 'var(--rp-amber-bg)', text: '#b89040' },
                   { label: 'Revenue',      value: `$${(stats.totalRevenue ?? 0).toFixed(2)}`,       bg: 'var(--rp-surface-2)', text: 'var(--rp-text)' },
                 ].map(s => (
                   <div key={s.label} className="rounded-[12px] border p-4 text-center"
                     style={{ background: s.bg, borderColor: 'var(--rp-border)' }}>
                     <p className="text-[20px] font-bold" style={{ color: s.text }}>{s.value}</p>
-                    <p className="text-[11.5px] mt-0.5 text-[#8aa29a] dark:text-[#94b8b0]">{s.label}</p>
+                    <p className="text-[11.5px] mt-0.5 text-[#64748b] dark:text-[#a9c1d0]">{s.label}</p>
                   </div>
                 ))}
               </div>
               {stats.recentUsages?.length > 0 && (
                 <div>
-                  <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] mb-2 text-[#8aa29a] dark:text-[#94b8b0]">Recent Bookings</p>
+                  <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] mb-2 text-[#64748b] dark:text-[#a9c1d0]">Recent Bookings</p>
                   <div className="space-y-0 max-h-48 overflow-y-auto rounded-[10px] border" style={{ borderColor: 'var(--rp-border)' }}>
                     {stats.recentUsages.map((u: { discount: number; booking: { createdAt: string; totalAmount: string } }, i: number) => (
                       <div key={i} className="flex justify-between px-4 py-2.5 text-[13px] transition-colors hover:bg-[#fafaf8]"
                         style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
                         <span style={{ color: 'var(--rp-text-subtle)' }}>{format(new Date(u.booking.createdAt), 'MMM d, yyyy')}</span>
-                        <span className="font-medium" style={{ color: '#23766a' }}>−${u.discount.toFixed(2)}</span>
+                        <span className="font-medium" style={{ color: '#183153' }}>−${u.discount.toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
@@ -295,10 +295,10 @@ export default function OffersPage() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { label: 'Active',    key: 'active',    bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a' },
+          { label: 'Active',    key: 'active',    bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153' },
           { label: 'Scheduled', key: 'scheduled', bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
           { label: 'Expired',   key: 'expired',   bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)' },
-          { label: 'Total',     key: 'total',     bg: '#1b342f', border: 'rgba(27,52,47,0.4)',    text: '#dfd9d0' },
+          { label: 'Total',     key: 'total',     bg: '#183153', border: 'rgba(24,49,83,0.4)',    text: '#f8fafc' },
         ].map(({ label, key, bg, border, text }) => (
           <div key={key} className="rounded-[14px] border p-4"
             style={{ background: bg, borderColor: border }}>
@@ -332,12 +332,12 @@ export default function OffersPage() {
         </div>
       ) : offers.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-[14px] border-2 border-dashed py-16 text-center"
-          style={{ borderColor: 'rgba(35,118,106,0.2)', background: 'var(--rp-surface-2)' }}>
+          style={{ borderColor: 'rgba(24,49,83,0.2)', background: 'var(--rp-surface-2)' }}>
           <div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'var(--rp-teal-bg)' }}>
-            <Tag className="h-7 w-7" style={{ color: '#23766a' }} />
+            <Tag className="h-7 w-7" style={{ color: '#183153' }} />
           </div>
-          <p className="text-[13.5px] font-medium text-[#18231f] dark:text-[#dfd9d0]">No offers yet</p>
-          <p className="text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">Click "New Offer" to create your first promotion</p>
+          <p className="text-[13.5px] font-medium text-[#183153] dark:text-[#f8fafc]">No offers yet</p>
+          <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">Click "New Offer" to create your first promotion</p>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
@@ -365,26 +365,26 @@ export default function OffersPage() {
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => setStatsFor(offer)}
-                      className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#f4f1eb] text-[#8aa29a] dark:text-[#94b8b0]">
+                      className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#f4f1eb] text-[#64748b] dark:text-[#a9c1d0]">
                       <BarChart2 className="h-4 w-4" />
                     </button>
                     <button onClick={() => setEditing(offer)}
-                      className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#f4f1eb] text-[#8aa29a] dark:text-[#94b8b0]">
+                      className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#f4f1eb] text-[#64748b] dark:text-[#a9c1d0]">
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button onClick={() => setConfirmDelete(offer)}
-                      className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#fef2f2] text-[#c5bdb4] dark:text-[#6e8580]">
+                      className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#fef2f2] text-[#94a3b8] dark:text-[#7f99ab]">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
 
-                <h3 className="text-[13.5px] font-semibold text-[#18231f] dark:text-[#dfd9d0]">{offer.title}</h3>
+                <h3 className="text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">{offer.title}</h3>
                 {offer.description && (
-                  <p className="text-[12.5px] mt-0.5 line-clamp-2 text-[#8aa29a] dark:text-[#94b8b0]">{offer.description}</p>
+                  <p className="text-[12.5px] mt-0.5 line-clamp-2 text-[#64748b] dark:text-[#a9c1d0]">{offer.description}</p>
                 )}
 
-                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-[12px] text-[#64748b] dark:text-[#a9c1d0]">
                   <span className="flex items-center gap-1">
                     <CalendarDays className="h-3 w-3" />
                     {format(new Date(offer.validFrom), 'MMM d')}–{format(new Date(offer.validTo), 'MMM d, yyyy')}
@@ -399,7 +399,7 @@ export default function OffersPage() {
 
                 {offer.promoCode && (
                   <div className="mt-3 inline-flex items-center gap-1.5 rounded-[8px] border border-dashed px-3 py-1 text-[12px] font-mono font-semibold"
-                    style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.3)', color: '#23766a' }}>
+                    style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.3)', color: '#183153' }}>
                     <Tag className="h-3 w-3" /> {offer.promoCode}
                   </div>
                 )}
@@ -413,7 +413,7 @@ export default function OffersPage() {
                     <span key={key}
                       className="rounded-[6px] px-1.5 py-0.5 text-[10.5px] font-medium"
                       style={offer[key as keyof Offer]
-                        ? { background: 'var(--rp-teal-bg)', color: '#23766a' }
+                        ? { background: 'var(--rp-teal-bg)', color: '#183153' }
                         : { background: 'var(--rp-surface-3)', color: 'var(--rp-text-faint)', textDecoration: 'line-through' }}>
                       {label}
                     </span>
@@ -465,7 +465,7 @@ export default function OffersPage() {
             </div>
           }
         >
-          <p className="text-[13.5px] text-[#4a6e66] dark:text-[#6d9990]">
+          <p className="text-[13.5px] text-[#475569] dark:text-[#9db4c4]">
             "{confirmDelete.title}" will be permanently removed.
           </p>
         </ModalShell>

@@ -36,9 +36,9 @@ function KpiCard({ label, value, sub, icon: Icon, color }: {
       style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]">{label}</p>
-          <p className="mt-1.5 text-[22px] font-semibold tracking-[-0.02em] text-[#18231f]">{value}</p>
-          {sub && <p className="mt-0.5 text-[11px] text-[#c5bdb4]">{sub}</p>}
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">{label}</p>
+          <p className="mt-1.5 text-[22px] font-semibold tracking-[-0.02em] text-[#183153]">{value}</p>
+          {sub && <p className="mt-0.5 text-[11px] text-[#94a3b8]">{sub}</p>}
         </div>
         <div className="flex h-[36px] w-[36px] items-center justify-center rounded-[9px]" style={{ background: color }}>
           <Icon className="h-[15px] w-[15px] text-white" />
@@ -53,11 +53,11 @@ function SectionHeader({ icon: Icon, title, count }: {
 }) {
   return (
     <div className="flex items-center gap-2 mb-3">
-      <Icon className="h-[14px] w-[14px]" style={{ color: '#23766a' }} />
-      <h3 className="text-[12px] font-semibold uppercase tracking-[0.07em] text-[#18231f]">{title}</h3>
+      <Icon className="h-[14px] w-[14px]" style={{ color: '#183153' }} />
+      <h3 className="text-[12px] font-semibold uppercase tracking-[0.07em] text-[#183153]">{title}</h3>
       {count !== undefined && (
         <span className="ml-1 rounded-[6px] border px-[8px] py-[2px] text-[11px] font-bold"
-          style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+          style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
           {count}
         </span>
       )}
@@ -134,35 +134,35 @@ function DispatchSettings() {
 
   const set = (key: string, value: any) => setForm(prev => ({ ...prev, [key]: value }));
 
-  const inputCls = 'mt-1 block w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30';
+  const inputCls = 'mt-1 block w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
 
   return (
     <div className="rounded-[14px] border bg-white no-print"
       style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
       <div className="flex items-center justify-between px-5 pt-5 pb-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-[30px] w-[30px] items-center justify-center rounded-[8px]" style={{ background: isDark ? 'rgba(35,118,106,0.2)' : 'var(--rp-teal-bg)' }}>
-            <Bell className="h-[14px] w-[14px]" style={{ color: '#23766a' }} />
+          <div className="flex h-[30px] w-[30px] items-center justify-center rounded-[8px]" style={{ background: isDark ? 'rgba(24,49,83,0.2)' : 'var(--rp-teal-bg)' }}>
+            <Bell className="h-[14px] w-[14px]" style={{ color: '#183153' }} />
           </div>
-          <span className="text-[12.5px] font-semibold uppercase tracking-[0.07em] text-[#18231f]">Auto-Dispatch Daily Report</span>
+          <span className="text-[12.5px] font-semibold uppercase tracking-[0.07em] text-[#183153]">Auto-Dispatch Daily Report</span>
         </div>
         <button
           onClick={() => set('enabled', !form.enabled)}
           className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors"
-          style={{ background: form.enabled ? '#23766a' : '#d1cfc9' }}
+          style={{ background: form.enabled ? '#183153' : '#d1cfc9' }}
         >
           <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg transition-transform ${form.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
         </button>
       </div>
-      <p className="px-5 pb-4 text-[12px] text-[#8aa29a]">
+      <p className="px-5 pb-4 text-[12px] text-[#64748b]">
         Send the daily report automatically to Telegram and/or WhatsApp every evening.
       </p>
 
       <div className="px-5 pb-5 space-y-5 border-t" style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
         <div className="pt-4 flex items-center gap-3">
-          <Clock className="h-4 w-4 shrink-0 text-[#8aa29a] dark:text-[#94b8b0]" />
+          <Clock className="h-4 w-4 shrink-0 text-[#64748b] dark:text-[#a9c1d0]" />
           <div className="flex-1">
-            <label className="text-[11.5px] font-medium text-[#6b8880]">Send Time (24h, server timezone)</label>
+            <label className="text-[11.5px] font-medium text-[#64748b]">Send Time (24h, server timezone)</label>
             <input type="time" value={form.dispatchTime} onChange={e => set('dispatchTime', e.target.value)} className={inputCls} />
           </div>
         </div>
@@ -171,13 +171,13 @@ function DispatchSettings() {
         <div className="rounded-[10px] border p-4 space-y-3" style={{ borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-border)', background: isDark ? 'rgba(255,255,255,0.05)' : 'var(--rp-surface-2)' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Send className="h-[14px] w-[14px]" style={{ color: '#23766a' }} />
-              <span className="text-[13px] font-medium text-[#18231f]">Telegram</span>
+              <Send className="h-[14px] w-[14px]" style={{ color: '#183153' }} />
+              <span className="text-[13px] font-medium text-[#183153]">Telegram</span>
             </div>
             <button
               onClick={() => set('telegramEnabled', !form.telegramEnabled)}
               className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors"
-              style={{ background: form.telegramEnabled ? '#23766a' : '#d1cfc9' }}
+              style={{ background: form.telegramEnabled ? '#183153' : '#d1cfc9' }}
             >
               <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${form.telegramEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
             </button>
@@ -185,20 +185,20 @@ function DispatchSettings() {
           {form.telegramEnabled && (
             <div className="space-y-2">
               <div>
-                <label className="text-[11px] text-[#6b8880]">Bot Token</label>
+                <label className="text-[11px] text-[#64748b]">Bot Token</label>
                 <input type="password" placeholder="123456789:ABCdefGhIJKlmNoPQRstuVWxyz" value={form.telegramBotToken}
                   onChange={e => set('telegramBotToken', e.target.value)} className={inputCls} />
-                <p className="mt-0.5 text-[11px] text-[#8aa29a]">Create a bot via <a href="https://t.me/BotFather" target="_blank" rel="noreferrer" style={{ color: '#23766a' }}>@BotFather</a> to get a token.</p>
+                <p className="mt-0.5 text-[11px] text-[#64748b]">Create a bot via <a href="https://t.me/BotFather" target="_blank" rel="noreferrer" style={{ color: '#183153' }}>@BotFather</a> to get a token.</p>
               </div>
               <div>
-                <label className="text-[11px] text-[#6b8880]">Chat ID</label>
+                <label className="text-[11px] text-[#64748b]">Chat ID</label>
                 <input type="text" placeholder="-1001234567890 or your personal chat ID" value={form.telegramChatId}
                   onChange={e => set('telegramChatId', e.target.value)} className={inputCls} />
-                <p className="mt-0.5 text-[11px] text-[#8aa29a]">Send a message to the bot, then call <code className="rounded px-1" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-surface-4)' }}>/getUpdates</code> to find your chat_id.</p>
+                <p className="mt-0.5 text-[11px] text-[#64748b]">Send a message to the bot, then call <code className="rounded px-1" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-surface-4)' }}>/getUpdates</code> to find your chat_id.</p>
               </div>
               <button onClick={() => testMut.mutate('telegram')} disabled={testingChannel === 'telegram' || !form.telegramBotToken || !form.telegramChatId}
                 className="flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12px] transition-colors disabled:opacity-50"
-                style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
                 {testingChannel === 'telegram' ? '⏳ Sending…' : <><Send className="h-3 w-3" /> Send Test Message</>}
               </button>
             </div>
@@ -209,13 +209,13 @@ function DispatchSettings() {
         <div className="rounded-[10px] border p-4 space-y-3" style={{ borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-border)', background: isDark ? 'rgba(255,255,255,0.05)' : 'var(--rp-surface-2)' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <MessageCircle className="h-[14px] w-[14px]" style={{ color: '#23766a' }} />
-              <span className="text-[13px] font-medium text-[#18231f]">WhatsApp</span>
+              <MessageCircle className="h-[14px] w-[14px]" style={{ color: '#183153' }} />
+              <span className="text-[13px] font-medium text-[#183153]">WhatsApp</span>
             </div>
             <button
               onClick={() => set('whatsappEnabled', !form.whatsappEnabled)}
               className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors"
-              style={{ background: form.whatsappEnabled ? '#23766a' : '#d1cfc9' }}
+              style={{ background: form.whatsappEnabled ? '#183153' : '#d1cfc9' }}
             >
               <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${form.whatsappEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
             </button>
@@ -223,14 +223,14 @@ function DispatchSettings() {
           {form.whatsappEnabled && (
             <div className="space-y-2">
               <div>
-                <label className="text-[11px] text-[#6b8880]">Recipient Phone Number</label>
+                <label className="text-[11px] text-[#64748b]">Recipient Phone Number</label>
                 <input type="tel" placeholder="+8801XXXXXXXXX" value={form.whatsappPhone}
                   onChange={e => set('whatsappPhone', e.target.value)} className={inputCls} />
-                <p className="mt-0.5 text-[11px] text-[#8aa29a]">Uses the WhatsApp gateway from Settings → SMS & WhatsApp.</p>
+                <p className="mt-0.5 text-[11px] text-[#64748b]">Uses the WhatsApp gateway from Settings → SMS & WhatsApp.</p>
               </div>
               <button onClick={() => testMut.mutate('whatsapp')} disabled={testingChannel === 'whatsapp' || !form.whatsappPhone}
                 className="flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12px] transition-colors disabled:opacity-50"
-                style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
                 {testingChannel === 'whatsapp' ? '⏳ Sending…' : <><MessageCircle className="h-3 w-3" /> Send Test Message</>}
               </button>
             </div>
@@ -238,8 +238,8 @@ function DispatchSettings() {
         </div>
 
         {dispatch?.lastDispatchedAt && (
-          <div className="flex items-center gap-2 text-[12px] text-[#8aa29a] dark:text-[#94b8b0]">
-            <CheckCircle2 className="h-3.5 w-3.5" style={{ color: '#23766a' }} />
+          <div className="flex items-center gap-2 text-[12px] text-[#64748b] dark:text-[#a9c1d0]">
+            <CheckCircle2 className="h-3.5 w-3.5" style={{ color: '#183153' }} />
             Last sent: {new Date(dispatch.lastDispatchedAt).toLocaleString()} (date: {dispatch.lastDispatchDate})
           </div>
         )}
@@ -318,7 +318,7 @@ export default function ReportsPage() {
                 className="px-3 py-2 text-[13px] hover:bg-[#f4f1eb] transition-colors border-r"
                 style={{ borderColor: 'var(--rp-border)' }}>←</button>
               <input type="date" value={date} max={toLocalDate(new Date())} onChange={(e) => setDate(e.target.value)}
-                className="px-3 py-2 text-[13px] bg-transparent focus:outline-none cursor-pointer text-[#18231f]" />
+                className="px-3 py-2 text-[13px] bg-transparent focus:outline-none cursor-pointer text-[#183153]" />
               <button onClick={() => changeDate(1)} disabled={date >= toLocalDate(new Date())}
                 className="px-3 py-2 text-[13px] hover:bg-[#f4f1eb] transition-colors border-l disabled:opacity-40"
                 style={{ borderColor: 'var(--rp-border)' }}>→</button>
@@ -356,7 +356,7 @@ export default function ReportsPage() {
           <div className="flex items-center gap-2 no-print">
             <input type="email" placeholder="recipient@email.com (leave blank for account email)"
               value={emailAddr} onChange={(e) => setEmailAddr(e.target.value)}
-              className="flex-1 rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-2 text-[13px] text-[#18231f] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30" />
+              className="flex-1 rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-2 text-[13px] text-[#183153] focus:outline-none focus:ring-2 focus:ring-[#183153]/30" />
             <button onClick={() => emailMut.mutate()} disabled={emailMut.isPending}
               className="rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors disabled:opacity-50"
               style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
@@ -387,23 +387,23 @@ export default function ReportsPage() {
           <div id="report-content" className="space-y-6">
             {/* Report date banner */}
             <div className="rounded-[12px] border px-5 py-4 flex items-center justify-between"
-              style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)' }}>
+              style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)' }}>
               <div className="flex items-center gap-3">
-                <Calendar className="h-[18px] w-[18px]" style={{ color: '#23766a' }} />
+                <Calendar className="h-[18px] w-[18px]" style={{ color: '#183153' }} />
                 <div>
-                  <p className="text-[13.5px] font-semibold" style={{ color: '#1b342f' }}>{formatDisplayDate(date)}</p>
-                  <p className="text-[12px]" style={{ color: '#23766a' }}>{report.tenant.name}</p>
+                  <p className="text-[13.5px] font-semibold" style={{ color: '#183153' }}>{formatDisplayDate(date)}</p>
+                  <p className="text-[12px]" style={{ color: '#183153' }}>{report.tenant.name}</p>
                 </div>
               </div>
-              <span className="text-[11.5px]" style={{ color: '#4a8c80' }}>Generated {new Date().toLocaleTimeString()}</span>
+              <span className="text-[11.5px]" style={{ color: '#6386a3' }}>Generated {new Date().toLocaleTimeString()}</span>
             </div>
 
             {/* ── KPI strip ── */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <KpiCard label="Occupancy" value={`${report.occupancy.rate}%`}
-                sub={`${report.occupancy.occupied} / ${report.occupancy.totalRooms} rooms`} icon={TrendingUp} color="#23766a" />
+                sub={`${report.occupancy.occupied} / ${report.occupancy.totalRooms} rooms`} icon={TrendingUp} color="#183153" />
               <KpiCard label="Total Revenue" value={formatCurrency(report.revenue.total)}
-                sub="Rooms + F&B + Extras" icon={Banknote} color="#1b342f" />
+                sub="Rooms + F&B + Extras" icon={Banknote} color="#183153" />
               <KpiCard label="Arrivals" value={report.arrivals.length}
                 sub={`${report.arrivals.filter((a: any) => a.status === 'CHECKED_IN').length} checked in`} icon={LogIn} color="#b89040" />
               <KpiCard label="Departures" value={report.departures.length}
@@ -418,7 +418,7 @@ export default function ReportsPage() {
                 <div className="pb-3"><SectionHeader icon={Banknote} title="Revenue Breakdown" /></div>
                 <div className="space-y-3">
                   {[
-                    { label: 'Room Revenue', amount: report.revenue.rooms, color: '#23766a' },
+                    { label: 'Room Revenue', amount: report.revenue.rooms, color: '#183153' },
                     { label: 'Restaurant & F&B', amount: report.revenue.restaurant, color: '#b8724a' },
                     { label: 'Extras & Charges', amount: report.revenue.extras, color: '#b89040' },
                   ].map(({ label, amount, color }) => {
@@ -427,7 +427,7 @@ export default function ReportsPage() {
                       <div key={label}>
                         <div className="flex justify-between text-[13px] mb-1.5">
                           <span style={{ color: 'var(--rp-text-muted)' }}>{label}</span>
-                          <span className="font-medium text-[#18231f] dark:text-[#dfd9d0]">{formatCurrency(amount)}</span>
+                          <span className="font-medium text-[#183153] dark:text-[#f8fafc]">{formatCurrency(amount)}</span>
                         </div>
                         <div className="h-[6px] w-full rounded-full" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-surface-4)' }}>
                           <div className="h-[6px] rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
@@ -437,7 +437,7 @@ export default function ReportsPage() {
                   })}
                   <div className="pt-2 border-t flex justify-between text-[13px] font-semibold" style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
                     <span style={{ color: 'var(--rp-text)' }}>Total</span>
-                    <span style={{ color: '#23766a' }}>{formatCurrency(report.revenue.total)}</span>
+                    <span style={{ color: '#183153' }}>{formatCurrency(report.revenue.total)}</span>
                   </div>
                 </div>
               </div>
@@ -448,8 +448,8 @@ export default function ReportsPage() {
                 <div className="pb-3"><SectionHeader icon={CreditCard} title="Payment Methods" /></div>
                 <div className="space-y-2">
                   {[
-                    { label: 'Cash', icon: Banknote, amount: report.payments.cash, accent: '#23766a', accentBg: 'var(--rp-teal-bg)' },
-                    { label: 'Card / Online', icon: CreditCard, amount: report.payments.card, accent: '#1b342f', accentBg: 'var(--rp-teal-bg)' },
+                    { label: 'Cash', icon: Banknote, amount: report.payments.cash, accent: '#183153', accentBg: 'var(--rp-teal-bg)' },
+                    { label: 'Card / Online', icon: CreditCard, amount: report.payments.card, accent: '#183153', accentBg: 'var(--rp-teal-bg)' },
                     { label: 'Bank Transfer', icon: Building2, amount: report.payments.bankTransfer, accent: '#b89040', accentBg: 'var(--rp-amber-bg)' },
                     { label: 'Other', icon: Banknote, amount: report.payments.other, accent: 'var(--rp-text-muted)', accentBg: 'var(--rp-surface-3)' },
                   ].map(({ label, icon: Icon, amount, accent, accentBg }) => (
@@ -459,7 +459,7 @@ export default function ReportsPage() {
                         <div className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px]" style={{ background: accentBg }}>
                           <Icon className="h-[13px] w-[13px]" style={{ color: accent }} />
                         </div>
-                        <span className="text-[13px] text-[#18231f] dark:text-[#dfd9d0]">{label}</span>
+                        <span className="text-[13px] text-[#183153] dark:text-[#f8fafc]">{label}</span>
                       </div>
                       <span className="text-[13px] font-semibold" style={{ color: amount > 0 ? accent : 'var(--rp-text-muted)' }}>
                         {formatCurrency(amount)}
@@ -475,7 +475,7 @@ export default function ReportsPage() {
               style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
               <div className="pb-3"><SectionHeader icon={LogIn} title="Arrivals" count={report.arrivals.length} /></div>
               {report.arrivals.length === 0 ? (
-                <p className="text-[13px] text-center py-6 text-[#8aa29a] dark:text-[#94b8b0]">No arrivals today</p>
+                <p className="text-[13px] text-center py-6 text-[#64748b] dark:text-[#a9c1d0]">No arrivals today</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -491,14 +491,14 @@ export default function ReportsPage() {
                       {report.arrivals.map((a: any) => (
                         <tr key={a.bookingId} className="border-b hover:bg-[#faf9f7] dark:hover:bg-white/5 transition-colors"
                           style={{ borderColor: 'rgba(0,0,0,0.03)' }}>
-                          <td className="py-2.5 text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{a.guestName}</td>
-                          <td className="py-2.5 text-[13px] text-[#7a9890] dark:text-[#94b8b0]">{a.room}</td>
-                          <td className="py-2.5 text-[13px] text-right text-[#7a9890] dark:text-[#94b8b0]">{a.nights}n</td>
-                          <td className="py-2.5 text-[13px] text-right text-[#7a9890] dark:text-[#94b8b0]">{a.checkOut}</td>
+                          <td className="py-2.5 text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{a.guestName}</td>
+                          <td className="py-2.5 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">{a.room}</td>
+                          <td className="py-2.5 text-[13px] text-right text-[#64748b] dark:text-[#a9c1d0]">{a.nights}n</td>
+                          <td className="py-2.5 text-[13px] text-right text-[#64748b] dark:text-[#a9c1d0]">{a.checkOut}</td>
                           <td className="py-2.5 text-right">
                             <span className="inline-block rounded-[7px] border px-[9px] py-[3px] text-[11px] font-semibold"
                               style={a.status === 'CHECKED_IN'
-                                ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }
+                                ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }
                                 : { background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.2)', color: '#b89040' }}>
                               {a.status === 'CHECKED_IN' ? 'In' : 'Due'}
                             </span>
@@ -516,7 +516,7 @@ export default function ReportsPage() {
               style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
               <div className="pb-3"><SectionHeader icon={LogOut} title="Departures" count={report.departures.length} /></div>
               {report.departures.length === 0 ? (
-                <p className="text-[13px] text-center py-6 text-[#8aa29a] dark:text-[#94b8b0]">No departures today</p>
+                <p className="text-[13px] text-center py-6 text-[#64748b] dark:text-[#a9c1d0]">No departures today</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -534,12 +534,12 @@ export default function ReportsPage() {
                         return (
                           <tr key={d.bookingId} className="border-b hover:bg-[#faf9f7] dark:hover:bg-white/5 transition-colors"
                             style={{ borderColor: 'rgba(0,0,0,0.03)' }}>
-                            <td className="py-2.5 text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{d.guestName}</td>
-                            <td className="py-2.5 text-[13px] text-[#7a9890] dark:text-[#94b8b0]">{d.room}</td>
-                            <td className="py-2.5 text-[13px] text-right text-[#18231f] dark:text-[#dfd9d0]">{formatCurrency(d.totalBill)}</td>
-                            <td className="py-2.5 text-[13px] text-right font-medium" style={{ color: '#23766a' }}>{formatCurrency(d.paidAmount)}</td>
+                            <td className="py-2.5 text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{d.guestName}</td>
+                            <td className="py-2.5 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">{d.room}</td>
+                            <td className="py-2.5 text-[13px] text-right text-[#183153] dark:text-[#f8fafc]">{formatCurrency(d.totalBill)}</td>
+                            <td className="py-2.5 text-[13px] text-right font-medium" style={{ color: '#183153' }}>{formatCurrency(d.paidAmount)}</td>
                             <td className="py-2.5 text-[13px] text-right font-medium"
-                              style={{ color: balance > 0 ? '#c43c3c' : '#23766a' }}>
+                              style={{ color: balance > 0 ? '#c43c3c' : '#183153' }}>
                               {balance > 0 ? formatCurrency(balance) : '✓ Settled'}
                             </td>
                             <td className="py-2.5 text-right">
@@ -568,7 +568,7 @@ export default function ReportsPage() {
                 {report.noShows.length === 0 ? (
                   <div className="flex flex-col items-center py-4 text-center">
                     <span className="text-2xl mb-1">✅</span>
-                    <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No no-shows today</p>
+                    <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">No no-shows today</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -577,8 +577,8 @@ export default function ReportsPage() {
                         style={{ background: isDark ? 'rgba(196,60,60,0.15)' : 'var(--rp-red-bg)' }}>
                         <AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: '#c43c3c' }} />
                         <div className="min-w-0">
-                          <p className="text-[13px] font-medium truncate text-[#18231f] dark:text-[#dfd9d0]">{n.guestName}</p>
-                          <p className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">{n.room}</p>
+                          <p className="text-[13px] font-medium truncate text-[#183153] dark:text-[#f8fafc]">{n.guestName}</p>
+                          <p className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">{n.room}</p>
                         </div>
                       </div>
                     ))}
@@ -591,9 +591,9 @@ export default function ReportsPage() {
                 style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
                 <div className="pb-3"><SectionHeader icon={Sparkles} title="Housekeeping" /></div>
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between rounded-[9px] p-3" style={{ background: isDark ? 'rgba(35,118,106,0.2)' : 'var(--rp-teal-bg)' }}>
-                    <span className="text-[13px]" style={{ color: '#23766a' }}>Completed</span>
-                    <span className="text-[22px] font-semibold" style={{ color: '#23766a' }}>{report.housekeeping.completed}</span>
+                  <div className="flex items-center justify-between rounded-[9px] p-3" style={{ background: isDark ? 'rgba(24,49,83,0.2)' : 'var(--rp-teal-bg)' }}>
+                    <span className="text-[13px]" style={{ color: '#183153' }}>Completed</span>
+                    <span className="text-[22px] font-semibold" style={{ color: '#183153' }}>{report.housekeeping.completed}</span>
                   </div>
                   <div className="flex items-center justify-between rounded-[9px] p-3" style={{ background: isDark ? 'rgba(184,144,64,0.18)' : 'var(--rp-amber-bg)' }}>
                     <span className="text-[13px]" style={{ color: '#b89040' }}>Pending</span>
@@ -602,7 +602,7 @@ export default function ReportsPage() {
                   {(report.housekeeping.completed + report.housekeeping.pending) > 0 && (
                     <div className="h-[6px] rounded-full" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-surface-4)' }}>
                       <div className="h-[6px] rounded-full transition-all" style={{
-                        background: '#23766a',
+                        background: '#183153',
                         width: `${Math.round((report.housekeeping.completed / (report.housekeeping.completed + report.housekeeping.pending)) * 100)}%`,
                       }} />
                     </div>
@@ -619,9 +619,9 @@ export default function ReportsPage() {
                     <span className="text-[13px]" style={{ color: '#c43c3c' }}>Open Tickets</span>
                     <span className="text-[22px] font-semibold" style={{ color: '#c43c3c' }}>{report.maintenance.open}</span>
                   </div>
-                  <div className="flex items-center justify-between rounded-[9px] p-3" style={{ background: isDark ? 'rgba(35,118,106,0.2)' : 'var(--rp-teal-bg)' }}>
-                    <span className="text-[13px]" style={{ color: '#23766a' }}>Resolved Today</span>
-                    <span className="text-[22px] font-semibold" style={{ color: '#23766a' }}>{report.maintenance.resolvedToday}</span>
+                  <div className="flex items-center justify-between rounded-[9px] p-3" style={{ background: isDark ? 'rgba(24,49,83,0.2)' : 'var(--rp-teal-bg)' }}>
+                    <span className="text-[13px]" style={{ color: '#183153' }}>Resolved Today</span>
+                    <span className="text-[22px] font-semibold" style={{ color: '#183153' }}>{report.maintenance.resolvedToday}</span>
                   </div>
                 </div>
               </div>
@@ -637,8 +637,8 @@ export default function ReportsPage() {
 
         {!isLoading && !report && (
           <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
-            <FileBarChart2 className="h-12 w-12 text-[#c5bdb4] dark:text-[#6e8580]" />
-            <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No report data for {date}</p>
+            <FileBarChart2 className="h-12 w-12 text-[#94a3b8] dark:text-[#7f99ab]" />
+            <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">No report data for {date}</p>
             <button onClick={() => refetch()}
               className="mt-2 rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors"
               style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>

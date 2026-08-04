@@ -22,7 +22,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 type IconFamily = 'teal' | 'gold' | 'coral';
 
 const ICON_STYLES: Record<IconFamily, { bg: string; color: string }> = {
-  teal:  { bg: 'var(--rp-teal-bg)', color: '#23766a' },
+  teal:  { bg: 'var(--rp-teal-bg)', color: '#183153' },
   gold:  { bg: 'var(--rp-amber-bg)', color: '#b89040' },
   coral: { bg: 'var(--rp-coral-bg)', color: '#b8724a' },
 };
@@ -87,7 +87,7 @@ function HeroStatCard({
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const style = ICON_STYLES[family];
-  const bg = dark ? '#1b342f' : isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)';
+  const bg = dark ? '#183153' : isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)';
   const border = isDark ? 'rgba(255,255,255,0.08)' : dark ? 'var(--rp-border-md)' : 'var(--rp-border)';
   return (
     <div
@@ -96,7 +96,7 @@ function HeroStatCard({
     >
       <div className="flex items-start justify-between mb-4">
         <span className="text-[10.5px] font-semibold uppercase tracking-[0.09em]"
-          style={{ color: dark ? '#62847c' : isDark ? '#94b8b0' : 'var(--rp-text-muted)' }}>
+          style={{ color: dark ? '#698599' : isDark ? '#a9c1d0' : 'var(--rp-text-muted)' }}>
           {title}
         </span>
         <div className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-[8px]"
@@ -106,12 +106,12 @@ function HeroStatCard({
       </div>
       <div>
         <span className="text-[40px] font-semibold leading-none tracking-[-0.03em]"
-          style={{ color: dark ? '#ece7df' : isDark ? '#dfd9d0' : 'var(--rp-text)' }}>
+          style={{ color: dark ? '#ece7df' : isDark ? '#f8fafc' : 'var(--rp-text)' }}>
           {value}
         </span>
-        {unit && <span className="ml-px text-[19px] font-normal" style={{ color: dark ? 'var(--rp-text-accent)' : isDark ? '#94b8b0' : 'var(--rp-text-muted)' }}>{unit}</span>}
+        {unit && <span className="ml-px text-[19px] font-normal" style={{ color: dark ? 'var(--rp-text-accent)' : isDark ? '#a9c1d0' : 'var(--rp-text-muted)' }}>{unit}</span>}
       </div>
-      {subtext && <p className="mt-[10px] text-[12px]" style={{ color: dark ? 'var(--rp-text-accent)' : isDark ? '#94b8b0' : 'var(--rp-text-muted)' }}>{subtext}</p>}
+      {subtext && <p className="mt-[10px] text-[12px]" style={{ color: dark ? 'var(--rp-text-accent)' : isDark ? '#a9c1d0' : 'var(--rp-text-muted)' }}>{subtext}</p>}
     </div>
   );
 }
@@ -137,16 +137,16 @@ function CompactStatCard({
       </div>
       <div>
         <div className="mb-[3px] text-[10px] font-semibold uppercase tracking-[0.07em]"
-          style={{ color: isDark ? '#94b8b0' : 'var(--rp-text-muted)' }}>{title}</div>
+          style={{ color: isDark ? '#a9c1d0' : 'var(--rp-text-muted)' }}>{title}</div>
         <div className="text-[22px] font-semibold leading-none tracking-[-0.02em]"
-          style={{ color: isDark ? '#dfd9d0' : 'var(--rp-text)' }}>{value}</div>
+          style={{ color: isDark ? '#f8fafc' : 'var(--rp-text)' }}>{value}</div>
       </div>
     </div>
   );
 }
 
 const STATUS_PILL: Record<string, { bg: string; border: string; text: string; label: string }> = {
-  CONFIRMED:   { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Confirmed' },
+  CONFIRMED:   { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153', label: 'Confirmed' },
   CHECKED_IN:  { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'In House'  },
   CHECKED_OUT: { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)', label: 'Checked Out'},
   PENDING:     { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a', label: 'Pending'   },
@@ -234,10 +234,10 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-end justify-between mb-4 animate-fade-up">
         <div>
-          <h1 className="font-display text-[27px] font-medium tracking-[-0.01em] text-[#18231f]">
+          <h1 className="font-display text-[27px] font-medium tracking-[-0.01em] text-[#183153]">
             {greeting}, {user?.firstName}
           </h1>
-          <p className="mt-[5px] text-[13px] text-[#7a9890]">
+          <p className="mt-[5px] text-[13px] text-[#64748b]">
             {today}
           </p>
         </div>
@@ -246,7 +246,7 @@ export default function DashboardPage() {
           {['OWNER', 'MANAGER', 'RECEPTIONIST'].includes(user?.role ?? '') && (
             <button
               onClick={() => setNewBookingOpen(true)}
-              className="rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
+              className="rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#f8fafc] transition-opacity hover:opacity-80"
               style={{ background: 'var(--rp-btn-accent)' }}
             >
               + New Booking
@@ -295,9 +295,9 @@ export default function DashboardPage() {
               style={{ background: isDark ? 'rgba(255,255,255,0.08)' : ICON_STYLES[family].bg }}>
               <Icon className="h-5 w-5" strokeWidth={2.2} style={{ color: ICON_STYLES[family].color }} />
             </div>
-            <span className="text-[15px] font-semibold" style={{ color: isDark ? '#dfd9d0' : 'var(--rp-text)' }}>{label}</span>
+            <span className="text-[15px] font-semibold" style={{ color: isDark ? '#f8fafc' : 'var(--rp-text)' }}>{label}</span>
             <ChevronRight className="ml-auto h-4 w-4 opacity-40 transition-transform group-hover:translate-x-0.5"
-              style={{ color: isDark ? '#94b8b0' : 'var(--rp-text-muted)' }} />
+              style={{ color: isDark ? '#a9c1d0' : 'var(--rp-text-muted)' }} />
           </Link>
         ))}
       </div>
@@ -350,30 +350,30 @@ export default function DashboardPage() {
         <div className="rounded-[14px] border overflow-hidden" style={{ background: cardBg, borderColor: cardBorder, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           <div className="flex items-center justify-between border-b px-5 py-[15px]" style={{ borderColor: dividerColor }}>
             <div className="flex items-center gap-2">
-              <LogIn className="h-[13px] w-[13px] text-[#23766a]" strokeWidth={2.5} />
-              <span className="text-[13px] font-semibold text-[#18231f]">Today's Arrivals</span>
-              <span className="rounded-full bg-[#e3f2ef] px-2 py-px text-[11px] font-semibold text-[#23766a]">{arrivals.length}</span>
+              <LogIn className="h-[13px] w-[13px] text-[#183153]" strokeWidth={2.5} />
+              <span className="text-[13px] font-semibold text-[#183153]">Today's Arrivals</span>
+              <span className="rounded-full bg-[#e5f0f7] px-2 py-px text-[11px] font-semibold text-[#183153]">{arrivals.length}</span>
             </div>
-            <a href="/dashboard/bookings?status=CONFIRMED" className="text-[12px] font-medium text-[#23766a] hover:underline">View all →</a>
+            <a href="/dashboard/bookings?status=CONFIRMED" className="text-[12px] font-medium text-[#183153] hover:underline">View all →</a>
           </div>
           {arrivals.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-8 text-center">
               <CheckCircle2 className="h-8 w-8 text-gray-200" />
-              <p className="text-[13px] text-[#8aa29a]">No arrivals today</p>
+              <p className="text-[13px] text-[#64748b]">No arrivals today</p>
             </div>
           ) : (
             <div className="divide-y" style={{ borderColor: dividerColor }}>
               {arrivals.map((b: any) => (
                 <div key={b.id} className="flex items-center gap-3 px-5 py-4 hover:bg-[#faf9f7] dark:hover:bg-white/5 transition-colors">
-                  <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-[#e3f2ef] text-[12px] font-semibold text-[#23766a]">
+                  <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-[#e5f0f7] text-[12px] font-semibold text-[#183153]">
                     {b.guest.firstName[0]}{b.guest.lastName[0]}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[14px] font-medium text-[#18231f] truncate">{b.guest.firstName} {b.guest.lastName}</p>
-                    <p className="mt-0.5 text-[12px] text-[#8aa29a]">Room {b.room.number} · {b.nights} nights</p>
+                    <p className="text-[14px] font-medium text-[#183153] truncate">{b.guest.firstName} {b.guest.lastName}</p>
+                    <p className="mt-0.5 text-[12px] text-[#64748b]">Room {b.room.number} · {b.nights} nights</p>
                   </div>
                   {b.status === 'CHECKED_IN' ? (
-                    <span className="rounded-[7px] border border-[#23766a]/20 bg-[#e3f2ef] px-[11px] py-[5px] text-[11.5px] font-medium text-[#23766a]">In</span>
+                    <span className="rounded-[7px] border border-[#183153]/20 bg-[#e5f0f7] px-[11px] py-[5px] text-[11.5px] font-medium text-[#183153]">In</span>
                   ) : (
                     <div className="flex items-center gap-[5px] rounded-[7px] border border-[#c9a04a]/20 bg-[#fef5e7] px-[11px] py-[5px]">
                       <div className="h-[5px] w-[5px] rounded-full bg-[#c9a04a]" />
@@ -390,30 +390,30 @@ export default function DashboardPage() {
         <div className="rounded-[14px] border overflow-hidden" style={{ background: cardBg, borderColor: cardBorder, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           <div className="flex items-center justify-between border-b px-5 py-[15px]" style={{ borderColor: dividerColor }}>
             <div className="flex items-center gap-2">
-              <LogOut className="h-[13px] w-[13px] text-[#23766a]" strokeWidth={2.5} />
-              <span className="text-[13px] font-semibold text-[#18231f]">Today's Departures</span>
-              <span className="rounded-full bg-[#e3f2ef] px-2 py-px text-[11px] font-semibold text-[#23766a]">{departures.length}</span>
+              <LogOut className="h-[13px] w-[13px] text-[#183153]" strokeWidth={2.5} />
+              <span className="text-[13px] font-semibold text-[#183153]">Today's Departures</span>
+              <span className="rounded-full bg-[#e5f0f7] px-2 py-px text-[11px] font-semibold text-[#183153]">{departures.length}</span>
             </div>
-            <span className="text-[12px] text-[#8aa29a]">{inHouseCount} in-house</span>
+            <span className="text-[12px] text-[#64748b]">{inHouseCount} in-house</span>
           </div>
           {departures.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-8 text-center">
               <CheckCircle2 className="h-8 w-8 text-gray-200" />
-              <p className="text-[13px] text-[#8aa29a]">No departures today</p>
+              <p className="text-[13px] text-[#64748b]">No departures today</p>
             </div>
           ) : (
             <div className="divide-y" style={{ borderColor: dividerColor }}>
               {departures.map((b: any) => (
                 <div key={b.id} className="flex items-center gap-3 px-5 py-4 hover:bg-[#faf9f7] dark:hover:bg-white/5 transition-colors">
-                  <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-[#e3f2ef] text-[12px] font-semibold text-[#23766a]">
+                  <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-[#e5f0f7] text-[12px] font-semibold text-[#183153]">
                     {b.guest.firstName[0]}{b.guest.lastName[0]}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[14px] font-medium text-[#18231f] truncate">{b.guest.firstName} {b.guest.lastName}</p>
-                    <p className="mt-0.5 text-[12px] text-[#8aa29a]">Room {b.room.number} · {b.nights}n stay</p>
+                    <p className="text-[14px] font-medium text-[#183153] truncate">{b.guest.firstName} {b.guest.lastName}</p>
+                    <p className="mt-0.5 text-[12px] text-[#64748b]">Room {b.room.number} · {b.nights}n stay</p>
                   </div>
                   {b.status === 'CHECKED_OUT' ? (
-                    <span className="rounded-[7px] border border-black/8 bg-[#f5f4f1] px-[11px] py-[5px] text-[11.5px] font-medium text-[#8aa29a]">Out</span>
+                    <span className="rounded-[7px] border border-black/8 bg-[#f5f4f1] px-[11px] py-[5px] text-[11.5px] font-medium text-[#64748b]">Out</span>
                   ) : (
                     <div className="flex items-center gap-[5px] rounded-[7px] border border-[#c9a04a]/20 bg-[#fef5e7] px-[11px] py-[5px]">
                       <div className="h-[5px] w-[5px] rounded-full bg-[#c9a04a]" />
@@ -434,19 +434,19 @@ export default function DashboardPage() {
           style={{ background: cardBg, borderColor: cardBorder, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <p className="text-[13px] font-semibold text-[#18231f]">Revenue</p>
-              <p className="text-[11px] text-[#8aa29a]">Last 12 months</p>
+              <p className="text-[13px] font-semibold text-[#183153]">Revenue</p>
+              <p className="text-[11px] text-[#64748b]">Last 12 months</p>
             </div>
-            <div className="flex h-[28px] w-[28px] items-center justify-center rounded-[8px] bg-[#e3f2ef]">
-              <TrendingUp className="h-[12px] w-[12px] text-[#23766a]" strokeWidth={2.5} />
+            <div className="flex h-[28px] w-[28px] items-center justify-center rounded-[8px] bg-[#e5f0f7]">
+              <TrendingUp className="h-[12px] w-[12px] text-[#183153]" strokeWidth={2.5} />
             </div>
           </div>
           <ResponsiveContainer width="100%" height={200}>
             <AreaChart data={revenueData} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#23766a" stopOpacity={0.12} />
-                  <stop offset="95%" stopColor="#23766a" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#183153" stopOpacity={0.12} />
+                  <stop offset="95%" stopColor="#183153" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.04)" />
@@ -455,10 +455,10 @@ export default function DashboardPage() {
               <Tooltip
                 formatter={(v) => [formatCurrency(Number(v)), 'Revenue']}
                 contentStyle={{ background: 'var(--rp-btn-accent)', border: 'none', borderRadius: 10, fontSize: 12 }}
-                labelStyle={{ color: '#9bbdb7' }}
+                labelStyle={{ color: '#aac0d0' }}
                 itemStyle={{ color: '#ece7df' }}
               />
-              <Area type="monotone" dataKey="revenue" stroke="#23766a" fill="url(#revenueGrad)" strokeWidth={2} dot={false} />
+              <Area type="monotone" dataKey="revenue" stroke="#183153" fill="url(#revenueGrad)" strokeWidth={2} dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -468,8 +468,8 @@ export default function DashboardPage() {
           style={{ background: cardBg, borderColor: cardBorder, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <p className="text-[13px] font-semibold text-[#18231f]">Occupancy Rate</p>
-              <p className="text-[11px] text-[#8aa29a]">Last 14 days</p>
+              <p className="text-[13px] font-semibold text-[#183153]">Occupancy Rate</p>
+              <p className="text-[11px] text-[#64748b]">Last 14 days</p>
             </div>
             <div className="flex h-[28px] w-[28px] items-center justify-center rounded-[8px] bg-[#f4ecda]">
               <BedDouble className="h-[12px] w-[12px] text-[#b89040]" strokeWidth={2.5} />
@@ -483,10 +483,10 @@ export default function DashboardPage() {
               <Tooltip
                 formatter={(v) => [`${v}%`, 'Occupancy']}
                 contentStyle={{ background: 'var(--rp-btn-accent)', border: 'none', borderRadius: 10, fontSize: 12 }}
-                labelStyle={{ color: '#9bbdb7' }}
+                labelStyle={{ color: '#aac0d0' }}
                 itemStyle={{ color: '#ece7df' }}
               />
-              <Bar dataKey="rate" fill="#23766a" radius={[5, 5, 0, 0]} />
+              <Bar dataKey="rate" fill="#183153" radius={[5, 5, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -502,24 +502,24 @@ export default function DashboardPage() {
                 <Globe className="h-[12px] w-[12px] text-[#b8724a]" strokeWidth={2.5} />
               </div>
               <div>
-                <p className="text-[13px] font-semibold text-[#18231f]">Website Visitors</p>
-                <p className="text-[11px] text-[#8aa29a]">Last 30 days</p>
+                <p className="text-[13px] font-semibold text-[#183153]">Website Visitors</p>
+                <p className="text-[11px] text-[#64748b]">Last 30 days</p>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-[22px] font-semibold leading-none tracking-[-0.02em] text-[#18231f]">{websiteStats.total30d}</p>
-              <p className="mt-[3px] text-[11px] text-[#8aa29a]">
-                <span className="font-medium text-[#23766a]">{websiteStats.todayViews}</span> today
+              <p className="text-[22px] font-semibold leading-none tracking-[-0.02em] text-[#183153]">{websiteStats.total30d}</p>
+              <p className="mt-[3px] text-[11px] text-[#64748b]">
+                <span className="font-medium text-[#183153]">{websiteStats.todayViews}</span> today
                 {' · '}
-                <a href="/dashboard/website" className="text-[#23766a] hover:underline">Edit site →</a>
+                <a href="/dashboard/website" className="text-[#183153] hover:underline">Edit site →</a>
               </p>
             </div>
           </div>
           {websiteStats.total30d === 0 ? (
             <div className="flex flex-col items-center gap-2 py-4 text-center">
-              <Globe className="h-8 w-8 text-[#d6cfc4]" />
-              <p className="text-[13px] text-[#8aa29a]">No visitors yet. Share your booking website to start tracking.</p>
-              <a href="/dashboard/website" className="text-[12px] font-medium text-[#23766a] hover:underline">Set up your website →</a>
+              <Globe className="h-8 w-8 text-[#94a3b8]" />
+              <p className="text-[13px] text-[#64748b]">No visitors yet. Share your booking website to start tracking.</p>
+              <a href="/dashboard/website" className="text-[12px] font-medium text-[#183153] hover:underline">Set up your website →</a>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={72}>
@@ -533,7 +533,7 @@ export default function DashboardPage() {
                 <Tooltip
                   formatter={(v: number) => [v, 'Visitors']}
                   contentStyle={{ background: 'var(--rp-btn-accent)', border: 'none', borderRadius: 10, fontSize: 11 }}
-                  labelStyle={{ color: '#9bbdb7' }}
+                  labelStyle={{ color: '#aac0d0' }}
                   itemStyle={{ color: '#ece7df' }}
                 />
                 <Area type="monotone" dataKey="views" stroke="#b8724a" fill="url(#visitorGrad)" strokeWidth={1.5} dot={false} />
@@ -551,17 +551,17 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between border-b px-5 py-[15px]"
             style={{ borderColor: dividerColor }}>
             <div className="flex items-center gap-2.5">
-              <div className="flex h-[28px] w-[28px] items-center justify-center rounded-[8px] bg-[#e3f2ef]">
-                <Users className="h-[12px] w-[12px] text-[#23766a]" strokeWidth={2.5} />
+              <div className="flex h-[28px] w-[28px] items-center justify-center rounded-[8px] bg-[#e5f0f7]">
+                <Users className="h-[12px] w-[12px] text-[#183153]" strokeWidth={2.5} />
               </div>
-              <span className="text-[13px] font-semibold text-[#18231f]">Recent Bookings</span>
+              <span className="text-[13px] font-semibold text-[#183153]">Recent Bookings</span>
             </div>
-            <a href="/dashboard/bookings" className="text-[12px] font-medium text-[#23766a] hover:underline">View all →</a>
+            <a href="/dashboard/bookings" className="text-[12px] font-medium text-[#183153] hover:underline">View all →</a>
           </div>
           {recentBookings.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-8 text-center">
-              <Users className="h-8 w-8 text-[#d6cfc4]" />
-              <p className="text-[13px] text-[#8aa29a]">No recent bookings</p>
+              <Users className="h-8 w-8 text-[#94a3b8]" />
+              <p className="text-[13px] text-[#64748b]">No recent bookings</p>
             </div>
           ) : (
             <div className="divide-y" style={{ borderColor: dividerColor }}>
@@ -571,14 +571,14 @@ export default function DashboardPage() {
                 const initials = `${guest?.firstName?.[0] ?? ''}${guest?.lastName?.[0] ?? ''}`;
                 return (
                   <div key={booking.id as string} className="flex items-center gap-3 px-5 py-[13px] hover:bg-[#faf9f7] dark:hover:bg-white/5 transition-colors">
-                    <div className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-full bg-[#e3f2ef] text-[11px] font-semibold text-[#23766a]">
+                    <div className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-full bg-[#e5f0f7] text-[11px] font-semibold text-[#183153]">
                       {initials}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13.5px] font-medium text-[#18231f] truncate">
+                      <p className="text-[13.5px] font-medium text-[#183153] truncate">
                         {guest?.firstName} {guest?.lastName}
                       </p>
-                      <p className="mt-px text-[11.5px] text-[#8aa29a]">
+                      <p className="mt-px text-[11.5px] text-[#64748b]">
                         {room?.name} · {formatDate(booking.checkIn as string)} → {formatDate(booking.checkOut as string)}
                       </p>
                     </div>
@@ -598,20 +598,20 @@ export default function DashboardPage() {
             <div className="flex h-[28px] w-[28px] items-center justify-center rounded-[8px] bg-[#fceee4]">
               <AlertCircle className="h-[12px] w-[12px] text-[#b8724a]" strokeWidth={2.5} />
             </div>
-            <span className="text-[13px] font-semibold text-[#18231f]">Low Stock</span>
+            <span className="text-[13px] font-semibold text-[#183153]">Low Stock</span>
           </div>
           {lowStock.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-8 text-center">
-              <AlertCircle className="h-8 w-8 text-[#d6cfc4]" />
-              <p className="text-[13px] text-[#8aa29a]">All stock levels OK</p>
+              <AlertCircle className="h-8 w-8 text-[#94a3b8]" />
+              <p className="text-[13px] text-[#64748b]">All stock levels OK</p>
             </div>
           ) : (
             <div className="divide-y" style={{ borderColor: dividerColor }}>
               {lowStock.map((item: Record<string, unknown>) => (
                 <div key={item.id as string} className="flex items-center justify-between px-5 py-[13px]">
                   <div className="min-w-0">
-                    <p className="text-[13.5px] font-medium text-[#18231f] truncate">{item.name as string}</p>
-                    <p className="mt-px text-[11.5px] text-[#8aa29a]">{String(item.currentStock)} {item.unit as string} left</p>
+                    <p className="text-[13.5px] font-medium text-[#183153] truncate">{item.name as string}</p>
+                    <p className="mt-px text-[11.5px] text-[#64748b]">{String(item.currentStock)} {item.unit as string} left</p>
                   </div>
                   <span className="ml-3 shrink-0 rounded-[7px] border border-[#b8724a]/20 bg-[#fceee4] px-[10px] py-[4px] text-[11px] font-semibold text-[#b8724a]">
                     Low

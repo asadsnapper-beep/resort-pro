@@ -9,7 +9,17 @@
 import type { FastifyInstance } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@resort-pro/database';
+import { PLAN_PRICING } from '@resort-pro/types';
 import { ok } from '../utils/response';
+
+// Canonical monthly USD price per plan key, used everywhere below instead of
+// a locally hardcoded map — see plan/launch-pricing-and-trial-abuse-prevention.md.
+const MONTHLY_PLAN_PRICE_USD: Record<string, number> = {
+  FREE: PLAN_PRICING.FREE.monthlyUsd,
+  STARTER: PLAN_PRICING.STARTER.monthlyUsd,
+  PROFESSIONAL: PLAN_PRICING.PROFESSIONAL.monthlyUsd,
+  ENTERPRISE: PLAN_PRICING.ENTERPRISE.monthlyUsd,
+};
 import { createAdminNotification } from '../utils/notifications';
 import { computeChurnRisk } from '../utils/churn';
 import { FLAG_REGISTRY, FLAG_MAP } from '../utils/feature-flags';
@@ -189,10 +199,10 @@ export async function adminRoutes(app: FastifyInstance) {
     const settingsPlans = (platformSettings?.plans ?? []) as Array<{ key: string; price: number }>;
     const planPrices: Record<string, number> = { FREE: 0 };
     for (const p of settingsPlans) planPrices[p.key] = p.price;
-    // Fallback hardcoded prices
-    if (!planPrices.STARTER) planPrices.STARTER = 49;
-    if (!planPrices.PROFESSIONAL) planPrices.PROFESSIONAL = 99;
-    if (!planPrices.ENTERPRISE) planPrices.ENTERPRISE = 199;
+    // Fallback to the canonical prices — not an independent hardcoded set
+    if (!planPrices.STARTER) planPrices.STARTER = PLAN_PRICING.STARTER.monthlyUsd;
+    if (!planPrices.PROFESSIONAL) planPrices.PROFESSIONAL = PLAN_PRICING.PROFESSIONAL.monthlyUsd;
+    if (!planPrices.ENTERPRISE) planPrices.ENTERPRISE = PLAN_PRICING.ENTERPRISE.monthlyUsd;
 
     const mrr = planBreakdown.reduce((sum, p) => {
       return sum + (planPrices[p.plan] || 0) * (p._count._all || 0);
@@ -534,7 +544,7 @@ export async function adminRoutes(app: FastifyInstance) {
       }),
     ]);
 
-    const planPrices: Record<string, number> = { STARTER: 49, PROFESSIONAL: 99, ENTERPRISE: 199, FREE: 0 };
+    const planPrices: Record<string, number> = MONTHLY_PLAN_PRICE_USD;
     const activePaidRows = planBreakdown.filter((r) => r.planStatus === 'active');
     const mrr = activePaidRows.reduce((sum, r) => sum + (planPrices[r.plan] || 0) * r._count._all, 0);
 
@@ -546,7 +556,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
   // ── GET /api/admin/failed-payments ────────────────────────────────────────
   app.get('/failed-payments', { preHandler: requireAdminRole(['SUPER_ADMIN', 'FINANCE', 'SUPPORT']) }, async (_req, reply) => {
-    const PLAN_PRICES: Record<string, number> = { STARTER: 49, PROFESSIONAL: 99, ENTERPRISE: 199, FREE: 0 };
+    const PLAN_PRICES: Record<string, number> = MONTHLY_PLAN_PRICE_USD;
 
     const [pastDue, trialsExpired] = await Promise.all([
       // Tenants with past_due status — payment actually failed
@@ -764,7 +774,7 @@ export async function adminRoutes(app: FastifyInstance) {
         _count: { select: { users: true, rooms: true, bookings: true, guests: true } },
       },
     });
-    const PRICES: Record<string, number> = { FREE: 0, STARTER: 49, PROFESSIONAL: 99, ENTERPRISE: 199 };
+    const PRICES: Record<string, number> = MONTHLY_PLAN_PRICE_USD;
     const headers = [
       'ID', 'Name', 'Slug', 'Plan', 'Plan Status', 'Active',
       'Email', 'Billing Email', 'Phone', 'Currency', 'MRR ($)',
@@ -786,7 +796,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
   // ── GET /api/admin/export/revenue-csv ─────────────────────────────────────
   app.get('/export/revenue-csv', { preHandler: requireAdminRole(['SUPER_ADMIN', 'FINANCE']) }, async (_req, reply) => {
-    const PRICES: Record<string, number> = { FREE: 0, STARTER: 49, PROFESSIONAL: 99, ENTERPRISE: 199 };
+    const PRICES: Record<string, number> = MONTHLY_PLAN_PRICE_USD;
     const paidTenants = await prisma.tenant.findMany({
       where: { planStatus: { in: ['active', 'past_due'] }, plan: { not: 'FREE' } },
       select: { plan: true, planStatus: true, trialEndsAt: true, createdAt: true },
@@ -887,24 +897,24 @@ export async function adminRoutes(app: FastifyInstance) {
   const DEFAULT_PLANS = [
     {
       key: 'STARTER',
-      name: 'Starter',
-      price: 49,
-      roomLimit: 20,
-      features: ['Up to 20 rooms', 'Booking management', 'Guest CRM', 'Website builder', 'Email support'],
+      name: PLAN_PRICING.STARTER.displayName,
+      price: PLAN_PRICING.STARTER.monthlyUsd,
+      roomLimit: PLAN_PRICING.STARTER.roomLimit,
+      features: [`Up to ${PLAN_PRICING.STARTER.roomLimit} rooms`, 'Booking management', 'Guest CRM', 'Website builder', 'Email support'],
     },
     {
       key: 'PROFESSIONAL',
-      name: 'Professional',
-      price: 99,
-      roomLimit: 100,
-      features: ['Up to 100 rooms', 'Everything in Starter', 'Staff invites', 'Priority support', 'Advanced analytics'],
+      name: PLAN_PRICING.PROFESSIONAL.displayName,
+      price: PLAN_PRICING.PROFESSIONAL.monthlyUsd,
+      roomLimit: PLAN_PRICING.PROFESSIONAL.roomLimit,
+      features: [`Up to ${PLAN_PRICING.PROFESSIONAL.roomLimit} rooms`, 'Everything in Starter', 'Staff invites', 'Priority support', 'Advanced analytics'],
     },
     {
       key: 'ENTERPRISE',
-      name: 'Enterprise',
-      price: 199,
-      roomLimit: -1,
-      features: ['Unlimited rooms', 'Everything in Pro', 'Custom integrations', 'Dedicated support', 'SLA guarantee'],
+      name: PLAN_PRICING.ENTERPRISE.displayName,
+      price: PLAN_PRICING.ENTERPRISE.monthlyUsd,
+      roomLimit: PLAN_PRICING.ENTERPRISE.roomLimit,
+      features: [`Up to ${PLAN_PRICING.ENTERPRISE.roomLimit} rooms`, 'Everything in Pro', 'Custom integrations', 'Dedicated support', 'SLA guarantee'],
     },
   ];
 
@@ -922,7 +932,7 @@ export async function adminRoutes(app: FastifyInstance) {
   // DB-derived MRR timeline — works without live Stripe.
   // Uses trialEndsAt as conversion date proxy for active paying tenants.
   app.get('/mrr-growth', { preHandler: requireAdminRole(['SUPER_ADMIN', 'FINANCE']) }, async (_req, reply) => {
-    const PLAN_PRICES: Record<string, number> = { FREE: 0, STARTER: 49, PROFESSIONAL: 99, ENTERPRISE: 199 };
+    const PLAN_PRICES: Record<string, number> = MONTHLY_PLAN_PRICE_USD;
 
     // Fetch all tenants that ever paid (active or canceled)
     const allTenants = await prisma.tenant.findMany({

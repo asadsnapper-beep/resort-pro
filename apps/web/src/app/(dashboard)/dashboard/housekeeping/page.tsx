@@ -58,36 +58,36 @@ const TASK_TYPES = ['DAILY', 'DEEP_CLEAN', 'TURNDOWN', 'CHECKOUT', 'CHECKIN'] as
 const STATUS_FILTERS = ['', 'PENDING', 'IN_PROGRESS', 'COMPLETED', 'SKIPPED'];
 
 const TYPE_PILL: Record<string, { bg: string; border: string; text: string; label: string }> = {
-  DAILY:      { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Daily' },
+  DAILY:      { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153', label: 'Daily' },
   DEEP_CLEAN: { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a', label: 'Deep Clean' },
   TURNDOWN:   { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'Turndown' },
   CHECKOUT:   { bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)',  text: '#c43c3c', label: 'Checkout' },
-  CHECKIN:    { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Check-In' },
+  CHECKIN:    { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153', label: 'Check-In' },
 };
 
 const STATUS_PILL: Record<string, { bg: string; border: string; text: string; label: string }> = {
   PENDING:     { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'Pending' },
-  IN_PROGRESS: { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)', text: '#23766a', label: 'In Progress' },
-  COMPLETED:   { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)', text: '#23766a', label: 'Completed' },
+  IN_PROGRESS: { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)', text: '#183153', label: 'In Progress' },
+  COMPLETED:   { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)', text: '#183153', label: 'Completed' },
   SKIPPED:     { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)', label: 'Skipped' },
 };
 
 const LOST_FOUND_STATUS_META: Record<string, { bg: string; text: string }> = {
   UNCLAIMED: { bg: 'var(--rp-amber-bg)', text: '#b89040' },
-  CLAIMED:   { bg: 'var(--rp-teal-bg)', text: '#23766a' },
+  CLAIMED:   { bg: 'var(--rp-teal-bg)', text: '#183153' },
   DISPOSED:  { bg: 'var(--rp-surface-3)', text: 'var(--rp-text-muted)' },
 };
 
 const LAUNDRY_STATUS_FLOW = ['REQUESTED', 'IN_PROGRESS', 'READY', 'DELIVERED'] as const;
 const LAUNDRY_STATUS_META: Record<string, { bg: string; text: string }> = {
   REQUESTED:   { bg: 'var(--rp-amber-bg)', text: '#b89040' },
-  IN_PROGRESS: { bg: 'var(--rp-teal-bg)', text: '#23766a' },
-  READY:       { bg: 'var(--rp-teal-bg)', text: '#23766a' },
+  IN_PROGRESS: { bg: 'var(--rp-teal-bg)', text: '#183153' },
+  READY:       { bg: 'var(--rp-teal-bg)', text: '#183153' },
   DELIVERED:   { bg: 'var(--rp-surface-3)', text: 'var(--rp-text-muted)' },
 };
 
-const selectCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[8px] text-[13px] text-[#18231f] focus:outline-none focus:ring-1 focus:ring-resort-600/20';
-const labelCls  = 'block text-[11.5px] font-medium text-[#6b8880] mb-1.5';
+const selectCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[8px] text-[13px] text-[#183153] focus:outline-none focus:ring-1 focus:ring-resort-600/20';
+const labelCls  = 'block text-[11.5px] font-medium text-[#64748b] mb-1.5';
 
 async function tryGetCurrentBookingId(roomId: string): Promise<string | undefined> {
   try {
@@ -166,16 +166,16 @@ function NewTaskModal({ open, onClose, loading, onSubmit }: {
           <label className={labelCls}>Notes</label>
           <textarea value={form.notes} onChange={e => set('notes', e.target.value)} rows={2}
             placeholder="Any special instructions..."
-            className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#8aa29a] focus:outline-none focus:ring-1 focus:ring-resort-600/20 resize-none" />
+            className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#64748b] focus:outline-none focus:ring-1 focus:ring-resort-600/20 resize-none" />
         </div>
         <div className="flex gap-3 justify-end pt-2 border-t" style={{ borderColor: 'var(--rp-border)' }}>
           <button type="button" onClick={onClose}
-            className="rounded-[9px] border px-4 py-[8px] text-[13px] font-medium text-[#6b8880] transition-colors hover:bg-[#f4f1eb]"
+            className="rounded-[9px] border px-4 py-[8px] text-[13px] font-medium text-[#64748b] transition-colors hover:bg-[#f4f1eb]"
             style={{ borderColor: 'var(--rp-border-md)' }}>
             Cancel
           </button>
           <button type="submit" disabled={loading}
-            className="rounded-[9px] px-5 py-[8px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80 disabled:opacity-50"
+            className="rounded-[9px] px-5 py-[8px] text-[13px] font-medium text-[#f8fafc] transition-opacity hover:opacity-80 disabled:opacity-50"
             style={{ background: 'var(--rp-btn-accent)' }}>
             {loading ? 'Creating…' : 'Create Task'}
           </button>
@@ -246,7 +246,7 @@ function TasksTab() {
         {canManage && (
           <button
             onClick={() => setAddOpen(true)}
-            className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
+            className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#f8fafc] transition-opacity hover:opacity-80"
             style={{ background: 'var(--rp-btn-accent)' }}
           >
             <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} /> New Task
@@ -256,18 +256,18 @@ function TasksTab() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          { label: 'Total Tasks',  value: total || 0,    icon: CheckSquare, bg: 'var(--rp-teal-bg)', color: '#23766a' },
+          { label: 'Total Tasks',  value: total || 0,    icon: CheckSquare, bg: 'var(--rp-teal-bg)', color: '#183153' },
           { label: 'Pending',      value: pendingCount,   icon: Clock,       bg: 'var(--rp-amber-bg)', color: '#b89040' },
           { label: 'In Progress',  value: inProgressCount,icon: AlertCircle, bg: 'var(--rp-coral-bg)', color: '#b8724a' },
-          { label: 'Completed',    value: completedCount, icon: CheckCircle2,bg: 'var(--rp-teal-bg)', color: '#23766a' },
+          { label: 'Completed',    value: completedCount, icon: CheckCircle2,bg: 'var(--rp-teal-bg)', color: '#183153' },
         ].map(({ label, value, icon: Icon, bg, color }) => (
           <div key={label} className="flex items-center gap-[11px] rounded-[12px] border px-[18px] py-[15px] bg-white dark:bg-white/5" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
             <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px]" style={{ background: bg }}>
               <Icon className="h-[14px] w-[14px]" strokeWidth={2} style={{ color }} />
             </div>
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.07em] text-[#8aa29a]">{label}</div>
-              <div className="text-[22px] font-semibold leading-none tracking-[-0.02em] text-[#18231f]">{value}</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.07em] text-[#64748b]">{label}</div>
+              <div className="text-[22px] font-semibold leading-none tracking-[-0.02em] text-[#183153]">{value}</div>
             </div>
           </div>
         ))}
@@ -275,19 +275,19 @@ function TasksTab() {
 
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
         <div className="relative max-w-xs flex-1">
-          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8aa29a]" />
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#64748b]" />
           <input
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
             placeholder="Search room or staff…"
-            className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-[8px] pl-9 pr-4 text-[13px] text-[#18231f] placeholder:text-[#8aa29a] focus:outline-none focus:ring-1 focus:ring-resort-600/20"
+            className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-[8px] pl-9 pr-4 text-[13px] text-[#183153] placeholder:text-[#64748b] focus:outline-none focus:ring-1 focus:ring-resort-600/20"
           />
         </div>
         <input
           type="date"
           value={dateFilter}
           onChange={e => { setDateFilter(e.target.value); setPage(1); }}
-          className="rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[8px] text-[13px] text-[#18231f] focus:outline-none focus:ring-1 focus:ring-resort-600/20 max-w-[160px]"
+          className="rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[8px] text-[13px] text-[#183153] focus:outline-none focus:ring-1 focus:ring-resort-600/20 max-w-[160px]"
         />
         <div className="flex gap-1.5 flex-wrap">
           {STATUS_FILTERS.map(s => {
@@ -296,8 +296,8 @@ function TasksTab() {
               <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
                 className="rounded-[8px] border px-[12px] py-[7px] text-[12px] font-medium transition-colors"
                 style={active
-                  ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', borderColor: '#1b342f' }
-                  : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', color: isDark ? '#94b8b0' : 'var(--rp-text-subtle)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)' }}>
+                  ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', borderColor: '#183153' }
+                  : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', color: isDark ? '#a9c1d0' : 'var(--rp-text-subtle)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)' }}>
                 {s ? s.replace('_', ' ') : 'All'}
               </button>
             );
@@ -315,20 +315,20 @@ function TasksTab() {
         ) : tasks.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#f5f4f1]">
-              <CheckSquare className="h-7 w-7 text-[#c5bdb4]" />
+              <CheckSquare className="h-7 w-7 text-[#94a3b8]" />
             </div>
             <div>
-              <p className="text-[14px] font-medium text-[#18231f]">
+              <p className="text-[14px] font-medium text-[#183153]">
                 {search || statusFilter || dateFilter ? 'No tasks found' : 'No tasks scheduled'}
               </p>
-              <p className="mt-1 text-[12.5px] text-[#8aa29a]">
+              <p className="mt-1 text-[12.5px] text-[#64748b]">
                 {search || statusFilter || dateFilter ? 'Try adjusting your filters' : 'Create your first housekeeping task'}
               </p>
             </div>
             {!search && !statusFilter && !dateFilter && canManage && (
               <button
                 onClick={() => setAddOpen(true)}
-                className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0]"
+                className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#f8fafc]"
                 style={{ background: 'var(--rp-btn-accent)' }}
               >
                 <Plus className="h-[13px] w-[13px]" /> New Task
@@ -339,7 +339,7 @@ function TasksTab() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]"
+                <tr className="border-b text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b]"
                   style={{ borderColor: 'var(--rp-border)', background: 'var(--rp-surface-2)' }}>
                   <th className="px-5 py-3 text-left">Room</th>
                   <th className="px-5 py-3 text-left">Type</th>
@@ -359,12 +359,12 @@ function TasksTab() {
                       style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
                       <td className="px-5 py-[14px]">
                         <div className="flex items-center gap-2.5">
-                          <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px] bg-[#e3f2ef]">
-                            <Bed className="h-[13px] w-[13px] text-[#23766a]" strokeWidth={2} />
+                          <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px] bg-[#e5f0f7]">
+                            <Bed className="h-[13px] w-[13px] text-[#183153]" strokeWidth={2} />
                           </div>
                           <div>
-                            <p className="text-[13.5px] font-medium text-[#18231f]">{task.room.name}</p>
-                            <p className="text-[11.5px] text-[#8aa29a]">#{task.room.number} · Floor {task.room.floor}</p>
+                            <p className="text-[13.5px] font-medium text-[#183153]">{task.room.name}</p>
+                            <p className="text-[11.5px] text-[#64748b]">#{task.room.number} · Floor {task.room.floor}</p>
                           </div>
                         </div>
                       </td>
@@ -377,24 +377,24 @@ function TasksTab() {
                       <td className="px-5 py-[14px]">
                         {task.assignedTo ? (
                           <div className="flex items-center gap-1.5">
-                            <div className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-[#e3f2ef] text-[10px] font-bold text-[#23766a]">
+                            <div className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-[#e5f0f7] text-[10px] font-bold text-[#183153]">
                               {task.assignedTo.user.firstName[0]}{task.assignedTo.user.lastName[0]}
                             </div>
-                            <span className="text-[13px] text-[#18231f]">
+                            <span className="text-[13px] text-[#183153]">
                               {task.assignedTo.user.firstName} {task.assignedTo.user.lastName}
                             </span>
                           </div>
                         ) : (
-                          <span className="text-[12.5px] italic text-[#c5bdb4]">Unassigned</span>
+                          <span className="text-[12.5px] italic text-[#94a3b8]">Unassigned</span>
                         )}
                       </td>
                       <td className="px-5 py-[14px]">
-                        <div className="flex items-center gap-1.5 text-[13px] text-[#18231f]">
-                          <CalendarDays className="h-[13px] w-[13px] text-[#8aa29a]" />
+                        <div className="flex items-center gap-1.5 text-[13px] text-[#183153]">
+                          <CalendarDays className="h-[13px] w-[13px] text-[#64748b]" />
                           {formatDate(task.scheduledDate)}
                         </div>
                         {task.completedAt && (
-                          <p className="mt-px text-[11.5px] text-[#23766a]">Done {formatDate(task.completedAt)}</p>
+                          <p className="mt-px text-[11.5px] text-[#183153]">Done {formatDate(task.completedAt)}</p>
                         )}
                       </td>
                       <td className="px-5 py-[14px]">
@@ -409,7 +409,7 @@ function TasksTab() {
                             <button
                               onClick={() => statusMutation.mutate({ id: task.id, status: 'IN_PROGRESS' })}
                               className="rounded-[7px] border px-[10px] py-[5px] text-[11.5px] font-medium transition-colors"
-                              style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                              style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
                               Start
                             </button>
                           )}
@@ -442,7 +442,7 @@ function TasksTab() {
 
       {pagination && pagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-[12.5px] text-[#8aa29a]">
+          <p className="text-[12.5px] text-[#64748b]">
             Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} of {total}
           </p>
           <div className="flex items-center gap-1.5">
@@ -613,14 +613,14 @@ function LostFoundTab() {
           <div className="h-32 animate-pulse" style={{ background: 'var(--rp-surface-2)' }} />
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
-            <PackageSearch className="h-10 w-10" style={{ color: '#c5bdb4' }} />
-            <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No lost & found items</p>
+            <PackageSearch className="h-10 w-10" style={{ color: '#94a3b8' }} />
+            <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">No lost & found items</p>
           </div>
         ) : (
           <table className="w-full">
             <thead>
               <tr style={{ background: 'var(--rp-surface-2)' }}>
-                {['Item', 'Room', 'Found', 'Storage', 'Status', ''].map(h => <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]">{h}</th>)}
+                {['Item', 'Room', 'Found', 'Storage', 'Status', ''].map(h => <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">{h}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -629,18 +629,18 @@ function LostFoundTab() {
                 return (
                   <tr key={it.id} className="hover:bg-[#faf9f7] dark:hover:bg-white/5" style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
                     <td className="px-5 py-3.5">
-                      <p className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{it.description}</p>
-                      {it.category && <p className="text-[11.5px] text-[#8aa29a] dark:text-[#94b8b0]">{it.category}</p>}
-                      {it.status === 'CLAIMED' && it.claimedBy && <p className="text-[11.5px] text-[#23766a]">Claimed by {it.claimedBy}</p>}
+                      <p className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{it.description}</p>
+                      {it.category && <p className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">{it.category}</p>}
+                      {it.status === 'CLAIMED' && it.claimedBy && <p className="text-[11.5px] text-[#183153]">Claimed by {it.claimedBy}</p>}
                     </td>
-                    <td className="px-5 py-3.5 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{it.room ? `#${it.room.number} ${it.room.name}` : '—'}</td>
-                    <td className="px-5 py-3.5 text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">{formatDate(it.foundDate)}</td>
-                    <td className="px-5 py-3.5 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{it.storageLocation ?? '—'}</td>
+                    <td className="px-5 py-3.5 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">{it.room ? `#${it.room.number} ${it.room.name}` : '—'}</td>
+                    <td className="px-5 py-3.5 text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">{formatDate(it.foundDate)}</td>
+                    <td className="px-5 py-3.5 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">{it.storageLocation ?? '—'}</td>
                     <td className="px-5 py-3.5"><span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: sm.bg, color: sm.text }}>{it.status}</span></td>
                     <td className="px-5 py-3.5">
                       {it.status === 'UNCLAIMED' && (
                         <div className="flex gap-1">
-                          <button onClick={() => setClaimItem(it)} className="rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e3f2ef]" style={{ borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>Claim</button>
+                          <button onClick={() => setClaimItem(it)} className="rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e5f0f7]" style={{ borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>Claim</button>
                           <button onClick={() => disposeMutation.mutate(it.id)} className="rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#faf0ee]" style={{ borderColor: 'rgba(200,60,60,0.2)', color: '#c43c3c' }}>Dispose</button>
                         </div>
                       )}
@@ -697,8 +697,8 @@ function CatalogModal({ open, onClose, catalog, loading, onSubmit }: {
             <p className="text-[12.5px] text-center py-6" style={{ color: 'var(--rp-text-muted)' }}>No catalog items yet</p>
           ) : catalog.map(c => (
             <div key={c.id} className="flex items-center justify-between rounded-[8px] border px-3 py-2" style={{ borderColor: 'var(--rp-border)' }}>
-              <span className="text-[13px] text-[#18231f] dark:text-[#dfd9d0]">{c.name}</span>
-              <span className="text-[13px] font-medium text-[#23766a]">{formatCurrency(c.price)}</span>
+              <span className="text-[13px] text-[#183153] dark:text-[#f8fafc]">{c.name}</span>
+              <span className="text-[13px] font-medium text-[#183153]">{formatCurrency(c.price)}</span>
             </div>
           ))}
         </div>
@@ -730,7 +730,7 @@ function LogConsumptionModal({ open, onClose, rooms, catalog, loading, onSubmit 
     <ModalShell open={open} onClose={onClose} title="Log Minibar Consumption" maxWidth="520px"
       footer={
         <div className="flex items-center justify-between w-full">
-          <span className="text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">Total: {formatCurrency(total)}</span>
+          <span className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">Total: {formatCurrency(total)}</span>
           <div className="flex gap-3">
             <button type="button" onClick={onClose} className="rounded-[9px] border px-4 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>Cancel</button>
             <button type="submit" form="mb-form" disabled={loading} className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium disabled:opacity-50" style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
@@ -755,7 +755,7 @@ function LogConsumptionModal({ open, onClose, rooms, catalog, loading, onSubmit 
             <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
               {catalog.map(c => (
                 <div key={c.id} className="flex items-center gap-3 rounded-[8px] border px-3 py-2" style={{ borderColor: 'var(--rp-border)' }}>
-                  <span className="flex-1 text-[13px] text-[#18231f] dark:text-[#dfd9d0]">{c.name} <span className="text-[#8aa29a]">· {formatCurrency(c.price)}</span></span>
+                  <span className="flex-1 text-[13px] text-[#183153] dark:text-[#f8fafc]">{c.name} <span className="text-[#64748b]">· {formatCurrency(c.price)}</span></span>
                   <input value={qty[c.id] ?? ''} onChange={e => setQty(q => ({ ...q, [c.id]: e.target.value }))} type="number" min="0" placeholder="0"
                     className="w-16 rounded-[7px] border border-black/5 bg-[#f4f1eb] px-2 py-1.5 text-[12.5px] text-center" />
                 </div>
@@ -816,31 +816,31 @@ function MinibarTab() {
           <div className="h-32 animate-pulse" style={{ background: 'var(--rp-surface-2)' }} />
         ) : consumption.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
-            <Wine className="h-10 w-10" style={{ color: '#c5bdb4' }} />
-            <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No minibar consumption logged</p>
+            <Wine className="h-10 w-10" style={{ color: '#94a3b8' }} />
+            <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">No minibar consumption logged</p>
           </div>
         ) : (
           <table className="w-full">
             <thead>
               <tr style={{ background: 'var(--rp-surface-2)' }}>
-                {['Room', 'Item', 'Qty', 'Cost', 'Date', 'Billed', ''].map(h => <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]">{h}</th>)}
+                {['Room', 'Item', 'Qty', 'Cost', 'Date', 'Billed', ''].map(h => <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">{h}</th>)}
               </tr>
             </thead>
             <tbody>
               {consumption.map(c => (
                 <tr key={c.id} className="hover:bg-[#faf9f7] dark:hover:bg-white/5" style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
-                  <td className="px-5 py-3.5 text-[13px] text-[#18231f] dark:text-[#dfd9d0]">#{c.room.number} {c.room.name}</td>
-                  <td className="px-5 py-3.5 text-[13px] text-[#18231f] dark:text-[#dfd9d0]">{c.itemName}</td>
-                  <td className="px-5 py-3.5 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{c.quantity}</td>
-                  <td className="px-5 py-3.5 text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{formatCurrency(c.unitPrice * c.quantity)}</td>
-                  <td className="px-5 py-3.5 text-[12.5px] text-[#8aa29a] dark:text-[#94b8b0]">{formatDate(c.createdAt)}</td>
+                  <td className="px-5 py-3.5 text-[13px] text-[#183153] dark:text-[#f8fafc]">#{c.room.number} {c.room.name}</td>
+                  <td className="px-5 py-3.5 text-[13px] text-[#183153] dark:text-[#f8fafc]">{c.itemName}</td>
+                  <td className="px-5 py-3.5 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">{c.quantity}</td>
+                  <td className="px-5 py-3.5 text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{formatCurrency(c.unitPrice * c.quantity)}</td>
+                  <td className="px-5 py-3.5 text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">{formatDate(c.createdAt)}</td>
                   <td className="px-5 py-3.5">
-                    {c.billed ? <span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: 'var(--rp-teal-bg)', color: '#23766a' }}>Billed</span>
+                    {c.billed ? <span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: 'var(--rp-teal-bg)', color: '#183153' }}>Billed</span>
                       : <span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: 'var(--rp-surface-3)', color: 'var(--rp-text-muted)' }}>Pending</span>}
                   </td>
                   <td className="px-5 py-3.5">
                     {!c.billed && c.bookingId && (
-                      <button onClick={() => billMutation.mutate({ entry: c })} className="flex items-center gap-1 rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e3f2ef]" style={{ borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                      <button onClick={() => billMutation.mutate({ entry: c })} className="flex items-center gap-1 rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e5f0f7]" style={{ borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
                         <Receipt className="h-3 w-3" /> Bill
                       </button>
                     )}
@@ -975,14 +975,14 @@ function LaundryTab() {
           <div className="h-32 animate-pulse" style={{ background: 'var(--rp-surface-2)' }} />
         ) : orders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
-            <Shirt className="h-10 w-10" style={{ color: '#c5bdb4' }} />
-            <p className="text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">No laundry orders</p>
+            <Shirt className="h-10 w-10" style={{ color: '#94a3b8' }} />
+            <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">No laundry orders</p>
           </div>
         ) : (
           <table className="w-full">
             <thead>
               <tr style={{ background: 'var(--rp-surface-2)' }}>
-                {['Room', 'Items', 'Service', 'Cost', 'Status', 'Billed', ''].map(h => <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]">{h}</th>)}
+                {['Room', 'Items', 'Service', 'Cost', 'Status', 'Billed', ''].map(h => <th key={h} className="px-5 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">{h}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -992,25 +992,25 @@ function LaundryTab() {
                 const nextStatus = LAUNDRY_STATUS_FLOW[nextIdx];
                 return (
                   <tr key={o.id} className="hover:bg-[#faf9f7] dark:hover:bg-white/5" style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
-                    <td className="px-5 py-3.5 text-[13px] text-[#18231f] dark:text-[#dfd9d0]">#{o.room.number} {o.room.name}</td>
-                    <td className="px-5 py-3.5 text-[13px] text-[#8aa29a] dark:text-[#94b8b0]">{o.itemCount} — {o.description ?? '—'}</td>
-                    <td className="px-5 py-3.5 text-[12.5px] text-[#4a6e66] dark:text-[#6d9990]">{o.serviceType.replace(/_/g, ' ')}</td>
-                    <td className="px-5 py-3.5 text-[13px] font-medium text-[#18231f] dark:text-[#dfd9d0]">{o.cost != null ? formatCurrency(o.cost) : '—'}</td>
+                    <td className="px-5 py-3.5 text-[13px] text-[#183153] dark:text-[#f8fafc]">#{o.room.number} {o.room.name}</td>
+                    <td className="px-5 py-3.5 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">{o.itemCount} — {o.description ?? '—'}</td>
+                    <td className="px-5 py-3.5 text-[12.5px] text-[#475569] dark:text-[#9db4c4]">{o.serviceType.replace(/_/g, ' ')}</td>
+                    <td className="px-5 py-3.5 text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{o.cost != null ? formatCurrency(o.cost) : '—'}</td>
                     <td className="px-5 py-3.5"><span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: sm.bg, color: sm.text }}>{o.status.replace('_', ' ')}</span></td>
                     <td className="px-5 py-3.5">
-                      {o.billed ? <span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: 'var(--rp-teal-bg)', color: '#23766a' }}>Billed</span>
+                      {o.billed ? <span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: 'var(--rp-teal-bg)', color: '#183153' }}>Billed</span>
                         : <span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: 'var(--rp-surface-3)', color: 'var(--rp-text-muted)' }}>Pending</span>}
                     </td>
                     <td className="px-5 py-3.5">
                       <div className="flex gap-1">
                         {nextStatus && (
                           <button onClick={() => statusMutation.mutate({ id: o.id, status: nextStatus })}
-                            className="rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e3f2ef]" style={{ borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                            className="rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e5f0f7]" style={{ borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
                             Mark {nextStatus.replace('_', ' ')}
                           </button>
                         )}
                         {!o.billed && o.bookingId && o.cost != null && (
-                          <button onClick={() => billMutation.mutate(o)} className="flex items-center gap-1 rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e3f2ef]" style={{ borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}>
+                          <button onClick={() => billMutation.mutate(o)} className="flex items-center gap-1 rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e5f0f7]" style={{ borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
                             <Receipt className="h-3 w-3" /> Bill
                           </button>
                         )}

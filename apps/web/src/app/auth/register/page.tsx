@@ -12,11 +12,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { Gift, Zap, Crown, Building2, ArrowLeft } from 'lucide-react';
+import { PLAN_PRICING } from '@resort-pro/types';
 
 const PLAN_META: Record<string, { label: string; color: string; icon: React.ElementType; desc: string }> = {
-  STARTER:      { label: 'Starter',      color: '#1a6b5e', icon: Zap,       desc: '$49/mo after trial · Up to 20 rooms' },
-  PROFESSIONAL: { label: 'Professional', color: '#d4a853', icon: Crown,     desc: '$99/mo after trial · Up to 100 rooms' },
-  ENTERPRISE:   { label: 'Enterprise',   color: '#6366f1', icon: Building2, desc: 'Custom pricing · Unlimited rooms' },
+  STARTER:      { label: PLAN_PRICING.STARTER.displayName,      color: '#1a6b5e', icon: Zap,       desc: `$${PLAN_PRICING.STARTER.monthlyUsd}/mo after trial · Up to ${PLAN_PRICING.STARTER.roomLimit} rooms` },
+  PROFESSIONAL: { label: PLAN_PRICING.PROFESSIONAL.displayName, color: '#d4a853', icon: Crown,     desc: `$${PLAN_PRICING.PROFESSIONAL.monthlyUsd}/mo after trial · Up to ${PLAN_PRICING.PROFESSIONAL.roomLimit} rooms` },
+  ENTERPRISE:   { label: PLAN_PRICING.ENTERPRISE.displayName,   color: '#6366f1', icon: Building2, desc: `$${PLAN_PRICING.ENTERPRISE.monthlyUsd}/mo after trial · Up to ${PLAN_PRICING.ENTERPRISE.roomLimit} rooms` },
 };
 
 const schema = z.object({

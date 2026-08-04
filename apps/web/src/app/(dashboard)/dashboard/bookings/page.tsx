@@ -45,7 +45,7 @@ type Booking = {
 };
 
 const BOOKING_STATUS_PILL: Record<string, { bg: string; border: string; text: string; label: string }> = {
-  CONFIRMED:   { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Confirmed'   },
+  CONFIRMED:   { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153', label: 'Confirmed'   },
   CHECKED_IN:  { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'In House'    },
   CHECKED_OUT: { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)', label: 'Checked Out' },
   PENDING:     { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a', label: 'Pending'     },
@@ -54,7 +54,7 @@ const BOOKING_STATUS_PILL: Record<string, { bg: string; border: string; text: st
 };
 
 const PAYMENT_STATUS_PILL: Record<string, { bg: string; border: string; text: string; label: string }> = {
-  PAID:        { bg: 'var(--rp-teal-bg)', border: 'rgba(35,118,106,0.2)',  text: '#23766a', label: 'Paid'        },
+  PAID:        { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153', label: 'Paid'        },
   PARTIAL:     { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040', label: 'Partial'     },
   PENDING:     { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a', label: 'Unpaid'      },
   REFUNDED:    { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)', label: 'Refunded'    },
@@ -146,7 +146,7 @@ export default function BookingsPage() {
           </button>
           <button
             onClick={() => setNewOpen(true)}
-            className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0] transition-opacity hover:opacity-80"
+            className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#f8fafc] transition-opacity hover:opacity-80"
             style={{ background: 'var(--rp-btn-accent)' }}
           >
             <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} />
@@ -165,7 +165,7 @@ export default function BookingsPage() {
           { label: 'Month Revenue',      value: stats != null ? formatCurrency(stats.monthlyRevenue) : '—', icon: TrendingUp, family: 'coral', shortcut: null },
         ].map(({ label, value, icon: Icon, family, shortcut }) => {
           const iconStyle = {
-            teal:  { bg: 'var(--rp-teal-bg)', color: '#23766a' },
+            teal:  { bg: 'var(--rp-teal-bg)', color: '#183153' },
             gold:  { bg: 'var(--rp-amber-bg)', color: '#b89040' },
             coral: { bg: 'var(--rp-coral-bg)', color: '#b8724a' },
           }[family]!;
@@ -181,8 +181,8 @@ export default function BookingsPage() {
                 <Icon className="h-[14px] w-[14px]" strokeWidth={2} style={{ color: iconStyle.color }} />
               </div>
               <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.07em] text-[#8aa29a]">{label}</div>
-                <div className="text-[22px] font-semibold leading-none tracking-[-0.02em] text-[#18231f]">{String(value)}</div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.07em] text-[#64748b]">{label}</div>
+                <div className="text-[22px] font-semibold leading-none tracking-[-0.02em] text-[#183153]">{String(value)}</div>
               </div>
             </div>
           );
@@ -194,12 +194,12 @@ export default function BookingsPage() {
         <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
           {/* Search */}
           <div className="relative max-w-sm flex-1">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8aa29a]" />
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#64748b]" />
             <input
               value={searchInput}
               onChange={(e) => { setSearchInput(e.target.value); setPage(1); }}
               placeholder="Search guest, email, confirmation #..."
-              className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-[8px] pl-9 pr-4 text-[13px] text-[#18231f] placeholder:text-[#8aa29a] focus:outline-none focus:ring-1 focus:ring-resort-600/20"
+              className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-[8px] pl-9 pr-4 text-[13px] text-[#183153] placeholder:text-[#64748b] focus:outline-none focus:ring-1 focus:ring-resort-600/20"
             />
           </div>
           {/* Status tabs */}
@@ -210,8 +210,8 @@ export default function BookingsPage() {
                 onClick={() => { setStatusFilter(s); setPage(1); }}
                 className="rounded-[8px] border px-[12px] py-[6px] text-[12px] font-medium transition-colors"
                 style={statusFilter === s
-                  ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', borderColor: '#1b342f' }
-                  : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', color: isDark ? '#94b8b0' : 'var(--rp-text-subtle)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)' }}
+                  ? { background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', borderColor: '#183153' }
+                  : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', color: isDark ? '#a9c1d0' : 'var(--rp-text-subtle)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)' }}
               >
                 {STATUS_LABELS[s]}
               </button>
@@ -227,8 +227,8 @@ export default function BookingsPage() {
               onClick={() => activeShortcut === s.label ? clearDateFilter() : applyShortcut(s)}
               className="rounded-[8px] border px-[12px] py-[6px] text-[12px] font-medium transition-colors"
               style={activeShortcut === s.label
-                ? { background: 'var(--rp-teal-bg)', color: '#23766a', borderColor: 'rgba(35,118,106,0.2)' }
-                : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', color: isDark ? '#94b8b0' : 'var(--rp-text-subtle)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)' }}
+                ? { background: 'var(--rp-teal-bg)', color: '#183153', borderColor: 'rgba(24,49,83,0.2)' }
+                : { background: isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)', color: isDark ? '#a9c1d0' : 'var(--rp-text-subtle)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'var(--rp-border-md)' }}
             >
               {s.label}
             </button>
@@ -238,27 +238,27 @@ export default function BookingsPage() {
               type="date"
               value={dateFrom}
               onChange={(e) => { setDateFrom(e.target.value); setActiveShortcut(null); setPage(1); }}
-              className="h-[34px] w-36 rounded-[8px] border border-black/5 bg-[#f4f1eb] px-2 text-[12px] text-[#18231f] focus:outline-none focus:ring-1 focus:ring-resort-600/20"
+              className="h-[34px] w-36 rounded-[8px] border border-black/5 bg-[#f4f1eb] px-2 text-[12px] text-[#183153] focus:outline-none focus:ring-1 focus:ring-resort-600/20"
             />
-            <span className="text-[11px] text-[#8aa29a]">→</span>
+            <span className="text-[11px] text-[#64748b]">→</span>
             <input
               type="date"
               value={dateTo}
               min={dateFrom}
               onChange={(e) => { setDateTo(e.target.value); setActiveShortcut(null); setPage(1); }}
-              className="h-[34px] w-36 rounded-[8px] border border-black/5 bg-[#f4f1eb] px-2 text-[12px] text-[#18231f] focus:outline-none focus:ring-1 focus:ring-resort-600/20"
+              className="h-[34px] w-36 rounded-[8px] border border-black/5 bg-[#f4f1eb] px-2 text-[12px] text-[#183153] focus:outline-none focus:ring-1 focus:ring-resort-600/20"
             />
             {hasDateFilter && (
               <button
                 onClick={clearDateFilter}
-                className="rounded-[8px] border border-black/5 bg-[#f4f1eb] p-1.5 text-[#8aa29a] hover:bg-[#ece9e2] transition-colors"
+                className="rounded-[8px] border border-black/5 bg-[#f4f1eb] p-1.5 text-[#64748b] hover:bg-[#ece9e2] transition-colors"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
           {hasDateFilter && (
-            <span className="text-[12px] font-medium text-[#23766a]">
+            <span className="text-[12px] font-medium text-[#183153]">
               {dateFrom === dateTo && dateFrom
                 ? `Showing: ${formatDate(dateFrom)}`
                 : `${dateFrom ? formatDate(dateFrom) : '…'} → ${dateTo ? formatDate(dateTo) : '…'}`}
@@ -278,11 +278,11 @@ export default function BookingsPage() {
         ) : bookings.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-20">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#f5f4f1]">
-              <CalendarDays className="h-7 w-7 text-[#c5bdb4]" />
+              <CalendarDays className="h-7 w-7 text-[#94a3b8]" />
             </div>
             <div className="text-center">
-              <p className="text-[14px] font-medium text-[#18231f]">No bookings found</p>
-              <p className="mt-1 text-[13px] text-[#8aa29a]">
+              <p className="text-[14px] font-medium text-[#183153]">No bookings found</p>
+              <p className="mt-1 text-[13px] text-[#64748b]">
                 {searchInput || statusFilter || hasDateFilter
                   ? 'Try adjusting your filters'
                   : 'Create your first booking to get started'}
@@ -291,7 +291,7 @@ export default function BookingsPage() {
             {!searchInput && !statusFilter && !hasDateFilter && (
               <button
                 onClick={() => setNewOpen(true)}
-                className="mt-1 flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#dfd9d0]"
+                className="mt-1 flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#f8fafc]"
                 style={{ background: 'var(--rp-btn-accent)' }}
               >
                 <Plus className="h-[13px] w-[13px]" /> New Booking
@@ -302,7 +302,7 @@ export default function BookingsPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8aa29a]"
+                <tr className="border-b text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b]"
                   style={{ borderColor: 'var(--rp-border)', background: 'var(--rp-surface-2)' }}>
                   <th className="px-5 py-3 text-left">Confirmation</th>
                   <th className="px-5 py-3 text-left">Guest</th>
@@ -323,7 +323,7 @@ export default function BookingsPage() {
                     onClick={() => setSelectedBooking(booking)}
                   >
                     <td className="px-5 py-[14px]">
-                      <span className="font-mono text-[12px] font-bold text-[#23766a]">{booking.confirmationNo}</span>
+                      <span className="font-mono text-[12px] font-bold text-[#183153]">{booking.confirmationNo}</span>
                       {booking.source === 'WALK_IN' && (
                         <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-[6px] border border-[rgba(184,144,64,0.2)] bg-[#f4ecda] px-[8px] py-[3px] text-[10px] font-bold text-[#b89040]">
                           <Zap className="h-2.5 w-2.5" />Walk-in
@@ -332,25 +332,25 @@ export default function BookingsPage() {
                     </td>
                     <td className="px-5 py-[14px]">
                       <div className="flex items-center gap-2.5">
-                        <div className="flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-full bg-[#e3f2ef] text-[11px] font-semibold text-[#23766a]">
+                        <div className="flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-full bg-[#e5f0f7] text-[11px] font-semibold text-[#183153]">
                           {booking.guest.firstName[0]}{booking.guest.lastName[0]}
                         </div>
                         <div>
-                          <p className="text-[13.5px] font-medium text-[#18231f]">{booking.guest.firstName} {booking.guest.lastName}</p>
-                          <p className="text-[11.5px] text-[#8aa29a]">{booking.guest.email}</p>
+                          <p className="text-[13.5px] font-medium text-[#183153]">{booking.guest.firstName} {booking.guest.lastName}</p>
+                          <p className="text-[11.5px] text-[#64748b]">{booking.guest.email}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-5 py-[14px]">
-                      <p className="text-[13.5px] font-medium text-[#18231f]">{booking.room.name}</p>
-                      <p className="text-[11.5px] text-[#8aa29a]">#{booking.room.number}</p>
+                      <p className="text-[13.5px] font-medium text-[#183153]">{booking.room.name}</p>
+                      <p className="text-[11.5px] text-[#64748b]">#{booking.room.number}</p>
                     </td>
                     <td className="px-5 py-[14px]">
-                      <p className="text-[13px] text-[#18231f]">{formatDate(booking.checkIn)}</p>
-                      <p className="text-[11.5px] text-[#8aa29a]">→ {formatDate(booking.checkOut)}</p>
+                      <p className="text-[13px] text-[#183153]">{formatDate(booking.checkIn)}</p>
+                      <p className="text-[11.5px] text-[#64748b]">→ {formatDate(booking.checkOut)}</p>
                     </td>
                     <td className="px-5 py-[14px]">
-                      <p className="text-[13.5px] font-semibold text-[#18231f]">{formatCurrency(Number(booking.totalAmount))}</p>
+                      <p className="text-[13.5px] font-semibold text-[#183153]">{formatCurrency(Number(booking.totalAmount))}</p>
                       {Number(booking.paidAmount) < Number(booking.totalAmount) && (
                         <p className="text-[11.5px] text-[#c43c3c]">{formatCurrency(Number(booking.totalAmount) - Number(booking.paidAmount))} due</p>
                       )}
@@ -365,7 +365,7 @@ export default function BookingsPage() {
                       {booking.status === 'CONFIRMED' && (
                         <button
                           className="rounded-[7px] border px-[10px] py-[5px] text-[11.5px] font-medium transition-colors hover:opacity-80"
-                          style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(35,118,106,0.2)', color: '#23766a' }}
+                          style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}
                           onClick={(e) => { e.stopPropagation(); setSelectedBooking(booking); }}
                         >
                           Check In
@@ -392,7 +392,7 @@ export default function BookingsPage() {
       {/* Pagination */}
       {pagination && pagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-[12.5px] text-[#8aa29a]">
+          <p className="text-[12.5px] text-[#64748b]">
             Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, pagination.total)} of {pagination.total} bookings
           </p>
           <div className="flex gap-2">
