@@ -10,6 +10,7 @@ import {
   CheckCircle2, Clock, Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getPlanDisplayName } from '@resort-pro/types';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -193,7 +194,7 @@ function AnnouncementModal({ ann, onClose, onSave }: ModalProps) {
                       : 'border-gray-700 text-gray-500 hover:border-gray-600'
                   )}
                 >
-                  {p}
+                  {getPlanDisplayName(p)}
                 </button>
               ))}
             </div>

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { useLocale } from 'next-intl';
 import {
@@ -150,6 +150,7 @@ function BrandMark() {
 
 export default function DemoPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const locale = useLocale();
   const isBn = locale === 'bn';
   const { setAuth, clearAuth } = useAuthStore();
@@ -160,10 +161,21 @@ export default function DemoPage() {
   const [emailError, setEmailError] = useState<string | null>(null);
 
   useEffect(() => {
+    // A demo-access email link carries ?email=... so opening it in a
+    // different browser/app (Gmail's in-app viewer, a phone vs. the
+    // desktop browser the visitor originally used) still skips the gate —
+    // localStorage alone doesn't survive across browser contexts.
+    const fromLink = searchParams.get('email');
+    if (fromLink && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fromLink)) {
+      window.localStorage.setItem(DEMO_EMAIL_KEY, fromLink);
+      setCapturedEmail(fromLink);
+      setCheckedStorage(true);
+      return;
+    }
     const stored = window.localStorage.getItem(DEMO_EMAIL_KEY);
     if (stored) setCapturedEmail(stored);
     setCheckedStorage(true);
-  }, []);
+  }, [searchParams]);
 
   const switchLocale = useCallback(() => {
     const next = isBn ? 'en' : 'bn';

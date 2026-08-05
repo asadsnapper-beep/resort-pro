@@ -10,6 +10,7 @@ import {
   ChevronLeft, ImagePlus, Link,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { getPlanDisplayName } from '@resort-pro/types';
 
 /* ── Types ─────────────────────────────────────────────────────────────────── */
 interface Theme {
@@ -46,6 +47,33 @@ const PLAN_COLOR: Record<string, string> = {
   STARTER:      'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
   PROFESSIONAL: 'text-blue-400 bg-blue-500/10 border-blue-500/30',
   ENTERPRISE:   'text-amber-400 bg-amber-500/10 border-amber-500/30',
+};
+
+/** Built-in themes have no remote preview image, so give each one a lightweight visual identity. */
+const THEME_THUMBNAIL: Record<string, {
+  canvas: string; bar: string; line: string; eyebrow: string; heading: string;
+  copy: string; accent: string; panel: string; serif?: boolean;
+}> = {
+  luxe: {
+    canvas: 'bg-[#183b35]', bar: 'bg-[#f8f1e4]/15', line: 'bg-[#f8f1e4]/30',
+    eyebrow: 'text-[#d4a853]', heading: 'text-[#fffaf0]', copy: 'A quieter kind of luxury',
+    accent: 'bg-[#d4a853]', panel: 'bg-[#f8f1e4]/10', serif: true,
+  },
+  coastal: {
+    canvas: 'bg-[#dceff2]', bar: 'bg-white/70', line: 'bg-[#0d6f8c]/20',
+    eyebrow: 'text-[#d97706]', heading: 'text-[#075d76]', copy: 'Slow days by the water',
+    accent: 'bg-[#d97706]', panel: 'bg-white/80',
+  },
+  'tea-garden-eco-resort': {
+    canvas: 'bg-[#e6edcf]', bar: 'bg-[#f8f4e8]/80', line: 'bg-[#1a6b2a]/20',
+    eyebrow: 'text-[#7b7f17]', heading: 'text-[#1a4d25]', copy: 'Wake up among the leaves',
+    accent: 'bg-[#1a6b2a]', panel: 'bg-[#f8f4e8]/85', serif: true,
+  },
+  minimal: {
+    canvas: 'bg-[#f8fafc]', bar: 'bg-white', line: 'bg-[#0f172a]/10',
+    eyebrow: 'text-[#2563eb]', heading: 'text-[#0f172a]', copy: 'Room for the essentials',
+    accent: 'bg-[#2563eb]', panel: 'bg-white',
+  },
 };
 
 const EMPTY_FORM = {
@@ -122,6 +150,38 @@ Claude-কে বলো:
 }
 
 /* ── Small components ──────────────────────────────────────────────────────── */
+function ThemeThumbnail({ theme }: { theme: Theme }) {
+  const visual = THEME_THUMBNAIL[theme.key] ?? {
+    canvas: 'bg-[#eff2f3]', bar: 'bg-white', line: 'bg-[#201e1d]/10',
+    eyebrow: 'text-[#ec3013]', heading: 'text-[#201e1d]', copy: 'A distinctive resort stay',
+    accent: 'bg-[#ec3013]', panel: 'bg-white',
+  };
+
+  return (
+    <div role="img" aria-label={`${theme.name} website thumbnail`} className={`relative h-full w-full overflow-hidden ${visual.canvas}`}>
+      <div className={`absolute inset-x-0 top-0 flex h-7 items-center justify-between px-3 ${visual.bar}`}>
+        <span className={`h-1.5 w-9 ${visual.line}`} />
+        <span className={`h-1.5 w-14 ${visual.line}`} />
+      </div>
+      <div className="absolute inset-x-0 top-7 h-px bg-black/5" />
+      <div className="absolute inset-x-0 top-7 bottom-0 px-4 pt-5">
+        <p className={`text-[7px] font-bold uppercase tracking-[0.22em] ${visual.eyebrow}`}>ResortPro stay</p>
+        <p className={`mt-1 max-w-[12rem] text-[19px] leading-[0.94] ${visual.serif ? 'font-serif' : 'font-semibold'} ${visual.heading}`}>{visual.copy}</p>
+        <span className={`mt-3 block h-1.5 w-14 ${visual.accent}`} />
+      </div>
+      <div className="absolute inset-x-4 bottom-3 grid grid-cols-3 gap-1.5">
+        {[0, 1, 2].map((index) => (
+          <div key={index} className={`h-8 border border-black/5 p-1.5 ${visual.panel}`}>
+            <span className={`block h-1 w-5 ${visual.line}`} />
+            <span className={`mt-1.5 block h-1 w-7 ${visual.line}`} />
+          </div>
+        ))}
+      </div>
+      <div className={`absolute -right-5 -top-7 h-24 w-24 rounded-full opacity-20 ${visual.accent}`} />
+    </div>
+  );
+}
+
 function FieldInput({
   label, value, onChange, placeholder, type = 'text', colSpan = 1,
 }: {
@@ -147,7 +207,7 @@ function PlanSelector({ value, onChange }: { value: string; onChange: (v: string
             className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1 border ${
               value === plan ? PLAN_COLOR[plan] : 'text-gray-600 bg-gray-800 border-gray-700 hover:bg-gray-700'
             }`}>
-            {PLAN_ICON[plan]} {plan}
+            {PLAN_ICON[plan]} {getPlanDisplayName(plan)}
           </button>
         ))}
       </div>
@@ -202,12 +262,7 @@ function ThemeCard({
       <div className="relative aspect-video w-full bg-gray-800 overflow-hidden flex-shrink-0">
         {allImages.length > 0
           ? <img src={allImages[imgIdx]} alt={theme.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-          : (
-            <div className="w-full h-full flex flex-col items-center justify-center text-gray-700 gap-2">
-              <Palette className="h-8 w-8" />
-              <span className="text-xs">No preview</span>
-            </div>
-          )
+          : <ThemeThumbnail theme={theme} />
         }
 
         {/* Carousel controls — only if multiple images */}
@@ -291,7 +346,7 @@ function ThemeCard({
         {/* Plan + installs */}
         <div className="flex items-center gap-2 flex-wrap mt-auto">
           <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 border ${PLAN_COLOR[theme.requiredPlan] ?? 'text-gray-400 bg-gray-700 border-gray-600'}`}>
-            {PLAN_ICON[theme.requiredPlan]} {theme.requiredPlan}
+            {PLAN_ICON[theme.requiredPlan]} {getPlanDisplayName(theme.requiredPlan)}
           </span>
           <span className="text-xs text-gray-500 flex items-center gap-1 ml-auto">
             <Users className="h-3 w-3" />
@@ -825,7 +880,7 @@ function UploadThemeModal({
                 <ImagePlus className="h-5 w-5 text-indigo-400" /> Upload Theme Package
               </h2>
               <p className="text-xs text-gray-500 mt-0.5">
-                {step === 'upload' ? 'Step 1 — Select .json or .zip file' : 'Step 2 — Preview & Publish'}
+                {step === 'upload' ? 'Step 1 — Select .html, .json, or .zip file' : 'Step 2 — Preview & Publish'}
               </p>
             </div>
             <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
@@ -845,11 +900,11 @@ function UploadThemeModal({
                   onDragLeave={() => setDrag(false)}
                   onDrop={e => { e.preventDefault(); setDrag(false); const f = e.dataTransfer.files[0]; if (f) setFile(f); }}
                 >
-                  <input type="file" accept=".json,.zip" className="hidden" onChange={e => setFile(e.target.files?.[0] ?? null)} />
+                  <input type="file" accept=".html,.htm,.json,.zip" className="hidden" onChange={e => setFile(e.target.files?.[0] ?? null)} />
                   <ImagePlus className="h-10 w-10 text-gray-600" />
                   <div className="text-center">
                     <p className="text-sm text-gray-400">Drag & drop or click to browse</p>
-                    <p className="text-xs text-gray-600 mt-1">Accepted: .json or .zip (max 512 KB)</p>
+                    <p className="text-xs text-gray-600 mt-1">Accepted: .html (template), .json, or .zip (max 512 KB)</p>
                   </div>
                   {file && (
                     <div className="flex items-center gap-2 mt-2 bg-indigo-500/10 border border-indigo-500/30 rounded-lg px-3 py-2">
@@ -859,8 +914,23 @@ function UploadThemeModal({
                   )}
                 </label>
 
-                {/* JSON format hint */}
+                {/* HTML template hint */}
                 <details className="mt-4 text-xs text-gray-600">
+                  <summary className="cursor-pointer text-gray-500 hover:text-gray-300 transition-colors">
+                    See required .html template format
+                  </summary>
+                  <div className="mt-2 p-3 bg-gray-800 rounded-lg text-[11px] text-gray-400 space-y-1.5">
+                    <p>One <code className="text-indigo-300">.html</code> file — CSS goes inside a <code className="text-indigo-300">&lt;style&gt;</code> tag in the same file, not a separate .css file.</p>
+                    <p>Data tokens: <code className="text-indigo-300">{'{{tenant.name}}'}</code>, <code className="text-indigo-300">{'{{website.heroTitle}}'}</code>, <code className="text-indigo-300">{'{{#each rooms}}'}</code> …</p>
+                    <p>Widget mounts: <code className="text-indigo-300">data-rp-widget=&quot;booking&quot;</code> (also: availability, menu, venues, vehicles, contact, offers, social-links).</p>
+                    <p>Required section ids: <code className="text-indigo-300">id=&quot;rooms&quot;</code> and <code className="text-indigo-300">id=&quot;booking&quot;</code> — the owner can never hide these.</p>
+                    <p>No <code className="text-indigo-300">&lt;script&gt;</code>, inline <code className="text-indigo-300">on*=</code> handlers, <code className="text-indigo-300">javascript:</code> URLs, or <code className="text-indigo-300">fetch</code>/<code className="text-indigo-300">eval</code> — these get rejected automatically.</p>
+                    <p className="text-gray-500">Full spec: <code className="text-indigo-300">plan/theme-contract.md</code></p>
+                  </div>
+                </details>
+
+                {/* JSON format hint */}
+                <details className="mt-3 text-xs text-gray-600">
                   <summary className="cursor-pointer text-gray-500 hover:text-gray-300 transition-colors">
                     See required config.json format
                   </summary>

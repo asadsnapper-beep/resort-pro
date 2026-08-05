@@ -10,3 +10,9 @@
 export { PageShell } from './PageShell';
 export { PageHeader } from './PageHeader';
 export { ActionButton } from './ActionButton';
+export { DataTable, type DataColumn } from './DataTable';
+export { EmptyState } from './EmptyState';
+export { FilterBar } from './FilterBar';
+export { FormField } from './FormField';
+export { StatCard, StatGrid } from './StatCard';
+export { TabBar } from './TabBar';

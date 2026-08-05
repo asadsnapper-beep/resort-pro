@@ -8,6 +8,7 @@ import {
   Search, Loader2, Printer, CheckCircle2, FileSpreadsheet,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getPlanDisplayName } from '@resort-pro/types';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -328,7 +329,7 @@ export default function ExportPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-medium truncate">{t.name}</p>
                     <p className="text-gray-600 text-xs">
-                      {t.slug} · {t._count.bookings} bookings · {t.plan}
+                      {t.slug} · {t._count.bookings} bookings · {getPlanDisplayName(t.plan)}
                     </p>
                   </div>
                   {!t.isActive && (

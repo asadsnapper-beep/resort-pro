@@ -11,6 +11,7 @@ import {
   ToggleLeft, ToggleRight, ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getPlanDisplayName } from '@resort-pro/types';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -333,7 +334,7 @@ export default function TenantEnterprisePage({ params }: { params: { id: string 
             <Building2 className="w-5 h-5 text-gray-500" />
             <h1 className="text-xl font-bold text-white">{profile.name}</h1>
             <span className="text-xs bg-amber-500/10 border border-amber-500/30 text-amber-400 px-2 py-0.5 rounded-full font-medium">
-              {profile.plan}
+              {getPlanDisplayName(profile.plan)}
             </span>
           </div>
           <p className="text-gray-500 text-sm mt-1 flex items-center gap-2">

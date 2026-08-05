@@ -661,6 +661,36 @@ export async function authRoutes(app: FastifyInstance) {
     },
   });
 
+  // ── GET /api/auth/check-slug?slug=X ───────────────────────────────────────
+  // Public endpoint — live availability check while typing on the register
+  // page. If taken, returns a ready-to-use suggestion (base-2, base-3, ...)
+  // instead of just failing, so a duplicate resort name never dead-ends the
+  // signup flow at submit time.
+  app.get('/check-slug', async (req, reply) => {
+    const { slug: rawSlug } = req.query as { slug?: string };
+    const base = (rawSlug || '').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+    if (!base || base.length < 2) {
+      return reply.send(ok({ slug: base, available: false, suggestion: null }));
+    }
+
+    const existing = await prisma.tenant.findUnique({ where: { slug: base }, select: { id: true } });
+    if (!existing) {
+      return reply.send(ok({ slug: base, available: true, suggestion: null }));
+    }
+
+    // Base is taken — find the first free "base-2", "base-3", ... suffix.
+    for (let n = 2; n <= 50; n++) {
+      const candidate = `${base}-${n}`;
+      const taken = await prisma.tenant.findUnique({ where: { slug: candidate }, select: { id: true } });
+      if (!taken) {
+        return reply.send(ok({ slug: base, available: false, suggestion: candidate }));
+      }
+    }
+    // Extremely unlikely (50 resorts with the exact same name) — fall back to a short random suffix.
+    const fallback = `${base}-${Math.random().toString(36).slice(2, 6)}`;
+    return reply.send(ok({ slug: base, available: false, suggestion: fallback }));
+  });
+
   // ── GET /api/auth/referrer?code=CODE ─────────────────────────────────────
   // Public endpoint — returns referrer resort name for the register page banner.
   app.get('/referrer', async (req, reply) => {

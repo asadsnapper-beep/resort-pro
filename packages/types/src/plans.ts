@@ -105,6 +105,18 @@ export const PLAN_PRICING: Record<PlanKey, PlanPricing> = {
   },
 };
 
+/**
+ * Converts a persisted plan enum into its customer-facing name. Use this in
+ * interfaces and messages; enum keys such as `FREE` are implementation
+ * details, not product copy. Unknown values are returned unchanged so API
+ * consumers can still render legacy data safely.
+ */
+export function getPlanDisplayName(plan: string): string {
+  return Object.prototype.hasOwnProperty.call(PLAN_PRICING, plan)
+    ? PLAN_PRICING[plan as PlanKey].displayName
+    : plan;
+}
+
 /** Only the plans customers can self-serve pick — for landing/plans/register. */
 export const PUBLIC_PLAN_ORDER: PlanKey[] = (['FREE', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE'] as const)
   .filter((key) => PLAN_PRICING[key].isPublic);

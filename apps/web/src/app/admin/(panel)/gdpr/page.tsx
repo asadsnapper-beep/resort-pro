@@ -9,6 +9,7 @@ import {
   FileJson, Info,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getPlanDisplayName } from '@resort-pro/types';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -107,7 +108,7 @@ function RequestRow({ r, onRefresh }: { r: ErasureRequest; onRefresh: () => void
               {badge.label}
             </span>
           </div>
-          <p className="text-gray-600 text-xs font-mono mt-0.5">{r.slug} · {r.plan}</p>
+          <p className="text-gray-600 text-xs font-mono mt-0.5">{r.slug} · {getPlanDisplayName(r.plan)}</p>
         </div>
 
         {/* Actions */}
