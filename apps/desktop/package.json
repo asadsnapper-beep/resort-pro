@@ -5,8 +5,8 @@
   "main": "dist/src/main.js",
   "private": true,
   "scripts": {
-    "dev": "tsc && cp db/schema.sql dist/db/schema.sql && electron dist/src/main.js",
-    "build": "tsc && cp db/schema.sql dist/db/schema.sql",
+    "dev": "tsc && cp db/schema.sql dist/db/schema.sql && mkdir -p dist/assets && cp assets/icon.png dist/assets/icon.png && electron dist/src/main.js",
+    "build": "tsc && cp db/schema.sql dist/db/schema.sql && mkdir -p dist/assets && cp assets/icon.png dist/assets/icon.png",
     "rebuild-native": "electron-rebuild -f -w better-sqlite3",
     "start": "electron dist/src/main.js",
     "dist:win": "pnpm run build && electron-builder --win --x64",
@@ -27,7 +27,8 @@
       "output": "release"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -36,7 +37,8 @@
     "mac": {
       "target": "dmg",
       "category": "public.app-category.business",
-      "identity": null
+      "identity": null,
+      "icon": "build/icon.icns"
     }
   },
   "devDependencies": {

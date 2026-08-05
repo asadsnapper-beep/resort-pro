@@ -9,6 +9,7 @@ import {
   ChevronDown, ChevronUp, CreditCard, Sparkles, X,
   Plus, Copy, Link2, Search, RefreshCw,
 } from 'lucide-react';
+import { getPlanDisplayName } from '@resort-pro/types';
 
 /* ── Types ─────────────────────────────────────────────────────────────────── */
 interface ReferralEntry {
@@ -130,7 +131,7 @@ function CreateLinkModal({ onClose }: { onClose: () => void }) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-white truncate">{selected.name}</p>
-                    <p className="text-xs text-gray-500">{selected.slug} · {selected.plan}</p>
+                    <p className="text-xs text-gray-500">{selected.slug} · {getPlanDisplayName(selected.plan)}</p>
                   </div>
                   <button onClick={() => { setSelected(null); setCode(''); setResult(null); }}
                     className="text-gray-500 hover:text-white">
@@ -314,9 +315,9 @@ function RewardModal({ referral, onClose, onSave, saving }: {
                   <label className="block text-xs font-medium text-gray-400 mb-1.5">Plan</label>
                   <select value={plan} onChange={e => setPlan(e.target.value)}
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-indigo-500">
-                    <option value="STARTER">STARTER</option>
-                    <option value="PROFESSIONAL">PROFESSIONAL</option>
-                    <option value="ENTERPRISE">ENTERPRISE</option>
+                    <option value="STARTER">{getPlanDisplayName('STARTER')}</option>
+                    <option value="PROFESSIONAL">{getPlanDisplayName('PROFESSIONAL')}</option>
+                    <option value="ENTERPRISE">{getPlanDisplayName('ENTERPRISE')}</option>
                   </select>
                 </div>
                 <div>
@@ -326,7 +327,7 @@ function RewardModal({ referral, onClose, onSave, saving }: {
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
                 </div>
                 <div className="col-span-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 px-3 py-2 text-xs text-indigo-300">
-                  {referral.referrer.name} পাবে: <strong>{months} months {plan} plan free</strong>
+                  {referral.referrer.name} পাবে: <strong>{months} months of {getPlanDisplayName(plan)} free</strong>
                 </div>
               </div>
             )}
@@ -383,7 +384,7 @@ function ReferralRow({ r, onReward }: { r: ReferralEntry; onReward: () => void }
   const rewardDesc = () => {
     if (!r.rewardType || r.rewardType === 'NONE') return null;
     if (r.rewardType === 'CREDIT') return `৳${r.rewardAmount?.toLocaleString()} credit`;
-    if (r.rewardType === 'FREE_PLAN') return `${r.rewardMonths}mo ${r.rewardPlan} free`;
+    if (r.rewardType === 'FREE_PLAN') return `${r.rewardMonths}mo ${getPlanDisplayName(r.rewardPlan ?? '')} free`;
     return null;
   };
 
@@ -425,12 +426,12 @@ function ReferralRow({ r, onReward }: { r: ReferralEntry; onReward: () => void }
             <p className="text-gray-500 mb-1">Referrer</p>
             <p className="text-white font-medium">{r.referrer.name}</p>
             <p className="text-gray-500">Code: <code className="text-indigo-400">{r.referrer.referralCode}</code></p>
-            <p className="text-gray-500">Plan: {r.referrer.plan}</p>
+            <p className="text-gray-500">Plan: {getPlanDisplayName(r.referrer.plan)}</p>
           </div>
           <div>
             <p className="text-gray-500 mb-1">New Signup</p>
             <p className="text-white font-medium">{r.referred.name}</p>
-            <p className="text-gray-500">Plan: {r.referred.plan} ({r.referred.planStatus})</p>
+            <p className="text-gray-500">Plan: {getPlanDisplayName(r.referred.plan)} ({r.referred.planStatus})</p>
             <p className="text-gray-500">Joined: {new Date(r.referred.createdAt).toLocaleDateString()}</p>
           </div>
           {r.status === 'REWARDED' && (
@@ -627,7 +628,7 @@ function CampaignLinksSection() {
                             <p className="text-xs text-gray-500">{t.slug}</p>
                           </div>
                           <span className="text-xs text-gray-500 shrink-0">{new Date(t.createdAt).toLocaleDateString('en-GB', { dateStyle: 'medium' })}</span>
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-800 text-gray-400 font-medium shrink-0">{t.plan}</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-800 text-gray-400 font-medium shrink-0">{getPlanDisplayName(t.plan)}</span>
                         </div>
                       ))}
                     </div>

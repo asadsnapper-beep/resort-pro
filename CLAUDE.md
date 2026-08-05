@@ -79,3 +79,9 @@ the bottom of DESIGN_TOKENS.md.
 See the global instructions — all new modals use `ModalShell` from
 `@/components/ui/modal-shell` (handles createPortal, body overflow, and the
 resort design). Don't use shadcn `<Modal>` in new code.
+
+## Active project memory
+
+Read [memory/projects/resortpro.md](memory/projects/resortpro.md) before
+starting product, pricing, marketing, deployment, or design work. It records
+the current source-of-truth decisions and flags older plans that are now stale.

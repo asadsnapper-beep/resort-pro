@@ -10,6 +10,7 @@ import {
   ShieldAlert, Loader2, Trash2, RefreshCw, AlertTriangle, ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getPlanDisplayName } from '@resort-pro/types';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -174,7 +175,7 @@ function DomainRow({
 
       {/* Plan */}
       <td className="px-4 py-4">
-        <span className="text-xs text-gray-400">{t.plan}</span>
+        <span className="text-xs text-gray-400">{getPlanDisplayName(t.plan)}</span>
       </td>
 
       {/* Actions */}

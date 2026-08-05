@@ -2,16 +2,16 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { PLAN_PRICING } from '@resort-pro/types';
+import { getPlanDisplayName, PLAN_PRICING } from '@resort-pro/types';
 import { adminEndpoints } from '@/lib/admin-api';
 import { useAuthStore } from '@/store/auth';
 import { toast } from '@/hooks/use-toast';
 import {
-  Search, Building2, ChevronLeft, ChevronRight,
-  ExternalLink, Loader2, CheckCircle2, AlertTriangle,
-  Ban, RefreshCw, UserCheck, Filter, Download, Flag,
+  ChevronLeft, ChevronRight, Loader2, Download, Flag,
 } from 'lucide-react';
 import Link from 'next/link';
+import { DataTable, type DataColumn, FilterBar, FormField } from '@/components/patterns';
+import { ModalShell } from '@/components/ui/modal-shell';
 
 type ChurnRisk = {
   level: 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE';
@@ -33,25 +33,25 @@ type Tenant = {
 };
 
 const RISK_BADGE: Record<string, { label: string; cls: string }> = {
-  HIGH:   { label: '🔴 High',   cls: 'bg-red-500/15 text-red-400 border border-red-500/20' },
-  MEDIUM: { label: '🟡 Medium', cls: 'bg-amber-500/15 text-amber-400 border border-amber-500/20' },
-  LOW:    { label: '🟢 Low',    cls: 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20' },
-  NONE:   { label: '—',         cls: 'text-gray-600' },
+  HIGH:   { label: 'High',   cls: 'bg-rp-teal-bg text-rp-brand-deep border border-rp-brand' },
+  MEDIUM: { label: 'Medium', cls: 'bg-rp-teal-bg text-rp-brand-deep border border-rp-brand' },
+  LOW:    { label: 'Low',    cls: 'bg-rp-surface-3 text-rp-subtle border border-rp-border-md' },
+  NONE:   { label: '—',      cls: 'text-rp-faint' },
 };
 
 const planColors: Record<string, string> = {
-  FREE: 'bg-gray-700 text-gray-300',
-  STARTER: 'bg-blue-500/20 text-blue-400 border border-blue-500/20',
-  PROFESSIONAL: 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/20',
-  ENTERPRISE: 'bg-purple-500/20 text-purple-400 border border-purple-500/20',
+  FREE: 'bg-rp-surface-3 text-rp-subtle border border-rp-border-md',
+  STARTER: 'bg-rp-teal-bg text-rp-brand-deep border border-rp-brand',
+  PROFESSIONAL: 'bg-rp-teal-bg text-rp-brand-deep border border-rp-brand',
+  ENTERPRISE: 'bg-rp-teal-bg text-rp-brand-deep border border-rp-brand',
 };
 
 const statusColors: Record<string, string> = {
-  trialing: 'bg-amber-500/20 text-amber-400',
-  active: 'bg-green-500/20 text-green-400',
-  past_due: 'bg-red-500/20 text-red-400',
-  canceled: 'bg-gray-700 text-gray-400',
-  incomplete: 'bg-orange-500/20 text-orange-400',
+  trialing: 'bg-rp-teal-bg text-rp-brand-deep border border-rp-brand',
+  active: 'bg-rp-surface-3 text-rp-text border border-rp-border-md',
+  past_due: 'bg-rp-teal-bg text-rp-brand-deep border border-rp-brand',
+  canceled: 'bg-rp-surface-3 text-rp-subtle border border-rp-border-md',
+  incomplete: 'bg-rp-teal-bg text-rp-brand-deep border border-rp-brand',
 };
 
 export default function AdminTenantsPage() {
@@ -183,273 +183,76 @@ export default function AdminTenantsPage() {
     }
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Tenants</h1>
-          <p className="text-gray-500 text-sm mt-1">{total} total tenants</p>
-        </div>
-      </div>
+  const columns: DataColumn<Tenant>[] = [
+    {
+      id: 'tenant', header: 'Tenant',
+      cell: (tenant) => <div className="flex min-w-52 items-center gap-3">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-rp-brand bg-rp-teal-bg text-rp-meta font-bold uppercase text-rp-brand-deep">{tenant.name[0]}</span>
+        <div className="min-w-0"><p className="truncate text-sm font-semibold text-rp-text">{tenant.name}</p><p className="truncate font-mono text-rp-meta text-rp-muted">{tenant.slug}{tenant.email ? ` · ${tenant.email}` : ''}</p></div>
+      </div>,
+    },
+    { id: 'plan', header: 'Plan', cell: (tenant) => <span className={`inline-flex border px-2 py-1 text-rp-micro font-semibold ${planColors[tenant.plan] || planColors.FREE}`}>{getPlanDisplayName(tenant.plan)}</span> },
+    {
+      id: 'status', header: 'Status', cell: (tenant) => <div className="flex min-w-28 flex-col items-start gap-1">
+        <span className={`inline-flex border px-2 py-0.5 text-rp-micro font-semibold ${statusColors[tenant.planStatus] || statusColors.canceled}`}>{tenant.planStatus}</span>
+        {!tenant.isActive && <span className="border border-rp-brand bg-rp-teal-bg px-2 py-0.5 text-rp-micro font-semibold text-rp-brand-deep">suspended</span>}
+        {tenant.trialEndsAt && tenant.planStatus === 'trialing' && <p className="text-rp-micro text-rp-muted">Trial ends {new Date(tenant.trialEndsAt).toLocaleDateString()}</p>}
+      </div>,
+    },
+    { id: 'stats', header: 'Stats', cell: (tenant) => <div className="whitespace-nowrap text-rp-meta text-rp-subtle">{tenant._count.users} users · {tenant._count.rooms} rooms · {tenant._count.bookings} bookings</div> },
+    {
+      id: 'risk', header: 'Risk', cell: (tenant) => tenant.churnRisk?.level !== 'NONE' ? <div title={tenant.churnRisk.reasons.join('\n')}>
+        <span className={`inline-flex border px-2 py-0.5 text-rp-micro font-semibold ${RISK_BADGE[tenant.churnRisk.level]?.cls}`}>{RISK_BADGE[tenant.churnRisk.level]?.label}</span>
+        {tenant.churnRisk.daysSinceLogin !== null && <p className="mt-1 text-rp-micro text-rp-muted">{tenant.churnRisk.daysSinceLogin}d no login</p>}
+      </div> : <span className="text-rp-faint">—</span>,
+    },
+    { id: 'joined', header: 'Joined', cell: (tenant) => <span className="whitespace-nowrap text-rp-meta text-rp-muted">{new Date(tenant.createdAt).toLocaleDateString()}</span> },
+    {
+      id: 'actions', header: 'Actions', headerClassName: 'text-right', className: 'text-right',
+      cell: (tenant) => <div className="flex min-w-64 items-center justify-end gap-1 text-rp-meta font-semibold">
+        <button onClick={() => openEdit(tenant)} className="border border-transparent px-2 py-1 text-rp-text hover:border-rp-border-md hover:bg-rp-surface-3">Edit</button>
+        <Link href={`/admin/tenants/${tenant.id}`} title="Feature flags" className="border border-transparent p-1.5 text-rp-subtle hover:border-rp-border-md hover:bg-rp-surface-3"><Flag className="h-3.5 w-3.5" /></Link>
+        <button onClick={() => handleExport(tenant)} disabled={actionLoading === `exp-${tenant.id}`} title="Export data as JSON" className="border border-transparent p-1.5 text-rp-subtle hover:border-rp-border-md hover:bg-rp-surface-3 disabled:opacity-40">{actionLoading === `exp-${tenant.id}` ? '…' : <Download className="h-3.5 w-3.5" />}</button>
+        <button onClick={() => handleImpersonate(tenant)} disabled={actionLoading === `imp-${tenant.id}` || !tenant.isActive} className="border border-transparent px-2 py-1 text-rp-brand-deep hover:border-rp-brand hover:bg-rp-teal-bg disabled:opacity-40">{actionLoading === `imp-${tenant.id}` ? '…' : 'Login as →'}</button>
+        {tenant.isActive ? <button onClick={() => handleSuspend(tenant)} disabled={actionLoading === `sus-${tenant.id}`} className="border border-transparent px-2 py-1 text-rp-brand-deep hover:border-rp-brand hover:bg-rp-teal-bg disabled:opacity-40">Suspend</button> : <button onClick={() => handleReactivate(tenant)} disabled={actionLoading === `act-${tenant.id}`} className="border border-transparent px-2 py-1 text-rp-brand-deep hover:border-rp-brand hover:bg-rp-teal-bg disabled:opacity-40">Reactivate</button>}
+      </div>,
+    },
+  ];
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-          <input
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Search name, slug, email..."
-            className="w-full h-9 bg-gray-900 border border-gray-700 rounded-lg pl-9 pr-3 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-          />
-        </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          className="h-9 bg-gray-900 border border-gray-700 rounded-lg px-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
-        >
-          <option value="">All Status</option>
-          <option value="active">Active</option>
-          <option value="trialing">Trialing</option>
-          <option value="paid">Paid</option>
-          <option value="suspended">Suspended</option>
-        </select>
-        <select
-          value={planFilter}
-          onChange={(e) => { setPlanFilter(e.target.value); setPage(1); }}
-          className="h-9 bg-gray-900 border border-gray-700 rounded-lg px-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
-        >
-          <option value="">All Plans</option>
-          <option value="FREE">Free</option>
-          <option value="STARTER">Starter</option>
-          <option value="PROFESSIONAL">Professional</option>
-          <option value="ENTERPRISE">Enterprise</option>
-        </select>
-      </div>
+  const activeFilters = [
+    statusFilter && { key: 'status', label: `Status: ${statusFilter}` },
+    planFilter && { key: 'plan', label: `Plan: ${getPlanDisplayName(planFilter)}` },
+  ].filter(Boolean) as Array<{ key: string; label: string }>;
 
-      {/* Table */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center h-48">
-            <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
-          </div>
-        ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-800">
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Tenant</th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Plan</th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Status</th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Stats</th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Risk</th>
-                <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Joined</th>
-                <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-800">
-              {tenants.map((t) => (
-                <tr key={t.id} className="hover:bg-gray-800/50 transition-colors">
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-600/20 border border-indigo-500/20 flex items-center justify-center text-xs font-bold text-indigo-400 uppercase">
-                        {t.name[0]}
-                      </div>
-                      <div>
-                        <p className="text-white text-sm font-medium">{t.name}</p>
-                        <p className="text-gray-500 text-xs font-mono">{t.slug}</p>
-                        {t.email && <p className="text-gray-600 text-xs">{t.email}</p>}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4">
-                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${planColors[t.plan] || 'bg-gray-700 text-gray-300'}`}>
-                      {t.plan}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <div className="flex flex-col gap-1">
-                      <span className={`text-xs px-2 py-0.5 rounded-full w-fit ${statusColors[t.planStatus] || 'bg-gray-700 text-gray-400'}`}>
-                        {t.planStatus}
-                      </span>
-                      {!t.isActive && (
-                        <span className="text-xs px-2 py-0.5 rounded-full w-fit bg-red-500/20 text-red-400 border border-red-500/20">
-                          suspended
-                        </span>
-                      )}
-                      {t.trialEndsAt && t.planStatus === 'trialing' && (
-                        <p className="text-xs text-gray-600">
-                          Trial ends {new Date(t.trialEndsAt).toLocaleDateString()}
-                        </p>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-5 py-4">
-                    <div className="flex gap-3 text-xs text-gray-400">
-                      <span title="Users">👥 {t._count.users}</span>
-                      <span title="Rooms">🛏 {t._count.rooms}</span>
-                      <span title="Bookings">📅 {t._count.bookings}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4">
-                    {t.churnRisk && t.churnRisk.level !== 'NONE' ? (
-                      <div title={t.churnRisk.reasons.join('\n')}>
-                        <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${RISK_BADGE[t.churnRisk.level]?.cls}`}>
-                          {RISK_BADGE[t.churnRisk.level]?.label}
-                        </span>
-                        {t.churnRisk.daysSinceLogin !== null && (
-                          <p className="text-[10px] text-gray-600 mt-0.5">
-                            {t.churnRisk.daysSinceLogin}d no login
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-gray-700 text-xs">—</span>
-                    )}
-                  </td>
-                  <td className="px-5 py-4 text-xs text-gray-500">
-                    {new Date(t.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="px-5 py-4">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => openEdit(t)}
-                        className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded-md hover:bg-gray-700 transition-colors"
-                      >
-                        Edit
-                      </button>
-                      <Link
-                        href={`/admin/tenants/${t.id}`}
-                        title="Feature flags"
-                        className="text-xs text-gray-400 hover:text-indigo-400 px-2 py-1 rounded-md hover:bg-indigo-500/10 transition-colors"
-                      >
-                        <Flag className="w-3.5 h-3.5" />
-                      </Link>
-                      <button
-                        onClick={() => handleExport(t)}
-                        disabled={actionLoading === `exp-${t.id}`}
-                        title="Export data as JSON"
-                        className="text-xs text-gray-400 hover:text-green-400 px-2 py-1 rounded-md hover:bg-green-500/10 transition-colors disabled:opacity-40"
-                      >
-                        {actionLoading === `exp-${t.id}` ? '...' : <Download className="w-3.5 h-3.5" />}
-                      </button>
-                      <button
-                        onClick={() => handleImpersonate(t)}
-                        disabled={actionLoading === `imp-${t.id}` || !t.isActive}
-                        className="text-xs text-indigo-400 hover:text-indigo-300 px-2 py-1 rounded-md hover:bg-indigo-500/10 transition-colors disabled:opacity-40"
-                      >
-                        {actionLoading === `imp-${t.id}` ? '...' : 'Login as →'}
-                      </button>
-                      {t.isActive ? (
-                        <button
-                          onClick={() => handleSuspend(t)}
-                          disabled={actionLoading === `sus-${t.id}`}
-                          className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded-md hover:bg-red-500/10 transition-colors disabled:opacity-40"
-                        >
-                          Suspend
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleReactivate(t)}
-                          disabled={actionLoading === `act-${t.id}`}
-                          className="text-xs text-green-400 hover:text-green-300 px-2 py-1 rounded-md hover:bg-green-500/10 transition-colors disabled:opacity-40"
-                        >
-                          Reactivate
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {tenants.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-5 py-12 text-center text-gray-500">
-                    No tenants found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        )}
-      </div>
+  const resetFilters = () => { setSearch(''); setStatusFilter(''); setPlanFilter(''); setPage(1); };
 
-      {/* Pagination */}
-      {pages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500">Page {page} of {pages} ({total} tenants)</p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="p-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white disabled:opacity-30"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setPage((p) => Math.min(pages, p + 1))}
-              disabled={page === pages}
-              className="p-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white disabled:opacity-30"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Modal */}
-      {editTenant && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md">
-            <h2 className="text-white font-bold text-lg mb-1">Edit Tenant</h2>
-            <p className="text-gray-400 text-sm mb-5">{editTenant.name} ({editTenant.slug})</p>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Plan</label>
-                <select
-                  value={editPlan}
-                  onChange={(e) => setEditPlan(e.target.value)}
-                  className="w-full h-10 bg-gray-800 border border-gray-700 rounded-lg px-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                >
-                  <option value="FREE">{PLAN_PRICING.FREE.displayName}</option>
-                  <option value="STARTER">{PLAN_PRICING.STARTER.displayName} (${PLAN_PRICING.STARTER.monthlyUsd}/mo)</option>
-                  <option value="PROFESSIONAL">{PLAN_PRICING.PROFESSIONAL.displayName} (${PLAN_PRICING.PROFESSIONAL.monthlyUsd}/mo)</option>
-                  <option value="ENTERPRISE">{PLAN_PRICING.ENTERPRISE.displayName} (${PLAN_PRICING.ENTERPRISE.monthlyUsd}/mo)</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                  Extend Trial (days)
-                  <span className="text-gray-500 font-normal ml-2">Leave blank to not change</span>
-                </label>
-                <input
-                  type="number"
-                  value={editTrialDays}
-                  onChange={(e) => setEditTrialDays(e.target.value)}
-                  placeholder="e.g. 30"
-                  className="w-full h-10 bg-gray-800 border border-gray-700 rounded-lg px-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={handleSaveEdit}
-                disabled={actionLoading === `edit-${editTenant.id}`}
-                className="flex-1 h-10 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
-              >
-                {actionLoading === `edit-${editTenant.id}` && <Loader2 className="w-4 h-4 animate-spin" />}
-                Save Changes
-              </button>
-              <button
-                onClick={() => setEditTenant(null)}
-                className="flex-1 h-10 bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+  return <div className="w-full space-y-6">
+    <div>
+      <h1 className="admin-page-title text-rp-text">Tenants</h1>
+      <p className="mt-1 text-sm text-rp-muted">{total} total tenants</p>
     </div>
-  );
+
+    <FilterBar
+      search={search}
+      onSearchChange={(value) => { setSearch(value); setPage(1); }}
+      searchPlaceholder="Search name, slug, email…"
+      activeFilters={activeFilters}
+      onRemoveFilter={(key) => { if (key === 'status') setStatusFilter(''); if (key === 'plan') setPlanFilter(''); setPage(1); }}
+      onReset={resetFilters}
+      filters={<>
+        <label className="text-rp-meta font-semibold text-rp-subtle">Status
+          <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }} className="mt-1 block h-9 min-w-36 border border-rp-border-md bg-rp-surface px-3 text-sm text-rp-text outline-none focus:border-rp-brand focus:ring-2 focus:ring-rp-teal-bg"><option value="">All statuses</option><option value="active">Active</option><option value="trialing">Trialing</option><option value="paid">Paid</option><option value="suspended">Suspended</option></select>
+        </label>
+        <label className="text-rp-meta font-semibold text-rp-subtle">Plan
+          <select value={planFilter} onChange={(event) => { setPlanFilter(event.target.value); setPage(1); }} className="mt-1 block h-9 min-w-36 border border-rp-border-md bg-rp-surface px-3 text-sm text-rp-text outline-none focus:border-rp-brand focus:ring-2 focus:ring-rp-teal-bg"><option value="">All plans</option><option value="FREE">{PLAN_PRICING.FREE.displayName}</option><option value="STARTER">{PLAN_PRICING.STARTER.displayName}</option><option value="PROFESSIONAL">{PLAN_PRICING.PROFESSIONAL.displayName}</option><option value="ENTERPRISE">{PLAN_PRICING.ENTERPRISE.displayName}</option></select>
+        </label>
+      </>}
+    />
+
+    <DataTable columns={columns} rows={tenants} getRowKey={(tenant) => tenant.id} loading={loading} emptyTitle="No tenants match these filters" emptyDescription="Try adjusting your search or reset the filters." footer={<div className="flex items-center justify-between gap-4"><p className="text-rp-meta text-rp-muted">Page {page} of {pages} · {total} tenants</p>{pages > 1 && <div className="flex gap-2"><button onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page === 1} className="flex h-8 w-8 items-center justify-center border border-rp-border-md text-rp-text hover:bg-rp-surface-3 disabled:opacity-30" aria-label="Previous page"><ChevronLeft className="h-4 w-4" /></button><button onClick={() => setPage((current) => Math.min(pages, current + 1))} disabled={page === pages} className="flex h-8 w-8 items-center justify-center border border-rp-border-md text-rp-text hover:bg-rp-surface-3 disabled:opacity-30" aria-label="Next page"><ChevronRight className="h-4 w-4" /></button></div>}</div>} />
+
+    {editTenant && <ModalShell variant="admin" open onClose={() => setEditTenant(null)} title="Edit Tenant" description={`${editTenant.name} · ${editTenant.slug}`} footer={<div className="flex justify-end gap-2"><button onClick={() => setEditTenant(null)} className="h-9 border border-rp-border-md px-4 text-sm font-semibold text-rp-text hover:bg-rp-surface-3">Cancel</button><button onClick={handleSaveEdit} disabled={actionLoading === `edit-${editTenant.id}`} className="inline-flex h-9 items-center gap-2 bg-rp-brand px-4 text-sm font-semibold text-rp-btn-accent-text hover:bg-rp-brand-hover disabled:opacity-50">{actionLoading === `edit-${editTenant.id}` && <Loader2 className="h-4 w-4 animate-spin" />}Save changes</button></div>}>
+      <div className="space-y-4"><FormField label="Plan"><select value={editPlan} onChange={(event) => setEditPlan(event.target.value)} className="h-10 w-full border border-rp-border-md bg-rp-surface px-3 text-sm text-rp-text outline-none focus:border-rp-brand focus:ring-2 focus:ring-rp-teal-bg"><option value="FREE">{PLAN_PRICING.FREE.displayName}</option><option value="STARTER">{PLAN_PRICING.STARTER.displayName} (${PLAN_PRICING.STARTER.monthlyUsd}/mo)</option><option value="PROFESSIONAL">{PLAN_PRICING.PROFESSIONAL.displayName} (${PLAN_PRICING.PROFESSIONAL.monthlyUsd}/mo)</option><option value="ENTERPRISE">{PLAN_PRICING.ENTERPRISE.displayName} (${PLAN_PRICING.ENTERPRISE.monthlyUsd}/mo)</option></select></FormField><FormField label="Extend trial (days)" help="Leave blank to keep the current trial date."><input type="number" value={editTrialDays} onChange={(event) => setEditTrialDays(event.target.value)} placeholder="e.g. 30" className="h-10 w-full border border-rp-border-md bg-rp-surface px-3 text-sm text-rp-text outline-none placeholder:text-rp-faint focus:border-rp-brand focus:ring-2 focus:ring-rp-teal-bg" /></FormField></div>
+    </ModalShell>}
+  </div>;
 }

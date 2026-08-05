@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Bitcount+Prop+Single:wght@400;500;600&family=Nunito:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=Bitcount+Prop+Single:wght@400;500;600&family=Nunito:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -151,6 +151,132 @@
   --rp-red-bg: rgba(196, 60, 60, 0.15);
   --rp-coral-bg: rgba(184, 100, 60, 0.18);
   --rp-teal-soft: rgba(24, 49, 83, 0.1);
+}
+
+/* ── Super Admin: Modernist semantic scope ─────────────────────────────────
+   Source of truth: demo-page/ResortPro admin panel redesign/_ds/modernist…
+   This staff console is intentionally not ResortPro's guest-facing UI:
+   architectural Archivo type, ink on off-white, one coral accent, square
+   geometry, and decisive 2px rules. */
+.admin-shell {
+  --rp-text: #201e1d;
+  --rp-text-muted: #7d7979;
+  --rp-text-muted-2: #7d7979;
+  --rp-text-subtle: #605d5d;
+  --rp-text-faint: #9b9797;
+  --rp-text-accent: #ae1800;
+
+  --rp-surface: #eae9e9;
+  --rp-surface-2: #f3f2f2;
+  --rp-surface-3: #f8f4f4;
+  --rp-surface-4: #d7d3d3;
+  --rp-modal: #eae9e9;
+
+  --rp-border: color-mix(in srgb, #201e1d 40%, transparent);
+  --rp-border-md: color-mix(in srgb, #201e1d 55%, transparent);
+
+  --rp-brand: #ec3013;
+  --rp-brand-hover: #dd2b0f;
+  --rp-brand-deep: #ae1800;
+  --rp-btn-accent: #ec3013;
+  --rp-btn-accent-text: #f3f2f2;
+
+  --rp-danger: #ae1800;
+  --rp-teal-bg: #fff2ef;
+  --rp-amber-bg: #ffe0d9;
+  --rp-red-bg: #ffe0d9;
+  --rp-coral-bg: #fff2ef;
+  --rp-teal-soft: #fff2ef;
+
+  color-scheme: light;
+  font-family: Archivo, ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Transitional mapping for the existing 18 hand-written admin pages. It makes
+   the token scope safe immediately; pages are migrated to direct `rp-*`
+   classes one by one and this compatibility layer can then be removed. */
+.admin-shell .bg-gray-950 { background-color: var(--rp-surface-2) !important; }
+.admin-shell .bg-gray-900,
+.admin-shell [class~="bg-gray-900/60"] { background-color: var(--rp-surface) !important; }
+.admin-shell .bg-gray-800,
+.admin-shell [class~="bg-gray-800/50"],
+.admin-shell [class~="bg-gray-800/30"] { background-color: var(--rp-surface-3) !important; }
+.admin-shell .bg-gray-700,
+.admin-shell [class~="bg-gray-700/50"] { background-color: var(--rp-surface-4) !important; }
+.admin-shell .border-gray-800,
+.admin-shell [class~="border-gray-800/60"],
+.admin-shell .border-gray-700 { border-color: var(--rp-border) !important; }
+.admin-shell .text-white,
+.admin-shell .text-gray-300 { color: var(--rp-text) !important; }
+.admin-shell .text-gray-400,
+.admin-shell .text-gray-500 { color: var(--rp-text-muted) !important; }
+.admin-shell .text-gray-600,
+.admin-shell .text-gray-700 { color: var(--rp-text-faint) !important; }
+.admin-shell [class*="bg-indigo"],
+.admin-shell [class*="bg-blue"],
+.admin-shell [class*="bg-purple"],
+.admin-shell [class*="bg-cyan"],
+.admin-shell [class*="bg-teal"],
+.admin-shell [class*="bg-emerald"],
+.admin-shell [class*="bg-green"],
+.admin-shell [class*="bg-amber"],
+.admin-shell [class*="bg-yellow"],
+.admin-shell [class*="bg-orange"],
+.admin-shell [class*="bg-red"] { background-color: var(--rp-teal-bg) !important; }
+.admin-shell [class*="text-indigo"],
+.admin-shell [class*="text-blue"],
+.admin-shell [class*="text-purple"],
+.admin-shell [class*="text-cyan"],
+.admin-shell [class*="text-teal"],
+.admin-shell [class*="text-emerald"],
+.admin-shell [class*="text-green"],
+.admin-shell [class*="text-amber"],
+.admin-shell [class*="text-yellow"],
+.admin-shell [class*="text-orange"],
+.admin-shell [class*="text-red"] { color: var(--rp-brand-deep) !important; }
+.admin-shell [class*="border-indigo"],
+.admin-shell [class*="border-blue"],
+.admin-shell [class*="border-purple"],
+.admin-shell [class*="border-cyan"],
+.admin-shell [class*="border-teal"],
+.admin-shell [class*="border-emerald"],
+.admin-shell [class*="border-green"],
+.admin-shell [class*="border-amber"],
+.admin-shell [class*="border-yellow"],
+.admin-shell [class*="border-orange"],
+.admin-shell [class*="border-red"] { border-color: var(--rp-brand) !important; }
+.admin-shell [class*="rounded-"]:not(.animate-spin) { border-radius: 0 !important; }
+.admin-shell [class*="hover:bg-gray-"]:hover,
+.admin-shell [class*="hover:bg-rp-surface-3"]:hover {
+  /* Modernist table / secondary-control hover: ink at only 4%, never slate. */
+  background-color: color-mix(in srgb, var(--rp-text) 4%, transparent) !important;
+}
+.admin-shell [class*="hover:bg-indigo"]:hover,
+.admin-shell [class*="hover:bg-blue"]:hover,
+.admin-shell [class*="hover:bg-purple"]:hover,
+.admin-shell [class*="hover:bg-cyan"]:hover,
+.admin-shell [class*="hover:bg-teal"]:hover,
+.admin-shell [class*="hover:bg-emerald"]:hover,
+.admin-shell [class*="hover:bg-green"]:hover,
+.admin-shell [class*="hover:bg-amber"]:hover,
+.admin-shell [class*="hover:bg-yellow"]:hover,
+.admin-shell [class*="hover:bg-orange"]:hover,
+.admin-shell [class*="hover:bg-red"]:hover,
+.admin-shell [class*="hover:bg-rp-teal-bg"]:hover {
+  /* Coral ghost-action hover: the reference uses an 8% coral wash. */
+  background-color: color-mix(in srgb, var(--rp-brand) 8%, transparent) !important;
+}
+.admin-shell aside nav a.bg-rp-teal-bg:hover {
+  /* Keep the active nav item in its coral state while the pointer is over it. */
+  background-color: color-mix(in srgb, var(--rp-brand) 8%, transparent) !important;
+}
+.admin-shell .admin-page-title {
+  margin: 0;
+  font-family: Archivo, ui-sans-serif, system-ui, sans-serif;
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 1.12;
 }
 
 /* ── Tailwind className overrides (for className="text-[#18231f]" patterns) ── */

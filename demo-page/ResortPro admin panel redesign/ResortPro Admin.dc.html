@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/modernist-6f892142-4e88-43c9-a161-eebdcf8995e2/styles.css">
+<script src="_ds/modernist-6f892142-4e88-43c9-a161-eebdcf8995e2/_ds_bundle.js"></script>
+<style>
+body{margin:0}
+a{color:var(--color-accent)}
+a:hover{color:var(--color-accent-700)}
+.rp-side a{color:var(--color-text);text-decoration:none;font-size:14px;display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);border-left:2px solid transparent;white-space:nowrap;overflow:hidden}
+.rp-side a svg{flex-shrink:0}
+.rp-side a:hover{background:color-mix(in srgb, var(--color-text) 6%, transparent)}
+.rp-side a.active{color:var(--color-accent-700);border-left-color:var(--color-accent);background:color-mix(in srgb, var(--color-accent) 8%, transparent)}
+.rp-row:hover{background:color-mix(in srgb, var(--color-text) 5%, transparent);cursor:pointer}
+</style>
+</helmet>
+
+<div style="background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);min-height:100vh;display:flex">
+
+  <aside style="width:{{ sidebarWidth }};flex-shrink:0;border-right:2px solid var(--color-divider);display:flex;flex-direction:column;min-height:100vh;overflow:hidden;transition:width 0.15s">
+    <div style="padding:var(--space-4);display:flex;align-items:center;justify-content:space-between;gap:var(--space-2)">
+      <sc-if value="{{ sidebarOpen }}">
+        <span class="nav-brand" style="white-space:nowrap">ResortPro</span>
+      </sc-if>
+      <button type="button" class="btn btn-ghost btn-icon" aria-label="Toggle sidebar" onClick="{{ toggleSidebar }}" style="flex-shrink:0">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="0"/><path d="M9 3v18"/></svg>
+      </button>
+    </div>
+    <sc-if value="{{ sidebarOpen }}">
+      <span class="tag tag-outline" style="margin:0 var(--space-4) var(--space-4);width:fit-content">Admin</span>
+    </sc-if>
+    <nav class="rp-side" style="display:flex;flex-direction:column;flex:1">
+      <a href="#" class="{{ overviewNavClass }}" onClick="{{ goOverview }}" title="Overview">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+        <sc-if value="{{ sidebarOpen }}"><span>Overview</span></sc-if>
+      </a>
+      <a href="#" class="{{ tenantsNavClass }}" onClick="{{ goTenants }}" title="Tenants">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>
+        <sc-if value="{{ sidebarOpen }}"><span>Tenants</span></sc-if>
+      </a>
+      <a href="#" title="Users">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <sc-if value="{{ sidebarOpen }}"><span>Users</span></sc-if>
+      </a>
+      <a href="#" title="Billing">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="0"/><path d="M2 10h20"/></svg>
+        <sc-if value="{{ sidebarOpen }}"><span>Billing</span></sc-if>
+      </a>
+      <a href="#" title="Audit Log">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+        <sc-if value="{{ sidebarOpen }}"><span>Audit Log</span></sc-if>
+      </a>
+      <a href="#" class="{{ healthNavClass }}" onClick="{{ goHealth }}" title="Health">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        <sc-if value="{{ sidebarOpen }}"><span>Health</span></sc-if>
+      </a>
+      <a href="#" class="{{ settingsNavClass }}" onClick="{{ goSettings }}" title="Settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        <sc-if value="{{ sidebarOpen }}"><span>Settings</span></sc-if>
+      </a>
+    </nav>
+  </aside>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;gap:var(--space-4);padding:var(--space-3) var(--space-6);border-bottom:2px solid var(--color-divider)">
+      <div class="field" style="margin:0;min-width:200px;flex:0 1 320px">
+        <input class="input" placeholder="Search tenants, users…" />
+      </div>
+      <div style="flex:1"></div>
+      <button type="button" class="btn btn-ghost btn-icon" aria-label="Notifications">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+      </button>
+      <div style="width:32px;height:32px;background:var(--color-neutral-800);color:var(--color-bg);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800">RS</div>
+    </div>
+
+  <sc-if value="{{ isOverview }}" hint-placeholder-val="{{ true }}">
+    <div style="padding:var(--space-8) var(--space-6);max-width:1400px;margin:0 auto">
+
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:var(--space-6)">
+        <div>
+          <h1 style="margin:0">Overview</h1>
+          <p class="text-muted" style="margin:var(--space-1) 0 0">ResortPro SaaS — real-time platform metrics</p>
+        </div>
+        <button type="button" class="btn btn-secondary">Refresh<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
+      </div>
+
+      <div class="card elev-sm" style="margin-bottom:var(--space-4)">
+        <div class="card-kicker">Monthly Recurring Revenue</div>
+        <div style="font-family:var(--font-heading);font-weight:800;font-size:40px;margin:var(--space-2) 0">{{ mrr.value }}</div>
+        <div class="text-muted" style="font-size:13px;margin-bottom:var(--space-4)">ARR: {{ mrr.arr }}</div>
+        <div class="hr"></div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-4)">
+          <div><div class="card-kicker">Paying customers</div><div style="font-weight:800;font-size:20px">{{ mrr.payingCustomers }}</div></div>
+          <div><div class="card-kicker">Conversion rate</div><div style="font-weight:800;font-size:20px">{{ mrr.conversion }}</div></div>
+          <div><div class="card-kicker">Max potential MRR</div><div style="font-weight:800;font-size:20px;color:var(--color-accent-700)">{{ mrr.maxPotential }}</div></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-4);margin-bottom:var(--space-4)">
+        <sc-for list="{{ topStats }}" as="stat" hint-placeholder-count="4">
+          <div class="card elev-sm">
+            <div style="font-family:var(--font-heading);font-weight:800;font-size:28px">{{ stat.value }}</div>
+            <div class="card-kicker" style="margin-top:var(--space-1)">{{ stat.label }}</div>
+            <div class="text-muted" style="font-size:12px">{{ stat.note }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div class="card elev-sm" style="margin-bottom:var(--space-4)">
+        <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-3)">
+          <div class="card-kicker" style="margin:0">Today's Action List</div>
+          <span class="tag tag-accent">{{ actionItems.length }}</span>
+        </div>
+        <sc-for list="{{ actionItems }}" as="item" hint-placeholder-count="2">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:var(--space-3) 0;border-bottom:1px solid var(--color-divider)">
+            <span>{{ item.text }}</span>
+            <button type="button" class="btn btn-ghost">View</button>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-4);margin-bottom:var(--space-4)">
+        <sc-for list="{{ midStats }}" as="stat" hint-placeholder-count="3">
+          <div class="card elev-sm">
+            <div style="font-family:var(--font-heading);font-weight:800;font-size:28px">{{ stat.value }}</div>
+            <div class="card-kicker" style="margin-top:var(--space-1)">{{ stat.label }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div class="card elev-sm" style="margin-bottom:var(--space-4)">
+          <div class="card-kicker">Plan Distribution</div>
+          <div class="card-title" style="margin-bottom:var(--space-4)">By tenant count</div>
+          <sc-for list="{{ planDist }}" as="p" hint-placeholder-count="3">
+            <div style="margin-bottom:var(--space-3)">
+              <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+                <span class="tag tag-outline">{{ p.plan }}</span>
+                <span>{{ p.count }} · {{ p.pct }}</span>
+              </div>
+              <div style="height:6px;background:var(--color-divider)">
+                <div style="height:6px;background:var(--color-accent);width:{{ p.pct }}"></div>
+              </div>
+            </div>
+          </sc-for>
+          <div class="hr"></div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-2);text-align:left">
+            <div><div style="font-weight:800;font-size:18px">{{ mrr.conversion }}</div><div class="text-muted" style="font-size:12px">Conversion</div></div>
+            <div><div style="font-weight:800;font-size:18px">{{ topStats.1.value }}</div><div class="text-muted" style="font-size:12px">Trialing</div></div>
+            <div><div style="font-weight:800;font-size:18px">{{ topStats.3.value }}</div><div class="text-muted" style="font-size:12px">Suspended</div></div>
+          </div>
+      </div>
+
+      <div class="card elev-sm" style="margin-bottom:var(--space-4)">
+          <div class="card-kicker">Recent Signups</div>
+          <div class="card-title" style="margin-bottom:var(--space-4)">Latest tenants to join</div>
+          <sc-for list="{{ recentSignups }}" as="t" hint-placeholder-count="8">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:var(--space-2) 0;border-bottom:1px solid var(--color-divider)">
+              <div>
+                <div style="font-weight:600">{{ t.name }}</div>
+                <span class="tag {{ t.statusTagClass }}" style="font-size:11px">{{ t.status }}</span>
+              </div>
+              <span class="text-muted" style="font-size:12px">{{ t.joined }}</span>
+            </div>
+          </sc-for>
+      </div>
+
+      <div class="card elev-sm" style="margin-bottom:var(--space-4)">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:var(--space-4)">
+          <div>
+            <div class="card-kicker">Churn Risk</div>
+            <div class="card-title">Based on login activity + booking trends</div>
+          </div>
+          <div style="display:flex;gap:var(--space-2)">
+            <span class="tag tag-accent">{{ churnSummary.high }} High</span>
+            <span class="tag tag-outline">{{ churnSummary.medium }} Medium</span>
+            <span class="tag tag-neutral">{{ churnSummary.low }} Low</span>
+          </div>
+        </div>
+        <sc-for list="{{ churnList }}" as="c" hint-placeholder-count="6">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:var(--space-3) 0;border-bottom:1px solid var(--color-divider)">
+            <div>
+              <div style="display:flex;align-items:center;gap:var(--space-2)">
+                <span style="font-weight:600">{{ c.name }}</span>
+                <span class="tag tag-accent" style="font-size:11px">{{ c.risk }}&#32;Risk</span>
+                <span class="tag tag-outline" style="font-size:11px">{{ c.plan }}</span>
+              </div>
+              <div class="text-muted" style="font-size:13px">{{ c.reason }}</div>
+            </div>
+            <div style="font-weight:800;font-size:18px;color:var(--color-accent-700)">{{ c.score }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-4)">
+        <button type="button" class="btn btn-secondary btn-block" onClick="{{ goTenants }}" style="justify-content:flex-start;padding:var(--space-4)">Manage Tenants</button>
+        <button type="button" class="btn btn-secondary btn-block" style="justify-content:flex-start;padding:var(--space-4)">Billing &amp; MRR</button>
+        <button type="button" class="btn btn-secondary btn-block" style="justify-content:flex-start;padding:var(--space-4)">All Users</button>
+        <button type="button" class="btn btn-secondary btn-block" style="justify-content:flex-start;padding:var(--space-4)">Platform Settings</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isTenants }}">
+    <div style="padding:var(--space-8) var(--space-6);max-width:1400px;margin:0 auto">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:var(--space-2)">
+        <h1 style="margin:0">Tenants</h1>
+      </div>
+      <p class="text-muted" style="margin:0 0 var(--space-6)">{{ tenantCount }} total tenants</p>
+
+      <div class="card elev-sm" style="margin-bottom:var(--space-4);display:flex;flex-direction:row;align-items:flex-end;gap:var(--space-4)">
+        <div class="field" style="margin:0;flex:1"><label>Search</label>
+          <input class="input" placeholder="Search name, slug, email…" value="{{ search }}" onChange="{{ onSearchChange }}" /></div>
+        <div class="field" style="margin:0;min-width:160px"><label>Status</label>
+          <select class="input" value="{{ statusFilter }}" onChange="{{ onStatusChange }}">
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="trialing">Trialing</option>
+            <option value="suspended">Suspended</option>
+          </select></div>
+        <div class="field" style="margin:0;min-width:160px"><label>Plan</label>
+          <select class="input" value="{{ planFilter }}" onChange="{{ onPlanChange }}">
+            <option value="all">All plans</option>
+            <option value="STARTER">Starter</option>
+            <option value="PROFESSIONAL">Professional</option>
+            <option value="ENTERPRISE">Enterprise</option>
+          </select></div>
+        <button type="button" class="btn btn-ghost" onClick="{{ resetFilters }}">Reset</button>
+      </div>
+
+      <div class="card elev-sm" style="padding:0;overflow:hidden">
+        <table class="table" style="margin:0">
+          <thead><tr><th>Tenant</th><th>Plan</th><th>Status</th><th>Stats</th><th>Risk</th><th>Joined</th></tr></thead>
+          <tbody>
+            <sc-for list="{{ filteredTenants }}" as="t" hint-placeholder-count="8">
+              <tr class="rp-row" onClick="{{ t.onClick }}">
+                <td>
+                  <div style="font-weight:600">{{ t.name }}</div>
+                  <div class="text-muted" style="font-size:12px">{{ t.slug }} · {{ t.email }}</div>
+                </td>
+                <td><span class="tag tag-outline">{{ t.plan }}</span></td>
+                <td>
+                  <span class="tag {{ t.statusTagClass }}">{{ t.status }}</span>
+                  <sc-if value="{{ t.trialEnds }}"><div class="text-muted" style="font-size:11px;margin-top:4px">Trial ends {{ t.trialEnds }}</div></sc-if>
+                </td>
+                <td class="text-muted" style="font-size:13px">{{ t.users }} users · {{ t.rooms }} rooms · {{ t.bookings }} bookings</td>
+                <td>
+                  <sc-if value="{{ t.risk }}"><span class="tag {{ t.riskTagClass }}">{{ t.risk }}</span></sc-if>
+                  <sc-if value="{{ t.riskNote }}"><div class="text-muted" style="font-size:11px;margin-top:4px">{{ t.riskNote }}</div></sc-if>
+                </td>
+                <td class="text-muted">{{ t.joined }}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+        <sc-if value="{{ noResults }}">
+          <div style="padding:var(--space-8);text-align:center">
+            <div class="card-title">No tenants match these filters</div>
+            <p class="text-muted">Try clearing a filter or searching a different term.</p>
+            <button type="button" class="btn btn-secondary" onClick="{{ resetFilters }}">Reset filters</button>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isHealth }}">
+    <div style="padding:var(--space-8) var(--space-6);max-width:1400px;margin:0 auto">
+      <div style="display:flex;flex-direction:row;align-items:flex-start;justify-content:space-between;margin-bottom:var(--space-6)">
+        <div>
+          <h1 style="margin:0">Platform Health</h1>
+          <p class="text-muted" style="margin:var(--space-1) 0 0">ResortPro SaaS — live infrastructure metrics</p>
+        </div>
+        <button type="button" class="btn btn-secondary">Refresh<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
+      </div>
+
+      <div class="card elev-sm" style="margin-bottom:var(--space-4)">
+        <div class="card-kicker">System Status</div>
+        <div style="display:flex;align-items:center;gap:10px;margin:var(--space-2) 0">
+          <span style="width:10px;height:10px;background:var(--color-accent-700);flex-shrink:0"></span>
+          <span style="font-family:var(--font-heading);font-weight:800;font-size:40px">Healthy</span>
+        </div>
+        <div class="text-muted" style="font-size:13px;margin-bottom:var(--space-4)">0% error rate · last 60 minutes</div>
+        <div class="hr"></div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-4)">
+          <div><div class="card-kicker">Req/min</div><div style="font-weight:800;font-size:20px">6</div><div class="text-muted" style="font-size:12px">341 in last 60min</div></div>
+          <div><div class="card-kicker">p95 Latency</div><div style="font-weight:800;font-size:20px">49ms</div><div class="text-muted" style="font-size:12px">p50: 2ms · avg: 10ms</div></div>
+          <div><div class="card-kicker">API Uptime</div><div style="font-weight:800;font-size:20px">1h 0m</div><div class="text-muted" style="font-size:12px">Node v20.20.2</div></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-4);margin-bottom:var(--space-4)">
+        <div class="card elev-sm">
+          <div style="font-family:var(--font-heading);font-weight:800;font-size:28px">0%</div>
+          <div class="card-kicker" style="margin-top:4px">Error Rate</div>
+          <div class="text-muted" style="font-size:12px">0 5xx · 4 4xx</div>
+        </div>
+        <div class="card elev-sm">
+          <div style="font-family:var(--font-heading);font-weight:800;font-size:28px">341</div>
+          <div class="card-kicker" style="margin-top:4px">Total Requests</div>
+          <div class="text-muted" style="font-size:12px">last 60 minutes</div>
+        </div>
+        <div class="card elev-sm">
+          <div style="font-family:var(--font-heading);font-weight:800;font-size:28px">6</div>
+          <div class="card-kicker" style="margin-top:4px">Req/min</div>
+          <div class="text-muted" style="font-size:12px">avg last hour</div>
+        </div>
+        <div class="card elev-sm">
+          <div style="font-family:var(--font-heading);font-weight:800;font-size:28px">49ms</div>
+          <div class="card-kicker" style="margin-top:4px">p95 Latency</div>
+          <div class="text-muted" style="font-size:12px">p50: 2ms</div>
+        </div>
+      </div>
+
+      <div class="card elev-sm" style="margin-bottom:var(--space-4)">
+        <div class="card-title" style="margin-bottom:var(--space-4)">Request Volume — Last 60 min (5-min buckets)</div>
+        <svg viewBox="0 0 600 200" style="width:100%;height:200px;display:block">
+          <line x1="0" y1="0" x2="600" y2="0" stroke="var(--color-divider)" stroke-width="1"/>
+          <line x1="0" y1="50" x2="600" y2="50" stroke="var(--color-divider)" stroke-width="1"/>
+          <line x1="0" y1="100" x2="600" y2="100" stroke="var(--color-divider)" stroke-width="1"/>
+          <line x1="0" y1="150" x2="600" y2="150" stroke="var(--color-divider)" stroke-width="1"/>
+          <line x1="0" y1="199" x2="600" y2="199" stroke="var(--color-divider)" stroke-width="1"/>
+          <polyline points="0,80 55,150 110,160 165,158 220,152 275,150 330,148 385,140 440,120 495,90 550,20 600,10" fill="none" stroke="var(--color-accent)" stroke-width="2"/>
+          <polyline points="0,196 600,196" fill="none" stroke="var(--color-accent-700)" stroke-width="1" stroke-dasharray="4 3"/>
+        </svg>
+        <div class="text-muted" style="display:flex;justify-content:space-between;font-size:11px;margin-top:4px"><span>08:26</span><span>08:41</span><span>08:56</span><span>09:11</span><span>09:21</span></div>
+        <div style="display:flex;gap:var(--space-4);margin-top:var(--space-2);font-size:12px">
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:2px;background:var(--color-accent);display:inline-block"></span>Requests</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:2px;background:var(--color-accent-700);display:inline-block"></span>5xx Errors</span>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);margin-bottom:var(--space-4)">
+        <div class="card elev-sm">
+          <div class="card-title" style="margin-bottom:var(--space-4)">Memory Usage</div>
+          <sc-for list="{{ memoryRows }}" as="m" hint-placeholder-count="3">
+            <div style="margin-bottom:var(--space-3)">
+              <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>{{ m.label }}</span><span>{{ m.value }}</span></div>
+              <div style="height:6px;background:var(--color-divider)"><div style="height:6px;background:var(--color-accent);width:{{ m.pct }}"></div></div>
+            </div>
+          </sc-for>
+          <p class="text-muted" style="margin:0;font-size:12px">Heap: 90% used · Platform: linux · v20.20.2</p>
+        </div>
+        <div class="card elev-sm">
+          <div class="card-title" style="margin-bottom:var(--space-4)">Latency Percentiles</div>
+          <div style="display:flex;align-items:flex-end;gap:var(--space-4);height:150px">
+            <sc-for list="{{ latencyBars }}" as="l" hint-placeholder-count="4">
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;gap:6px">
+                <div style="width:100%;background:var(--color-accent);height:{{ l.pct }}"></div>
+                <div class="text-muted" style="font-size:11px">{{ l.label }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4)">
+        <div class="card elev-sm">
+          <div style="display:flex;justify-content:space-between;margin-bottom:var(--space-4)"><div class="card-title" style="margin:0">Database</div><span class="text-muted" style="font-size:12px">unknown · 0 connections</span></div>
+          <p class="text-muted" style="margin:0">No connection data available.</p>
+        </div>
+        <div class="card elev-sm">
+          <div style="display:flex;justify-content:space-between;margin-bottom:var(--space-3)"><div class="card-title" style="margin:0">Slowest Endpoints</div><span class="text-muted" style="font-size:12px">last 60min</span></div>
+          <sc-for list="{{ slowEndpoints }}" as="e" hint-placeholder-count="10">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);padding:6px 0;border-bottom:1px solid var(--color-divider);font-size:13px">
+              <span style="font-family:ui-monospace,monospace;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ e.method }} {{ e.path }}</span>
+              <span style="flex-shrink:0;white-space:nowrap"><span style="color:var(--color-accent-700);font-weight:600">{{ e.ms }}</span> <span class="text-muted">{{ e.req }}</span></span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isSettings }}">
+    <div style="padding:var(--space-8) var(--space-6);max-width:1400px;margin:0 auto">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:var(--space-6)">
+        <div>
+          <h1 style="margin:0">Platform Settings</h1>
+          <p class="text-muted" style="margin:var(--space-1) 0 0">Configure plans, pricing, and trial settings for all new signups</p>
+          <p class="text-muted" style="margin:var(--space-1) 0 0;font-size:12px">Last saved: {{ savedAt }}</p>
+        </div>
+        <button type="button" class="btn btn-primary">Save Changes</button>
+      </div>
+
+      <div class="card elev-sm" style="margin-bottom:var(--space-4)">
+        <div style="display:flex;flex-direction:row;justify-content:space-between;align-items:flex-start;gap:var(--space-4)">
+          <div>
+            <div class="card-title" style="margin-bottom:4px">AI Features — Master Switch</div>
+            <p class="text-muted" style="margin:0;max-width:70ch">Global kill-switch for all AI features. When OFF, no AI runs for any tenant (no Claude calls, zero cost) — even if a tenant has an AI flag enabled.</p>
+          </div>
+          <button type="button" onClick="{{ toggleAi }}" aria-label="Toggle AI features" style="flex-shrink:0;width:44px;height:24px;border:2px solid var(--color-divider);background:{{ aiTrackBg }};position:relative;cursor:pointer;padding:0">
+            <span style="position:absolute;top:1px;left:{{ aiThumbLeft }};width:16px;height:16px;background:var(--color-bg)"></span>
+          </button>
+        </div>
+        <div class="hr"></div>
+        <p class="text-muted" style="margin:0;font-size:13px">AI is globally {{ aiStatusLabel }}. AI code ships dark until you flip this. Turn on only when you're ready to pay for tokens.</p>
+      </div>
+
+      <div class="card elev-sm" style="margin-bottom:var(--space-6)">
+        <div style="display:flex;flex-direction:row;justify-content:space-between;align-items:flex-start;margin-bottom:var(--space-4)">
+          <div>
+            <div class="card-title" style="margin-bottom:4px">Free Trial Duration</div>
+            <p class="text-muted" style="margin:0">How many days new signups get for free</p>
+          </div>
+          <div style="font-family:var(--font-heading);font-weight:800;font-size:32px;flex-shrink:0">{{ trialDays }} <span style="font-size:16px;font-weight:400">days</span></div>
+        </div>
+        <input type="range" min="1" max="90" value="{{ trialDays }}" onChange="{{ onTrialSlider }}" style="width:100%;accent-color:var(--color-accent);margin-bottom:4px" />
+        <div class="text-muted" style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:var(--space-4)">
+          <span>1 day</span><span>30 days</span><span>60 days</span><span>90 days</span>
+        </div>
+        <div style="display:flex;flex-direction:row;gap:var(--space-2);flex-wrap:wrap;margin-bottom:var(--space-4)">
+          <sc-for list="{{ trialPresets }}" as="p" hint-placeholder-count="4">
+            <button type="button" class="btn {{ p.btnClass }}" onClick="{{ p.onClick }}">{{ p.label }}</button>
+          </sc-for>
+          <span class="text-muted" style="font-size:13px;align-self:center">Custom:</span>
+          <input class="input" style="width:70px" type="number" value="{{ trialDays }}" onChange="{{ onTrialCustom }}" />
+        </div>
+        <div class="hr"></div>
+        <p class="text-muted" style="margin:0;font-size:13px">How it works: New signups automatically get a free trial of this duration. After it expires, they're redirected to the upgrade page. You can extend individual tenants' trials anytime from the Tenants page.</p>
+      </div>
+
+      <div style="display:flex;flex-direction:row;justify-content:space-between;align-items:baseline;margin-bottom:var(--space-4)">
+        <div>
+          <h2 style="margin:0">Subscription Plans</h2>
+          <p class="text-muted" style="margin:4px 0 0">{{ plans.length }} plans · Combined max MRR potential: {{ maxMrrPotential }}/mo per customer</p>
+        </div>
+        <button type="button" class="btn btn-primary">+ Add Plan</button>
+      </div>
+
+      <sc-for list="{{ plans }}" as="plan" hint-placeholder-count="4">
+        <div class="card elev-sm" style="margin-bottom:var(--space-4)">
+          <div style="display:flex;flex-direction:row;justify-content:space-between;align-items:flex-start;margin-bottom:var(--space-4)">
+            <div style="display:flex;flex-direction:row;gap:var(--space-3);align-items:center">
+              <div style="width:24px;height:24px;background:var(--color-neutral-800);color:var(--color-bg);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800">{{ plan.num }}</div>
+              <div>
+                <div class="card-title" style="margin:0">{{ plan.display }}</div>
+                <div class="text-muted" style="font-size:12px">{{ plan.key }} · ${{ plan.price }}/mo · {{ plan.roomLimitLabel }}</div>
+              </div>
+            </div>
+            <button type="button" class="btn btn-ghost btn-icon" aria-label="Delete plan"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);margin-bottom:var(--space-4)">
+            <div class="field" style="margin:0"><label>Plan Key</label>
+              <select class="input"><option>{{ plan.key }}</option></select></div>
+            <div class="field" style="margin:0"><label>Display Name</label>
+              <input class="input" value="{{ plan.display }}" /></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);margin-bottom:var(--space-4)">
+            <div class="field" style="margin:0"><label>Monthly Price (USD)</label>
+              <input class="input" value="{{ plan.price }}" /></div>
+            <div class="field" style="margin:0"><label>Room Limit (-1 = unlimited)</label>
+              <input class="input" value="{{ plan.roomLimit }}" /></div>
+          </div>
+          <div class="card-kicker" style="margin-bottom:var(--space-2)">Features</div>
+          <sc-for list="{{ plan.features }}" as="f" hint-placeholder-count="5">
+            <div style="display:flex;flex-direction:row;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--color-divider)">
+              <span style="display:flex;align-items:center;gap:var(--space-2);font-size:14px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-700)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>{{ f }}</span>
+              <button type="button" class="btn btn-ghost btn-icon" aria-label="Remove feature"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+            </div>
+          </sc-for>
+          <button type="button" class="btn btn-ghost" style="margin-top:var(--space-2)">+ Add feature</button>
+        </div>
+      </sc-for>
+
+      <div class="card elev-sm">
+        <div class="card-title" style="margin-bottom:var(--space-4)">Plan Preview (what customers see)</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-4)">
+          <sc-for list="{{ plans }}" as="plan" hint-placeholder-count="4">
+            <div class="card" style="background:var(--color-bg);border:1px solid var(--color-divider)">
+              <div class="card-title" style="margin-bottom:4px">{{ plan.display }}</div>
+              <div style="font-family:var(--font-heading);font-weight:800;font-size:24px;margin-bottom:var(--space-2)">${{ plan.price }}<span style="font-size:13px;font-weight:400">/mo</span></div>
+              <sc-for list="{{ plan.previewFeatures }}" as="f" hint-placeholder-count="4">
+                <div style="font-size:12px;display:flex;gap:6px;margin-bottom:4px"><span style="color:var(--color-accent-700)">✓</span>{{ f }}</div>
+              </sc-for>
+              <div class="text-muted" style="font-size:11px">{{ plan.moreCount }} more</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+  </div>
+
+  <sc-if value="{{ drawerOpen }}">
+    <div style="position:fixed;inset:0;background:color-mix(in srgb, var(--color-neutral-900) 45%, transparent);z-index:20" onClick="{{ closeDrawer }}"></div>
+    <div style="position:fixed;top:0;right:0;bottom:0;width:420px;background:var(--color-modal, var(--color-bg));background:#fff;box-shadow:var(--shadow-lg);z-index:21;display:flex;flex-direction:column">
+      <div style="padding:var(--space-6);border-bottom:2px solid var(--color-divider);display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div class="card-kicker">Tenant</div>
+          <h2 style="margin:0">{{ drawerTenant.name }}</h2>
+        </div>
+        <button type="button" class="btn btn-ghost btn-icon" aria-label="Close" onClick="{{ closeDrawer }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <div style="padding:var(--space-6);flex:1;overflow:auto;display:grid;gap:var(--space-4)">
+        <div><div class="card-kicker">Status</div><span class="tag {{ drawerTenant.statusTagClass }}">{{ drawerTenant.status }}</span></div>
+        <div><div class="card-kicker">Plan</div><div style="font-weight:600">{{ drawerTenant.plan }}</div></div>
+        <div><div class="card-kicker">Slug</div><div style="font-weight:600">{{ drawerTenant.slug }}</div></div>
+        <div><div class="card-kicker">Email</div><div style="font-weight:600">{{ drawerTenant.email }}</div></div>
+        <div><div class="card-kicker">Users / Rooms / Bookings</div><div style="font-weight:600">{{ drawerTenant.users }} / {{ drawerTenant.rooms }} / {{ drawerTenant.bookings }}</div></div>
+        <sc-if value="{{ drawerTenant.risk }}"><div><div class="card-kicker">Churn risk</div><span class="tag {{ drawerTenant.riskTagClass }}">{{ drawerTenant.risk }}</span><div class="text-muted" style="font-size:12px;margin-top:4px">{{ drawerTenant.riskNote }}</div></div></sc-if>
+        <div><div class="card-kicker">Joined</div><div style="font-weight:600">{{ drawerTenant.joined }}</div></div>
+      </div>
+      <div style="padding:var(--space-6);border-top:2px solid var(--color-divider);display:flex;justify-content:space-between;gap:var(--space-2)">
+        <button type="button" class="btn btn-secondary" onClick="{{ closeDrawer }}">Close</button>
+        <button type="button" class="btn btn-primary" style="background:var(--color-accent-700)" onClick="{{ openConfirm }}">Suspend tenant</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ confirmOpen }}">
+    <div class="dialog-backdrop">
+      <div class="dialog" role="dialog" aria-modal="true">
+        <div class="dialog-title">Suspend {{ drawerTenant.name }}?</div>
+        <div class="dialog-body">This tenant loses access immediately. Billing pauses and staff can reinstate the account from this same panel.</div>
+        <div class="dialog-actions">
+          <button type="button" class="btn btn-secondary" onClick="{{ closeConfirm }}">Cancel</button>
+          <button type="button" class="btn btn-primary" style="background:var(--color-accent-700)" onClick="{{ confirmSuspend }}">Suspend</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    tab: 'overview',
+    selectedDay: 2,
+    search: '',
+    planFilter: 'all',
+    statusFilter: 'all',
+    drawerTenantId: null,
+    confirmOpen: false,
+    sidebarOpen: true,
+    aiEnabled: false,
+    trialDays: 0,
+    plans: [
+      { num: 1, key: 'STARTER', display: 'Solo', price: 10, roomLimit: 5, features: ['Up to 5 rooms', '2 staff seats', 'Booking website (subdomain)', 'Invoicing & basic reports', 'Full data export'] },
+      { num: 2, key: 'STARTER', display: 'Independent Resort', price: 19, roomLimit: 20, features: ['Up to 20 rooms', '20 staff seats', 'Booking website (subdomain)', 'Invoicing', 'AI Content Generator (~30/month)', 'Email support'] },
+      { num: 3, key: 'PROFESSIONAL', display: 'Resort Group', price: 59, roomLimit: 200, features: ['Up to 200 rooms', '100 staff seats', 'Custom domain (no badge)', 'F&B + table ordering', 'CRM + email/SMS marketing', 'Offers / packages / loyalty', 'AI Content + Chatbot (~300/month)', 'Priority support'] },
+      { num: 4, key: 'ENTERPRISE', display: 'Enterprise (Legacy/Custom)', price: 100, roomLimit: -1, features: ['Up to -1 rooms', '-1 staff seats', 'Custom domain', 'All AI features (~1500/month)', 'Up to -1 properties', 'Revenue intelligence', 'Priority support + SLA'] },
+    ],
+    tenants: [
+      { id: 1, name: 'demopro', slug: 'demopro', email: 'photoscoronet@gmail.com', plan: 'STARTER', status: 'trialing', trialEnds: '19/08/2026', users: 1, rooms: 1, bookings: 1, risk: '', riskNote: '', joined: '05/08/2026' },
+      { id: 2, name: 'Nog nest farm', slug: 'nog-nest-farm', email: 'nognestfarm@gmail.com', plan: 'STARTER', status: 'trialing', trialEnds: '12/08/2026', users: 1, rooms: 1, bookings: 0, risk: '', riskNote: '', joined: '29/07/2026' },
+      { id: 3, name: 'anowar', slug: 'anowar', email: 'asadojjaman876@gmail.com', plan: 'PROFESSIONAL', status: 'trialing', trialEnds: '27/07/2026', users: 1, rooms: 1, bookings: 0, risk: 'Medium', riskNote: '', joined: '13/07/2026' },
+      { id: 4, name: 'demo site', slug: 'demo-site', email: 'asadojjaman876@gmail.com', plan: 'STARTER', status: 'trialing', trialEnds: '20/07/2026', users: 1, rooms: 1, bookings: 0, risk: 'Medium', riskNote: '', joined: '06/07/2026' },
+      { id: 5, name: 'Coral Bay Resort', slug: 'demo', email: 'info@coralbay.demo', plan: 'PROFESSIONAL', status: 'active', trialEnds: '', users: 8, rooms: 10, bookings: 19, risk: 'High', riskNote: 'Owner has never logged in · Bookings dropped 94%', joined: '03/07/2026' },
+      { id: 6, name: 'Water Lili', slug: 'water-lili', email: 'waterlili@gmail.com', plan: 'STARTER', status: 'trialing', trialEnds: '09/06/2026', users: 1, rooms: 1, bookings: 0, risk: 'High', riskNote: '', joined: '26/05/2026' },
+      { id: 7, name: 'taj', slug: 'taj', email: 'taj@mail.com', plan: 'STARTER', status: 'trialing', trialEnds: '04/06/2026', users: 1, rooms: 1, bookings: 0, risk: 'High', riskNote: '', joined: '21/05/2026' },
+      { id: 8, name: 'khan place', slug: 'khanplace80', email: 'Zakariasylheteboy@gmail.com', plan: 'STARTER', status: 'trialing', trialEnds: '03/06/2026', users: 1, rooms: 1, bookings: 0, risk: 'High', riskNote: '', joined: '20/05/2026' },
+      { id: 9, name: 'jamtola', slug: 'jamtola', email: 'asadojjaman876@gmail.com', plan: 'STARTER', status: 'trialing', trialEnds: '03/06/2026', users: 1, rooms: 1, bookings: 0, risk: 'High', riskNote: '', joined: '20/05/2026' },
+      { id: 10, name: 'Taj Resort', slug: 'taj-resort', email: '', plan: 'STARTER', status: 'trialing', trialEnds: '02/06/2026', users: 1, rooms: 0, bookings: 0, risk: 'High', riskNote: '77d no login', joined: '19/05/2026' },
+      { id: 11, name: 'asad-re', slug: 'asad-re', email: 'asadojjaman876@gmail.com', plan: 'STARTER', status: 'trialing', trialEnds: '31/05/2026', users: 1, rooms: 1, bookings: 0, risk: 'High', riskNote: '', joined: '17/05/2026' },
+      { id: 12, name: 'Test Hotel BD', slug: 'testhotelbd99', email: '', plan: 'STARTER', status: 'trialing', trialEnds: '31/05/2026', users: 1, rooms: 0, bookings: 0, risk: 'High', riskNote: '', joined: '17/05/2026' },
+      { id: 13, name: 'ResortPro Admin', slug: 'resortpro', email: 'asadojjaman876@gmail.com', plan: 'ENTERPRISE', status: 'active', trialEnds: '', users: 1, rooms: 0, bookings: 0, risk: 'High', riskNote: '80d no login', joined: '17/05/2026' },
+    ],
+  };
+
+  statusTagClass(status) {
+    if (status === 'active') return 'tag-accent';
+    if (status === 'suspended') return 'tag-outline';
+    return 'tag-neutral';
+  }
+
+  riskTagClass(risk) {
+    if (risk === 'High') return 'tag-accent';
+    if (risk === 'Medium') return 'tag-outline';
+    return 'tag-neutral';
+  }
+
+  renderVals() {
+    const s = this.state;
+
+    const filteredTenants = s.tenants.filter(t => {
+      if (s.planFilter !== 'all' && t.plan !== s.planFilter) return false;
+      if (s.statusFilter !== 'all' && t.status !== s.statusFilter) return false;
+      if (s.search && !t.name.toLowerCase().includes(s.search.toLowerCase())) return false;
+      return true;
+    }).map(t => ({
+      ...t,
+      statusTagClass: this.statusTagClass(t.status),
+      riskTagClass: this.riskTagClass(t.risk),
+      onClick: () => this.setState({ drawerTenantId: t.id }),
+    }));
+
+    const drawerTenantRaw = s.tenants.find(t => t.id === s.drawerTenantId);
+    const drawerTenant = drawerTenantRaw ? { ...drawerTenantRaw, statusTagClass: this.statusTagClass(drawerTenantRaw.status), riskTagClass: this.riskTagClass(drawerTenantRaw.risk) } : null;
+
+    const planCounts = { STARTER: 0, PROFESSIONAL: 0, ENTERPRISE: 0 };
+    s.tenants.forEach(t => planCounts[t.plan]++);
+    const total = s.tenants.length;
+    const planDist = [
+      { plan: 'STARTER', count: planCounts.STARTER, pct: Math.round(planCounts.STARTER / total * 100) + '%' },
+      { plan: 'ENTERPRISE', count: planCounts.ENTERPRISE, pct: Math.round(planCounts.ENTERPRISE / total * 100) + '%' },
+      { plan: 'PROFESSIONAL', count: planCounts.PROFESSIONAL, pct: Math.round(planCounts.PROFESSIONAL / total * 100) + '%' },
+    ];
+
+    const recentSignups = s.tenants.slice(0, 8).map(t => ({ ...t, statusTagClass: this.statusTagClass(t.status) }));
+
+    const churnList = s.tenants.filter(t => t.risk === 'High' && t.riskNote).concat(
+      s.tenants.filter(t => t.risk === 'High' && !t.riskNote).slice(0, 3)
+    ).slice(0, 6).map(t => ({
+      name: t.name, plan: t.plan, risk: t.risk,
+      reason: t.riskNote || 'Owner has never logged in · No bookings in 60 days',
+      score: t.riskNote ? 70 : 60,
+    }));
+
+    return {
+      isOverview: s.tab === 'overview',
+      isTenants: s.tab === 'tenants',
+      isSettings: s.tab === 'settings',
+      isHealth: s.tab === 'health',
+      overviewNavClass: s.tab === 'overview' ? 'active' : '',
+      tenantsNavClass: s.tab === 'tenants' ? 'active' : '',
+      settingsNavClass: s.tab === 'settings' ? 'active' : '',
+      healthNavClass: s.tab === 'health' ? 'active' : '',
+      goOverview: (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ tab: 'overview', drawerTenantId: null, confirmOpen: false }); },
+      goTenants: (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ tab: 'tenants', drawerTenantId: null, confirmOpen: false }); },
+      goSettings: (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ tab: 'settings', drawerTenantId: null, confirmOpen: false }); },
+      goHealth: (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ tab: 'health', drawerTenantId: null, confirmOpen: false }); },
+      memoryRows: [
+        { label: 'Heap Used', value: '38 MB / 42 MB', pct: '90%' },
+        { label: 'RSS (total)', value: '124 MB', pct: '100%' },
+        { label: 'External', value: '5 MB', pct: '15%' },
+      ],
+      latencyBars: [
+        { label: 'p50', pct: '5%' },
+        { label: 'avg', pct: '20%' },
+        { label: 'p95', pct: '65%' },
+        { label: 'p99', pct: '100%' },
+      ],
+      slowEndpoints: [
+        { method: 'POST', path: '/api/admin/login', ms: '334ms', req: '1req' },
+        { method: 'DELETE', path: '/api/admin/tenants/:id', ms: '174ms', req: '1req' },
+        { method: 'GET', path: '/api/admin/churn-risk', ms: '80ms', req: '2req' },
+        { method: 'GET', path: '/api/admin/stats', ms: '78ms', req: '3req' },
+        { method: 'GET', path: '/api/admin/mrr-growth', ms: '63ms', req: '4req' },
+        { method: 'GET', path: '/api/admin/failed-payments', ms: '60ms', req: '2req' },
+        { method: 'PATCH', path: '/api/admin/tenants/:id', ms: '49ms', req: '1req' },
+        { method: 'GET', path: '/api/admin/billing', ms: '49ms', req: '1req' },
+        { method: 'GET', path: '/site/favicon.ico', ms: '43ms', req: '2req' },
+        { method: 'GET', path: '/site/wp-login.php', ms: '42ms', req: '1req' },
+      ],
+      savedAt: '05/08/2026, 15:27:13',
+      toggleAi: () => this.setState(st => ({ aiEnabled: !st.aiEnabled })),
+      aiTrackBg: s.aiEnabled ? 'var(--color-accent)' : 'var(--color-neutral-400)',
+      aiThumbLeft: s.aiEnabled ? '24px' : '2px',
+      aiStatusLabel: s.aiEnabled ? 'ON' : 'OFF',
+      trialDays: s.trialDays,
+      onTrialSlider: (e) => this.setState({ trialDays: Number(e.target.value) }),
+      onTrialCustom: (e) => this.setState({ trialDays: Number(e.target.value) || 0 }),
+      trialPresets: [7, 14, 21, 30].map(d => ({
+        label: d + ' days',
+        btnClass: s.trialDays === d ? 'btn-primary' : 'btn-secondary',
+        onClick: () => this.setState({ trialDays: d }),
+      })),
+      plans: s.plans.map(p => ({
+        ...p,
+        roomLimitLabel: p.roomLimit === -1 ? 'unlimited rooms' : p.roomLimit + ' rooms',
+        previewFeatures: p.features.slice(0, 4),
+        moreCount: Math.max(0, p.features.length - 4) + ' more',
+      })),
+      maxMrrPotential: '$' + s.plans.reduce((sum, p) => sum + p.price, 0),
+      sidebarOpen: s.sidebarOpen,
+      sidebarWidth: s.sidebarOpen ? '220px' : '64px',
+      toggleSidebar: () => this.setState(st => ({ sidebarOpen: !st.sidebarOpen })),
+      mrr: { value: '$408', arr: '$4,896', payingCustomers: 2, conversion: '15%', maxPotential: '$947' },
+      topStats: [
+        { value: '13', label: 'Total Tenants', note: '13 active' },
+        { value: '11', label: 'On Trial', note: 'Free trial accounts' },
+        { value: '20', label: 'Total Users', note: '' },
+        { value: '0', label: 'Suspended', note: 'All good' },
+      ],
+      midStats: [
+        { value: '19', label: 'Total Rooms' },
+        { value: '20', label: 'Total Bookings' },
+        { value: '1.5', label: 'Avg Rooms/Tenant' },
+      ],
+      actionItems: [
+        { text: 'ResortPro Admin — high churn risk (No login in 80 days)' },
+        { text: 'Taj Resort — high churn risk (No login in 77 days)' },
+      ],
+      planDist,
+      recentSignups,
+      churnSummary: { high: 9, medium: 2, low: 0 },
+      churnList,
+      tenantCount: total,
+      search: s.search,
+      onSearchChange: (e) => this.setState({ search: e.target.value }),
+      planFilter: s.planFilter,
+      onPlanChange: (e) => this.setState({ planFilter: e.target.value }),
+      statusFilter: s.statusFilter,
+      onStatusChange: (e) => this.setState({ statusFilter: e.target.value }),
+      resetFilters: () => this.setState({ search: '', planFilter: 'all', statusFilter: 'all' }),
+      filteredTenants,
+      noResults: filteredTenants.length === 0,
+      drawerOpen: !!drawerTenant,
+      drawerTenant: drawerTenant || {},
+      closeDrawer: () => this.setState({ drawerTenantId: null, confirmOpen: false }),
+      openConfirm: () => this.setState({ confirmOpen: true }),
+      closeConfirm: () => this.setState({ confirmOpen: false }),
+      confirmSuspend: () => {
+        this.setState(st => ({
+          tenants: st.tenants.map(t => t.id === st.drawerTenantId ? { ...t, status: 'suspended' } : t),
+          confirmOpen: false,
+        }));
+      },
+      confirmOpen: s.confirmOpen,
+    };
+  }
+}
+
+</script>
+</body>
+</html>

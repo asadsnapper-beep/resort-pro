@@ -60,11 +60,52 @@ function RegisterForm() {
   });
 
   const resortName = watch('resortName');
+  const slug = watch('slug');
+
+  // Live slug availability — same resort name twice must never dead-end the
+  // signup at submit time; suggest a free alternative while they're still typing.
+  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const [slugSuggestion, setSlugSuggestion] = useState<string | null>(null);
 
   const handleResortNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const name = e.target.value;
     setValue('resortName', name);
     setValue('slug', name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
+  };
+
+  useEffect(() => {
+    const base = (slug || '').trim();
+    if (base.length < 2) {
+      setSlugStatus('idle');
+      setSlugSuggestion(null);
+      return;
+    }
+    setSlugStatus('checking');
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    const timer = setTimeout(() => {
+      fetch(`${API_URL}/api/auth/check-slug?slug=${encodeURIComponent(base)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (!d?.data) return;
+          if (d.data.available) {
+            setSlugStatus('available');
+            setSlugSuggestion(null);
+          } else {
+            setSlugStatus('taken');
+            setSlugSuggestion(d.data.suggestion ?? null);
+          }
+        })
+        .catch(() => setSlugStatus('idle'));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [slug]);
+
+  const useSuggestedSlug = () => {
+    if (slugSuggestion) {
+      setValue('slug', slugSuggestion);
+      setSlugStatus('available');
+      setSlugSuggestion(null);
+    }
   };
 
   const onSubmit = async (data: FormData) => {
@@ -93,8 +134,25 @@ function RegisterForm() {
         router.push('/dashboard/upgrade');
       }
     } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
       const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Registration failed';
-      toast({ title: 'Error', description: message, variant: 'destructive' });
+      // Race condition: the live check said available, but someone else took
+      // it between then and submit — re-check and hand back a fresh suggestion
+      // instead of leaving the user stuck on a bare error.
+      if (status === 409) {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+        try {
+          const res = await fetch(`${API_URL}/api/auth/check-slug?slug=${encodeURIComponent(data.slug)}`);
+          const d = await res.json();
+          if (d?.data?.suggestion) {
+            setSlugStatus('taken');
+            setSlugSuggestion(d.data.suggestion);
+          }
+        } catch { /* fall through to the generic toast below */ }
+        toast({ title: 'That URL was just taken', description: 'We found a similar one below — pick it and try again.', variant: 'destructive' });
+      } else {
+        toast({ title: 'Error', description: message, variant: 'destructive' });
+      }
     } finally {
       setLoading(false);
     }
@@ -176,6 +234,26 @@ function RegisterForm() {
                 className="border-white/10 bg-white/10 text-white placeholder:text-white/30 focus-visible:ring-gold-500 font-mono"
               />
               {errors.slug && <p className="mt-1 text-xs text-red-400">{errors.slug.message}</p>}
+              {!errors.slug && slugStatus === 'checking' && (
+                <p className="mt-1 text-xs text-white/40">Checking availability…</p>
+              )}
+              {!errors.slug && slugStatus === 'available' && (
+                <p className="mt-1 text-xs text-emerald-400">✓ Available</p>
+              )}
+              {!errors.slug && slugStatus === 'taken' && (
+                <p className="mt-1 text-xs text-amber-400">
+                  That name is already taken.
+                  {slugSuggestion && (
+                    <>
+                      {' '}Try{' '}
+                      <button type="button" onClick={useSuggestedSlug} className="underline font-mono text-gold-400 hover:text-gold-300">
+                        {slugSuggestion}
+                      </button>{' '}
+                      instead?
+                    </>
+                  )}
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">

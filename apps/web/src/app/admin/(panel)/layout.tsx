@@ -48,8 +48,8 @@ export default function AdminPanelLayout({ children }: { children: React.ReactNo
   // Show spinner until client-side mount — avoids SSR/localStorage mismatch
   if (!mounted) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+      <div className="admin-shell min-h-screen bg-rp-surface-2 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-rp-brand" />
       </div>
     );
   }
@@ -62,17 +62,17 @@ export default function AdminPanelLayout({ children }: { children: React.ReactNo
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-950">
+    <div className="admin-shell flex h-screen overflow-hidden bg-rp-surface-2 text-rp-text">
       {/* Sidebar */}
-      <aside className="w-60 flex flex-col bg-gray-900 border-r border-gray-800 shrink-0">
+      <aside className="w-60 flex flex-col bg-rp-surface border-r-2 border-rp-border shrink-0">
         {/* Logo */}
-        <div className="flex items-center gap-3 h-16 px-5 border-b border-gray-800">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
-            <Shield className="w-4 h-4 text-white" />
+        <div className="flex items-center gap-3 h-16 px-5 border-b-2 border-rp-border">
+          <div className="w-8 h-8 bg-rp-brand rounded-lg flex items-center justify-center">
+            <Shield className="w-4 h-4 text-rp-btn-accent-text" />
           </div>
           <div>
-            <p className="text-white text-sm font-bold">Admin Panel</p>
-            <p className="text-gray-500 text-xs">ResortPro</p>
+            <p className="text-rp-text text-sm font-bold">ResortPro</p>
+            <p className="text-rp-muted text-xs">Super Admin</p>
           </div>
         </div>
 
@@ -87,8 +87,8 @@ export default function AdminPanelLayout({ children }: { children: React.ReactNo
                 className={cn(
                   'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                   isActive
-                    ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/20'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                    ? 'bg-rp-teal-bg text-rp-brand border border-rp-border-md'
+                    : 'text-rp-muted hover:text-rp-text hover:bg-rp-surface-3'
                 )}
               >
                 <Icon className="w-4 h-4 shrink-0" />
@@ -99,21 +99,21 @@ export default function AdminPanelLayout({ children }: { children: React.ReactNo
         </nav>
 
         {/* User */}
-        <div className="border-t border-gray-800 p-4">
+        <div className="border-t-2 border-rp-border p-4">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 bg-indigo-500/20 border border-indigo-500/30 rounded-full flex items-center justify-center">
-              <span className="text-indigo-400 text-xs font-bold uppercase">
+            <div className="w-8 h-8 bg-rp-teal-bg border border-rp-border-md rounded-full flex items-center justify-center">
+              <span className="text-rp-brand text-xs font-bold uppercase">
                 {admin?.email?.[0] || 'A'}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-white text-xs font-medium truncate">{admin?.email || 'Admin'}</p>
-              <p className="text-indigo-400 text-xs">Super Admin</p>
+              <p className="text-rp-text text-xs font-medium truncate">{admin?.email || 'Admin'}</p>
+              <p className="text-rp-brand text-xs">Super Admin</p>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-rp-muted hover:text-rp-danger hover:bg-rp-red-bg transition-colors"
           >
             <LogOut className="w-4 h-4" />
             Sign out
@@ -124,21 +124,21 @@ export default function AdminPanelLayout({ children }: { children: React.ReactNo
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="h-16 border-b border-gray-800 bg-gray-900 flex items-center px-6 gap-2 shrink-0">
+        <header className="h-16 border-b-2 border-rp-border bg-rp-surface flex items-center px-6 gap-2 shrink-0">
           {/* Breadcrumb */}
-          <span className="text-gray-500 text-sm">Admin</span>
-          <ChevronRight className="w-3 h-3 text-gray-700" />
-          <span className="text-gray-300 text-sm font-medium capitalize">
+          <span className="text-rp-muted text-sm">Admin</span>
+          <ChevronRight className="w-3 h-3 text-rp-faint" />
+          <span className="text-rp-text text-sm font-medium capitalize">
             {pathname === '/admin' ? 'Overview' : pathname.split('/').pop()}
           </span>
           <div className="ml-auto flex items-center gap-3">
             <NotificationBell />
-            <span className="text-xs text-gray-600 bg-gray-800 border border-gray-700 px-2 py-1 rounded-full">
+            <span className="text-xs text-rp-brand bg-rp-teal-bg border border-rp-border-md px-2 py-1 rounded-full">
               Super Admin
             </span>
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto bg-gray-950 p-6">
+        <main className="flex-1 min-w-0 overflow-y-auto bg-rp-surface-2 p-5 md:p-6 xl:p-8">
           {children}
         </main>
       </div>

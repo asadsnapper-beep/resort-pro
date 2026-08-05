@@ -15,6 +15,8 @@ import {
   TrendingDown, Minus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { StatCard, StatGrid } from '@/components/patterns';
+import { getPlanDisplayName } from '@resort-pro/types';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
@@ -108,42 +110,29 @@ function KpiCard({
   label,
   value,
   sub,
-  iconBg,
-  iconColor,
   href,
   trend,
+  tone = 'brand',
 }: {
   icon: React.ElementType;
   label: string;
   value: string | number;
   sub?: string;
-  iconBg: string;
-  iconColor: string;
   href?: string;
   trend?: { value: string; up: boolean };
+  tone?: 'brand' | 'success' | 'warning' | 'danger' | 'neutral';
 }) {
   const inner = (
-    <div className={cn(
-      'group bg-gray-900 border border-gray-800 rounded-2xl p-5 transition-all',
-      href && 'hover:border-gray-700 cursor-pointer',
-    )}>
-      <div className="flex items-start justify-between mb-4">
-        <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', iconBg)}>
-          <Icon className={cn('w-5 h-5', iconColor)} />
-        </div>
-        {href && (
-          <ArrowRight className="w-4 h-4 text-gray-700 group-hover:text-gray-500 transition-colors" />
-        )}
-      </div>
-      <p className="text-2xl font-bold text-white tracking-tight">{value}</p>
-      <p className="text-sm text-gray-400 mt-0.5">{label}</p>
-      {sub && <p className="text-xs text-gray-600 mt-1">{sub}</p>}
-      {trend && (
-        <div className={cn('flex items-center gap-1 mt-2 text-xs font-medium', trend.up ? 'text-emerald-400' : 'text-red-400')}>
-          <TrendingUp className={cn('w-3 h-3', !trend.up && 'rotate-180')} />
-          {trend.value}
-        </div>
-      )}
+    <div className={cn('group relative transition-colors', href && 'cursor-pointer hover:opacity-90')}>
+      <StatCard
+        icon={Icon}
+        label={label}
+        value={value}
+        description={sub}
+        tone={tone}
+        trend={trend && <span className={cn('inline-flex items-center gap-1', trend.up ? 'text-emerald-600 dark:text-emerald-400' : 'text-rp-danger')}><TrendingUp className={cn('h-3 w-3', !trend.up && 'rotate-180')} />{trend.value}</span>}
+      />
+      {href && <ArrowRight className="pointer-events-none absolute right-4 top-4 h-4 w-4 text-rp-faint transition-colors group-hover:text-rp-brand" />}
     </div>
   );
   return href ? <Link href={href}>{inner}</Link> : inner;
@@ -213,8 +202,8 @@ export default function AdminOverviewPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-rp-brand" />
       </div>
     );
   }
@@ -228,17 +217,17 @@ export default function AdminOverviewPage() {
   const trialConversionPotential = stats.mrr + (stats.trialingTenants * 49);
 
   return (
-    <div className="space-y-8">
+    <div className="w-full space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Overview</h1>
-          <p className="text-gray-500 text-sm mt-1">ResortPro SaaS — real-time platform metrics</p>
+          <h1 className="admin-page-title text-rp-text">Overview</h1>
+          <p className="mt-1 text-sm text-rp-muted">ResortPro SaaS — real-time platform metrics</p>
         </div>
         <button
           onClick={() => load(true)}
           disabled={refreshing}
-          className="flex items-center gap-2 h-9 px-4 rounded-lg bg-gray-800 border border-gray-700 text-gray-400 hover:text-white text-sm transition-colors disabled:opacity-50"
+          className="flex h-9 items-center gap-2 rounded-rp-ctrl border border-rp-border-md bg-rp-surface px-4 text-sm font-semibold text-rp-subtle transition-colors hover:bg-rp-surface-3 hover:text-rp-text disabled:opacity-50"
         >
           <RefreshCw className={cn('w-3.5 h-3.5', refreshing && 'animate-spin')} />
           Refresh
@@ -246,61 +235,61 @@ export default function AdminOverviewPage() {
       </div>
 
       {/* Revenue row — most important first */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-indigo-900/40 to-indigo-800/20 border border-indigo-500/20 rounded-2xl p-6">
+      <div className="grid grid-cols-1 gap-4 2xl:grid-cols-5">
+        <div className="border-2 border-rp-border bg-rp-surface p-6 shadow-none 2xl:col-span-2">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-indigo-300 font-medium">Monthly Recurring Revenue</p>
-              <p className="text-4xl font-extrabold text-white mt-1">${stats.mrr.toLocaleString()}</p>
-              <p className="text-indigo-400/70 text-sm mt-1">ARR: ${(stats.mrr * 12).toLocaleString()}</p>
+              <p className="text-rp-meta font-bold uppercase tracking-[0.1em] text-rp-brand">Monthly Recurring Revenue</p>
+              <p className="mt-1 text-4xl font-extrabold tracking-[-0.04em] text-rp-text">${stats.mrr.toLocaleString()}</p>
+              <p className="mt-1 text-sm text-rp-muted">ARR: ${(stats.mrr * 12).toLocaleString()}</p>
             </div>
-            <div className="w-12 h-12 bg-indigo-500/20 rounded-xl flex items-center justify-center">
-              <DollarSign className="w-6 h-6 text-indigo-400" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-rp-card bg-rp-teal-bg">
+              <DollarSign className="h-6 w-6 text-rp-brand" />
             </div>
           </div>
-          <div className="mt-5 pt-4 border-t border-indigo-500/15 grid grid-cols-3 gap-4">
+          <div className="mt-5 grid grid-cols-3 gap-4 border-t border-rp-border pt-4">
             <div>
-              <p className="text-2xl font-bold text-white">{stats.paidTenants}</p>
-              <p className="text-xs text-indigo-300/60">Paying customers</p>
+              <p className="text-2xl font-bold text-rp-text">{stats.paidTenants}</p>
+              <p className="text-xs text-rp-muted">Paying customers</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{conversionRate}%</p>
-              <p className="text-xs text-indigo-300/60">Conversion rate</p>
+              <p className="text-2xl font-bold text-rp-text">{conversionRate}%</p>
+              <p className="text-xs text-rp-muted">Conversion rate</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-emerald-400">${trialConversionPotential.toLocaleString()}</p>
-              <p className="text-xs text-indigo-300/60">Max potential MRR</p>
+              <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">${trialConversionPotential.toLocaleString()}</p>
+              <p className="text-xs text-rp-muted">Max potential MRR</p>
             </div>
           </div>
         </div>
 
-        <div className="col-span-2 sm:col-span-1 grid grid-cols-2 gap-3">
+        <StatGrid className="2xl:col-span-3 2xl:grid-cols-4">
           <KpiCard
             icon={Building2} label="Total Tenants"
             value={stats.totalTenants}
             sub={`${stats.activeTenants} active`}
-            iconBg="bg-indigo-500/10" iconColor="text-indigo-400"
+            tone="brand"
             href="/admin/tenants"
           />
           <KpiCard
             icon={Activity} label="On Trial"
             value={stats.trialingTenants}
             sub="Free trial accounts"
-            iconBg="bg-amber-500/10" iconColor="text-amber-400"
+            tone="warning"
           />
           <KpiCard
             icon={Users} label="Total Users"
             value={stats.totalUsers.toLocaleString()}
-            iconBg="bg-blue-500/10" iconColor="text-blue-400"
+            tone="neutral"
             href="/admin/users"
           />
           <KpiCard
             icon={ShieldAlert} label="Suspended"
             value={stats.suspendedTenants}
             sub={stats.suspendedTenants > 0 ? 'Need attention' : 'All good'}
-            iconBg="bg-red-500/10" iconColor="text-red-400"
+            tone="danger"
           />
-        </div>
+        </StatGrid>
       </div>
 
       {/* Smart Alerts — today's action list */}
@@ -450,18 +439,18 @@ export default function AdminOverviewPage() {
                 <AreaChart data={chartData}>
                   <defs>
                     <linearGradient id="mrrGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                      <stop offset="5%" stopColor="var(--rp-brand)" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="var(--rp-brand)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#6b7280' }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--rp-border-md)" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--rp-text-muted)' }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: 'var(--rp-text-muted)' }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
                   <Tooltip
-                    contentStyle={{ background: '#111827', border: '1px solid #1f2937', borderRadius: 8, fontSize: 12 }}
+                    contentStyle={{ background: 'var(--rp-surface)', border: '1px solid var(--rp-border-md)', borderRadius: 8, fontSize: 12, color: 'var(--rp-text)' }}
                     formatter={(v: number) => [`$${v.toLocaleString()}`, 'MRR']}
                   />
-                  <Area type="monotone" dataKey="mrr" stroke="#6366f1" fill="url(#mrrGrad)" strokeWidth={2} dot={false} />
+                  <Area type="monotone" dataKey="mrr" stroke="var(--rp-brand)" fill="url(#mrrGrad)" strokeWidth={2} dot={false} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -470,24 +459,24 @@ export default function AdminOverviewPage() {
       })()}
 
       {/* Secondary stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <StatGrid className="xl:grid-cols-3">
         <KpiCard
           icon={BedDouble} label="Total Rooms"
           value={stats.totalRooms.toLocaleString()}
-          iconBg="bg-purple-500/10" iconColor="text-purple-400"
+          tone="neutral"
         />
         <KpiCard
           icon={CalendarDays} label="Total Bookings"
           value={stats.totalBookings.toLocaleString()}
-          iconBg="bg-teal-500/10" iconColor="text-teal-400"
+          tone="success"
         />
         <KpiCard
           icon={TrendingUp} label="Avg Rooms/Tenant"
           value={stats.totalTenants > 0 ? (stats.totalRooms / stats.totalTenants).toFixed(1) : '0'}
           sub="Platform average"
-          iconBg="bg-cyan-500/10" iconColor="text-cyan-400"
+          tone="brand"
         />
-      </div>
+      </StatGrid>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Plan breakdown with better visuals */}
@@ -513,7 +502,7 @@ export default function AdminOverviewPage() {
                       <div className="flex items-center gap-2">
                         <div className={cn('w-2 h-2 rounded-full', colors.dot)} />
                         <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', colors.bg, colors.text)}>
-                          {p.plan}
+                          {getPlanDisplayName(p.plan)}
                         </span>
                       </div>
                       <span className="text-white text-sm font-semibold">{p.count}</span>
@@ -645,7 +634,7 @@ export default function AdminOverviewPage() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-white">{t.name}</p>
                   <p className="text-xs text-gray-500">
-                    {t.plan} · ${t.amount}/mo
+                    {getPlanDisplayName(t.plan)} · ${t.amount}/mo
                     {t.daysOverdue !== null && t.daysOverdue > 0 && (
                       <span className="ml-2 text-red-400">{t.daysOverdue}d overdue</span>
                     )}
@@ -758,7 +747,7 @@ export default function AdminOverviewPage() {
                           style={{ width: `${t.churnRisk.score}%` }}
                         />
                       </div>
-                      <p className="text-[10px] text-gray-600 mt-0.5 text-right">{t.plan}</p>
+                      <p className="text-[10px] text-gray-600 mt-0.5 text-right">{getPlanDisplayName(t.plan)}</p>
                     </div>
                   </div>
                 );

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { PLAN_PRICING } from '@resort-pro/types';
+import { getPlanDisplayName, PLAN_PRICING } from '@resort-pro/types';
 import { adminEndpoints } from '@/lib/admin-api';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -487,7 +487,7 @@ export default function AdminBillingPage() {
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-emerald-400 text-sm font-semibold">${planPrices[t.plan] ?? 0}/mo</p>
-                    <p className="text-gray-600 text-xs">{t.plan}</p>
+                    <p className="text-gray-600 text-xs">{getPlanDisplayName(t.plan)}</p>
                   </div>
                 </div>
               ))}
