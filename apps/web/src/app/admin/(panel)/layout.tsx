@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useAdminStore } from '@/store/admin';
 import {
   LayoutDashboard, Building2, Users, CreditCard,
-  LogOut, Shield, ChevronRight, Loader2, Settings, Palette, ClipboardList, Download, Gift, UserCog, Megaphone, ShieldCheck, Activity, Star, Globe, HardDrive, Sparkles, Mail,
+  LogOut, ChevronRight, Loader2, Settings, Palette, ClipboardList, Download, Gift, UserCog, Megaphone, ShieldCheck, Activity, Star, Globe, HardDrive, Sparkles, Mail,
 } from 'lucide-react';
 import NotificationBell from '@/components/admin/NotificationBell';
 import { cn } from '@/lib/utils';
@@ -67,12 +68,10 @@ export default function AdminPanelLayout({ children }: { children: React.ReactNo
       <aside className="w-60 flex flex-col bg-rp-surface border-r-2 border-rp-border shrink-0">
         {/* Logo */}
         <div className="flex items-center gap-3 h-16 px-5 border-b-2 border-rp-border">
-          <div className="w-8 h-8 bg-rp-brand rounded-lg flex items-center justify-center">
-            <Shield className="w-4 h-4 text-rp-btn-accent-text" />
-          </div>
+          <Image src="/logo/resortpro-icon-64.png" alt="ResortPro" width={32} height={32} priority className="h-8 w-8 shrink-0 mix-blend-multiply" />
           <div>
-            <p className="text-rp-text text-sm font-bold">ResortPro</p>
-            <p className="text-rp-muted text-xs">Super Admin</p>
+            <p className="admin-nav-brand text-rp-text">ResortPro</p>
+            <p className="admin-nav-meta text-rp-muted">Super Admin</p>
           </div>
         </div>
 
@@ -85,7 +84,7 @@ export default function AdminPanelLayout({ children }: { children: React.ReactNo
                 key={href}
                 href={href}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                  'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-normal transition-colors',
                   isActive
                     ? 'bg-rp-teal-bg text-rp-brand border border-rp-border-md'
                     : 'text-rp-muted hover:text-rp-text hover:bg-rp-surface-3'

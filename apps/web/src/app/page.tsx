@@ -710,7 +710,7 @@ export default function HomePage() {
           </div>
         </div>
         <div className="mx-auto max-w-[1240px] border-t border-white/25 px-5 py-6 text-xs text-white/55 sm:px-8">
-          © 2026 ResortPro. Made in Bangladesh.
+          © 2026 ResortPro.
         </div>
       </footer>
     </main>

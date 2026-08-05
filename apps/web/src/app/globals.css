@@ -190,7 +190,34 @@
 
   color-scheme: light;
   font-family: Archivo, ui-sans-serif, system-ui, sans-serif;
+  /* Modernist's base type scale. Keep this scoped: the guest dashboard has
+     its own token scale and must not inherit the admin console values. */
+  font-size: 15px;
+  line-height: 1.55;
 }
+
+/* Modernist typography bridge -------------------------------------------------
+   Admin pages share dashboard primitives such as DataTable. The primitives use
+   ResortPro's dashboard size tokens, so translate those roles only inside the
+   admin shell to the reference system's 14 / 12 / 11px rhythm. */
+.admin-shell .text-rp-body { font-size: 14px; line-height: 1.55; }
+.admin-shell .text-rp-meta { font-size: 12px; line-height: 1.45; }
+.admin-shell .text-rp-label { font-size: 12px; line-height: 1.2; }
+.admin-shell .text-rp-micro { font-size: 11px; line-height: 1.2; }
+.admin-shell .admin-table-stats { font-size: 13px; line-height: 1.55; }
+
+.admin-shell table { font-size: 14px; line-height: 1.55; }
+.admin-shell table th { font-size: 11px; line-height: 1.2; }
+
+.admin-shell .admin-nav-brand {
+  font-family: Archivo, ui-sans-serif, system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+
+.admin-shell .admin-nav-meta { font-size: 11px; line-height: 1.2; }
 
 /* Transitional mapping for the existing 18 hand-written admin pages. It makes
    the token scope safe immediately; pages are migrated to direct `rp-*`

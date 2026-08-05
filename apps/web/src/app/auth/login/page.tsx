@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { ArrowLeft } from 'lucide-react';
 import { useLocale } from 'next-intl';
 import type { Locale } from '@/i18n/config';
 
@@ -133,6 +135,17 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-resort-900 to-resort-700 flex items-center justify-center p-4">
+      {/* Back to home — top left. Web only: the desktop app has no marketing
+          site to go back to, so this link only makes sense in the browser. */}
+      {!isElectron && (
+        <div className="absolute top-4 left-4">
+          <Link href="/" className="flex items-center gap-1.5 text-white/50 hover:text-white/80 text-sm transition-colors">
+            <ArrowLeft className="h-4 w-4" />
+            Back to home
+          </Link>
+        </div>
+      )}
+
       {/* Language switcher — top right */}
       <div className="absolute top-4 right-4">
         <LanguageSwitcher currentLocale={locale} variant="button" />
@@ -140,7 +153,9 @@ export default function LoginPage() {
 
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gold-500 font-display text-2xl font-bold text-resort-900">R</div>
+          <Link href="/" className="relative mx-auto mb-4 block h-14 w-14 overflow-hidden rounded-2xl bg-white">
+            <Image src="/brand/resortpro-icon-mark.png" alt="ResortPro" fill sizes="56px" className="object-cover" />
+          </Link>
           <h1 className="font-display text-3xl font-bold text-white">{t('title')}</h1>
           <p className="mt-2 text-white/60">{t('subtitle')}</p>
         </div>

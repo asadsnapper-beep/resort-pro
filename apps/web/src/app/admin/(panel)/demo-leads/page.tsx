@@ -54,48 +54,48 @@ export default function AdminDemoLeadsPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2.5">
-          <Mail className="h-6 w-6 text-indigo-500" />
+        <h1 className="admin-page-title flex items-center gap-2.5 text-rp-text">
+          <Mail className="h-6 w-6 text-rp-brand" />
           Demo Leads
         </h1>
-        <p className="text-gray-500 text-sm mt-1">
+        <p className="mt-1 text-sm text-rp-muted">
           Everyone who entered an email to view the /try demo — plan/demo-gate-and-click-tracking.md
         </p>
       </div>
 
       {leads.length > 0 && (
-        <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/20 bg-indigo-500/10 px-3 py-1.5 text-sm font-medium text-indigo-400">
+        <div className="inline-flex items-center gap-2 border border-rp-brand bg-rp-teal-bg px-3 py-1.5 text-sm font-semibold text-rp-brand-deep">
           {leads.length} lead{leads.length !== 1 ? 's' : ''}
         </div>
       )}
 
       {/* List */}
       {leads.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-800 bg-gray-900/50 py-16 text-center">
-          <Mail className="h-8 w-8 text-gray-700" />
-          <p className="text-sm text-gray-500">No demo leads yet</p>
+        <div className="flex flex-col items-center gap-2 border border-rp-border-md bg-rp-surface py-16 text-center">
+          <Mail className="h-8 w-8 text-rp-faint" />
+          <p className="text-sm text-rp-muted">No demo leads yet</p>
         </div>
       ) : (
-        <div className="rounded-xl border border-gray-800 overflow-hidden divide-y divide-gray-800">
+        <div className="divide-y divide-rp-border-md overflow-hidden border border-rp-border-md bg-rp-surface">
           {leads.map((lead) => (
             <div
               key={lead.id}
-              className="flex items-center gap-4 bg-gray-900/50 px-4 py-4"
+              className="flex items-center gap-4 bg-rp-surface px-4 py-4 transition-colors hover:bg-rp-surface-3"
             >
-              <div className="h-9 w-9 rounded-lg bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-400 shrink-0">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-rp-border-md bg-rp-surface-3 text-xs font-bold text-rp-subtle">
                 {lead.email[0]?.toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">{lead.email}</p>
-                <p className="text-xs text-gray-500 truncate mt-0.5">
+                <p className="truncate text-sm font-semibold text-rp-text">{lead.email}</p>
+                <p className="mt-0.5 truncate text-xs text-rp-muted">
                   {lead.ipAddress ?? 'IP unknown'}
                 </p>
               </div>
-              <div className="text-right shrink-0 text-xs text-gray-500">
-                <span className="rounded-full border border-indigo-500/20 bg-indigo-500/10 px-2 py-0.5 text-[11px] font-semibold text-indigo-400">
+              <div className="shrink-0 text-right text-xs text-rp-muted">
+                <span className="border border-rp-brand bg-rp-teal-bg px-2 py-0.5 text-[11px] font-semibold text-rp-brand-deep">
                   {ROLE_LABEL[lead.role] ?? lead.role}
                 </span>
-                <p className="flex items-center gap-1 mt-1.5 justify-end">
+                <p className="mt-1.5 flex items-center justify-end gap-1">
                   <Clock className="h-3 w-3" /> {timeAgo(lead.createdAt)}
                 </p>
               </div>

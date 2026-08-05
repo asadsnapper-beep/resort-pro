@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -177,7 +178,9 @@ function RegisterForm() {
         </div>
 
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gold-500 font-display text-2xl font-bold text-resort-900">R</div>
+          <Link href="/" className="relative mx-auto mb-4 block h-14 w-14 overflow-hidden rounded-2xl bg-white">
+            <Image src="/brand/resortpro-icon-mark.png" alt="ResortPro" fill sizes="56px" className="object-cover" />
+          </Link>
           <h1 className="font-display text-3xl font-bold text-white">Create your resort</h1>
           <p className="mt-2 text-white/60">Create your workspace, then complete secure checkout.</p>
         </div>

@@ -188,7 +188,7 @@ export default function AdminTenantsPage() {
       id: 'tenant', header: 'Tenant',
       cell: (tenant) => <div className="flex min-w-52 items-center gap-3">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-rp-brand bg-rp-teal-bg text-rp-meta font-bold uppercase text-rp-brand-deep">{tenant.name[0]}</span>
-        <div className="min-w-0"><p className="truncate text-sm font-semibold text-rp-text">{tenant.name}</p><p className="truncate font-mono text-rp-meta text-rp-muted">{tenant.slug}{tenant.email ? ` · ${tenant.email}` : ''}</p></div>
+        <div className="min-w-0"><p className="truncate text-sm font-semibold text-rp-text">{tenant.name}</p><p className="truncate text-rp-meta text-rp-muted">{tenant.slug}{tenant.email ? ` · ${tenant.email}` : ''}</p></div>
       </div>,
     },
     { id: 'plan', header: 'Plan', cell: (tenant) => <span className={`inline-flex border px-2 py-1 text-rp-micro font-semibold ${planColors[tenant.plan] || planColors.FREE}`}>{getPlanDisplayName(tenant.plan)}</span> },
@@ -199,17 +199,17 @@ export default function AdminTenantsPage() {
         {tenant.trialEndsAt && tenant.planStatus === 'trialing' && <p className="text-rp-micro text-rp-muted">Trial ends {new Date(tenant.trialEndsAt).toLocaleDateString()}</p>}
       </div>,
     },
-    { id: 'stats', header: 'Stats', cell: (tenant) => <div className="whitespace-nowrap text-rp-meta text-rp-subtle">{tenant._count.users} users · {tenant._count.rooms} rooms · {tenant._count.bookings} bookings</div> },
+    { id: 'stats', header: 'Stats', cell: (tenant) => <div className="admin-table-stats whitespace-nowrap text-rp-subtle">{tenant._count.users} users · {tenant._count.rooms} rooms · {tenant._count.bookings} bookings</div> },
     {
       id: 'risk', header: 'Risk', cell: (tenant) => tenant.churnRisk?.level !== 'NONE' ? <div title={tenant.churnRisk.reasons.join('\n')}>
         <span className={`inline-flex border px-2 py-0.5 text-rp-micro font-semibold ${RISK_BADGE[tenant.churnRisk.level]?.cls}`}>{RISK_BADGE[tenant.churnRisk.level]?.label}</span>
         {tenant.churnRisk.daysSinceLogin !== null && <p className="mt-1 text-rp-micro text-rp-muted">{tenant.churnRisk.daysSinceLogin}d no login</p>}
       </div> : <span className="text-rp-faint">—</span>,
     },
-    { id: 'joined', header: 'Joined', cell: (tenant) => <span className="whitespace-nowrap text-rp-meta text-rp-muted">{new Date(tenant.createdAt).toLocaleDateString()}</span> },
+    { id: 'joined', header: 'Joined', cell: (tenant) => <span className="whitespace-nowrap text-rp-body text-rp-muted">{new Date(tenant.createdAt).toLocaleDateString()}</span> },
     {
       id: 'actions', header: 'Actions', headerClassName: 'text-right', className: 'text-right',
-      cell: (tenant) => <div className="flex min-w-64 items-center justify-end gap-1 text-rp-meta font-semibold">
+      cell: (tenant) => <div className="flex min-w-64 items-center justify-end gap-1 text-rp-body font-semibold">
         <button onClick={() => openEdit(tenant)} className="border border-transparent px-2 py-1 text-rp-text hover:border-rp-border-md hover:bg-rp-surface-3">Edit</button>
         <Link href={`/admin/tenants/${tenant.id}`} title="Feature flags" className="border border-transparent p-1.5 text-rp-subtle hover:border-rp-border-md hover:bg-rp-surface-3"><Flag className="h-3.5 w-3.5" /></Link>
         <button onClick={() => handleExport(tenant)} disabled={actionLoading === `exp-${tenant.id}`} title="Export data as JSON" className="border border-transparent p-1.5 text-rp-subtle hover:border-rp-border-md hover:bg-rp-surface-3 disabled:opacity-40">{actionLoading === `exp-${tenant.id}` ? '…' : <Download className="h-3.5 w-3.5" />}</button>

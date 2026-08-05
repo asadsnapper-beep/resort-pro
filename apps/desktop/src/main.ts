@@ -212,6 +212,13 @@ function createWindow() {
 
 // ─── App lifecycle ────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
+  // macOS dev-mode Dock icon — packaged builds get this from build/icon.icns
+  // automatically, but `electron .` runs as the stock Electron.app bundle, so
+  // the Dock icon has to be set at runtime here to show ResortPro's mark.
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.setIcon(path.join(__dirname, '../assets/icon.png'));
+  }
+
   // Open SQLite local database (creates it if first run)
   getDb();
 
