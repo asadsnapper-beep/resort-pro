@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import Stripe from 'stripe';
 import { prisma } from '@resort-pro/database';
-import { PLAN_PRICING } from '@resort-pro/types';
+import { PLAN_ORDER, PLAN_PRICING, PUBLIC_PLAN_ORDER, type PlanKey } from '@resort-pro/types';
 import { createAdminNotification } from '../utils/notifications';
 import { applyPlanFlagsToTenant, resolveTenantEntitlement, getPlanConfigs } from '../utils/entitlement';
 import { bkashGrantToken, bkashCreatePayment, bkashExecutePayment, type BkashConfig } from '../services/bkash';
@@ -75,6 +75,19 @@ const BKASH_PLAN_ANNUAL_BDT: Record<keyof typeof PLANS, number> = {
   ENTERPRISE: Number(process.env.BKASH_PRICE_ENTERPRISE_ANNUAL) || PLAN_PRICING.ENTERPRISE.annualBdt,
 };
 
+/** Enterprise is a negotiated/legacy plan, never a self-serve checkout target. */
+function isSelfServePlanKey(value: unknown): value is PlanKey {
+  return typeof value === 'string' && PUBLIC_PLAN_ORDER.includes(value as PlanKey);
+}
+
+function isSelfServeUpgrade(currentPlan: PlanKey, status: string, requestedPlan: PlanKey) {
+  // During initial checkout an incomplete account may pay for its selected
+  // plan. Once access is active, changing to the same/lower tier belongs in
+  // support/Stripe portal—not a new checkout session.
+  if (!['active', 'trialing'].includes(status)) return true;
+  return PLAN_ORDER.indexOf(requestedPlan) > PLAN_ORDER.indexOf(currentPlan);
+}
+
 // Platform bKash merchant account (money comes to YOU). Returns null if unset,
 // so the endpoint can degrade gracefully instead of crashing.
 function getPlatformBkash(): BkashConfig | null {
@@ -113,6 +126,11 @@ export async function billingRoutes(app: FastifyInstance) {
         name: true,
         email: true,
         isActive: true,
+        promotionRedemptions: {
+          select: { expiresAt: true },
+          orderBy: { redeemedAt: 'desc' },
+          take: 1,
+        },
       },
     });
 
@@ -127,6 +145,9 @@ export async function billingRoutes(app: FastifyInstance) {
     const isActive = tenant.planStatus === 'active';
     const isPastDue = tenant.planStatus === 'past_due';
     const isCanceled = tenant.planStatus === 'canceled';
+    const isLaunchOffer = isTrialing && tenant.promotionRedemptions.some(
+      (redemption) => redemption.expiresAt.getTime() >= Date.now()
+    );
 
     const [entitlement, planConfigs] = await Promise.all([
       resolveTenantEntitlement(tenantId),
@@ -143,13 +164,14 @@ export async function billingRoutes(app: FastifyInstance) {
         isActive,
         isPastDue,
         isCanceled,
+        isLaunchOffer,
+        isStripeTestMode: (process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder').startsWith('sk_test_'),
         currentPeriodEnd: tenant.currentPeriodEnd,
         trialEndsAt: tenant.trialEndsAt,
         priceProtectedUntil: tenant.priceProtectedUntil,
         tenantIsActive: tenant.isActive,
         hasStripeCustomer: !!tenant.stripeCustomerId,
         hasSubscription: !!tenant.stripeSubscriptionId,
-        availablePlans: PLANS,
         bkashEnabled: !!getPlatformBkash(),
         bkashPricesBdt: BKASH_PLAN_BDT,
         entitlement: {
@@ -159,7 +181,9 @@ export async function billingRoutes(app: FastifyInstance) {
           aiMonthlyTokenCap: entitlement.aiMonthlyTokenCap,
           flags: entitlement.flags,
         },
-        planConfigs,
+        // The dashboard only receives plans that an owner can choose without
+        // speaking to us. Legacy/custom Enterprise stays out of self-serve UI.
+        planConfigs: planConfigs.filter((plan) => isSelfServePlanKey(plan.key)),
       },
     });
   });
@@ -172,8 +196,10 @@ export async function billingRoutes(app: FastifyInstance) {
       const { tenantId } = request.user as any;
       const { planKey, interval = 'month' } = request.body;
 
+      if (!isSelfServePlanKey(planKey)) {
+        return reply.status(400).send({ success: false, error: 'This plan is available through our team. Please contact support.' });
+      }
       const plan = PLANS[planKey];
-      if (!plan) return reply.status(400).send({ success: false, error: 'Invalid plan' });
       const priceId = interval === 'year' ? plan.annualPriceId : plan.priceId;
       if (!priceId) {
         return reply.status(400).send({
@@ -184,9 +210,12 @@ export async function billingRoutes(app: FastifyInstance) {
 
       const tenant = await prisma.tenant.findUnique({
         where: { id: tenantId },
-        select: { name: true, email: true, billingEmail: true, stripeCustomerId: true, slug: true },
+        select: { name: true, email: true, billingEmail: true, stripeCustomerId: true, slug: true, plan: true, planStatus: true },
       });
       if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
+      if (!isSelfServeUpgrade(tenant.plan as PlanKey, tenant.planStatus, planKey)) {
+        return reply.status(400).send({ success: false, error: 'Your current plan is already active. Use the billing portal or contact support to make this change.' });
+      }
 
       const appUrl = process.env.WEB_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -258,7 +287,18 @@ export async function billingRoutes(app: FastifyInstance) {
       const { tenantId } = request.user as any;
       const { planKey, interval = 'month' } = request.body;
 
-      if (!PLANS[planKey]) return reply.status(400).send({ success: false, error: 'Invalid plan' });
+      if (!isSelfServePlanKey(planKey)) {
+        return reply.status(400).send({ success: false, error: 'This plan is available through our team. Please contact support.' });
+      }
+
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { plan: true, planStatus: true },
+      });
+      if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
+      if (!isSelfServeUpgrade(tenant.plan as PlanKey, tenant.planStatus, planKey)) {
+        return reply.status(400).send({ success: false, error: 'Your current plan is already active. Use the billing portal or contact support to make this change.' });
+      }
 
       const cfg = getPlatformBkash();
       if (!cfg) {
@@ -305,7 +345,7 @@ export async function billingRoutes(app: FastifyInstance) {
       const fail = (reason: string) => reply.redirect(`${appUrl}/dashboard/billing?canceled=1&reason=${encodeURIComponent(reason)}`);
 
       if (!paymentID || status !== 'success' || !tenantId || !planKey) return fail('cancelled');
-      if (!PLANS[planKey as keyof typeof PLANS]) return fail('invalid_plan');
+      if (!isSelfServePlanKey(planKey)) return fail('invalid_plan');
 
       const cfg = getPlatformBkash();
       if (!cfg) return fail('not_configured');
@@ -317,11 +357,11 @@ export async function billingRoutes(app: FastifyInstance) {
 
         // Re-verify the paid amount against what we expected (guards tampered callback params)
         const expected = interval === 'year'
-          ? BKASH_PLAN_ANNUAL_BDT[planKey as keyof typeof PLANS]
-          : BKASH_PLAN_BDT[planKey as keyof typeof PLANS];
+          ? BKASH_PLAN_ANNUAL_BDT[planKey]
+          : BKASH_PLAN_BDT[planKey];
         if (expected && Math.abs(Number(exec.amount) - expected) > 0.5) return fail('amount_mismatch');
 
-        const plan = planKey as keyof typeof PLANS;
+        const plan = planKey;
         const days = interval === 'year' ? 365 : 30;
         const periodEnd = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 

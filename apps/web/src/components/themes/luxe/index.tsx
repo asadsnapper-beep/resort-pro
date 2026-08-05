@@ -4,6 +4,7 @@ import { Menu, X } from 'lucide-react'
 
 import type { ThemeProps, ResortRoom } from '../types'
 import { orderSections } from '../_utils/sections'
+import { toLocalDateKey } from '../_utils/date'
 
 const LUXE_SECTION_ORDER = ['about', 'rooms', 'menu', 'venues', 'vehicles', 'gallery', 'testimonials', 'availability', 'booking', 'contact'] as const
 import { AvailabilityCalendar, BookingForm, MenuWidget, ContactForm, VenuesWidget, VehiclesWidget } from '../_widgets'
@@ -164,8 +165,8 @@ export function LuxeTheme({ data }: ThemeProps) {
                   accentColor={accent}
                   currency={tenant.currency}
                   onRoomSelect={(room, checkIn, checkOut) => {
-                    setCalendarCheckIn(checkIn.toISOString().split('T')[0])
-                    setCalendarCheckOut(checkOut.toISOString().split('T')[0])
+                    setCalendarCheckIn(toLocalDateKey(checkIn))
+                    setCalendarCheckOut(toLocalDateKey(checkOut))
                     setCalendarRoomId(room.id)
                     document.getElementById('booking')?.scrollIntoView({ behavior: 'smooth' })
                   }}

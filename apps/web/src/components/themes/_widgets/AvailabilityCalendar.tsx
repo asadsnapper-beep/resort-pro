@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Loader2, BedDouble } from 'lucide-react';
+import { toLocalDateKey } from '../_utils/date';
 
 /* ── Types ───────────────────────────────────────────────────────────────────── */
 interface DayData {
@@ -43,10 +44,6 @@ function fmt(amount: number, currency: string) {
   return new Intl.NumberFormat('en-US', {
     style: 'currency', currency, maximumFractionDigits: 0,
   }).format(amount);
-}
-
-function toYMD(date: Date): string {
-  return date.toISOString().split('T')[0];
 }
 
 function monthKey(date: Date): string {
@@ -114,7 +111,7 @@ export function AvailabilityCalendar({
     (async () => {
       try {
         const res = await fetch(
-          `${API_BASE}/site/${slug}/availability?checkIn=${toYMD(checkIn)}&checkOut=${toYMD(checkOut)}`,
+          `${API_BASE}/site/${slug}/availability?checkIn=${toLocalDateKey(checkIn)}&checkOut=${toLocalDateKey(checkOut)}`,
           { signal: controller.signal },
         );
         const json = await res.json();
@@ -175,7 +172,7 @@ export function AvailabilityCalendar({
 
   /* ── Day helpers ──────────────────────────────────────────────────────────── */
   const getDayStatus = (date: Date): DayData | null => {
-    const key = toYMD(date);
+    const key = toLocalDateKey(date);
     return calendarData?.days[key] ?? null;
   };
 
@@ -184,8 +181,8 @@ export function AvailabilityCalendar({
     return date > checkIn && date < previewEnd;
   };
 
-  const isCheckIn = (date: Date) => checkIn ? toYMD(date) === toYMD(checkIn) : false;
-  const isCheckOut = (date: Date) => previewEnd ? toYMD(date) === toYMD(previewEnd) : false;
+  const isCheckIn = (date: Date) => checkIn ? toLocalDateKey(date) === toLocalDateKey(checkIn) : false;
+  const isCheckOut = (date: Date) => previewEnd ? toLocalDateKey(date) === toLocalDateKey(previewEnd) : false;
 
   /* ── Render ───────────────────────────────────────────────────────────────── */
   const year = currentMonth.getFullYear();
