@@ -1,5 +1,6 @@
 'use client'
 import { orderSections } from '../_utils/sections'
+import { toLocalDateKey } from '../_utils/date'
 import React, { useState, useEffect } from 'react'
 import { Menu, X } from 'lucide-react'
 import type { ResortData, ResortRoom } from '../types'
@@ -53,13 +54,20 @@ export function ConfigThemeRenderer({ data, config: rawConfig }: ConfigThemeProp
   }, [])
 
   const scrollTo = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+    const section = document.getElementById(id)
+    const navHeight = document.getElementById('public-site-nav')?.offsetHeight ?? 64
+    if (section) {
+      window.scrollTo({
+        top: Math.max(0, section.getBoundingClientRect().top + window.scrollY - navHeight - 16),
+        behavior: 'smooth',
+      })
+    }
     setNavOpen(false)
   }
 
   const handleRoomSelect = (room: ResortRoom, checkIn: Date, checkOut: Date) => {
-    setCalendarCheckIn(checkIn.toISOString().split('T')[0])
-    setCalendarCheckOut(checkOut.toISOString().split('T')[0])
+    setCalendarCheckIn(toLocalDateKey(checkIn))
+    setCalendarCheckOut(toLocalDateKey(checkOut))
     setCalendarRoomId(room.id)
     scrollTo('booking')
   }
@@ -140,7 +148,7 @@ export function ConfigThemeRenderer({ data, config: rawConfig }: ConfigThemeProp
       )}
 
       {/* ── Fixed navbar shell ──────────────────────────────────────────── */}
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 40 }}>
+      <div id="public-site-nav" style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 40 }}>
         {barVisible && (
           <AnnouncementBar
             slug={tenant.slug}

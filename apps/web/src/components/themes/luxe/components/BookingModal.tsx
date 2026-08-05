@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { X, Calendar, CheckCircle, Minus, Plus } from 'lucide-react'
 import type { ResortData, ResortRoom } from '../../types'
 import { fmt } from '../utils'
+import { toLocalDateKey } from '../../_utils/date'
 
 const ROOM_TYPE_LABELS: Record<string, string> = {
   STANDARD: 'Standard Room', DELUXE: 'Deluxe Room', SUITE: 'Suite',
@@ -35,7 +36,7 @@ export function BookingModal({ room, data, onClose }: BookingModalProps) {
   const [confirmation, setConfirmation]     = useState<{ confirmationNo: string; totalAmount: number; nights: number } | null>(null)
   const [error, setError]                   = useState('')
 
-  const today  = new Date().toISOString().split('T')[0]
+  const today  = toLocalDateKey(new Date())
   const nights = checkIn && checkOut
     ? Math.max(0, Math.ceil((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000))
     : 0

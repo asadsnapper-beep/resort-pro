@@ -4,6 +4,7 @@ import { Menu, X } from 'lucide-react'
 
 import type { ThemeProps, ResortRoom } from '../types'
 import { orderSections } from '../_utils/sections'
+import { toLocalDateKey } from '../_utils/date'
 import {
   HeroSection, AboutSection, RoomsSection,
   AvailabilitySection, BookingSection,
@@ -48,8 +49,8 @@ export function MinimalTheme({ data }: ThemeProps) {
   }
 
   const handleRoomSelect = (room: ResortRoom, checkIn: Date, checkOut: Date) => {
-    setCalendarCheckIn(checkIn.toISOString().split('T')[0])
-    setCalendarCheckOut(checkOut.toISOString().split('T')[0])
+    setCalendarCheckIn(toLocalDateKey(checkIn))
+    setCalendarCheckOut(toLocalDateKey(checkOut))
     setCalendarRoomId(room.id)
     document.getElementById('booking')?.scrollIntoView({ behavior: 'smooth' })
   }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Calendar, Bed, CheckCircle, Wifi, Car, Coffee, Waves, Dumbbell, Utensils, Shield, Wind, Tag, X } from 'lucide-react';
 import type { WidgetProps, ResortRoom } from '../types';
+import { toLocalDateKey } from '../_utils/date';
 
 /* ── Types ───────────────────────────────────────────────────────────────────── */
 export interface BookingFormProps extends WidgetProps {
@@ -173,7 +174,7 @@ export function BookingForm({
   initialCheckIn, initialCheckOut, initialRoomId,
   initialPromoCode,
 }: BookingFormProps & { initialPromoCode?: string }) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = toLocalDateKey(new Date());
   const color = primaryColor || '#1a6b5e';
   const accent = accentColor || primaryColor || '#1a6b5e';
 

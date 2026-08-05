@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import { Menu, X } from 'lucide-react'
 
 import { orderSections } from '../_utils/sections'
+import { toLocalDateKey } from '../_utils/date'
 import type { ThemeProps, ResortRoom } from '../types'
 import {
   HeroSection, AboutSection, RoomsSection, GallerySection,
@@ -56,8 +57,8 @@ export function TeaGardenEcoResortTheme({ data }: ThemeProps) {
   }
 
   const handleRoomSelect = (room: ResortRoom, checkIn: Date, checkOut: Date) => {
-    setCalendarCheckIn(checkIn.toISOString().split('T')[0])
-    setCalendarCheckOut(checkOut.toISOString().split('T')[0])
+    setCalendarCheckIn(toLocalDateKey(checkIn))
+    setCalendarCheckOut(toLocalDateKey(checkOut))
     setCalendarRoomId(room.id)
     scrollTo('booking')
   }
