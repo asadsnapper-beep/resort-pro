@@ -10,7 +10,7 @@ import {
   ChevronLeft, ChevronRight, Loader2, Download, Flag,
 } from 'lucide-react';
 import Link from 'next/link';
-import { DataTable, type DataColumn, FilterBar, FormField } from '@/components/patterns';
+import { DataTable, type DataColumn, FilterBar, FormField, ConfirmDialog } from '@/components/patterns';
 import { ModalShell } from '@/components/ui/modal-shell';
 
 type ChurnRisk = {
@@ -67,6 +67,7 @@ export default function AdminTenantsPage() {
   const [planFilter, setPlanFilter] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [editTenant, setEditTenant] = useState<Tenant | null>(null);
+  const [suspendTarget, setSuspendTarget] = useState<Tenant | null>(null);
   const [editPlan, setEditPlan] = useState('');
   const [editTrialDays, setEditTrialDays] = useState('');
 
@@ -107,7 +108,6 @@ export default function AdminTenantsPage() {
   };
 
   const handleSuspend = async (t: Tenant) => {
-    if (!confirm(`Suspend "${t.name}"? They will lose dashboard access.`)) return;
     setActionLoading(`sus-${t.id}`);
     try {
       await adminEndpoints.suspendTenant(t.id);
@@ -115,6 +115,7 @@ export default function AdminTenantsPage() {
       fetchTenants();
     } catch {
       toast({ title: 'Failed to suspend', variant: 'destructive' });
+      throw new Error('Failed to suspend');
     } finally {
       setActionLoading(null);
     }
@@ -214,7 +215,7 @@ export default function AdminTenantsPage() {
         <Link href={`/admin/tenants/${tenant.id}`} title="Feature flags" className="border border-transparent p-1.5 text-rp-subtle hover:border-rp-border-md hover:bg-rp-surface-3"><Flag className="h-3.5 w-3.5" /></Link>
         <button onClick={() => handleExport(tenant)} disabled={actionLoading === `exp-${tenant.id}`} title="Export data as JSON" className="border border-transparent p-1.5 text-rp-subtle hover:border-rp-border-md hover:bg-rp-surface-3 disabled:opacity-40">{actionLoading === `exp-${tenant.id}` ? '…' : <Download className="h-3.5 w-3.5" />}</button>
         <button onClick={() => handleImpersonate(tenant)} disabled={actionLoading === `imp-${tenant.id}` || !tenant.isActive} className="border border-transparent px-2 py-1 text-rp-brand-deep hover:border-rp-brand hover:bg-rp-teal-bg disabled:opacity-40">{actionLoading === `imp-${tenant.id}` ? '…' : 'Login as →'}</button>
-        {tenant.isActive ? <button onClick={() => handleSuspend(tenant)} disabled={actionLoading === `sus-${tenant.id}`} className="border border-transparent px-2 py-1 text-rp-brand-deep hover:border-rp-brand hover:bg-rp-teal-bg disabled:opacity-40">Suspend</button> : <button onClick={() => handleReactivate(tenant)} disabled={actionLoading === `act-${tenant.id}`} className="border border-transparent px-2 py-1 text-rp-brand-deep hover:border-rp-brand hover:bg-rp-teal-bg disabled:opacity-40">Reactivate</button>}
+        {tenant.isActive ? <button onClick={() => setSuspendTarget(tenant)} disabled={actionLoading === `sus-${tenant.id}`} className="border border-transparent px-2 py-1 text-rp-brand-deep hover:border-rp-brand hover:bg-rp-teal-bg disabled:opacity-40">Suspend</button> : <button onClick={() => handleReactivate(tenant)} disabled={actionLoading === `act-${tenant.id}`} className="border border-transparent px-2 py-1 text-rp-brand-deep hover:border-rp-brand hover:bg-rp-teal-bg disabled:opacity-40">Reactivate</button>}
       </div>,
     },
   ];
@@ -254,5 +255,15 @@ export default function AdminTenantsPage() {
     {editTenant && <ModalShell variant="admin" open onClose={() => setEditTenant(null)} title="Edit Tenant" description={`${editTenant.name} · ${editTenant.slug}`} footer={<div className="flex justify-end gap-2"><button onClick={() => setEditTenant(null)} className="h-9 border border-rp-border-md px-4 text-sm font-semibold text-rp-text hover:bg-rp-surface-3">Cancel</button><button onClick={handleSaveEdit} disabled={actionLoading === `edit-${editTenant.id}`} className="inline-flex h-9 items-center gap-2 bg-rp-brand px-4 text-sm font-semibold text-rp-btn-accent-text hover:bg-rp-brand-hover disabled:opacity-50">{actionLoading === `edit-${editTenant.id}` && <Loader2 className="h-4 w-4 animate-spin" />}Save changes</button></div>}>
       <div className="space-y-4"><FormField label="Plan"><select value={editPlan} onChange={(event) => setEditPlan(event.target.value)} className="h-10 w-full border border-rp-border-md bg-rp-surface px-3 text-sm text-rp-text outline-none focus:border-rp-brand focus:ring-2 focus:ring-rp-teal-bg"><option value="FREE">{PLAN_PRICING.FREE.displayName}</option><option value="STARTER">{PLAN_PRICING.STARTER.displayName} (${PLAN_PRICING.STARTER.monthlyUsd}/mo)</option><option value="PROFESSIONAL">{PLAN_PRICING.PROFESSIONAL.displayName} (${PLAN_PRICING.PROFESSIONAL.monthlyUsd}/mo)</option><option value="ENTERPRISE">{PLAN_PRICING.ENTERPRISE.displayName} (${PLAN_PRICING.ENTERPRISE.monthlyUsd}/mo)</option></select></FormField><FormField label="Extend trial (days)" help="Leave blank to keep the current trial date."><input type="number" value={editTrialDays} onChange={(event) => setEditTrialDays(event.target.value)} placeholder="e.g. 30" className="h-10 w-full border border-rp-border-md bg-rp-surface px-3 text-sm text-rp-text outline-none placeholder:text-rp-faint focus:border-rp-brand focus:ring-2 focus:ring-rp-teal-bg" /></FormField></div>
     </ModalShell>}
+
+    <ConfirmDialog
+      open={!!suspendTarget}
+      onClose={() => setSuspendTarget(null)}
+      onConfirm={() => handleSuspend(suspendTarget as Tenant)}
+      title="Suspend tenant"
+      description={`"${suspendTarget?.name}" will immediately lose dashboard access. You can reactivate them anytime.`}
+      confirmLabel="Suspend"
+      tone="danger"
+    />
   </div>;
 }

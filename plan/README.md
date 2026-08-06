@@ -16,6 +16,8 @@ plan/
 
 *(Status ta 22 Jul 2026-এর একটা full codebase audit থেকে — feature list বাড়লে/build হলে re-audit lagbe, eta point-in-time snapshot.)*
 
+> **🎯 Active execution roadmap:** [core-workflow-execution-plan.md](./core-workflow-execution-plan.md) — sequenced, small-step plan for booking/payment core gaps found by hand-testing (modify, cancel/refund, rate-plan pricing, double-booking concurrency). Read this before picking the next task; it also says what to explicitly skip/defer from [core-workflow-completion-plan.md](./core-workflow-completion-plan.md)'s bigger 13-initiative audit.
+
 ---
 
 ## 🏗️ Core PMS (Property Management)

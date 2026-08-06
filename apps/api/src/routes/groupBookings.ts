@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { prisma, Prisma } from '@resort-pro/database';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { ok } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
@@ -91,7 +92,6 @@ export async function groupBookingRoutes(app: FastifyInstance) {
     schema: { tags: ['group-bookings'], security: [{ bearerAuth: [] }] },
     preHandler: [requireAuth, requireRole('OWNER', 'MANAGER', 'RECEPTIONIST')],
     handler: async (request, reply) => {
-      const { db } = request;
       const { tenantId } = request.user as JwtPayload;
 
       const bodySchema = groupSchema.extend({
@@ -115,70 +115,110 @@ export async function groupBookingRoutes(app: FastifyInstance) {
       const checkOut = new Date(groupData.checkOut);
       const nights = Math.max(1, Math.ceil((checkOut.getTime() - checkIn.getTime()) / 86_400_000));
 
-      // Create group + bookings in a transaction
-      const group = await db.$transaction(async (tx) => {
-        const newGroup = await tx.groupBooking.create({
-          data: { ...groupData, checkIn, checkOut },
-        });
-
-        for (const bi of bookingInputs) {
-          // Resolve or create guest
-          let guestId = bi.guestId;
-          if (!guestId && bi.guestEmail) {
-            const g = await tx.guest.upsert({
-              where: { tenantId_email: { tenantId, email: bi.guestEmail } },
-              update: {},
-              create: {
-                firstName: bi.guestFirstName ?? 'Group',
-                lastName: bi.guestLastName ?? 'Guest',
-                email: bi.guestEmail,
-              },
-            });
-            guestId = g.id;
-          }
-          if (!guestId) continue; // skip if no guest info
-
-          // Get room base price
-          const room = await tx.room.findUnique({ where: { id: bi.roomId } });
-          if (!room) continue;
-
-          let totalAmount = Number(room.basePrice) * nights;
-
-          // Apply group discount
-          if (groupData.discountType === 'PERCENTAGE' && groupData.discountValue > 0) {
-            totalAmount = totalAmount * (1 - groupData.discountValue / 100);
-          } else if (groupData.discountType === 'FLAT' && groupData.discountValue > 0) {
-            totalAmount = Math.max(0, totalAmount - groupData.discountValue);
-          }
-
-          const confirmationNo = `GRP-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
-
-          await tx.booking.create({
-            data: {
-              roomId: bi.roomId,
-              guestId,
-              groupId: newGroup.id,
-              checkIn,
-              checkOut,
-              adults: bi.adults,
-              children: bi.children,
-              totalAmount,
-              specialRequests: bi.specialRequests,
-              status: 'CONFIRMED',
-              source: 'GROUP',
-              confirmationNo,
-            },
+      // ── Atomic: conflict-check + create inside a serializable transaction ──
+      // Same pattern as the internal single-booking and public-website
+      // booking-creation routes (bookings.ts / website.ts) — previously this
+      // handler created each child booking with NO conflict check at all, so
+      // a group could double-book a room already held by another booking
+      // (or even by an earlier room in the same group submission).
+      //
+      // Uses the raw `prisma` client (not the tenant-scoped `db`) so the
+      // isolation level can be set explicitly — every query below fills in
+      // `tenantId` by hand to keep the same multi-tenant isolation `db`
+      // would otherwise have provided automatically.
+      let group;
+      try {
+        group = await prisma.$transaction(async (tx) => {
+          const newGroup = await tx.groupBooking.create({
+            data: { ...groupData, tenantId, checkIn, checkOut },
           });
 
-          // Mark room as RESERVED
-          await tx.room.update({ where: { id: bi.roomId }, data: { status: 'RESERVED' } });
-        }
+          for (const bi of bookingInputs) {
+            // Resolve or create guest
+            let guestId = bi.guestId;
+            if (!guestId && bi.guestEmail) {
+              const g = await tx.guest.upsert({
+                where: { tenantId_email: { tenantId, email: bi.guestEmail } },
+                update: {},
+                create: {
+                  tenantId,
+                  firstName: bi.guestFirstName ?? 'Group',
+                  lastName: bi.guestLastName ?? 'Guest',
+                  email: bi.guestEmail,
+                },
+              });
+              guestId = g.id;
+            }
+            if (!guestId) continue; // skip if no guest info
 
-        return tx.groupBooking.findUnique({
-          where: { id: newGroup.id },
-          include: { bookings: { include: bookingInclude }, _count: { select: { bookings: true } } },
-        });
-      });
+            // Get room base price (tenant-scoped lookup — raw client doesn't
+            // auto-filter the way `db` does)
+            const room = await tx.room.findFirst({ where: { id: bi.roomId, tenantId } });
+            if (!room) continue;
+
+            // Conflict check — reads happen inside the transaction so
+            // they're serialized against any concurrent create attempt,
+            // including another room in this very same group submission.
+            const conflict = await tx.booking.findFirst({
+              where: {
+                tenantId,
+                roomId: bi.roomId,
+                status: { in: ['CONFIRMED', 'CHECKED_IN', 'PENDING'] },
+                checkIn: { lt: checkOut },
+                checkOut: { gt: checkIn },
+              },
+            });
+            if (conflict) {
+              throw Object.assign(
+                new Error(`Room ${room.number} (${room.name}) is not available for the selected dates`),
+                { statusCode: 409 },
+              );
+            }
+
+            let totalAmount = Number(room.basePrice) * nights;
+
+            // Apply group discount
+            if (groupData.discountType === 'PERCENTAGE' && groupData.discountValue > 0) {
+              totalAmount = totalAmount * (1 - groupData.discountValue / 100);
+            } else if (groupData.discountType === 'FLAT' && groupData.discountValue > 0) {
+              totalAmount = Math.max(0, totalAmount - groupData.discountValue);
+            }
+
+            const confirmationNo = `GRP-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+
+            await tx.booking.create({
+              data: {
+                tenantId,
+                roomId: bi.roomId,
+                guestId,
+                groupId: newGroup.id,
+                checkIn,
+                checkOut,
+                adults: bi.adults,
+                children: bi.children,
+                totalAmount,
+                specialRequests: bi.specialRequests,
+                status: 'CONFIRMED',
+                source: 'GROUP',
+                confirmationNo,
+              },
+            });
+
+            // Mark room as RESERVED
+            await tx.room.update({ where: { id: bi.roomId }, data: { status: 'RESERVED' } });
+          }
+
+          return tx.groupBooking.findUnique({
+            where: { id: newGroup.id },
+            include: { bookings: { include: bookingInclude }, _count: { select: { bookings: true } } },
+          });
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      } catch (err: unknown) {
+        const e = err as { statusCode?: number; message?: string; code?: string };
+        if (e.statusCode === 409) return reply.status(409).send({ success: false, error: e.message });
+        if (e.code === 'P2034') return reply.status(409).send({ success: false, error: 'One of the rooms was just booked by someone else — please review and try again' });
+        throw err;
+      }
 
       return reply.status(201).send(ok(group));
     },
@@ -321,6 +361,11 @@ export async function groupBookingRoutes(app: FastifyInstance) {
       const now = new Date();
       const toCheckOut = group.bookings.filter((b) => b.status === 'CHECKED_IN');
 
+      // Same lifecycle a single checkout goes through (PATCH /bookings/:id/check-out):
+      // room → CLEANING (not straight to AVAILABLE) + a CHECKOUT housekeeping
+      // task per room. Bulk checkout was skipping both, so a group's rooms
+      // never showed up on the housekeeping board and looked "available"
+      // before anyone actually cleaned them.
       await db.$transaction([
         ...toCheckOut.map((b) =>
           db.booking.update({
@@ -329,7 +374,12 @@ export async function groupBookingRoutes(app: FastifyInstance) {
           })
         ),
         ...toCheckOut.map((b) =>
-          db.room.update({ where: { id: b.roomId }, data: { status: 'AVAILABLE' } })
+          db.room.update({ where: { id: b.roomId }, data: { status: 'CLEANING' } })
+        ),
+        ...toCheckOut.map((b) =>
+          db.housekeepingTask.create({
+            data: { roomId: b.roomId, type: 'CHECKOUT', status: 'PENDING', scheduledDate: now },
+          })
         ),
         db.groupBooking.update({ where: { id }, data: { status: 'CHECKED_OUT' } }),
       ]);

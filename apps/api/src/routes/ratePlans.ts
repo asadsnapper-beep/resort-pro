@@ -15,16 +15,52 @@ const TYPE_PRIORITY: Record<string, number> = {
   STANDARD: 1,
 };
 
+export interface NightlyRate {
+  date: string; // YYYY-MM-DD
+  price: number;
+  planName: string | null; // null = no rate plan matched this specific night, basePrice was used
+  planType: string | null;
+}
+
+export interface ResolvedRate {
+  price: number;       // blended average nightly rate — price * nights === totalPrice, so
+                        // existing callers doing `(resolved?.price ?? basePrice) * nights` still get
+                        // the right number even though the underlying nights may differ from each other.
+  totalPrice: number;  // exact sum across all nights — prefer this when precision matters (money math).
+  planName: string;    // the plan used, or "Mixed rates (A, B)" if more than one distinct plan applied
+                        // across the stay. Only the FIRST matched night's plan is named otherwise —
+                        // see nightlyBreakdown for the exact per-night picture.
+  planType: string;
+  nightlyBreakdown: NightlyRate[];
+}
+
 /**
- * Given a roomId + date range, find the best applicable RatePlan price.
- * Returns { price, planName, planType } or null (caller should fall back to basePrice).
+ * Given a roomId + date range, find the best applicable RatePlan price —
+ * evaluated night by night, not just against the check-in date.
+ *
+ * A stay that crosses a rate plan's own date-range or day-of-week boundary
+ * (e.g. a 5-night stay where only the Fri/Sat nights fall inside a Weekend
+ * plan) previously priced the *entire* stay off whichever plan matched the
+ * check-in night alone — undercharging or overcharging every other night.
+ * This resolves each night independently and sums the result.
+ *
+ * `basePrice` (the room's own nightly price) is required so a night with no
+ * matching plan can still be priced correctly within a mixed stay — the
+ * caller already has it from its own room lookup.
+ *
+ * Returns null only when NO night in the stay matched any rate plan at all
+ * (a pure base-price stay) — same "caller falls back to basePrice" contract
+ * as before. When at least one night matched something, the result always
+ * covers the full stay (mixed nights use basePrice internally, not left for
+ * the caller to patch in).
  */
 export async function resolveRate(
   tenantId: string,
   roomId: string,
   checkIn: Date,
   checkOut: Date,
-): Promise<{ price: number; planName: string; planType: string } | null> {
+  basePrice: number,
+): Promise<ResolvedRate | null> {
   const plans = await prisma.ratePlan.findMany({
     where: {
       tenantId,
@@ -35,38 +71,60 @@ export async function resolveRate(
 
   const nights = Math.max(1, Math.round((checkOut.getTime() - checkIn.getTime()) / 86_400_000));
 
-  // Filter applicable plans
-  const applicable = plans.filter(p => {
-    // min nights check
-    if (p.minNights > nights) return false;
+  const breakdown: NightlyRate[] = [];
+  const planNamesUsed = new Set<string>();
+  let totalPrice = 0;
+  let anyPlanMatched = false;
 
-    // date range check (if set, checkIn must fall within range)
-    if (p.startDate && checkIn < p.startDate) return false;
-    if (p.endDate && checkIn > p.endDate) return false;
+  for (let i = 0; i < nights; i++) {
+    const night = new Date(checkIn.getTime() + i * 86_400_000);
 
-    // days-of-week check (if set, at least one night must match)
-    if (p.daysOfWeek.length > 0) {
-      const dayOfWeek = checkIn.getDay(); // 0=Sun
-      if (!p.daysOfWeek.includes(dayOfWeek)) return false;
+    // Same filters as before, but evaluated against THIS night, not just checkIn.
+    // minNights stays a whole-stay qualifier — a plan either qualifies for the
+    // stay's total length or it doesn't; that's not a per-night question.
+    const applicable = plans.filter(p => {
+      if (p.minNights > nights) return false;
+      if (p.startDate && night < p.startDate) return false;
+      if (p.endDate && night > p.endDate) return false;
+      if (p.daysOfWeek.length > 0 && !p.daysOfWeek.includes(night.getDay())) return false;
+      return true;
+    });
+
+    if (applicable.length === 0) {
+      totalPrice += basePrice;
+      breakdown.push({ date: night.toISOString().slice(0, 10), price: basePrice, planName: null, planType: null });
+      continue;
     }
 
-    return true;
-  });
+    // Pick highest priority plan for this night (by type, then by
+    // specificity: room-specific beats global). This is an exclusive,
+    // highest-priority-wins policy — plans are never additive/stacked
+    // against each other for the same night.
+    applicable.sort((a, b) => {
+      const pDiff = (TYPE_PRIORITY[b.type] ?? 0) - (TYPE_PRIORITY[a.type] ?? 0);
+      if (pDiff !== 0) return pDiff;
+      if (a.roomId && !b.roomId) return -1;
+      if (!a.roomId && b.roomId) return 1;
+      return 0;
+    });
 
-  if (applicable.length === 0) return null;
+    const best = applicable[0];
+    anyPlanMatched = true;
+    planNamesUsed.add(best.name);
+    totalPrice += best.price;
+    breakdown.push({ date: night.toISOString().slice(0, 10), price: best.price, planName: best.name, planType: best.type });
+  }
 
-  // Pick highest priority plan (by type, then by specificity: room-specific > global)
-  applicable.sort((a, b) => {
-    const pDiff = (TYPE_PRIORITY[b.type] ?? 0) - (TYPE_PRIORITY[a.type] ?? 0);
-    if (pDiff !== 0) return pDiff;
-    // Room-specific beats global
-    if (a.roomId && !b.roomId) return -1;
-    if (!a.roomId && b.roomId) return 1;
-    return 0;
-  });
+  if (!anyPlanMatched) return null;
 
-  const best = applicable[0];
-  return { price: best.price, planName: best.name, planType: best.type };
+  const firstMatched = breakdown.find((b) => b.planName)!;
+  return {
+    price: totalPrice / nights,
+    totalPrice,
+    planName: planNamesUsed.size > 1 ? `Mixed rates (${[...planNamesUsed].join(', ')})` : firstMatched.planName!,
+    planType: firstMatched.planType!,
+    nightlyBreakdown: breakdown,
+  };
 }
 
 const createPlanSchema = z.object({
@@ -166,14 +224,16 @@ export async function ratePlanRoutes(app: FastifyInstance) {
       const { id } = request.params as { id: string };
 
       await db.ratePlan.deleteMany({ where: { id } });
-      return ok(reply, { deleted: true });
+      return ok({ deleted: true });
     },
   });
 
   // GET /api/rate-plans/resolve?roomId=&checkIn=&checkOut=
+  // Read-only price preview — kept in step with who can modify a booking
+  // (OWNER/MANAGER/RECEPTIONIST), not the narrower rate-plan-management roles.
   app.get('/resolve', {
     schema: { tags: ['rate-plans'], security: [{ bearerAuth: [] }] },
-    preHandler: requireRole('OWNER', 'MANAGER'),
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { db } = request;
       const { tenantId } = request.user as JwtPayload;
@@ -186,7 +246,7 @@ export async function ratePlanRoutes(app: FastifyInstance) {
       const room = await db.room.findFirst({ where: { id: roomId } });
       if (!room) return reply.status(404).send({ error: 'Room not found' });
 
-      const resolved = await resolveRate(tenantId, roomId, new Date(checkIn), new Date(checkOut));
+      const resolved = await resolveRate(tenantId, roomId, new Date(checkIn), new Date(checkOut), Number(room.basePrice));
       return ok({
         roomId,
         basePrice: Number(room.basePrice),

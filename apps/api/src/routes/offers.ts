@@ -167,7 +167,11 @@ export async function offersRoutes(app: FastifyInstance) {
       const offer = await db.offer.findFirst({ where: { id } });
       if (!offer) return reply.status(404).send({ success: false, error: 'Offer not found' });
 
-      const bookingOffers = await db.bookingOffer.findMany({
+      // BookingOffer has no tenantId column — the tenant-scoped `db` client's
+      // extension would inject one anyway and Prisma would reject it as
+      // unknown. The offer fetch above already proved this offerId belongs
+      // to the caller's tenant, so the raw `prisma` client is safe here.
+      const bookingOffers = await prisma.bookingOffer.findMany({
         where: { offerId: id },
         select: { discount: true, booking: { select: { createdAt: true, totalAmount: true } } },
         orderBy: { booking: { createdAt: 'desc' } },
@@ -183,6 +187,116 @@ export async function offersRoutes(app: FastifyInstance) {
         totalRevenue,
         recentUsages: bookingOffers.slice(0, 10),
       });
+    },
+  });
+
+  // ── POST /api/offers/apply ────────────────────────────────────────────────
+  // Apply an offer to an existing booking (staff picks from the list — no
+  // promo code needed here, that's only for the guest-facing public flow).
+  app.post('/apply', {
+    schema: { tags: ['offers'], security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER', 'MANAGER'),
+    handler: async (request, reply) => {
+      const { db } = request;
+      const { bookingId, offerId } = z.object({
+        bookingId: z.string(),
+        offerId: z.string(),
+      }).parse(request.body);
+
+      const [booking, offer] = await Promise.all([
+        db.booking.findFirst({ where: { id: bookingId } }),
+        db.offer.findFirst({ where: { id: offerId } }),
+      ]);
+      if (!booking) return reply.status(404).send({ error: 'Booking not found' });
+      if (!offer) return reply.status(404).send({ error: 'Offer not found' });
+      if (!isOfferActive(offer)) return reply.status(400).send({ error: 'This offer is not currently active' });
+
+      const nights = Math.max(1, Math.ceil((new Date(booking.checkOut).getTime() - new Date(booking.checkIn).getTime()) / 86_400_000));
+      if (nights < offer.minStay) {
+        return reply.status(400).send({ error: `This offer requires a minimum stay of ${offer.minStay} night(s)` });
+      }
+      if (offer.roomIds.length > 0 && !offer.roomIds.includes(booking.roomId)) {
+        return reply.status(400).send({ error: 'This offer is not valid for the booked room' });
+      }
+
+      // BookingOffer has no tenantId column — see the comment on GET
+      // /:id/stats above. Tenancy is already proven by the tenant-scoped
+      // booking/offer fetches above.
+      const existing = await prisma.bookingOffer.findUnique({
+        where: { bookingId_offerId: { bookingId, offerId } },
+      });
+      if (existing) return reply.status(409).send({ error: 'Offer already applied to this booking' });
+
+      const discount = calcDiscount(offer, Number(booking.totalAmount), nights);
+
+      const [bo] = await prisma.$transaction([
+        prisma.bookingOffer.create({ data: { bookingId, offerId, discount } }),
+        prisma.booking.update({
+          where: { id: bookingId },
+          data: { totalAmount: { decrement: discount } },
+        }),
+        prisma.offer.update({
+          where: { id: offerId },
+          data: { usedCount: { increment: 1 } },
+        }),
+      ]);
+
+      return reply.status(201).send(ok(bo));
+    },
+  });
+
+  // ── DELETE /api/offers/remove ──────────────────────────────────────────────
+  app.delete('/remove', {
+    schema: { tags: ['offers'], security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER', 'MANAGER'),
+    handler: async (request, reply) => {
+      const { db } = request;
+      const { bookingId, offerId } = z.object({
+        bookingId: z.string(),
+        offerId: z.string(),
+      }).parse(request.body);
+
+      const booking = await db.booking.findFirst({ where: { id: bookingId } });
+      if (!booking) return reply.status(404).send({ error: 'Booking not found' });
+
+      const bo = await prisma.bookingOffer.findUnique({
+        where: { bookingId_offerId: { bookingId, offerId } },
+      });
+      if (!bo) return reply.status(404).send({ error: 'Offer not applied to this booking' });
+
+      await prisma.$transaction([
+        prisma.bookingOffer.delete({ where: { bookingId_offerId: { bookingId, offerId } } }),
+        prisma.booking.update({
+          where: { id: bookingId },
+          data: { totalAmount: { increment: bo.discount } },
+        }),
+        prisma.offer.update({
+          where: { id: offerId },
+          data: { usedCount: { decrement: 1 } },
+        }),
+      ]);
+
+      return ok({ removed: true });
+    },
+  });
+
+  // ── GET /api/offers/booking/:bookingId ────────────────────────────────────
+  app.get('/booking/:bookingId', {
+    schema: { tags: ['offers'], security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER', 'MANAGER'),
+    handler: async (request, reply) => {
+      const { db } = request;
+      const { bookingId } = request.params as { bookingId: string };
+
+      const booking = await db.booking.findFirst({ where: { id: bookingId } });
+      if (!booking) return reply.status(404).send({ error: 'Booking not found' });
+
+      const bookingOffers = await prisma.bookingOffer.findMany({
+        where: { bookingId },
+        include: { offer: { select: { id: true, title: true, type: true, value: true } } },
+      });
+
+      return ok(bookingOffers);
     },
   });
 }

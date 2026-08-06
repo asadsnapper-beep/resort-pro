@@ -31,6 +31,8 @@ interface OrderItem {
 interface FoodOrder {
   id: string;
   status: string;
+  paymentStatus: string;
+  bookingId?: string | null;
   totalAmount: number;
   tableNumber?: string;
   notes?: string;
@@ -38,6 +40,15 @@ interface FoodOrder {
   guest?: { firstName: string; lastName: string };
   items: OrderItem[];
 }
+
+const PAYMENT_METHODS = [
+  { value: 'CASH', label: 'Cash' },
+  { value: 'BANK_TRANSFER', label: 'Bank transfer' },
+  { value: 'BKASH', label: 'bKash' },
+  { value: 'NAGAD', label: 'Nagad' },
+  { value: 'CARD', label: 'Card' },
+  { value: 'OTHER', label: 'Other' },
+];
 
 interface MenuItem {
   id: string;
@@ -239,6 +250,7 @@ function OrderCard({ order, expanded, onToggleExpand }: {
   order: FoodOrder; expanded: boolean; onToggleExpand: () => void;
 }) {
   const queryClient = useQueryClient();
+  const [payMethod, setPayMethod] = useState('CASH');
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => foodOrdersApi.updateStatus(id, status),
     onSuccess: () => {
@@ -248,8 +260,19 @@ function OrderCard({ order, expanded, onToggleExpand }: {
     },
     onError: () => toast({ title: 'Error', description: 'Failed to update order', variant: 'destructive' }),
   });
+  const markPaidMutation = useMutation({
+    mutationFn: ({ id, method }: { id: string; method: string }) => foodOrdersApi.markPaid(id, method),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['food-orders'] });
+      toast({ title: 'Marked as paid' });
+    },
+    onError: () => toast({ title: 'Error', description: 'Failed to record payment', variant: 'destructive' }),
+  });
   const nextStatus = STATUS_NEXT[order.status];
   const cfg = ORDER_STATUS_PILL[order.status] ?? ORDER_STATUS_PILL.PENDING;
+  // Room-service orders settle via the booking's own invoice at checkout —
+  // only a direct walk-in/table sale needs an explicit "mark as paid" here.
+  const needsPaymentAction = !order.bookingId && order.paymentStatus && order.paymentStatus !== 'PAID' && order.status !== 'CANCELLED';
 
   return (
     <div className="rounded-[14px] border bg-white overflow-hidden transition-shadow hover:shadow-sm"
@@ -262,6 +285,12 @@ function OrderCard({ order, expanded, onToggleExpand }: {
                 style={{ background: cfg.bg, borderColor: cfg.border, color: cfg.text }}>
                 {cfg.label}
               </span>
+              {needsPaymentAction && (
+                <span className="inline-flex items-center rounded-[7px] border px-[10px] py-[4px] text-[11px] font-semibold"
+                  style={{ background: 'var(--rp-red-bg)', borderColor: 'rgba(200,60,60,0.18)', color: '#c43c3c' }}>
+                  Unpaid
+                </span>
+              )}
               {order.guest && (
                 <span className="text-[13.5px] font-medium text-[#183153]">
                   {order.guest.firstName} {order.guest.lastName}
@@ -281,6 +310,24 @@ function OrderCard({ order, expanded, onToggleExpand }: {
                 {expanded ? ' ▲' : ' ▼'}
               </p>
             </button>
+            {needsPaymentAction && (
+              <div className="mt-2 flex items-center gap-2">
+                <select
+                  value={payMethod}
+                  onChange={(e) => setPayMethod(e.target.value)}
+                  className="rounded-[6px] border px-[8px] py-[4px] text-[11.5px]"
+                  style={{ background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border)', color: '#183153' }}>
+                  {PAYMENT_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+                <button
+                  onClick={() => markPaidMutation.mutate({ id: order.id, method: payMethod })}
+                  disabled={markPaidMutation.isPending}
+                  className="rounded-[8px] border px-[10px] py-[4px] text-[11.5px] font-medium transition-colors disabled:opacity-50"
+                  style={{ background: 'var(--rp-btn-accent)', borderColor: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+                  {markPaidMutation.isPending ? 'Saving…' : 'Mark Paid'}
+                </button>
+              </div>
+            )}
           </div>
           <div className="flex gap-2 flex-shrink-0">
             {nextStatus && (
@@ -371,7 +418,7 @@ function KitchenCard({ order }: { order: FoodOrder }) {
               <span className="text-2xl font-black text-gray-900">Walk-in</span>
             )}
           </div>
-          {(order as any).paymentStatus && (order as any).paymentStatus !== 'PAID' && (
+          {order.paymentStatus && order.paymentStatus !== 'PAID' && (
             <span className="mt-1 inline-block text-xs font-bold bg-red-100 text-red-600 px-2 py-0.5 rounded-full">
               Unpaid
             </span>

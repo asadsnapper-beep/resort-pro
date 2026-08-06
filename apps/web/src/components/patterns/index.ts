@@ -16,3 +16,4 @@ export { FilterBar } from './FilterBar';
 export { FormField } from './FormField';
 export { StatCard, StatGrid } from './StatCard';
 export { TabBar } from './TabBar';
+export { ConfirmDialog } from './ConfirmDialog';

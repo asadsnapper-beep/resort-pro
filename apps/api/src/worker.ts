@@ -12,11 +12,13 @@
  *  - Daily report dispatch    — every minute (checks tenant dispatchTime)
  *  - Automation engine        — every 15 min (email sequences)
  *  - Trial lifecycle emails   — every 12 hours
+ *  - Expire pending bookings  — every 5 min (abandoned public-checkout holds)
  */
 
 import { startPreArrivalCron } from './jobs/pre-arrival-reminder';
 import { startICalSyncCron } from './jobs/ical-sync';
 import { startReportDispatchJob } from './jobs/daily-report-dispatch';
+import { startPendingExpiryCron } from './jobs/expire-pending-bookings';
 import { startAutomationEngine } from './services/automation';
 import { runTrialEmailCron } from './services/trial-emails';
 
@@ -26,6 +28,7 @@ async function main() {
   startPreArrivalCron();
   startICalSyncCron();
   startReportDispatchJob();
+  startPendingExpiryCron();
   startAutomationEngine();
 
   // Trial emails: run once on startup, then every 12 hours

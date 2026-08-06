@@ -13,7 +13,7 @@ export default function RatePlansPage() {
   return (
     <DocLayout
       title="Rate Plans"
-      description="Set up flexible pricing rules — seasonal rates, meal plans, minimum stays, and advance booking discounts — all without a spreadsheet."
+      description="Set up flexible pricing rules — seasonal rates, weekend rates, room-specific pricing, and promo pricing — all without a spreadsheet."
       readTime="6 min read"
       tag="Pricing"
       tagColor="bg-amber-100 text-amber-700"
@@ -25,17 +25,17 @@ export default function RatePlansPage() {
       <p>
         A <strong>rate plan</strong> is a pricing rule that determines how much a guest pays for a room,
         and under what conditions. Instead of having a single fixed price per room, rate plans let you
-        create flexible pricing based on meal inclusions, season, length of stay, and booking timing.
+        create flexible pricing based on season, day of week, minimum length of stay, and which room
+        it applies to.
       </p>
-      <p>Examples of rate plans you might set up:</p>
+      <p>The rate types you can pick from when creating a plan:</p>
       <ul>
-        <li><strong>Room Only (RO)</strong> — No meals included, base price only.</li>
-        <li><strong>Bed &amp; Breakfast (BB)</strong> — Room plus breakfast; slightly higher rate.</li>
-        <li><strong>Half Board (HB)</strong> — Room, breakfast, and dinner.</li>
-        <li><strong>Full Board (FB)</strong> — Room plus all three meals.</li>
-        <li><strong>All Inclusive (AI)</strong> — Room, all meals, drinks, and activities.</li>
-        <li><strong>Early Bird</strong> — 15% discount for bookings made 30+ days in advance.</li>
-        <li><strong>Weekend Rate</strong> — Higher price for Friday/Saturday nights.</li>
+        <li><strong>Standard</strong> — Default year-round rate.</li>
+        <li><strong>Seasonal</strong> — Specific date-range pricing (peak/off-season, holidays).</li>
+        <li><strong>Weekend</strong> — Friday–Saturday rates.</li>
+        <li><strong>Promo</strong> — Highest priority; overrides every other plan when it applies.</li>
+        <li><strong>Early Bird</strong> — A discounted plan you create and manage yourself; there's no automatic "30 days before arrival" trigger, so keep it active only while it should apply.</li>
+        <li><strong>Last Minute</strong> — Same idea for filling rooms close to the date — you turn it on manually when you want it live.</li>
       </ul>
       <div className="info-box">
         <strong>Why this matters:</strong> Rate plans are the key to maximising your revenue without
@@ -61,52 +61,45 @@ export default function RatePlansPage() {
         </thead>
         <tbody>
           <tr>
-            <td><strong>Name</strong></td>
+            <td><strong>Rate Type</strong></td>
+            <td>Standard, Seasonal, Weekend, Promo, Early Bird, or Last Minute — sets its priority against other plans (see the tie-breaking note below)</td>
+            <td>Seasonal</td>
+          </tr>
+          <tr>
+            <td><strong>Plan Name</strong></td>
             <td>Short name for this rate plan</td>
-            <td>Bed &amp; Breakfast</td>
+            <td>Peak Season 2026</td>
           </tr>
           <tr>
-            <td><strong>Base Rate</strong></td>
-            <td>Nightly price for this plan (can be a fixed amount or a percentage markup over the room's base price)</td>
-            <td>৳ 6,500 / night or +15%</td>
+            <td><strong>Price / Night</strong></td>
+            <td>A flat nightly price — not a percentage markup over the room's base price</td>
+            <td>৳6,500 / night</td>
           </tr>
           <tr>
-            <td><strong>Meal Plan</strong></td>
-            <td>What meals are included (Room Only, B&amp;B, Half Board, Full Board, All Inclusive)</td>
-            <td>Breakfast only</td>
+            <td><strong>Room (optional)</strong></td>
+            <td>Apply to one specific room, or leave blank to apply to every room</td>
+            <td>Room #201, or blank for all rooms</td>
           </tr>
           <tr>
-            <td><strong>Minimum Stay</strong></td>
-            <td>Minimum number of nights required to use this rate</td>
+            <td><strong>Minimum Nights</strong></td>
+            <td>Minimum length of stay required to use this rate (there's no separate maximum-stay field)</td>
             <td>2 nights</td>
           </tr>
           <tr>
-            <td><strong>Maximum Stay</strong></td>
-            <td>Optional maximum stay (leave blank for no limit)</td>
-            <td>14 nights</td>
+            <td><strong>Applies on Days</strong></td>
+            <td>Optional — restrict this plan to specific days of the week (e.g. Friday/Saturday for a weekend rate). Leave all days unchecked to apply to every day.</td>
+            <td>Fri, Sat</td>
           </tr>
           <tr>
-            <td><strong>Advance Booking</strong></td>
-            <td>Minimum days in advance the booking must be made to qualify</td>
-            <td>7 days in advance</td>
-          </tr>
-          <tr>
-            <td><strong>Discount</strong></td>
-            <td>Percentage discount applied on top of the base rate</td>
-            <td>10% off</td>
-          </tr>
-          <tr>
-            <td><strong>Cancellation Policy</strong></td>
-            <td>How many days before check-in cancellation is free; penalty after that</td>
-            <td>Free until 48 hours before; 1 night charge after</td>
-          </tr>
-          <tr>
-            <td><strong>Valid Dates</strong></td>
+            <td><strong>Start Date / End Date</strong></td>
             <td>Date range when this rate plan is active (leave blank for year-round)</td>
             <td>1 Jun – 31 Aug 2026</td>
           </tr>
         </tbody>
       </table>
+      <div className="info-box">
+        <strong>Not in this form:</strong> meal-plan inclusions (Room Only/B&amp;B/Half Board etc.), percentage-based pricing, a maximum-stay field, an advance-booking-window rule, and a cancellation policy are not tracked on a rate plan — see the FAQ below for how to handle a non-refundable rate manually.
+      </div>
 
       {/* ── 3. Seasonal pricing ───────────────────────────────────────── */}
       <h2 id="seasonal-pricing">3. Seasonal pricing</h2>
@@ -120,30 +113,30 @@ export default function RatePlansPage() {
         <li><strong>Off-Season Rate</strong> — June to August; lowest prices to attract bookings.</li>
       </ul>
       <p>
-        Set the <strong>Valid Dates</strong> field on each rate plan to the relevant season dates.
-        ResortPro automatically applies the correct rate plan when a guest books for dates that fall
-        within that season.
+        Set the <strong>Start Date</strong>/<strong>End Date</strong> fields on each rate plan to the
+        relevant season dates. ResortPro automatically resolves and applies the correct rate — for
+        bookings made from the dashboard, a walk-in, or your public website alike — whenever a stay
+        falls within that range. There's nothing for staff or the guest to manually pick.
       </p>
       <blockquote>
-        <strong>Note:</strong> If two rate plans are valid for the same dates, the system uses the one
-        with the lower price for direct website bookings, and the one you manually select when creating
-        a booking from the dashboard.
+        <strong>Note — tie-breaking order:</strong> if more than one active plan could apply to the
+        same night, ResortPro picks by <strong>Rate Type priority</strong>: Promo &gt; Seasonal &gt;
+        Weekend &gt; Early Bird &gt; Last Minute &gt; Standard. If two plans of the same type both
+        match, a plan tied to that specific room wins over one that applies to all rooms. Price is not
+        part of the tie-break.
       </blockquote>
 
       {/* ── 4. Linking to rooms ───────────────────────────────────────── */}
       <h2 id="linking-to-rooms">4. How rate plans link to rooms</h2>
       <p>
-        A rate plan can apply to all rooms, specific room types, or individual rooms. When creating
-        or editing a rate plan, you will see a section called <strong>Applicable Rooms</strong>.
+        A rate plan's <strong>Room</strong> field is either one specific room, or left blank to apply
+        to every room in your property. There's no room-type or multi-room picker yet — for now, a
+        plan meant for "all Villas" needs one rate plan per villa room (or set it up as a single
+        property-wide plan if the price is the same across room types).
       </p>
-      <ul>
-        <li>Choose <strong>All Rooms</strong> to apply the rate plan across your entire property.</li>
-        <li>Choose <strong>By Room Type</strong> to apply it only to Suites, Villas, etc.</li>
-        <li>Choose <strong>Specific Rooms</strong> to apply it to individual rooms you select.</li>
-      </ul>
       <p>
-        When a receptionist or guest selects a room for a booking, ResortPro shows all available rate
-        plans for that room, and the booker chooses which one applies.
+        Rate resolution happens automatically on the server whenever a booking is created or modified
+        — the applicable plan (if any) is used without anyone needing to select it.
       </p>
 
       {/* ── 5. Yield management tips ──────────────────────────────────── */}
@@ -158,8 +151,10 @@ export default function RatePlansPage() {
           national holidays, festivals, and local events with a higher base rate.
         </li>
         <li>
-          <strong>Offer early bird discounts</strong> — Reward guests who book 30+ days in advance
-          with a 10–15% discount. This helps you fill rooms earlier and plan staffing.
+          <strong>Offer early bird discounts</strong> — Create an "Early Bird" plan with a 10–15%
+          lower price for a future date range, and turn it on well ahead of time. There's no automatic
+          "only if booked 30+ days out" check, so it applies to anyone who books while it's active —
+          plan the on/off dates accordingly.
         </li>
         <li>
           <strong>Add minimum stay requirements on peak weekends</strong> — Set a 2-night minimum
@@ -203,9 +198,11 @@ export default function RatePlansPage() {
 
       <h3>Can I have a non-refundable rate?</h3>
       <p>
-        Yes. Set the <strong>Cancellation Policy</strong> to "Non-refundable" — this means no refund
-        is given if the guest cancels, regardless of how far in advance. Non-refundable rates are
-        typically priced 10–20% lower to attract the right guests.
+        There's no automated "non-refundable" flag on a rate plan yet — you'll need to enforce it
+        manually. Name the plan clearly (e.g. "Non-Refundable Rate") and price it 10–20% lower to
+        attract the right guests. When a guest with that rate cancels, use the{' '}
+        <strong>Cancel Booking</strong> flow's cancellation-fee field and set it to the full amount
+        paid, so nothing gets refunded.
       </p>
 
     </DocLayout>

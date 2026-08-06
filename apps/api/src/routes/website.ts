@@ -1,11 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { prisma } from '@resort-pro/database';
+import { prisma, Prisma } from '@resort-pro/database';
 import { requireRole } from '../middleware/auth';
 import { ok, validate } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
 import { resolveRate } from './ratePlans';
 import { sendWebBookingEmails } from '../utils/guest-emails';
+import { PENDING_HOLD_MINUTES } from '../utils/booking';
 
 // Accept absolute http(s) URLs OR site-relative upload paths (/uploads/…) —
 // the app's own ImageUpload produces relative paths, so strict .url() broke saves.
@@ -283,40 +284,13 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
       const room = await prisma.room.findFirst({ where: { id: body.roomId, tenantId: tenant.id, isActive: true } });
       if (!room) return reply.status(404).send({ success: false, error: 'Room not found' });
 
-      // Check availability — PENDING bookings within last 30 min also block (stale ones are ignored)
-      const pendingCutoff = new Date(Date.now() - 30 * 60 * 1000);
-      const conflict = await prisma.booking.findFirst({
-        where: {
-          tenantId: tenant.id, roomId: room.id,
-          status: { in: ['CONFIRMED', 'CHECKED_IN', 'PENDING'] },
-          AND: [
-            { checkIn: { lt: checkOut } },
-            { checkOut: { gt: checkIn } },
-            // Ignore stale PENDING bookings older than 30 minutes
-            {
-              OR: [
-                { status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
-                { status: 'PENDING', createdAt: { gte: pendingCutoff } },
-              ],
-            },
-          ],
-        },
-      });
-      if (conflict) return reply.status(409).send({ success: false, error: 'Room not available for selected dates' });
-
-      // Find or create guest
-      let guest = await prisma.guest.findFirst({ where: { tenantId: tenant.id, email: body.email } });
-      if (!guest) {
-        guest = await prisma.guest.create({
-          data: { tenantId: tenant.id, firstName: body.firstName, lastName: body.lastName, email: body.email, phone: body.phone },
-        });
-      }
-
       const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / 86400000);
       const baseAmount = Number(room.basePrice) * nights;
 
-      // Resolve promo code
-      let appliedOffer: { id: string; discount: number } | null = null;
+      // Resolve promo code (read-only lookup — usage increment happens inside
+      // the transaction below, right next to the booking create, so a guest
+      // can't spend the last redemption of a maxUses offer twice).
+      let appliedOfferCandidate: { id: string; type: string; value: number } | null = null;
       if (body.promoCode) {
         const now = new Date();
         const offer = await prisma.offer.findFirst({
@@ -332,48 +306,103 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
           const canUse = offer.maxUses === null || offer.usedCount < offer.maxUses;
           const minOk  = nights >= offer.minStay;
           const roomOk = offer.roomIds.length === 0 || offer.roomIds.includes(body.roomId);
-          if (canUse && minOk && roomOk) {
-            let disc = 0;
-            if (offer.type === 'PERCENTAGE') disc = baseAmount * (offer.value / 100);
-            else if (offer.type === 'FIXED')  disc = Math.min(offer.value, baseAmount);
-            else if (offer.type === 'FREE_NIGHT') {
-              const perNight = nights > 0 ? baseAmount / nights : 0;
-              disc = Math.min(perNight * offer.value, baseAmount);
-            }
-            appliedOffer = { id: offer.id, discount: disc };
-          }
+          if (canUse && minOk && roomOk) appliedOfferCandidate = { id: offer.id, type: offer.type, value: offer.value };
         }
       }
 
-      const totalAmount = appliedOffer ? baseAmount - appliedOffer.discount : baseAmount;
+      let result: { booking: Awaited<ReturnType<typeof prisma.booking.create>>; discount: number };
 
-      const booking = await prisma.booking.create({
-        data: {
-          tenantId: tenant.id,
-          guestId: guest.id,
-          roomId: room.id,
-          checkIn,
-          checkOut,
-          adults: body.adults,
-          children: body.children,
-          totalAmount,
-          specialRequests: body.specialRequests,
-          status: 'PENDING',
-          paymentStatus: 'PENDING',
-          confirmationNo: `WEB-${Date.now().toString(36).toUpperCase()}`,
-        },
-      });
+      // ── Atomic: conflict-check + create inside a serializable transaction ──
+      // Same pattern as the internal/dashboard booking routes (bookings.ts) —
+      // without this, two guests hitting "Book now" for the same room/dates
+      // within milliseconds of each other could both pass the availability
+      // check and both get a PENDING booking created (double-booking).
+      try {
+        result = await prisma.$transaction(async (tx) => {
+          // Check availability — PENDING bookings within last 30 min also
+          // block (stale/abandoned ones are ignored). Read happens inside the
+          // transaction so it's serialized against any concurrent attempt.
+          const pendingCutoff = new Date(Date.now() - PENDING_HOLD_MINUTES * 60 * 1000);
+          const conflict = await tx.booking.findFirst({
+            where: {
+              tenantId: tenant.id, roomId: room.id,
+              checkIn: { lt: checkOut },
+              checkOut: { gt: checkIn },
+              OR: [
+                { status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
+                { status: 'PENDING', createdAt: { gte: pendingCutoff } },
+              ],
+            },
+          });
+          if (conflict) {
+            throw Object.assign(new Error('Room not available for selected dates'), { statusCode: 409 });
+          }
 
-      // Record offer usage
-      if (appliedOffer) {
-        await prisma.bookingOffer.create({
-          data: { bookingId: booking.id, offerId: appliedOffer.id, discount: appliedOffer.discount },
-        });
-        await prisma.offer.update({
-          where: { id: appliedOffer.id },
-          data: { usedCount: { increment: 1 } },
-        });
+          // Find or create guest
+          let guest = await tx.guest.findFirst({ where: { tenantId: tenant.id, email: body.email } });
+          if (!guest) {
+            guest = await tx.guest.create({
+              data: { tenantId: tenant.id, firstName: body.firstName, lastName: body.lastName, email: body.email, phone: body.phone },
+            });
+          }
+
+          // Re-validate the promo code's usage limit inside the transaction —
+          // the read above could be stale by the time we get here.
+          let appliedOffer: { id: string; discount: number } | null = null;
+          if (appliedOfferCandidate) {
+            const offer = await tx.offer.findFirst({ where: { id: appliedOfferCandidate.id } });
+            if (offer && (offer.maxUses === null || offer.usedCount < offer.maxUses)) {
+              let disc = 0;
+              if (offer.type === 'PERCENTAGE') disc = baseAmount * (offer.value / 100);
+              else if (offer.type === 'FIXED')  disc = Math.min(offer.value, baseAmount);
+              else if (offer.type === 'FREE_NIGHT') {
+                const perNight = nights > 0 ? baseAmount / nights : 0;
+                disc = Math.min(perNight * offer.value, baseAmount);
+              }
+              appliedOffer = { id: offer.id, discount: disc };
+            }
+          }
+
+          const totalAmount = appliedOffer ? baseAmount - appliedOffer.discount : baseAmount;
+
+          const newBooking = await tx.booking.create({
+            data: {
+              tenantId: tenant.id,
+              guestId: guest.id,
+              roomId: room.id,
+              checkIn,
+              checkOut,
+              adults: body.adults,
+              children: body.children,
+              totalAmount,
+              specialRequests: body.specialRequests,
+              status: 'PENDING',
+              paymentStatus: 'PENDING',
+              confirmationNo: `WEB-${Date.now().toString(36).toUpperCase()}`,
+            },
+          });
+
+          if (appliedOffer) {
+            await tx.bookingOffer.create({
+              data: { bookingId: newBooking.id, offerId: appliedOffer.id, discount: appliedOffer.discount },
+            });
+            await tx.offer.update({
+              where: { id: appliedOffer.id },
+              data: { usedCount: { increment: 1 } },
+            });
+          }
+
+          return { booking: newBooking, discount: appliedOffer?.discount ?? 0 };
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      } catch (err: unknown) {
+        const e = err as { statusCode?: number; message?: string; code?: string };
+        if (e.statusCode === 409) return reply.status(409).send({ success: false, error: e.message });
+        // Prisma serialization failure (P2034) — another request won the race
+        if (e.code === 'P2034') return reply.status(409).send({ success: false, error: 'Room was just booked by someone else — please choose different dates or a different room' });
+        throw err;
       }
+
+      const { booking, discount } = result;
 
       // Fire-and-forget emails — don't block the 201 response
       sendWebBookingEmails(booking.id).catch(() => {});
@@ -381,9 +410,9 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
       return reply.status(201).send(ok({
         id: booking.id,
         confirmationNo: booking.confirmationNo,
-        totalAmount,
+        totalAmount: Number(booking.totalAmount),
         baseAmount,
-        discount: appliedOffer?.discount ?? 0,
+        discount,
         nights,
       }, 'Booking request submitted!'));
     },
@@ -853,7 +882,7 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
       const room = await prisma.room.findFirst({ where: { id: roomId, tenantId: tenant.id }, select: { id: true, basePrice: true, name: true } });
       if (!room) return reply.status(404).send({ success: false, error: 'Room not found' });
 
-      const resolved = await resolveRate(tenant.id, roomId, new Date(checkIn), new Date(checkOut));
+      const resolved = await resolveRate(tenant.id, roomId, new Date(checkIn), new Date(checkOut), Number(room.basePrice));
 
       return reply.send({
         success: true,

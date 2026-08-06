@@ -753,6 +753,11 @@ model Booking {
   confirmationNo        String        @unique
   actualCheckIn         DateTime? // set when staff clicks Check In
   actualCheckOut        DateTime? // set when staff clicks Check Out
+  // Cancellation
+  cancellationReason    String? // owner-selected reason (or free text)
+  cancellationFee       Decimal?      @db.Decimal(10, 2) // withheld from refund, per resort's own policy
+  cancelledAt           DateTime?
+  cancelledBy           String? // staff userId who cancelled it
   // Invoice
   invoiceNumber         String?       @unique
   invoiceSentAt         DateTime?

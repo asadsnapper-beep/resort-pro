@@ -98,6 +98,47 @@ export async function buildApp() {
     },
   });
 
+  // ── Error Handler ──────────────────────────────────────────────────────────
+  // Registered immediately after the Fastify instance is created, BEFORE any
+  // plugin/route registration. Fastify resolves which error handler applies
+  // to a route based on the encapsulation context in effect when that route
+  // was registered — a setErrorHandler call made *after* routes exist does
+  // not retroactively apply to them. This used to be the very last statement
+  // in this function (after ~100 routes were already registered), which
+  // meant literally no route in the API ever used this handler: every
+  // validation failure fell back to Fastify's raw default error format
+  // (500 Internal Server Error, no `success`/`details` shape) instead of the
+  // intended 400 with field-level messages.
+  app.setErrorHandler((error, _request, reply) => {
+    app.log.error(error);
+
+    if (error.statusCode === 429) {
+      return reply.status(429).send({ success: false, error: error.message });
+    }
+
+    // Zod validation errors
+    if (error instanceof ZodError) {
+      return reply.status(400).send({
+        success: false,
+        error: 'Validation failed',
+        details: error.errors.map((e) => ({ field: e.path.join('.'), message: e.message })),
+      });
+    }
+
+    if (error.validation) {
+      return reply.status(400).send({
+        success: false,
+        error: 'Validation failed',
+        details: error.validation,
+      });
+    }
+
+    return reply.status(error.statusCode || 500).send({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  });
+
   // ── Plugins ──────────────────────────────────────────────────────────────
   await app.register(helmet, {
     contentSecurityPolicy: false,
@@ -309,37 +350,6 @@ export async function buildApp() {
   await registerFeatureRoutes('/api/restaurant/tables', 'restaurant_module', restaurantTableRoutes);
   await app.register(publicTableRoutes,     { prefix: '/table' });
   await app.register(aiRoutes,              { prefix: '/api/ai' });
-
-  // ── Error Handler ─────────────────────────────────────────────────────────
-  app.setErrorHandler((error, _request, reply) => {
-    app.log.error(error);
-
-    if (error.statusCode === 429) {
-      return reply.status(429).send({ success: false, error: error.message });
-    }
-
-    // Zod validation errors
-    if (error instanceof ZodError) {
-      return reply.status(400).send({
-        success: false,
-        error: 'Validation failed',
-        details: error.errors.map((e) => ({ field: e.path.join('.'), message: e.message })),
-      });
-    }
-
-    if (error.validation) {
-      return reply.status(400).send({
-        success: false,
-        error: 'Validation failed',
-        details: error.validation,
-      });
-    }
-
-    return reply.status(error.statusCode || 500).send({
-      success: false,
-      error: error.message || 'Internal server error',
-    });
-  });
 
   return app;
 }

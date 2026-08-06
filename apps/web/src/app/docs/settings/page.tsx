@@ -53,7 +53,6 @@ export default function SettingsPage() {
           <tr><td><strong>Email Address</strong></td><td>Booking confirmations sent from this address</td></tr>
           <tr><td><strong>Check-in Time</strong></td><td>Booking confirmations, pre-arrival emails</td></tr>
           <tr><td><strong>Check-out Time</strong></td><td>Booking confirmations, pre-arrival emails</td></tr>
-          <tr><td><strong>Cancellation Policy</strong></td><td>Booking page, invoices, your public website</td></tr>
         </tbody>
       </table>
       <div className="info-box">

@@ -227,6 +227,13 @@ async function main() {
   for (const b of bookingsData) {
     const existing = await prisma.booking.findFirst({ where: { tenantId: demo.id, confirmationNo: b.cn } });
     if (!existing) {
+      // paymentStatus must reflect paid vs total — GET /bookings/:id/invoice and
+      // the balance-consistency audit (scripts/audit-balances.ts) both check
+      // this against the actual Payment rows below, so it has to be right.
+      const paymentStatus =
+        b.paid <= 0 ? 'PENDING' :
+        b.paid >= b.total ? 'PAID' : 'PARTIAL';
+
       const booking = await prisma.booking.create({
         data: {
           tenantId: demo.id,
@@ -239,6 +246,7 @@ async function main() {
           children: b.ch,
           totalAmount: b.total,
           paidAmount: b.paid,
+          paymentStatus: paymentStatus as any,
           confirmationNo: b.cn,
           source: b.src as any,
           notes: b.status === BookingStatus.CANCELLED ? 'Guest requested cancellation' : undefined,
@@ -246,7 +254,11 @@ async function main() {
       });
       createdBookings.push(booking);
 
-      // Add payment records for paid bookings
+      // Add payment records for paid bookings. `status` must be a real
+      // PaymentStatus enum value ('PAID', not 'COMPLETED' — that value never
+      // existed) — the previous 'COMPLETED' + a silent .catch(() => {}) meant
+      // every one of these inserts had been failing invisibly, leaving every
+      // "paid" demo booking with zero backing Payment rows.
       if (b.paid > 0 && b.status !== BookingStatus.CANCELLED) {
         await prisma.payment.create({
           data: {
@@ -254,11 +266,11 @@ async function main() {
             bookingId: booking.id,
             amount: b.paid,
             method: b.src === 'BOOKING_COM' || b.src === 'AIRBNB' ? PaymentMethod.BANK_TRANSFER : PaymentMethod.CASH,
-            status: 'COMPLETED' as any,
+            status: 'PAID',
             reference: `PAY-${b.cn}`,
             notes: 'Demo payment',
           },
-        }).catch(() => {});
+        }).catch((err) => console.error(`⚠️  Payment create failed for ${b.cn}:`, err.message));
       }
     } else {
       createdBookings.push(existing);

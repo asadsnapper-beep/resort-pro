@@ -112,7 +112,22 @@ export const bookingsApi = {
   checkOut: (id: string, data?: { additionalPayment?: number; paymentMethod?: string }) =>
     api.patch(`/bookings/${id}/check-out`, data ?? {}),
   walkIn: (data: unknown) => api.post('/bookings/walk-in', data),
-  cancel: (id: string) => api.patch(`/bookings/${id}/cancel`),
+  modify: (id: string, data: {
+    checkIn?: string;
+    checkOut?: string;
+    roomId?: string;
+    adults?: number;
+    children?: number;
+    specialRequests?: string;
+    notifyGuest?: boolean;
+  }) => api.patch(`/bookings/${id}/modify`, data),
+  cancel: (id: string, data?: {
+    reason?: string;
+    cancellationFee?: number;
+    refund?: { amount: number; method: string; reference?: string; note?: string };
+    notifyGuest?: boolean;
+    isNoShow?: boolean;
+  }) => api.patch(`/bookings/${id}/cancel`, data ?? {}),
   addPayment: (id: string, data: unknown) => api.post(`/bookings/${id}/payment`, data),
   calendar: (month: number, year: number) => api.get('/bookings/calendar', { params: { month, year } }),
   gantt: (from: string, to: string) => api.get('/bookings/gantt', { params: { from, to } }),
@@ -275,6 +290,7 @@ export const foodOrdersApi = {
   stats:        () => api.get('/food-orders/stats'),
   create:       (data: unknown) => api.post('/food-orders', data),
   updateStatus: (id: string, status: string) => api.patch(`/food-orders/${id}/status`, { status }),
+  markPaid:     (id: string, method: string) => api.patch(`/food-orders/${id}/payment`, { method }),
 };
 
 // ── Inventory ─────────────────────────────────────────────────────────────────
@@ -634,4 +650,8 @@ export const offersApi = {
   update: (id: string, data: unknown)  => api.patch(`/offers/${id}`, data),
   delete: (id: string)                 => api.delete(`/offers/${id}`),
   stats:  (id: string)                 => api.get(`/offers/${id}/stats`),
+  // Booking-offer operations
+  getForBooking: (bookingId: string) => api.get(`/offers/booking/${bookingId}`),
+  apply: (bookingId: string, offerId: string) => api.post('/offers/apply', { bookingId, offerId }),
+  remove: (bookingId: string, offerId: string) => api.delete('/offers/remove', { data: { bookingId, offerId } }),
 };

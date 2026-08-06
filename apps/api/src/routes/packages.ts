@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { prisma } from '@resort-pro/database';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { ok } from '../utils/response';
 
@@ -74,8 +75,11 @@ export async function packageRoutes(app: FastifyInstance) {
       const pkg = await db.package.findFirst({ where: { id } });
       if (!pkg) return reply.status(404).send({ error: 'Package not found' });
 
-      // Block delete if package is used in any bookings
-      const usageCount = await db.bookingPackage.count({ where: { packageId: id } });
+      // Block delete if package is used in any bookings.
+      // BookingPackage has no tenantId column — see the comment on GET
+      // /booking/:bookingId above. The package fetch above already proved
+      // this packageId belongs to the caller's tenant.
+      const usageCount = await prisma.bookingPackage.count({ where: { packageId: id } });
       if (usageCount > 0) {
         return reply.status(409).send({
           error: `Cannot delete "${pkg.name}" — it has been applied to ${usageCount} booking(s). Deactivate it instead.`,
@@ -99,7 +103,7 @@ export async function packageRoutes(app: FastifyInstance) {
       const pkg = await db.package.findFirst({ where: { id } });
       if (!pkg) return reply.status(404).send({ error: 'Package not found' });
 
-      const bookings = await db.bookingPackage.findMany({
+      const bookings = await prisma.bookingPackage.findMany({
         where: { packageId: id },
         include: {
           booking: {
@@ -136,8 +140,11 @@ export async function packageRoutes(app: FastifyInstance) {
       if (!booking) return reply.status(404).send({ error: 'Booking not found' });
       if (!pkg) return reply.status(404).send({ error: 'Package not found' });
 
-      // Check not already applied
-      const existing = await db.bookingPackage.findUnique({
+      // BookingPackage has no tenantId column — see the comment on GET
+      // /booking/:bookingId below. Tenancy is already proven by the
+      // tenant-scoped booking/package fetches above, so the raw `prisma`
+      // client is safe to use for everything touching BookingPackage itself.
+      const existing = await prisma.bookingPackage.findUnique({
         where: { bookingId_packageId: { bookingId, packageId } },
       });
       if (existing) return reply.status(409).send({ error: 'Package already applied to this booking' });
@@ -149,8 +156,8 @@ export async function packageRoutes(app: FastifyInstance) {
       const packageCost = pkg.priceType === 'PER_NIGHT' ? pkg.price * nights : pkg.price;
 
       // Create the join record + update booking totalAmount
-      const [bp] = await db.$transaction([
-        db.bookingPackage.create({
+      const [bp] = await prisma.$transaction([
+        prisma.bookingPackage.create({
           data: {
             bookingId,
             packageId,
@@ -160,7 +167,7 @@ export async function packageRoutes(app: FastifyInstance) {
             nights,
           },
         }),
-        db.booking.update({
+        prisma.booking.update({
           where: { id: bookingId },
           data: { totalAmount: { increment: packageCost } },
         }),
@@ -185,18 +192,18 @@ export async function packageRoutes(app: FastifyInstance) {
       const booking = await db.booking.findFirst({ where: { id: bookingId } });
       if (!booking) return reply.status(404).send({ error: 'Booking not found' });
 
-      const bp = await db.bookingPackage.findUnique({
+      const bp = await prisma.bookingPackage.findUnique({
         where: { bookingId_packageId: { bookingId, packageId } },
       });
       if (!bp) return reply.status(404).send({ error: 'Package not applied to this booking' });
 
       const packageCost = bp.priceType === 'PER_NIGHT' ? bp.price * bp.nights : bp.price;
 
-      await db.$transaction([
-        db.bookingPackage.delete({
+      await prisma.$transaction([
+        prisma.bookingPackage.delete({
           where: { bookingId_packageId: { bookingId, packageId } },
         }),
-        db.booking.update({
+        prisma.booking.update({
           where: { id: bookingId },
           data: { totalAmount: { decrement: packageCost } },
         }),
@@ -218,7 +225,12 @@ export async function packageRoutes(app: FastifyInstance) {
       const booking = await db.booking.findFirst({ where: { id: bookingId } });
       if (!booking) return reply.status(404).send({ error: 'Booking not found' });
 
-      const packages = await db.bookingPackage.findMany({
+      // BookingPackage has no tenantId column of its own — the tenant-scoped
+      // `db` client's extension injects one into every query regardless, which
+      // Prisma rejects as an unknown field. The booking fetch above already
+      // proved this bookingId belongs to the caller's tenant, so querying by
+      // bookingId through the raw client is safe.
+      const packages = await prisma.bookingPackage.findMany({
         where: { bookingId },
         include: {
           package: {

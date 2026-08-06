@@ -13,6 +13,7 @@ import {
 import { awardCheckoutPoints } from '../services/loyalty';
 import { syncCalendarsForRoom } from '../jobs/ical-sync';
 import { createGuestPaymentLink } from './billing';
+import { resolveRate } from './ratePlans';
 import type { JwtPayload } from '@resort-pro/types';
 
 /* ── Auto-create invoice when a booking is confirmed ────────────────────── */
@@ -331,7 +332,14 @@ export async function bookingRoutes(app: FastifyInstance) {
       let booking: Awaited<ReturnType<typeof prisma.booking.findFirst>> & object;
       const now = new Date();
       const nights = calculateNights(checkInDate, checkOutDate);
-      const totalAmount = Number(room.basePrice) * nights;
+      // Use the best-matching rate plan for this room/date range if one
+      // applies (seasonal, weekend, promo, etc.) — resolved night by night,
+      // so a stay crossing a plan's date/day boundary is priced correctly
+      // per night, not off whichever plan matched check-in alone. Falls
+      // back to the room's plain nightly price for any/all nights with no
+      // matching plan.
+      const rate = await resolveRate(tenantId, body.roomId, checkInDate, checkOutDate, Number(room.basePrice));
+      const totalAmount = rate?.totalPrice ?? Number(room.basePrice) * nights;
 
       // Resolve or validate guest before entering transaction
       if (!body.guestId && (!body.guestFirstName || !body.guestLastName)) {
@@ -598,20 +606,176 @@ export async function bookingRoutes(app: FastifyInstance) {
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { db } = request;
+      const { sub: cancelledByStaff } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
+      const body = z.object({
+        reason: z.string().max(500).optional(),
+        cancellationFee: z.number().min(0).optional(),
+        // Manual refund record — no gateway call yet, just an auditable entry.
+        refund: z.object({
+          amount: z.number().min(0),
+          method: z.enum(['CASH', 'BANK_TRANSFER', 'BKASH', 'NAGAD', 'CARD', 'STRIPE', 'OTHER']),
+          reference: z.string().max(120).optional(),
+          note: z.string().max(500).optional(),
+        }).optional(),
+        notifyGuest: z.boolean().optional(),
+        // Guest never arrived — distinct from an owner-initiated cancellation.
+        // Reuses the same fee/refund handling below; only the resulting
+        // status and audit reason differ.
+        isNoShow: z.boolean().optional().default(false),
+      }).parse(request.body ?? {});
 
       const booking = await db.booking.findFirst({ where: { id } });
       if (!booking) return reply.status(404).send({ success: false, error: 'Booking not found' });
-      if (['CHECKED_OUT', 'CANCELLED'].includes(booking.status)) {
+      if (['CHECKED_OUT', 'CANCELLED', 'NO_SHOW'].includes(booking.status)) {
         return reply.status(400).send({ success: false, error: 'Cannot cancel this booking' });
       }
+      if (body.isNoShow && booking.status !== 'CONFIRMED') {
+        return reply.status(400).send({ success: false, error: 'Only a confirmed booking can be marked as a no-show' });
+      }
 
-      const updated = await db.booking.update({ where: { id }, data: { status: 'CANCELLED' } });
+      const refundAmount = body.refund?.amount ?? 0;
+      if (refundAmount > Number(booking.paidAmount)) {
+        return reply.status(400).send({ success: false, error: 'Refund amount cannot exceed the amount already paid' });
+      }
 
-      // Send cancellation email (fire-and-forget)
-      sendCancellationEmail(id).catch(() => {});
+      const newPaid = Number(booking.paidAmount) - refundAmount;
+      const newPaymentStatus = refundAmount > 0
+        ? (newPaid <= 0 ? 'REFUNDED' : 'PARTIAL')
+        : booking.paymentStatus;
 
-      return ok(updated, 'Booking cancelled');
+      const [updated] = await Promise.all([
+        db.booking.update({
+          where: { id },
+          data: {
+            status: (body.isNoShow ? 'NO_SHOW' : 'CANCELLED') as never,
+            cancellationReason: body.reason ?? (body.isNoShow ? 'Guest did not arrive (no-show)' : undefined),
+            cancellationFee: body.cancellationFee,
+            cancelledAt: new Date(),
+            cancelledBy: cancelledByStaff,
+            paidAmount: newPaid,
+            paymentStatus: newPaymentStatus as never,
+          },
+        }),
+        ...(refundAmount > 0 ? [db.payment.create({
+          data: {
+            bookingId: id,
+            amount: -refundAmount, // negative = money returned to the guest
+            method: body.refund!.method as never,
+            status: 'REFUNDED',
+            reference: body.refund!.reference,
+            notes: body.refund!.note ?? 'Manual refund recorded at cancellation',
+            processedAt: new Date(),
+          },
+        })] : []),
+      ]);
+
+      // Send cancellation email (fire-and-forget), unless the caller opts out.
+      // Skipped for no-shows — the "Booking Cancelled" template's wording
+      // doesn't fit a guest who simply never arrived.
+      if (body.notifyGuest !== false && !body.isNoShow) {
+        sendCancellationEmail(id).catch(() => {});
+      }
+
+      return ok(updated, body.isNoShow ? 'Booking marked as no-show' : 'Booking cancelled');
+    },
+  });
+
+  // PATCH /api/bookings/:id/modify
+  // Reschedule, change room, or update guest count / special requests.
+  // Scope (v1): core fields only — rate plan / package / discount changes are
+  // handled by the existing bookingPackages/bookingOffers relations elsewhere,
+  // not by this endpoint.
+  app.patch('/:id/modify', {
+    schema: { tags: ['bookings'], summary: 'Modify a booking (dates, room, guests)', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
+    handler: async (request, reply) => {
+      const { db } = request;
+      const { tenantId } = request.user as JwtPayload;
+      const { id } = request.params as { id: string };
+      const body = z.object({
+        checkIn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        checkOut: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        roomId: z.string().uuid().optional(),
+        adults: z.number().int().min(1).optional(),
+        children: z.number().int().min(0).optional(),
+        specialRequests: z.string().optional(),
+        notifyGuest: z.boolean().optional(),
+      }).parse(request.body ?? {});
+
+      const existing = await db.booking.findFirst({ where: { id } });
+      if (!existing) return reply.status(404).send({ success: false, error: 'Booking not found' });
+      if (!['PENDING', 'CONFIRMED'].includes(existing.status)) {
+        return reply.status(400).send({ success: false, error: 'Only pending or confirmed bookings can be modified' });
+      }
+
+      const newCheckIn = body.checkIn ? new Date(body.checkIn) : existing.checkIn;
+      const newCheckOut = body.checkOut ? new Date(body.checkOut) : existing.checkOut;
+      const newRoomId = body.roomId ?? existing.roomId;
+      if (newCheckOut <= newCheckIn) {
+        return reply.status(400).send({ success: false, error: 'Check-out must be after check-in' });
+      }
+
+      const datesOrRoomChanged = body.checkIn !== undefined || body.checkOut !== undefined || body.roomId !== undefined;
+      const oldTotal = Number(existing.totalAmount);
+      let newTotal = oldTotal;
+      let room = null as Awaited<ReturnType<typeof db.room.findFirst>>;
+
+      try {
+        const updated = await prisma.$transaction(async (tx) => {
+          if (datesOrRoomChanged) {
+            room = await tx.room.findFirst({ where: { id: newRoomId, isActive: true } });
+            if (!room) throw Object.assign(new Error('Room not found'), { statusCode: 404 });
+
+            const conflict = await tx.booking.findFirst({
+              where: {
+                tenantId,
+                roomId: newRoomId,
+                id: { not: id }, // exclude this booking's own current row
+                status: { in: ['CONFIRMED', 'CHECKED_IN', 'PENDING'] },
+                checkIn: { lt: newCheckOut },
+                checkOut: { gt: newCheckIn },
+              },
+            });
+            if (conflict) {
+              throw Object.assign(new Error('Room is not available for the selected dates'), { statusCode: 409 });
+            }
+
+            const nights = calculateNights(newCheckIn, newCheckOut);
+            const rate = await resolveRate(tenantId, newRoomId, newCheckIn, newCheckOut, Number(room.basePrice));
+            newTotal = rate?.totalPrice ?? Number(room.basePrice) * nights;
+          }
+
+          return tx.booking.update({
+            where: { id },
+            data: {
+              checkIn: newCheckIn,
+              checkOut: newCheckOut,
+              roomId: newRoomId,
+              adults: body.adults ?? existing.adults,
+              children: body.children ?? existing.children,
+              specialRequests: body.specialRequests ?? existing.specialRequests,
+              totalAmount: newTotal,
+            },
+            include: {
+              guest: { select: { firstName: true, lastName: true, email: true } },
+              room: { select: { number: true, name: true } },
+            },
+          });
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+        if (body.notifyGuest !== false) {
+          sendBookingConfirmation(updated.id).catch(() => {});
+        }
+
+        return ok({ booking: updated, priceDiff: newTotal - oldTotal, oldTotal, newTotal }, 'Booking updated');
+      } catch (err: unknown) {
+        const e = err as { statusCode?: number; message?: string; code?: string };
+        if (e.statusCode === 409) return reply.status(409).send({ success: false, error: e.message });
+        if (e.statusCode === 404) return reply.status(404).send({ success: false, error: e.message });
+        if (e.code === 'P2034') return reply.status(409).send({ success: false, error: 'Room is no longer available for these dates' });
+        throw err;
+      }
     },
   });
 

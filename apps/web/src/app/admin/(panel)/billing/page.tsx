@@ -7,13 +7,13 @@ import { toast } from '@/hooks/use-toast';
 import {
   DollarSign, Loader2, AlertTriangle, Clock,
   TrendingUp, TrendingDown, Users, BarChart3,
-  ArrowUpRight, ArrowDownRight, Minus,
 } from 'lucide-react';
 import {
   ComposedChart, Area, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, Line,
 } from 'recharts';
 import { cn } from '@/lib/utils';
+import { StatCard, StatGrid } from '@/components/patterns';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -83,46 +83,6 @@ function MrrTooltip({ active, payload, label }: any) {
   );
 }
 
-// ── Metric Card ────────────────────────────────────────────────────────────────
-
-function MetricCard({
-  label, value, sub, icon: Icon, iconBg, iconColor, trend,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  icon: React.ElementType;
-  iconBg: string;
-  iconColor: string;
-  trend?: { value: string; up: boolean | null };
-}) {
-  return (
-    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-      <div className="flex items-start justify-between mb-3">
-        <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center', iconBg)}>
-          <Icon className={cn('w-4.5 h-4.5 w-[18px] h-[18px]', iconColor)} />
-        </div>
-        {trend && (
-          <div className={cn(
-            'flex items-center gap-0.5 text-xs font-medium px-1.5 py-0.5 rounded-full',
-            trend.up === true ? 'text-emerald-400 bg-emerald-500/10' :
-            trend.up === false ? 'text-red-400 bg-red-500/10' :
-            'text-gray-400 bg-gray-800'
-          )}>
-            {trend.up === true ? <ArrowUpRight className="w-3 h-3" /> :
-             trend.up === false ? <ArrowDownRight className="w-3 h-3" /> :
-             <Minus className="w-3 h-3" />}
-            {trend.value}
-          </div>
-        )}
-      </div>
-      <p className="text-2xl font-bold text-white tracking-tight">{value}</p>
-      <p className="text-sm text-gray-400 mt-0.5">{label}</p>
-      {sub && <p className="text-xs text-gray-600 mt-1">{sub}</p>}
-    </div>
-  );
-}
-
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function AdminBillingPage() {
@@ -147,7 +107,7 @@ export default function AdminBillingPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-rp-brand" />
       </div>
     );
   }
@@ -170,53 +130,43 @@ export default function AdminBillingPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-white">Billing & MRR</h1>
-        <p className="text-gray-500 text-sm mt-1">Revenue analytics for ResortPro</p>
+        <h1 className="admin-page-title text-rp-text">Billing &amp; MRR</h1>
+        <p className="mt-1 text-sm text-rp-muted">Revenue analytics for ResortPro</p>
       </div>
 
       {/* Primary Metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
+      <StatGrid>
+        <StatCard
           label="Monthly Recurring Revenue"
           value={`$${metrics.currentMrr.toLocaleString()}`}
-          sub={`ARR: $${metrics.arr.toLocaleString()}`}
+          description={`ARR: $${metrics.arr.toLocaleString()}`}
           icon={DollarSign}
-          iconBg="bg-emerald-500/15"
-          iconColor="text-emerald-400"
-          trend={{
-            value: `${metrics.mrrGrowthRate > 0 ? '+' : ''}${metrics.mrrGrowthRate}% vs last mo`,
-            up: metrics.mrrGrowthRate > 0 ? true : metrics.mrrGrowthRate < 0 ? false : null,
-          }}
+          tone="success"
+          trend={`${metrics.mrrGrowthRate > 0 ? '+' : ''}${metrics.mrrGrowthRate}% vs last mo`}
         />
-        <MetricCard
+        <StatCard
           label="Paying Customers"
-          value={String(paidCount)}
-          sub={`${trialingCount} on trial`}
+          value={paidCount}
+          description={`${trialingCount} on trial`}
           icon={Users}
-          iconBg="bg-indigo-500/15"
-          iconColor="text-indigo-400"
+          tone="brand"
         />
-        <MetricCard
+        <StatCard
           label="ARPU"
           value={`$${metrics.arpu}`}
-          sub="Avg revenue per user"
+          description="Avg revenue per user"
           icon={BarChart3}
-          iconBg="bg-blue-500/15"
-          iconColor="text-blue-400"
+          tone="neutral"
         />
-        <MetricCard
+        <StatCard
           label="Net Revenue Retention"
           value={`${metrics.nrr}%`}
-          sub={metrics.nrr >= 100 ? 'Expansion exceeds churn' : 'Below 100% — churn present'}
+          description={metrics.nrr >= 100 ? 'Expansion exceeds churn' : 'Below 100% — churn present'}
           icon={metrics.nrr >= 100 ? TrendingUp : TrendingDown}
-          iconBg={metrics.nrr >= 100 ? 'bg-cyan-500/15' : 'bg-amber-500/15'}
-          iconColor={metrics.nrr >= 100 ? 'text-cyan-400' : 'text-amber-400'}
-          trend={{
-            value: metrics.nrr >= 100 ? 'Healthy' : 'Needs attention',
-            up: metrics.nrr >= 100,
-          }}
+          tone={metrics.nrr >= 100 ? 'brand' : 'warning'}
+          trend={metrics.nrr >= 100 ? 'Healthy' : 'Needs attention'}
         />
-      </div>
+      </StatGrid>
 
       {/* MRR Growth Chart */}
       <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">

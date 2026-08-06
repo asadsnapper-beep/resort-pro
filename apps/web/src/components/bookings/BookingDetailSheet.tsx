@@ -15,6 +15,8 @@ import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { IdScanModal, type ScannedFields } from '@/components/guests/IdScanModal';
 import { PrintReceiptButton } from '@/components/bookings/PrintReceiptButton';
+import { CancelBookingModal, type CancelBookingPayload } from '@/components/bookings/CancelBookingModal';
+import { ModifyBookingModal, type ModifyBookingPayload } from '@/components/bookings/ModifyBookingModal';
 
 interface Booking {
   id: string;
@@ -33,6 +35,7 @@ interface Booking {
   actualCheckIn?: string | null;
   actualCheckOut?: string | null;
   guest: { id?: string; firstName: string; lastName: string; email: string; phone?: string };
+  roomId: string;
   room: { number: string; name: string; type: string };
   payments?: { amount: number; method: string; status: string; processedAt: string; reference?: string }[];
 }
@@ -468,6 +471,10 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
   const [payAmount, setPayAmount] = useState('');
   const [payMethod, setPayMethod] = useState('CASH');
   const [confirmModal, setConfirmModal] = useState<'checkin' | 'checkout' | null>(null);
+  // Reuses CancelBookingModal for both flows — 'noshow' only differs in the
+  // resulting booking status (see PATCH /:id/cancel's isNoShow flag).
+  const [cancelModalMode, setCancelModalMode] = useState<'cancel' | 'noshow' | null>(null);
+  const [showModifyModal, setShowModifyModal] = useState(false);
   const [showIdScan,   setShowIdScan]   = useState(false);
 
   useEffect(() => {
@@ -503,9 +510,25 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
   });
 
   const cancel = useMutation({
-    mutationFn: () => bookingsApi.cancel(booking!.id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['bookings'] }); toast({ title: 'Booking cancelled' }); onClose(); },
-    onError: () => toast({ title: 'Cancel failed', variant: 'destructive' }),
+    mutationFn: (payload: CancelBookingPayload) => bookingsApi.cancel(booking!.id, payload),
+    onSuccess: (_res, payload) => {
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      toast({ title: payload.isNoShow ? 'Booking marked as no-show' : 'Booking cancelled' });
+      setCancelModalMode(null);
+      onClose();
+    },
+    onError: (err: any) => toast({ title: 'Cancel failed', description: err?.response?.data?.error, variant: 'destructive' }),
+  });
+
+  const modify = useMutation({
+    mutationFn: (payload: ModifyBookingPayload) => bookingsApi.modify(booking!.id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      toast({ title: 'Booking updated' });
+      setShowModifyModal(false);
+      onClose();
+    },
+    onError: () => {}, // surfaced inline in the modal via modify.error
   });
 
   const addPayment = useMutation({
@@ -903,7 +926,39 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
           )}
           {['PENDING', 'CONFIRMED'].includes(booking.status) && (
             <button
-              onClick={() => cancel.mutate()}
+              onClick={() => setShowModifyModal(true)}
+              className="w-full flex items-center justify-center gap-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+            >
+              <CalendarDays className="h-4 w-4" /> Modify Booking
+            </button>
+          )}
+          {isConfirmed && (
+            <button
+              onClick={() => setCancelModalMode('noshow')}
+              disabled={cancel.isPending}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                borderRadius: '9px',
+                border: '1px solid #fde68a',
+                background: 'transparent',
+                color: '#92400e',
+                fontSize: '13px',
+                fontWeight: 500,
+                padding: '9px 12px',
+                cursor: 'pointer',
+                opacity: cancel.isPending ? 0.6 : 1,
+              }}
+            >
+              <XCircle className="h-4 w-4" /> Mark No-Show
+            </button>
+          )}
+          {['PENDING', 'CONFIRMED'].includes(booking.status) && (
+            <button
+              onClick={() => setCancelModalMode('cancel')}
               disabled={cancel.isPending}
               style={{
                 width: '100%',
@@ -967,6 +1022,29 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
           onConfirm={() => confirmModal === 'checkin' ? checkInMutation.mutate() : checkOutMutation.mutate()}
           onCancel={() => setConfirmModal(null)}
           loading={checkInMutation.isPending || checkOutMutation.isPending}
+        />
+      )}
+
+      {showModifyModal && (
+        <ModifyBookingModal
+          open={showModifyModal}
+          onClose={() => setShowModifyModal(false)}
+          onConfirm={(payload) => modify.mutate(payload)}
+          booking={booking}
+          loading={modify.isPending}
+          error={(modify.error as any)?.response?.data?.error}
+          onPackagesChanged={() => queryClient.invalidateQueries({ queryKey: ['bookings'] })}
+        />
+      )}
+
+      {cancelModalMode && (
+        <CancelBookingModal
+          open={!!cancelModalMode}
+          onClose={() => setCancelModalMode(null)}
+          onConfirm={(payload) => cancel.mutate(payload)}
+          paidAmount={Number(booking.paidAmount)}
+          loading={cancel.isPending}
+          isNoShow={cancelModalMode === 'noshow'}
         />
       )}
     </>

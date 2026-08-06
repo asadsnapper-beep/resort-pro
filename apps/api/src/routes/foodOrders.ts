@@ -80,6 +80,11 @@ export async function foodOrderRoutes(app: FastifyInstance) {
         return sum + Number(menuItem.price) * item.quantity;
       }, 0);
 
+      // paymentStatus defaults to PENDING (schema default) — no money has
+      // actually been collected yet at order time. A room-service order
+      // (bookingId set) rides on the booking's own invoice/payment at
+      // checkout; a walk-in/table order needs an explicit "mark as paid"
+      // once cash/card is actually collected (see PATCH /:id/payment below).
       const order = await db.foodOrder.create({
         data: {
           bookingId: body.bookingId,
@@ -87,7 +92,6 @@ export async function foodOrderRoutes(app: FastifyInstance) {
           tableNumber: body.tableNumber,
           notes: body.notes,
           totalAmount,
-          paymentStatus: 'PAID',
           items: {
             create: body.items.map((item) => {
               const menuItem = menuItems.find((m) => m.id === item.menuItemId)!;
@@ -115,6 +119,38 @@ export async function foodOrderRoutes(app: FastifyInstance) {
       if (!order) return reply.status(404).send({ success: false, error: 'Order not found' });
       const updated = await db.foodOrder.update({ where: { id }, data: { status: status as never } });
       return ok(updated, 'Order status updated');
+    },
+  });
+
+  // PATCH /api/food-orders/:id/payment — record that a walk-in/table order
+  // was actually paid for (cash/card at the counter). Room-service orders
+  // (bookingId set) don't need this — they're already tracked via the
+  // booking's own invoice/payment flow at checkout (see GET /bookings/:id/invoice).
+  app.patch('/:id/payment', {
+    schema: { tags: ['food-orders'], summary: 'Mark an order as paid', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
+    handler: async (request, reply) => {
+      const { db } = request;
+      const { id } = request.params as { id: string };
+      const { method } = z.object({
+        method: z.enum([
+          'CASH', 'CARD', 'BANK_TRANSFER', 'OTHER',
+          'BKASH', 'NAGAD', 'SSLCOMMERZ', 'ROCKET',
+          'RAZORPAY', 'CASHFREE', 'PAYHERE',
+        ]),
+      }).parse(request.body);
+
+      const order = await db.foodOrder.findFirst({ where: { id } });
+      if (!order) return reply.status(404).send({ success: false, error: 'Order not found' });
+      if (order.status === 'CANCELLED') {
+        return reply.status(400).send({ success: false, error: 'Cannot mark a cancelled order as paid' });
+      }
+
+      const updated = await db.foodOrder.update({
+        where: { id },
+        data: { paymentStatus: 'PAID', paymentMethod: method as never },
+      });
+      return ok(updated, 'Order marked as paid');
     },
   });
 }

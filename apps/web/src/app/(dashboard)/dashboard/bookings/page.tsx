@@ -40,6 +40,7 @@ type Booking = {
   totalAmount: number; paidAmount: number; specialRequests?: string;
   notes?: string; createdAt: string; source?: string;
   guest: { firstName: string; lastName: string; email: string; phone?: string };
+  roomId: string;
   room: { number: string; name: string; type: string };
   payments?: { amount: number; method: string; status: string; processedAt: string }[];
 };
