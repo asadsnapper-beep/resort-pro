@@ -286,8 +286,7 @@ function OrderCard({ order, expanded, onToggleExpand }: {
                 {cfg.label}
               </span>
               {needsPaymentAction && (
-                <span className="inline-flex items-center rounded-[7px] border px-[10px] py-[4px] text-[11px] font-semibold"
-                  style={{ background: 'var(--rp-red-bg)', borderColor: 'rgba(200,60,60,0.18)', color: '#c43c3c' }}>
+                <span className="inline-flex items-center rounded-rp-xs border border-red-200/20 px-[10px] py-[4px] text-rp-micro font-semibold bg-rp-red-bg text-rp-danger">
                   Unpaid
                 </span>
               )}
@@ -315,15 +314,15 @@ function OrderCard({ order, expanded, onToggleExpand }: {
                 <select
                   value={payMethod}
                   onChange={(e) => setPayMethod(e.target.value)}
-                  className="rounded-[6px] border px-[8px] py-[4px] text-[11.5px]"
-                  style={{ background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border)', color: '#183153' }}>
+                  className="rounded-rp-ctrl border border-rp-border bg-rp-surface-3 px-[8px] py-[4px] text-rp-label text-rp-brand"
+                >
                   {PAYMENT_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select>
                 <button
                   onClick={() => markPaidMutation.mutate({ id: order.id, method: payMethod })}
                   disabled={markPaidMutation.isPending}
-                  className="rounded-[8px] border px-[10px] py-[4px] text-[11.5px] font-medium transition-colors disabled:opacity-50"
-                  style={{ background: 'var(--rp-btn-accent)', borderColor: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+                  className="rounded-rp-sm border border-rp-btn-accent bg-rp-btn-accent px-[10px] py-[4px] text-rp-label font-medium text-rp-btn-accent-text transition-colors disabled:opacity-50"
+                >
                   {markPaidMutation.isPending ? 'Saving…' : 'Mark Paid'}
                 </button>
               </div>
