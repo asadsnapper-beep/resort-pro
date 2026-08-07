@@ -511,9 +511,9 @@ Track the platform's referral program — tenants who refer other resorts get re
 **Marking a referral as rewarded:**
 1. Find the referral in the list
 2. Click **"Mark Rewarded"**
-3. Manually apply the reward (extend their subscription in Stripe or credit their account)
+3. Choose the reward in the panel. ResortPro applies the account credit or free-plan period to the referrer automatically.
 
-> The referral system tracks referrals but does not auto-apply rewards — all reward fulfillment is manual.
+> A Super Admin must approve the reward, but once approved ResortPro applies the selected credit or free-plan period automatically.
 
 ---
 

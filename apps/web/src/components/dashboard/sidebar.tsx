@@ -188,6 +188,9 @@ export function Sidebar() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const t = useTranslations('common') as (key: string, ...args: any[]) => string;
   const locale = useLocale() as Locale;
+  const role = (user?.role ?? 'STAFF') as Role;
+  const canReadModuleFlags = ['OWNER', 'MANAGER'].includes(role);
+  const canReadAiStatus = ['OWNER', 'MANAGER'].includes(role);
 
   useEffect(() => {
     try {
@@ -200,6 +203,7 @@ export function Sidebar() {
     queryKey: ['tenant-modules'],
     queryFn: () => tenantApi.getModules(),
     staleTime: 5 * 60 * 1000,
+    enabled: canReadModuleFlags,
   });
 
   const { data: statsRes } = useQuery({
@@ -216,9 +220,8 @@ export function Sidebar() {
   const planFeatures = new Set(PLAN_FEATURES[(tenant?.plan ?? 'FREE') as keyof typeof PLAN_FEATURES] ?? []);
   const hasFeature = (flag: string) => flag in enabledModules ? enabledModules[flag] : planFeatures.has(flag);
 
-  const { status: aiStatus } = useAiStatus();
+  const { status: aiStatus } = useAiStatus(canReadAiStatus);
 
-  const role = (user?.role ?? 'STAFF') as Role;
   const roleConfig = ROLE_LABELS[role] ?? ROLE_LABELS.STAFF;
   const visibleItems = getVisibleItems(role).filter((item) => {
     if (item.featureFlag && !hasFeature(item.featureFlag)) return false;

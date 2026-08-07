@@ -54,15 +54,22 @@ export function useAiFeature(feature: AiFeature): boolean {
 }
 
 /** Full status + loading, for components that gate on multiple AI features. */
-export function useAiStatus() {
+export function useAiStatus(enabled = true) {
   const [status, setStatus] = useState<AiStatus>(ALL_OFF);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
 
   useEffect(() => {
+    if (!enabled) {
+      setStatus(ALL_OFF);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
     let mounted = true;
     fetchStatus().then((s) => { if (mounted) { setStatus(s); setLoading(false); } });
     return () => { mounted = false; };
-  }, []);
+  }, [enabled]);
 
   return { status, loading };
 }

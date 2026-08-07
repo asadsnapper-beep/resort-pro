@@ -7,7 +7,7 @@ import {
   Gift, Link2, Copy, Check, Users, Clock, Award,
   Share2, MessageCircle, Mail, ExternalLink, Loader2, Sparkles, CreditCard,
 } from 'lucide-react';
-import { PageShell, PageHeader } from '@/components/patterns';
+import { ActionButton, PageShell, PageHeader } from '@/components/patterns';
 import { toast } from '@/hooks/use-toast';
 
 interface ReferralEntry {
@@ -58,7 +58,7 @@ function rewardDescription(r: ReferralEntry) {
 export default function ReferralsPage() {
   const [copied, setCopied] = useState(false);
 
-  const { data: d, isLoading } = useQuery<ReferralData>({
+  const { data: d, isLoading, isError, isFetching, refetch } = useQuery<ReferralData>({
     queryKey: ['tenant-referrals'],
     queryFn:  () => tenantApi.getReferrals().then(r => r.data.data),
   });
@@ -197,9 +197,16 @@ export default function ReferralsPage() {
             </p>
           </>
         ) : (
-          <p className="text-[13px] text-[#94a3b8] dark:text-[#7f99ab]">
-            Referral link generate হয়নি। Support-এ যোগাযোগ করুন।
-          </p>
+          <div className="flex flex-wrap items-center gap-3 rounded-rp-ctrl bg-rp-surface-3 px-4 py-3">
+            <p className="text-rp-body text-rp-muted">
+              {isError
+                ? 'Referral link তৈরি করা যায়নি। আবার চেষ্টা করুন।'
+                : 'আপনার referral link তৈরি করা হচ্ছে। আবার চেষ্টা করুন।'}
+            </p>
+            <ActionButton variant="secondary" onClick={() => refetch()} disabled={isFetching}>
+              {isFetching ? 'Trying…' : 'Try again'}
+            </ActionButton>
+          </div>
         )}
       </div>
 

@@ -27,6 +27,7 @@ import { applyPlanFlagsToTenant, DEFAULT_PLAN_CONFIGS, getPlanConfigs } from '..
 import { anonymizeTenant, collectTenantExport, getPendingErasures } from '../utils/gdpr';
 import { metrics } from '../utils/metrics';
 import { getStorageConfig, invalidateStorageCache, uploadToStorage, deleteFromStorage, type StorageConfig } from '../services/storage';
+import { generateReferralCode, referralRegistrationUrl } from '../utils/referral';
 
 // ── Role definitions ───────────────────────────────────────────────────────
 type AdminRole = 'SUPER_ADMIN' | 'SUPPORT' | 'FINANCE' | 'VIEWER';
@@ -1652,12 +1653,10 @@ Rules:
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true, slug: true } });
     if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
 
-    const APP_URL = process.env.CORS_ORIGIN?.split(',')[0]?.trim() || 'http://localhost:3000';
-
     // Use provided code or generate one
     let referralCode = code
       ? code.toUpperCase().replace(/[^A-Z0-9-]/g, '')
-      : tenant.slug.toUpperCase().replace(/-/g, '').slice(0, 8) + Math.random().toString(36).slice(2, 5).toUpperCase();
+      : generateReferralCode(tenant.slug);
 
     // Ensure uniqueness (skip own record)
     const conflict = await prisma.tenant.findFirst({
@@ -1671,7 +1670,7 @@ Rules:
       tenantId,
       tenantName: tenant.name,
       referralCode,
-      referralLink: `${APP_URL}/auth/register?ref=${referralCode}`,
+      referralLink: referralRegistrationUrl(referralCode),
     }, 'Custom referral link created'));
   });
 
@@ -1683,10 +1682,9 @@ Rules:
       select: { id: true, name: true, slug: true, plan: true, referralCode: true },
       orderBy: { name: 'asc' },
     });
-    const APP_URL = process.env.CORS_ORIGIN?.split(',')[0]?.trim() || 'http://localhost:3000';
     return reply.send(ok(tenants.map(t => ({
       ...t,
-      referralLink: t.referralCode ? `${APP_URL}/auth/register?ref=${t.referralCode}` : null,
+      referralLink: t.referralCode ? referralRegistrationUrl(t.referralCode) : null,
     }))));
   });
 

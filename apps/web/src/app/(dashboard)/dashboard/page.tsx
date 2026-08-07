@@ -173,6 +173,7 @@ export default function DashboardPage() {
   const cardBg = isDark ? 'rgba(255,255,255,0.07)' : 'var(--rp-surface)';
   const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-border)';
   const dividerColor = isDark ? 'rgba(255,255,255,0.06)' : 'var(--rp-border)';
+  const canViewWebsiteStats = ['OWNER', 'MANAGER', 'MARKETER', 'DEVELOPER'].includes(user?.role ?? '');
 
   const { data: statsRes, isLoading } = useQuery({
     queryKey: ['dashboard-stats'],
@@ -200,6 +201,7 @@ export default function DashboardPage() {
     queryKey: ['website-stats'],
     queryFn: () => websiteApi.getStats(),
     refetchInterval: 300000, // refresh every 5 min
+    enabled: canViewWebsiteStats,
   });
 
   const stats = statsRes?.data?.data?.stats;

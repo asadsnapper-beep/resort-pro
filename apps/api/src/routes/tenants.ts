@@ -9,6 +9,7 @@ import { FLAG_REGISTRY } from '../utils/feature-flags';
 import { resolveTenantEntitlement } from '../utils/entitlement';
 import { sendTestEmail } from '../utils/guest-emails';
 import crypto from 'crypto';
+import { ensureTenantReferralCode, referralRegistrationUrl } from '../utils/referral';
 
 const updateTenantSchema = z.object({
   name: z.string().min(2).max(100).optional(),
@@ -675,11 +676,18 @@ export async function tenantRoutes(app: FastifyInstance) {
 
       const tenant = await db.tenant.findUnique({
         where: { id: tenantId },
-        select: { referralCode: true, accountCredit: true, freeUntil: true, plan: true },
+        select: { id: true, slug: true, referralCode: true, accountCredit: true, freeUntil: true, plan: true },
       });
       if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
 
-      const referrals = await db.referral.findMany({
+      // Existing tenants predate referral codes. Generate theirs on demand so
+      // the owner never has to contact support before sharing a link.
+      const referralCode = await ensureTenantReferralCode(prisma, tenant);
+
+      // Referral is related through referrerId/referredId, not tenantId. Use
+      // the base client with an explicit referrer filter; the tenant-scoped
+      // client would inject a non-existent tenantId column here.
+      const referrals = await prisma.referral.findMany({
         where: { referrerId: tenantId },
         include: {
           referred: { select: { name: true, slug: true, plan: true, planStatus: true, createdAt: true } },
@@ -687,13 +695,10 @@ export async function tenantRoutes(app: FastifyInstance) {
         orderBy: { createdAt: 'desc' },
       });
 
-      const APP_URL = process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:3000';
-      const referralLink = tenant.referralCode
-        ? `${APP_URL}/register?ref=${tenant.referralCode}`
-        : null;
+      const referralLink = referralRegistrationUrl(referralCode);
 
       return reply.send(ok({
-        referralCode: tenant.referralCode,
+        referralCode,
         referralLink,
         accountCredit: tenant.accountCredit,
         freeUntil: tenant.freeUntil,

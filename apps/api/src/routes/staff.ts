@@ -200,50 +200,97 @@ export async function staffRoutes(app: FastifyInstance) {
         ownershipPercent: z.number().min(0.01).max(100).optional(),
       }).parse(request.body);
 
-      if (body.role === 'SHAREHOLDER') {
-        if (body.ownershipPercent === undefined) {
-          return reply.status(400).send({ success: false, error: 'ownershipPercent is required for shareholder invites.' });
-        }
-        const allocated = await db.shareholderProfile.aggregate({
-          where: { tenantId },
-          _sum: { ownershipPercent: true },
-        });
-        const pendingInvites = await db.staffInvite.aggregate({
-          where: { tenantId, role: 'SHAREHOLDER', used: false, expiresAt: { gt: new Date() } },
-          _sum: { ownershipPercent: true },
-        });
-        const alreadyAllocated = (allocated._sum.ownershipPercent ?? 0) + (pendingInvites._sum.ownershipPercent ?? 0);
-        if (alreadyAllocated + body.ownershipPercent > 100) {
-          const remaining = Math.max(0, 100 - alreadyAllocated);
-          return reply.status(400).send({ success: false, error: `Only ${remaining.toFixed(2)}% ownership remaining.` });
-        }
+      if (body.role === 'SHAREHOLDER' && body.ownershipPercent === undefined) {
+        return reply.status(400).send({ success: false, error: 'ownershipPercent is required for shareholder invites.' });
       }
 
       const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true, slug: true } });
       if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
 
-      // Check if user already exists
-      const existing = await db.user.findUnique({
-        where: { tenantId_email: { tenantId, email: body.email } },
-      });
-      if (existing) return reply.status(409).send({ success: false, error: 'A staff member with this email already exists.' });
+      let token: string;
 
-      // Expire old unused invites for this email
-      await db.staffInvite.updateMany({
-        where: { email: body.email, used: false },
-        data: { used: true },
-      });
+      if (body.role === 'SHAREHOLDER') {
+        // Lock the tenant row so the allocation check and invite reservation are
+        // one operation. Without this, concurrent requests can each see the
+        // same remaining percentage and collectively allocate more than 100%.
+        const invitation = await prisma.$transaction(async (tx) => {
+          await tx.$queryRaw`SELECT "id" FROM "tenants" WHERE "id" = ${tenantId} FOR UPDATE`;
 
-      const token = randomBytes(32).toString('hex');
-      await db.staffInvite.create({
-        data: {
-          email: body.email,
-          role: body.role,
-          ownershipPercent: body.role === 'SHAREHOLDER' ? body.ownershipPercent : undefined,
-          token,
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        },
-      });
+          const existing = await tx.user.findUnique({
+            where: { tenantId_email: { tenantId, email: body.email } },
+          });
+          if (existing) return { ok: false as const, error: 'A staff member with this email already exists.', status: 409 };
+
+          const [allocated, pendingInvites] = await Promise.all([
+            tx.shareholderProfile.aggregate({
+              where: { tenantId },
+              _sum: { ownershipPercent: true },
+            }),
+            // A new invite replaces an unused invite for the same email, so it
+            // must not count that old invite twice against the cap.
+            tx.staffInvite.aggregate({
+              where: {
+                tenantId,
+                role: 'SHAREHOLDER',
+                email: { not: body.email },
+                used: false,
+                expiresAt: { gt: new Date() },
+              },
+              _sum: { ownershipPercent: true },
+            }),
+          ]);
+          const alreadyAllocated = (allocated._sum.ownershipPercent ?? 0) + (pendingInvites._sum.ownershipPercent ?? 0);
+          const ownershipPercent = body.ownershipPercent!;
+          if (alreadyAllocated + ownershipPercent > 100) {
+            const remaining = Math.max(0, 100 - alreadyAllocated);
+            return { ok: false as const, error: `Only ${remaining.toFixed(2)}% ownership remaining.`, status: 400 };
+          }
+
+          await tx.staffInvite.updateMany({
+            where: { tenantId, email: body.email, used: false },
+            data: { used: true },
+          });
+
+          const invite = await tx.staffInvite.create({
+            data: {
+              tenantId,
+              email: body.email,
+              role: body.role,
+              ownershipPercent,
+              token: randomBytes(32).toString('hex'),
+              expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            },
+          });
+          return { ok: true as const, token: invite.token };
+        });
+
+        if (!invitation.ok) {
+          return reply.status(invitation.status).send({ success: false, error: invitation.error });
+        }
+        token = invitation.token;
+      } else {
+        // Check if user already exists
+        const existing = await db.user.findUnique({
+          where: { tenantId_email: { tenantId, email: body.email } },
+        });
+        if (existing) return reply.status(409).send({ success: false, error: 'A staff member with this email already exists.' });
+
+        // Expire old unused invites for this email
+        await db.staffInvite.updateMany({
+          where: { email: body.email, used: false },
+          data: { used: true },
+        });
+
+        token = randomBytes(32).toString('hex');
+        await db.staffInvite.create({
+          data: {
+            email: body.email,
+            role: body.role,
+            token,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          },
+        });
+      }
 
       const webUrl = process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:3000';
       const inviteUrl = `${webUrl}/auth/invite?token=${token}`;

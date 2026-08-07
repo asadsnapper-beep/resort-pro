@@ -10,7 +10,7 @@
 
 ```
 Owner পায়:
-  Referral Link: https://resortpro.site/register?ref=PALM25
+  Referral Link: https://app.resortpro.site/auth/register?ref=PALM25
 
 কেউ সেই link দিয়ে signup করে → নতুন resort register হয়
 
@@ -64,7 +64,7 @@ Admin action:
 ## ৩. Signup Page — Referral Detection
 
 ```
-URL: /register?ref=PALM25
+URL: /auth/register?ref=PALM25
 
 Signup form-এ referral code auto-detect হবে:
 
@@ -167,16 +167,11 @@ Reward apply হলে:
 ## ৭. Referral Code Generation
 
 ```
-Code format: First 4 chars of resort name + 2 digit random
-  "Palm Paradise Resort" → PALM25
-  "Sea Breeze Hotel"     → SEAB41
-  "Coral Bay Resort"     → CORA08
-
-OR: UUID-based short code (more unique):
-  ref_k8x2mq
+Code format: first 6 characters of the resort slug + 12 random characters
+  "Palm Paradise Resort" → PALMPA-4B53A4614241
 
 Code stored in Tenant model as referralCode (unique)
-Link: https://resortpro.site/register?ref=<code>
+Link: https://app.resortpro.site/auth/register?ref=<code>
 ```
 
 ---

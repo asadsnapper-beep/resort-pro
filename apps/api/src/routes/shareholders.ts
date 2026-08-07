@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { prisma } from '@resort-pro/database';
 import { requireRole } from '../middleware/auth';
 import { ok } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
@@ -80,27 +81,50 @@ export async function shareholderRoutes(app: FastifyInstance) {
     preHandler: requireRole('OWNER'),
     handler: async (request, reply) => {
       const { db } = request;
+      const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
       const body = z.object({
         ownershipPercent: z.number().min(0.01).max(100).optional(),
         notes: z.string().optional(),
       }).parse(request.body);
 
-      const existing = await db.shareholderProfile.findUnique({ where: { id } });
-      if (!existing) return reply.status(404).send({ success: false, error: 'Shareholder not found' });
-
       if (body.ownershipPercent !== undefined) {
-        const others = await db.shareholderProfile.aggregate({
-          where: { id: { not: id } },
-          _sum: { ownershipPercent: true },
+        // Use the same per-tenant lock as shareholder invites. This prevents a
+        // simultaneous profile edit and invite from taking total ownership over 100%.
+        const result = await prisma.$transaction(async (tx) => {
+          await tx.$queryRaw`SELECT "id" FROM "tenants" WHERE "id" = ${tenantId} FOR UPDATE`;
+
+          const existing = await tx.shareholderProfile.findFirst({ where: { id, tenantId } });
+          if (!existing) return { ok: false as const, error: 'Shareholder not found', status: 404 };
+
+          const [others, pendingInvites] = await Promise.all([
+            tx.shareholderProfile.aggregate({
+              where: { tenantId, id: { not: id } },
+              _sum: { ownershipPercent: true },
+            }),
+            tx.staffInvite.aggregate({
+              where: { tenantId, role: 'SHAREHOLDER', used: false, expiresAt: { gt: new Date() } },
+              _sum: { ownershipPercent: true },
+            }),
+          ]);
+          const otherTotal = (others._sum.ownershipPercent ?? 0) + (pendingInvites._sum.ownershipPercent ?? 0);
+          if (otherTotal + body.ownershipPercent! > 100) {
+            const remaining = Math.max(0, 100 - otherTotal);
+            return { ok: false as const, error: `Only ${remaining.toFixed(2)}% ownership available.`, status: 400 };
+          }
+
+          const updated = await tx.shareholderProfile.update({ where: { id }, data: body });
+          return { ok: true as const, updated };
         });
-        const otherTotal = others._sum.ownershipPercent ?? 0;
-        if (otherTotal + body.ownershipPercent > 100) {
-          const remaining = Math.max(0, 100 - otherTotal);
-          return reply.status(400).send({ success: false, error: `Only ${remaining.toFixed(2)}% ownership available.` });
+
+        if (!result.ok) {
+          return reply.status(result.status).send({ success: false, error: result.error });
         }
+        return ok(result.updated, 'Shareholder updated');
       }
 
+      const existing = await db.shareholderProfile.findUnique({ where: { id } });
+      if (!existing) return reply.status(404).send({ success: false, error: 'Shareholder not found' });
       const updated = await db.shareholderProfile.update({ where: { id }, data: body });
       return ok(updated, 'Shareholder updated');
     },
