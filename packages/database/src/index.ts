@@ -27,9 +27,21 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 //   - Scripts (seed, gdpr-purge, etc.)
 //   - Auth routes (login needs to find user before tenantId is known)
 
-export type TenantScopedPrisma = ReturnType<typeof tenantPrisma>;
+type RelaxWriteArgs<T> = {
+  [K in keyof T]: T[K] extends {
+    create: (...args: any[]) => infer CreateRet;
+  }
+    ? Omit<T[K], 'create' | 'createMany' | 'update' | 'updateMany' | 'upsert'> & {
+        create: (args: { data: any; select?: any; include?: any }) => CreateRet;
+        createMany: (args: { data: any[]; skipDuplicates?: boolean }) => any;
+        update: (args: { data: any; where: any; select?: any; include?: any }) => any;
+        updateMany: (args: { data: any; where: any }) => any;
+        upsert: (args: { where: any; create: any; update: any; select?: any; include?: any }) => any;
+      }
+    : T[K];
+};
 
-export function tenantPrisma(tenantId: string) {
+function createTenantPrisma(tenantId: string) {
   // Fail-closed: a falsy tenantId would make Prisma treat `where: { tenantId:
   // undefined }` as "no filter", silently turning every query UNSCOPED across
   // all tenants. Never allow that — a missing tenantId is always a bug (e.g. a
@@ -134,4 +146,10 @@ export function tenantPrisma(tenantId: string) {
       },
     },
   });
+}
+
+export type TenantScopedPrisma = RelaxWriteArgs<ReturnType<typeof createTenantPrisma>>;
+
+export function tenantPrisma(tenantId: string): TenantScopedPrisma {
+  return createTenantPrisma(tenantId) as unknown as TenantScopedPrisma;
 }
