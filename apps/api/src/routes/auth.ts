@@ -712,7 +712,12 @@ export async function authRoutes(app: FastifyInstance) {
   // the product. Safe: demo tenant is completely isolated (separate
   // tenantId, isDemo=true).
   app.post('/demo-login', {
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    // Was 10/min — easily exceeded by a normal shared-IP burst (an office
+    // or school trying the demo together) since this endpoint is meant to
+    // be frictionless, and by the E2E role suite itself (17 logins/run from
+    // one IP), which started intermittently failing mid-suite once it hit
+    // this ceiling. Still meaningfully bot-resistant at 30/min.
+    config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
   }, async (req, reply) => {
     const { role: requestedRole, email } = (req.body as any) ?? {};
 

@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { X, LogOut } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
+import { authApi } from '@/lib/api';
 import { NAV_ITEMS, getVisibleItems, groupItems } from '@/components/dashboard/sidebar';
 
 /**
@@ -46,13 +47,28 @@ export function MobileMoreSheet({ open, onClose }: { open: boolean; onClose: () 
     router.push(href);
   };
 
+  // Was hardcoded to '/auth/login' and skipped the server-side logout call —
+  // unlike the desktop sidebar's handleLogout, so a demo session on mobile
+  // got bounced to the real login screen (with no account to log into)
+  // instead of back to /try. Mirror the desktop behavior exactly.
+  const handleLogout = async () => {
+    const isDemo = !!tenant?.isDemo;
+    onClose();
+    await authApi.logout().catch(() => {});
+    clearAuth();
+    router.push(isDemo ? '/try' : '/auth/login');
+  };
+
   return createPortal(
     <div className="fixed inset-0 z-[60] md:hidden">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
 
       {/* Sheet */}
-      <div className="absolute inset-x-0 bottom-0 flex max-h-[82vh] flex-col rounded-t-[20px] bg-[#f7f5f0] shadow-2xl dark:bg-gray-900">
+      <div
+        data-testid="mobile-nav-sheet"
+        className="absolute inset-x-0 bottom-0 flex max-h-[82vh] flex-col rounded-t-[20px] bg-[#f7f5f0] shadow-2xl dark:bg-gray-900"
+      >
         {/* Handle + header */}
         <div className="flex items-center justify-between px-5 pb-2 pt-3">
           <div>
@@ -94,7 +110,7 @@ export function MobileMoreSheet({ open, onClose }: { open: boolean; onClose: () 
 
           {/* Sign out */}
           <button
-            onClick={() => { clearAuth(); router.push('/auth/login'); }}
+            onClick={handleLogout}
             className="mt-2 flex w-full items-center justify-center gap-2 rounded-[12px] border border-red-200 bg-white py-3 text-[13px] font-semibold text-red-600">
             <LogOut className="h-4 w-4" /> Sign out
           </button>
