@@ -19,7 +19,14 @@ export default defineConfig({
   webServer: {
     command: 'pnpm dev',
     url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
+    // Always reuse whatever's already listening on 3000 instead of trying
+    // to start a second server. This was `!process.env.CI` — backwards: CI's
+    // own workflow already starts the built web server as its own step
+    // *specifically* so tests can hit it, but that inverted flag forced
+    // Playwright to spawn a second `pnpm dev` on the same port anyway,
+    // which fails immediately with "port already used" — CI could never
+    // get past this once the earlier startup/health-check bugs were fixed.
+    reuseExistingServer: true,
     timeout: 120000,
   },
 });
