@@ -275,8 +275,10 @@ test.describe('STAFF role', () => {
     await page.goto('/dashboard/housekeeping');
     await page.waitForTimeout(2000);
     // "New Task" is gated to canManage roles (OWNER/MANAGER/RECEPTIONIST) —
-    // STAFF should never see it.
-    await expect(page.getByText('New Task')).not.toBeVisible();
+    // STAFF should never see it. Scoped to the button role (not getByText)
+    // so an unrelated toast/badge that happens to contain the same words
+    // can never trip a strict-mode multi-match here either.
+    await expect(page.getByRole('button', { name: /New Task/i })).not.toBeVisible();
   });
 });
 
@@ -308,9 +310,13 @@ test.describe('CHEF role', () => {
     await page.goto('/dashboard/orders');
     // Kitchen Display has "Kitchen Display" heading
     await expect(page.getByText('Kitchen Display')).toBeVisible({ timeout: 8000 });
-    // Should NOT see "New Order" button — Kitchen Display is a distinct,
-    // read/act-only view with no order-creation control.
-    await expect(page.getByText('New Order')).not.toBeVisible();
+    // Should NOT see a "New Order" button — Kitchen Display is a distinct,
+    // read/act-only view with no order-creation control. getByText('New
+    // Order') is case-insensitive substring matching, which also caught a
+    // live "🔔 New order received!" toast and a "NEW ORDER" status badge on
+    // this real-time page (confirmed failing in CI) — neither is the create
+    // button in question, so scope to the button role instead.
+    await expect(page.getByRole('button', { name: /New Order/i })).not.toBeVisible();
   });
 
   test('Kitchen Display shows live clock', async ({ page }) => {
