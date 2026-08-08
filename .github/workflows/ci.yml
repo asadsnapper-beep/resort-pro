@@ -369,10 +369,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: '20'
+          cache: 'pnpm'
 
       - name: Check for design system regressions
         run: node scripts/design-system-ratchet.mjs

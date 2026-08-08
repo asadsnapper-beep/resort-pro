@@ -119,8 +119,8 @@ async function main() {
   // ── Staff Records ─────────────────────────────────────────────────────────────
   await prisma.staff.upsert({ where: { userId: demoOwner.id }, update: {}, create: { tenantId: demo.id, userId: demoOwner.id, department: StaffDepartment.MANAGEMENT, position: 'Resort Owner', hireDate: new Date('2022-01-01') } });
   await prisma.staff.upsert({ where: { userId: demoManager.id }, update: {}, create: { tenantId: demo.id, userId: demoManager.id, department: StaffDepartment.MANAGEMENT, position: 'General Manager', hireDate: new Date('2022-03-15') } });
-  await prisma.staff.upsert({ where: { userId: demoStaff1.id }, update: {}, create: { tenantId: demo.id, userId: demoStaff1.id, department: StaffDepartment.FRONT_DESK, position: 'Senior Receptionist', hireDate: new Date('2022-06-01') } });
-  await prisma.staff.upsert({ where: { userId: demoStaff2.id }, update: {}, create: { tenantId: demo.id, userId: demoStaff2.id, department: StaffDepartment.HOUSEKEEPING, position: 'Housekeeping Supervisor', hireDate: new Date('2023-01-10') } });
+  const staff1 = await prisma.staff.upsert({ where: { userId: demoStaff1.id }, update: {}, create: { tenantId: demo.id, userId: demoStaff1.id, department: StaffDepartment.FRONT_DESK, position: 'Senior Receptionist', hireDate: new Date('2022-06-01') } });
+  const staff2 = await prisma.staff.upsert({ where: { userId: demoStaff2.id }, update: {}, create: { tenantId: demo.id, userId: demoStaff2.id, department: StaffDepartment.HOUSEKEEPING, position: 'Housekeeping Supervisor', hireDate: new Date('2023-01-10') } });
   console.log('✅ Staff records');
 
   // ── Rooms ────────────────────────────────────────────────────────────────────
@@ -336,7 +336,12 @@ async function main() {
       data: {
         tenantId:      demo.id,
         roomId:        createdRooms[hk.r].id,
-        assignedToId:  demoStaff2.id,
+        // HousekeepingTask.assignedToId is a Staff FK, not a User FK — using
+        // demoStaff2.id (the User id) here violated the FK constraint on any
+        // fresh DB where housekeeping_tasks didn't already have stale rows
+        // from before this bug (this is what broke CI's E2E job, which seeds
+        // against a brand-new database every run).
+        assignedToId:  staff2.id,
         type:          hk.type,
         status:        hk.status,
         notes:         hk.notes,
