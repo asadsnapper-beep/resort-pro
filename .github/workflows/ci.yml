@@ -279,7 +279,7 @@ jobs:
 
       - name: Wait for servers to be ready
         run: |
-          npx wait-on http://localhost:4000/api/health http://localhost:3000 --timeout 60000
+          npx wait-on http://localhost:4000/health http://localhost:3000 --timeout 60000
 
       - name: Install Playwright browsers
         working-directory: apps/web
