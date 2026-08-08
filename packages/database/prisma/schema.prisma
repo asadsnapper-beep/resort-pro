@@ -792,8 +792,8 @@ model Booking {
 
   // Relations
   tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  room             Room              @relation(fields: [roomId], references: [id])
-  guest            Guest             @relation(fields: [guestId], references: [id])
+  room             Room              @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  guest            Guest             @relation(fields: [guestId], references: [id], onDelete: Cascade)
   group            GroupBooking?     @relation(fields: [groupId], references: [id], onDelete: SetNull)
   corporateAccount CorporateAccount? @relation(fields: [corporateAccountId], references: [id], onDelete: SetNull)
   corporateInvoice CorporateInvoice? @relation(fields: [corporateInvoiceId], references: [id], onDelete: SetNull)
@@ -900,7 +900,7 @@ model Payment {
   updatedAt   DateTime  @updatedAt
 
   tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  booking Booking? @relation(fields: [bookingId], references: [id])
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
   @@index([bookingId])
@@ -1356,8 +1356,8 @@ model HousekeepingTask {
 
   // Relations
   tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  room       Room   @relation(fields: [roomId], references: [id])
-  assignedTo Staff? @relation(fields: [assignedToId], references: [id])
+  room       Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  assignedTo Staff? @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
   @@index([scheduledDate])
@@ -1427,7 +1427,7 @@ model MinibarConsumption {
   tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   room        Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
   booking     Booking?    @relation(fields: [bookingId], references: [id], onDelete: SetNull)
-  minibarItem MinibarItem @relation(fields: [minibarItemId], references: [id])
+  minibarItem MinibarItem @relation(fields: [minibarItemId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([roomId])
@@ -1512,9 +1512,9 @@ model FoodOrder {
   updatedAt         DateTime       @updatedAt
 
   tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  booking         Booking?         @relation(fields: [bookingId], references: [id])
-  guest           Guest?           @relation(fields: [guestId], references: [id])
-  restaurantTable RestaurantTable? @relation(fields: [restaurantTableId], references: [id])
+  booking         Booking?         @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  guest           Guest?           @relation(fields: [guestId], references: [id], onDelete: SetNull)
+  restaurantTable RestaurantTable? @relation(fields: [restaurantTableId], references: [id], onDelete: SetNull)
   items           FoodOrderItem[]
 
   @@index([tenantId])
@@ -1551,7 +1551,7 @@ model FoodOrderItem {
   notes      String?
 
   order    FoodOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  menuItem MenuItem  @relation(fields: [menuItemId], references: [id])
+  menuItem MenuItem  @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
 
   @@map("food_order_items")
 }
@@ -1741,7 +1741,7 @@ model InventoryMovement {
   createdAt       DateTime @default(now())
 
   tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([inventoryItemId])
@@ -1783,7 +1783,7 @@ model PurchaseOrder {
   updatedAt  DateTime  @updatedAt
 
   tenant Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  vendor Vendor              @relation(fields: [vendorId], references: [id])
+  vendor Vendor              @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   items  PurchaseOrderItem[]
 
   @@index([tenantId])
@@ -1799,7 +1799,7 @@ model PurchaseOrderItem {
   unitCost         Float
 
   purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
 
   @@index([purchaseOrderId])
   @@map("purchase_order_items")
@@ -1886,9 +1886,9 @@ model SupportTicket {
   updatedAt      DateTime       @updatedAt
 
   tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  guest      Guest?        @relation(fields: [guestId], references: [id])
-  assignedTo User?         @relation("AssignedTickets", fields: [assignedToId], references: [id])
-  booking    Booking?      @relation(fields: [bookingId], references: [id])
+  guest      Guest?        @relation(fields: [guestId], references: [id], onDelete: SetNull)
+  assignedTo User?         @relation("AssignedTickets", fields: [assignedToId], references: [id], onDelete: SetNull)
+  booking    Booking?      @relation(fields: [bookingId], references: [id], onDelete: SetNull)
   messages   ChatMessage[]
 
   @@index([tenantId])
@@ -1908,7 +1908,7 @@ model ChatMessage {
   createdAt     DateTime       @default(now())
 
   ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  sender User          @relation(fields: [senderId], references: [id])
+  sender User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([ticketId])
   @@map("chat_messages")
@@ -2181,7 +2181,7 @@ model Campaign {
   updatedAt      DateTime       @updatedAt
 
   tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  template EmailTemplate? @relation(fields: [templateId], references: [id])
+  template EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
   sends    EmailSend[]
   stats    CampaignStats?
 
@@ -2226,8 +2226,8 @@ model EmailSend {
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   guest        Guest         @relation(fields: [guestId], references: [id], onDelete: Cascade)
-  campaign     Campaign?     @relation(fields: [campaignId], references: [id])
-  sequenceStep SequenceStep? @relation(fields: [sequenceStepId], references: [id])
+  campaign     Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  sequenceStep SequenceStep? @relation(fields: [sequenceStepId], references: [id], onDelete: SetNull)
   clicks       EmailClick[]
 
   @@index([tenantId])
@@ -2310,7 +2310,7 @@ model SequenceStep {
   updatedAt  DateTime @updatedAt
 
   sequence Sequence       @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
-  template EmailTemplate? @relation(fields: [templateId], references: [id])
+  template EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
   sends    EmailSend[]
 
   @@index([sequenceId])
