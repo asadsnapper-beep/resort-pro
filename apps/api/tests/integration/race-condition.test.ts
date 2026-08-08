@@ -34,7 +34,9 @@ beforeAll(async () => {
     },
   });
   expect(reg.statusCode).toBe(201);
-  ownerToken = JSON.parse(reg.body).data.token;
+  const regBody = JSON.parse(reg.body);
+  ownerToken = regBody.data.token;
+  await prisma.tenant.update({ where: { id: regBody.data.tenant.id }, data: { planStatus: 'active', plan: 'ENTERPRISE' } });
 
   const roomRes = await app.inject({
     method: 'POST', url: '/api/rooms',

@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildApp } from '../../src/app';
 import { prisma } from '@resort-pro/database';
+import { applyPlanFlagsToTenant } from '../../src/utils/entitlement';
 import type { FastifyInstance } from 'fastify';
 
 let app: FastifyInstance;
@@ -29,6 +30,8 @@ beforeAll(async () => {
   const regBody = JSON.parse(reg.body);
   tokens.OWNER = regBody.data.token;
   tenantId = regBody.data.tenant.id;
+  await prisma.tenant.update({ where: { id: tenantId }, data: { planStatus: 'active', plan: 'ENTERPRISE' } });
+  await applyPlanFlagsToTenant(tenantId, 'ENTERPRISE');
 
   // 2. Create users for each role directly in DB (faster than invite flow)
   const bcrypt = await import('bcryptjs');

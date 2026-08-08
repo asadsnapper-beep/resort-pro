@@ -10,6 +10,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildApp } from '../../src/app';
 import { prisma } from '@resort-pro/database';
+import { applyPlanFlagsToTenant } from '../../src/utils/entitlement';
 import type { FastifyInstance } from 'fastify';
 
 let app: FastifyInstance;
@@ -62,6 +63,9 @@ beforeAll(async () => {
   const bodyB = JSON.parse(regB.body);
   tokenB = bodyB.data.token;
   tenantBId = bodyB.data.tenant.id;
+  await prisma.tenant.updateMany({ where: { id: { in: [tenantAId, tenantBId] } }, data: { planStatus: 'active', plan: 'ENTERPRISE' } });
+  await applyPlanFlagsToTenant(tenantAId, 'ENTERPRISE');
+  await applyPlanFlagsToTenant(tenantBId, 'ENTERPRISE');
 
   // Tenant A creates a room
   const roomRes = await app.inject({

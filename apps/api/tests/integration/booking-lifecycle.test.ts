@@ -41,6 +41,7 @@ beforeAll(async () => {
   const body = JSON.parse(reg.body);
   ownerToken = body.data.token;
   tenantId = body.data.tenant.id;
+  await prisma.tenant.update({ where: { id: tenantId }, data: { planStatus: 'active', plan: 'ENTERPRISE' } });
 }, 15000);
 
 afterAll(async () => {
