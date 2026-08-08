@@ -50,7 +50,7 @@ async function attachDemand(db: TenantScopedPrisma, items: ItemWithDemand[]): Pr
 
 // Notify OWNER/MANAGER users the first time an item crosses from above-minimum to at/below-minimum.
 async function notifyIfCrossedLowStock(
-  db: TenantScopedPrisma,
+  db: any,
   item: { id: string; name: string; minimumStock: unknown; unit: string },
   prevStock: number,
   newStock: number,
@@ -58,7 +58,7 @@ async function notifyIfCrossedLowStock(
   const minimum = Number(item.minimumStock);
   if (!(prevStock > minimum && newStock <= minimum)) return;
   const recipients = await db.user.findMany({ where: { role: { in: ['OWNER', 'MANAGER'] } }, select: { id: true } });
-  await Promise.all(recipients.map((u) =>
+  await Promise.all(recipients.map((u: { id: string }) =>
     db.notification.create({
       data: {
         userId: u.id,

@@ -889,7 +889,7 @@ export async function tenantRoutes(app: FastifyInstance) {
       }
 
       const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { roomTypeLabels: true } });
-      const current = { ...(tenant?.roomTypeLabels ?? {}) } as Record<string, string>;
+      const current = { ...((tenant?.roomTypeLabels as Record<string, any>) ?? {}) } as Record<string, string>;
       delete current[type];
       await prisma.tenant.update({ where: { id: tenantId }, data: { roomTypeLabels: current } });
 

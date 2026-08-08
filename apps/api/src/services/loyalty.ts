@@ -102,7 +102,7 @@ export async function awardCheckoutPoints(bookingId: string) {
     booking.tenantId,
     booking.guestId,
     points,
-    `Stay: ${booking.room ? '' : ''}${nights} night${nights !== 1 ? 's' : ''} · Booking ${booking.confirmationNo}`,
+    `Stay: ${nights} night${nights !== 1 ? 's' : ''} · Booking ${booking.confirmationNo}`,
     bookingId,
   );
 

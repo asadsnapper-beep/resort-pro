@@ -91,7 +91,7 @@ export async function websiteRoutes(app: FastifyInstance) {
       const content = await db.websiteContent.upsert({
         where: { tenantId },
         update: body,
-        create: { tenantId, heroTitle: body.heroTitle, ...body },
+        create: { tenantId, ...body },
       });
       return ok(content, 'Website updated');
     },

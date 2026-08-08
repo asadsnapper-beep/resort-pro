@@ -127,7 +127,7 @@ export async function ticketRoutes(app: FastifyInstance) {
           select: { telegramBotToken: true, waApiToken: true, waPhoneNumberId: true, waEnabled: true },
         });
         if (tenant) {
-          const staffName = [chatMessage.sender?.firstName, chatMessage.sender?.lastName].filter(Boolean).join(' ') || 'Staff';
+          const staffName = [(chatMessage as any).sender?.firstName, (chatMessage as any).sender?.lastName].filter(Boolean).join(' ') || 'Staff';
           forwardReplyToChannel(ticket, tenant, message, staffName).catch((err) =>
             console.warn('[tickets] forwardReplyToChannel error:', err?.message),
           );

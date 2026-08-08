@@ -26,7 +26,7 @@ export async function guestDocumentRoutes(app: FastifyInstance) {
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { db } = request;
-      const { tenantId, id: uploadedBy } = request.user as JwtPayload;
+      const { tenantId, sub: uploadedBy } = request.user as JwtPayload;
       const { id: guestId } = request.params;
 
       // Verify guest belongs to tenant

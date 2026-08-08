@@ -9,7 +9,7 @@ export async function chatRoutes(app: FastifyInstance) {
     schema: { hide: true },
     websocket: true,
     preHandler: requireAuth,
-    handler: async (socket, request) => {
+    handler: async (socket: any, request: any) => {
       const { db } = request;
       const { sub: userId } = request.user as JwtPayload;
       const { ticketId } = request.params as { ticketId: string };
@@ -21,7 +21,7 @@ export async function chatRoutes(app: FastifyInstance) {
         return;
       }
 
-      socket.on('message', async (rawMessage) => {
+      socket.on('message', async (rawMessage: any) => {
         try {
           const { message } = JSON.parse(rawMessage.toString());
           if (!message?.trim()) return;

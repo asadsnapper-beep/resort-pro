@@ -105,7 +105,7 @@ export async function anonymizeTenant(tenantId: string): Promise<AnonymizeResult
         data: {
           firstName:   'Deleted',
           lastName:    'Guest',
-          email:       g.email ? anonEmail(g.email) : null,
+          email:       anonEmail(g.email),
           phone:       null,
           address:     null,
           nationality: null,

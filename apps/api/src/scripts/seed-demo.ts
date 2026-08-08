@@ -156,7 +156,7 @@ async function main() {
     { name: 'Early Bird (30 days)',description: 'Book 30 days ahead and save 10%.',                                      multiplier: 0.90, minNights: 2, isActive: true },
   ];
   for (const rp of ratePlans) {
-    await prisma.ratePlan.create({ data: { tenantId: demo.id, ...rp } }).catch(() => {});
+    await prisma.ratePlan.create({ data: { tenantId: demo.id, price: 0, ...rp } }).catch(() => {});
   }
   console.log('✅ Rate plans');
 
@@ -362,11 +362,10 @@ async function main() {
       data: {
         tenantId:    demo.id,
         roomId:      createdRooms[mt.r].id,
-        reportedById: demoStaff1.id,
+        createdBy:   demoStaff1.id,
         issueType:   mt.type,
         priority:    mt.priority,
         status:      mt.status,
-        title:       mt.title,
         description: mt.desc,
         resolvedAt:  mt.status === MaintenanceStatus.RESOLVED ? d(-1) : null,
       },
@@ -390,12 +389,11 @@ async function main() {
         tenantId:    demo.id,
         guestId:     createdGuests[t.g].id,
         assignedToId: demoStaff1.id,
-        subject:     t.subject,
-        message:     t.msg,
+        title:       t.subject,
+        description: t.msg,
         priority:    t.priority,
         status:      t.status,
         category:    t.category,
-        roomNumber:  createdRooms[t.g % createdRooms.length].number,
         resolvedAt:  t.status === TicketStatus.RESOLVED ? d(-1) : null,
       },
     }).catch(() => {});
@@ -429,20 +427,19 @@ async function main() {
     if (bk.status === BookingStatus.CANCELLED) continue;
     const item1 = menuItems2[i % menuItems2.length];
     const item2 = menuItems2[(i + 2) % menuItems2.length];
-    const total = item1.price + item2.price;
+    const total = Number(item1.price) + Number(item2.price);
     await prisma.foodOrder.create({
       data: {
         tenantId:   demo.id,
         bookingId:  bk.id,
         guestId:    bk.guestId,
-        roomId:     bk.roomId,
         status:     foodOrderStatuses[i] as any,
         totalAmount: total,
         notes:      i % 2 === 0 ? 'No spicy please' : 'Extra sauce on side',
         items: {
           create: [
-            { menuItemId: item1.id, quantity: 1, unitPrice: item1.price, totalPrice: item1.price, notes: '' },
-            { menuItemId: item2.id, quantity: 1, unitPrice: item2.price, totalPrice: item2.price, notes: '' },
+            { menuItemId: item1.id, quantity: 1, unitPrice: item1.price, notes: '' },
+            { menuItemId: item2.id, quantity: 1, unitPrice: item2.price, notes: '' },
           ],
         },
       },
@@ -475,7 +472,7 @@ async function main() {
     { description: 'Staff Salary — March',         amount: 275000, category: 'SALARIES',      date: d(-63), isPaid: true },
   ];
   for (const e of expenses) {
-    await prisma.expense.create({ data: { tenantId: demo.id, ...e } }).catch(() => {});
+    await prisma.expense.create({ data: { tenantId: demo.id, createdBy: demoStaff1.id, ...e as any } }).catch(() => {});
   }
   console.log(`✅ ${expenses.length} expenses`);
 
@@ -504,7 +501,7 @@ async function main() {
   const createdTags: any[] = [];
   for (const name of tagNames) {
     const t = await prisma.guestTag.create({
-      data: { tenantId: demo.id, name, color: name === 'VIP' ? '#gold' : '#3b82f6', description: `${name} guest category` },
+      data: { tenantId: demo.id, name, color: name === 'VIP' ? '#gold' : '#3b82f6' },
     }).catch(() => null);
     if (t) createdTags.push(t);
   }
@@ -540,9 +537,7 @@ async function main() {
         tenantId:      demo.id,
         guestId:       createdGuests[i].id,
         totalStays:    i < 4 ? Math.floor(Math.random() * 5) + 1 : 1,
-        totalSpent:    [13500, 22500, 30000, 28500, 120000, 28500, 48000, 120000, 11400, 84000][i] ?? 10000,
-        averageRating: [4.8, 4.5, 5.0, 4.2, 4.7, 4.9, 5.0, 4.6, 4.3, 4.8][i] ?? 4.5,
-        lifetimeValue: [27000, 22500, 30000, 28500, 120000, 57000, 48000, 120000, 11400, 84000][i] ?? 10000,
+        totalSpend:    [13500, 22500, 30000, 28500, 120000, 28500, 48000, 120000, 11400, 84000][i] ?? 10000,
       },
     }).catch(() => {});
   }
@@ -588,7 +583,6 @@ async function main() {
         data: {
           tenantId:      demo.id,
           guestId:       createdGuests[i].id,
-          programId:     lp.id,
           points,
           tier:          points >= 50000 ? 'PLATINUM' : points >= 15000 ? 'GOLD' : points >= 5000 ? 'SILVER' : 'BRONZE',
           lifetimePoints:points + Math.floor(points * 0.2),
@@ -702,17 +696,13 @@ async function main() {
     await prisma.groupBooking.create({
       data: {
         tenantId:      demo.id,
-        groupName:     'Dhaka Corporate Retreat — TechCorp BD',
+        name:          'Dhaka Corporate Retreat — TechCorp BD',
         contactName:   'Tanvir Islam',
         contactEmail:  'tanvir@example.com',
         contactPhone:  '+8801311111116',
         checkIn:       d(15),
         checkOut:      d(18),
-        roomCount:     4,
-        totalGuests:   8,
         status:        'CONFIRMED' as any,
-        totalAmount:   120000,
-        paidAmount:    60000,
         notes:         'Corporate team-building event. Meeting room required on Day 1 and Day 2.',
       },
     }).catch(() => {});
