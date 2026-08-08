@@ -4,10 +4,13 @@ import { useAuthStore } from '@/store/auth';
 import { Sparkles, X, ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
+import { useLocale } from 'next-intl';
 
 export function DemoBanner() {
   const { tenant } = useAuthStore();
   const [dismissed, setDismissed] = useState(false);
+  const locale = useLocale();
+  const isBn = locale === 'bn';
 
   if (!tenant?.isDemo || dismissed) return null;
 
@@ -21,10 +24,12 @@ export function DemoBanner() {
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-semibold" style={{ color: '#7a5c2a' }}>
-            You&apos;re exploring the ResortPro Demo
+            {isBn ? 'আপনি ResortPro ডেমো দেখছেন' : "You're exploring the ResortPro Demo"}
           </p>
           <p className="text-[12px] mt-0.5" style={{ color: '#b89040' }}>
-            এটি একটি demo environment — সব data sample। আপনার real resort manage করতে sign up করুন।
+            {isBn
+              ? 'এটি একটি demo environment — সব data sample। আপনার real resort manage করতে sign up করুন।'
+              : 'This is a demo environment with sample data. Sign up to manage your real resort.'}
           </p>
         </div>
         {/* Dismiss sits beside the text on mobile so it's always reachable */}

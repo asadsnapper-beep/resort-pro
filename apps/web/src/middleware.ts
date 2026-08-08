@@ -56,11 +56,7 @@ function isInternalPath(pathname: string): boolean {
 function detectLocale(request: NextRequest): string | null {
   // 1. User manually set locale cookie — respect it
   const cookieLocale = request.cookies.get('locale')?.value;
-  if (cookieLocale === 'en' || cookieLocale === 'bn') return null; // already set, no override
-
-  // 2. No cookie yet → check Cloudflare country header
-  const country = request.headers.get('CF-IPCountry') ?? request.headers.get('cf-ipcountry');
-  if (country === 'BD') return 'bn';
+  if (cookieLocale === 'en' || cookieLocale === 'bn') return null;
 
   return null; // default 'en'
 }

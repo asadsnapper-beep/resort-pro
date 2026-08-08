@@ -20,19 +20,19 @@ const TIERS = [
   {
     id: 'branding',
     name: 'Branding polish',
-    from: '৳১০,০০০',
+    from: '৳10,000',
     blurb: 'Your colours, logo, fonts and copy tuned into an existing theme.',
   },
   {
     id: 'custom',
     name: 'Custom design',
-    from: '৳৪০,০০০',
+    from: '৳40,000',
     blurb: 'A completely unique website, designed for your resort alone.',
   },
   {
     id: 'premium',
     name: 'Premium',
-    from: '৳৮০,০০০',
+    from: '৳80,000',
     blurb: 'Custom animation and bespoke interactions, built in code.',
   },
 ] as const;
@@ -311,7 +311,7 @@ export function CustomDesignCta({ onClick }: { onClick: () => void }) {
           Want something nobody else has?
         </span>
         <span className="mt-0.5 block text-rp-meta text-rp-muted">
-          We can design a website just for your resort — from ৳১০,০০০.
+          We can design a website just for your resort — from ৳10,000.
         </span>
       </span>
     </button>
