@@ -381,13 +381,18 @@ export default function BanglaHomePage() {
             {/* Language switcher */}
             <Link
               href="/"
-              className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors ${
+              onClick={() => {
+                document.cookie = 'locale=en; path=/; max-age=31536000; SameSite=Lax';
+              }}
+              className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors ${
                 scrolled
                   ? 'border-gray-200 text-gray-500 hover:text-resort-700 hover:border-resort-300'
                   : 'border-white/20 text-white/60 hover:text-white hover:border-white/40'
               }`}
+              title="Switch to English"
             >
-              EN
+              <span>🇬🇧</span>
+              <span>EN</span>
             </Link>
             <Link
               href="/auth/login"

@@ -232,6 +232,17 @@ export default function HomePage() {
           </div>
 
           <div className="hidden items-center gap-6 lg:flex">
+            <Link
+              href="/bn"
+              onClick={() => {
+                document.cookie = 'locale=bn; path=/; max-age=31536000; SameSite=Lax';
+              }}
+              className="flex items-center gap-1.5 rounded-lg border border-[#183153]/20 px-3 py-1.5 text-xs font-bold text-[#183153] transition-all hover:bg-[#183153]/5"
+              title="Switch to বাংলা"
+            >
+              <span className="text-sm">🇧🇩</span>
+              <span>বাংলা</span>
+            </Link>
             <Link href="/auth/login" className="text-sm font-bold">
               Log in
             </Link>
@@ -266,7 +277,17 @@ export default function HomePage() {
                   {link.label}
                 </a>
               ))}
-              <div className="mt-2 flex gap-3">
+              <div className="mt-2 flex items-center gap-3">
+                <Link
+                  href="/bn"
+                  onClick={() => {
+                    document.cookie = 'locale=bn; path=/; max-age=31536000; SameSite=Lax';
+                  }}
+                  className="flex items-center gap-1.5 border-2 border-[#183153] px-3 py-2 text-xs font-bold"
+                >
+                  <span>🇧🇩</span>
+                  <span>বাংলা</span>
+                </Link>
                 <Link
                   href="/auth/login"
                   className="border-2 border-[#183153] px-4 py-2.5 text-sm font-bold"
