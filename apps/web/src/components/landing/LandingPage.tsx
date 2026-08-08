@@ -397,7 +397,16 @@ export function LandingPage({ isBn = false }: { isBn?: boolean }) {
             ))}
           </div>
         </div>
-        <AvailabilityBoard isBn={isBn} />
+        <div className="relative min-w-0 border-2 border-[#183153] bg-white p-2 shadow-[8px_8px_0_#183153] sm:p-3">
+          <Image
+            src="/brand/hero-dashboard-preview.png"
+            alt="ResortPro Dashboard Preview"
+            width={1200}
+            height={675}
+            priority
+            className="h-auto w-full border border-[#183153]/20 object-cover"
+          />
+        </div>
       </section>
 
       <section className="border-y-2 border-[#183153] bg-white">
