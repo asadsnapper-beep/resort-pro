@@ -8,6 +8,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildApp } from '../../src/app';
 import { prisma } from '@resort-pro/database';
+import { verifyOwnerAndLogin } from '../helpers/auth';
 import type { FastifyInstance } from 'fastify';
 
 let app: FastifyInstance;
@@ -35,7 +36,12 @@ beforeAll(async () => {
   });
   expect(reg.statusCode).toBe(201);
   const regBody = JSON.parse(reg.body);
-  ownerToken = regBody.data.token;
+  ownerToken = await verifyOwnerAndLogin(app, {
+    tenantId: regBody.data.tenant.id,
+    email: `race-${slug}@test.com`,
+    password,
+    slug,
+  });
   await prisma.tenant.update({ where: { id: regBody.data.tenant.id }, data: { planStatus: 'active', plan: 'ENTERPRISE' } });
 
   const roomRes = await app.inject({

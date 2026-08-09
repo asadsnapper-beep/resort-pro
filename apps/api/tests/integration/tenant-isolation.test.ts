@@ -11,6 +11,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildApp } from '../../src/app';
 import { prisma } from '@resort-pro/database';
 import { applyPlanFlagsToTenant } from '../../src/utils/entitlement';
+import { verifyOwnerAndLogin } from '../helpers/auth';
 import type { FastifyInstance } from 'fastify';
 
 let app: FastifyInstance;
@@ -44,12 +45,18 @@ beforeAll(async () => {
   });
   expect(regA.statusCode).toBe(201);
   const bodyA = JSON.parse(regA.body);
-  tokenA = bodyA.data.token;
   tenantAId = bodyA.data.tenant.id;
+  tokenA = await verifyOwnerAndLogin(app, {
+    tenantId: tenantAId,
+    email: `alice-${slugA}@test.com`,
+    password,
+    slug: slugA,
+  });
 
   // Register Tenant B
   const regB = await app.inject({
     method: 'POST', url: '/api/auth/register',
+    remoteAddress: '127.0.0.2',
     payload: {
       resortName: 'Resort Beta',
       slug: slugB,
@@ -61,8 +68,13 @@ beforeAll(async () => {
   });
   expect(regB.statusCode).toBe(201);
   const bodyB = JSON.parse(regB.body);
-  tokenB = bodyB.data.token;
   tenantBId = bodyB.data.tenant.id;
+  tokenB = await verifyOwnerAndLogin(app, {
+    tenantId: tenantBId,
+    email: `bob-${slugB}@test.com`,
+    password,
+    slug: slugB,
+  });
   await prisma.tenant.updateMany({ where: { id: { in: [tenantAId, tenantBId] } }, data: { planStatus: 'active', plan: 'ENTERPRISE' } });
   await applyPlanFlagsToTenant(tenantAId, 'ENTERPRISE');
   await applyPlanFlagsToTenant(tenantBId, 'ENTERPRISE');

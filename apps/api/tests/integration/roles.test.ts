@@ -6,6 +6,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildApp } from '../../src/app';
 import { prisma } from '@resort-pro/database';
 import { applyPlanFlagsToTenant } from '../../src/utils/entitlement';
+import { verifyOwnerAndLogin } from '../helpers/auth';
 import type { FastifyInstance } from 'fastify';
 
 let app: FastifyInstance;
@@ -28,8 +29,13 @@ beforeAll(async () => {
   });
   expect(reg.statusCode).toBe(201);
   const regBody = JSON.parse(reg.body);
-  tokens.OWNER = regBody.data.token;
   tenantId = regBody.data.tenant.id;
+  tokens.OWNER = await verifyOwnerAndLogin(app, {
+    tenantId,
+    email: `owner-${slug}@test.com`,
+    password,
+    slug,
+  });
   await prisma.tenant.update({ where: { id: tenantId }, data: { planStatus: 'active', plan: 'ENTERPRISE' } });
   await applyPlanFlagsToTenant(tenantId, 'ENTERPRISE');
 

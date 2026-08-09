@@ -11,6 +11,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildApp } from '../../src/app';
 import { prisma } from '@resort-pro/database';
+import { verifyOwnerAndLogin } from '../helpers/auth';
 import type { FastifyInstance } from 'fastify';
 
 let app: FastifyInstance;
@@ -39,8 +40,13 @@ beforeAll(async () => {
   });
   expect(reg.statusCode).toBe(201);
   const body = JSON.parse(reg.body);
-  ownerToken = body.data.token;
   tenantId = body.data.tenant.id;
+  ownerToken = await verifyOwnerAndLogin(app, {
+    tenantId,
+    email: `owner-${slug}@test.com`,
+    password,
+    slug,
+  });
   await prisma.tenant.update({ where: { id: tenantId }, data: { planStatus: 'active', plan: 'ENTERPRISE' } });
 }, 15000);
 

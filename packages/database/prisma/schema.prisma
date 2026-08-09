@@ -529,6 +529,9 @@ model User {
   avatarUrl    String?
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime?
+  // Existing/invited staff are trusted by default. Public resort signup
+  // explicitly writes null until the owner clicks the verification link.
+  emailVerifiedAt DateTime? @default(now())
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -540,12 +543,27 @@ model User {
   notifications       Notification[]
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
   shareholderProfile  ShareholderProfile?
   tenantDeletionRequests TenantDeletionRequest[] @relation("TenantDeletionRequests")
 
   @@unique([tenantId, email])
   @@index([tenantId])
   @@map("users")
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verification_tokens")
 }
 
 model RefreshToken {

@@ -7,8 +7,7 @@ import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { authApi, billingApi } from '@/lib/api';
-import { useAuthStore } from '@/store/auth';
+import { authApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
@@ -28,6 +27,10 @@ const schema = z.object({
   lastName: z.string().min(1, 'Last name required'),
   email: z.string().email('Valid email required'),
   password: z.string().min(8, 'At least 8 characters').regex(/(?=.*[A-Z])/, 'Must contain uppercase').regex(/(?=.*[0-9])/, 'Must contain a number'),
+  confirmPassword: z.string().min(1, 'Please confirm your password'),
+}).refine((data) => data.password === data.confirmPassword, {
+  path: ['confirmPassword'],
+  message: 'Passwords do not match',
 });
 
 type FormData = z.infer<typeof schema>;
@@ -35,7 +38,6 @@ type FormData = z.infer<typeof schema>;
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { setAuth } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [referralCode, setReferralCode] = useState('');
   const [referrerName, setReferrerName] = useState('');
@@ -113,27 +115,18 @@ function RegisterForm() {
     setLoading(true);
     try {
       const res = await authApi.register({
-        ...(data as Required<typeof data>),
+        resortName: data.resortName,
+        slug: data.slug,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        password: data.password,
         ...(referralCode && { referralCode }),
         plan: selectedPlan,
       });
-      const { user, tenant, token, refreshToken } = res.data.data;
-      setAuth(user, tenant, token, refreshToken);
-      if (tenant.planStatus === 'trialing') {
-        toast({ title: 'Resort created!', description: 'Your launch offer is active—let’s set up your workspace.' });
-        router.push('/onboarding');
-        return;
-      }
-      toast({ title: 'Resort created!', description: 'Taking you to secure checkout…' });
-      try {
-        const checkout = await billingApi.createCheckout(selectedPlan);
-        window.location.assign(checkout.data.data.url);
-      } catch (checkoutError: unknown) {
-        const message = (checkoutError as { response?: { data?: { error?: string } } })?.response?.data?.error
-          || 'Your account was created, but secure checkout could not start.';
-        toast({ title: 'Checkout needs attention', description: message, variant: 'destructive' });
-        router.push('/dashboard/upgrade');
-      }
+      const pending = res.data.data;
+      toast({ title: 'Check your email', description: 'Verify your email to continue setting up your resort.' });
+      router.push(`/auth/verify-email?email=${encodeURIComponent(pending.email)}&workspace=${encodeURIComponent(pending.slug)}`);
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status;
       const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Registration failed';
@@ -283,6 +276,12 @@ function RegisterForm() {
               <Input {...register('password')} type="password" placeholder="••••••••" className="border-white/10 bg-white/10 text-white placeholder:text-white/30 focus-visible:ring-gold-500" />
               {errors.password && <p className="mt-1 text-xs text-red-400">{errors.password.message}</p>}
               <p className="mt-1 text-xs text-white/40">Min. 8 chars, one uppercase, one number</p>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-white/80">Confirm password</label>
+              <Input {...register('confirmPassword')} type="password" placeholder="Repeat your password" className="border-white/10 bg-white/10 text-white placeholder:text-white/30 focus-visible:ring-gold-500" />
+              {errors.confirmPassword && <p className="mt-1 text-xs text-red-400">{errors.confirmPassword.message}</p>}
             </div>
 
             <Button type="submit" variant="gold" size="lg" className="w-full mt-2" loading={loading}>

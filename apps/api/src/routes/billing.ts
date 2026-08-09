@@ -100,6 +100,17 @@ function getPlatformBkash(): BkashConfig | null {
 async function requireAuth(request: any, reply: any) {
   try {
     await request.jwtVerify();
+    const user = await prisma.user.findUnique({
+      where: { id: request.user.sub },
+      select: { emailVerifiedAt: true, isActive: true, tenantId: true },
+    });
+    if (!user || !user.isActive || !user.emailVerifiedAt || user.tenantId !== request.user.tenantId) {
+      return reply.status(403).send({
+        success: false,
+        error: 'Verify your email before continuing.',
+        code: 'EMAIL_VERIFICATION_REQUIRED',
+      });
+    }
   } catch {
     return reply.status(401).send({ success: false, error: 'Unauthorized' });
   }
@@ -110,6 +121,7 @@ export async function billingRoutes(app: FastifyInstance) {
   // GET /billing/status — current plan + subscription info
   app.get('/status', async (request, reply) => {
     await requireAuth(request, reply);
+    if (reply.sent) return;
     const { tenantId } = request.user as any;
 
     const tenant = await prisma.tenant.findUnique({
@@ -193,6 +205,7 @@ export async function billingRoutes(app: FastifyInstance) {
     '/checkout',
     async (request, reply) => {
       await requireAuth(request, reply);
+      if (reply.sent) return;
       const { tenantId } = request.user as any;
       const { planKey, interval = 'month' } = request.body;
 
@@ -210,7 +223,7 @@ export async function billingRoutes(app: FastifyInstance) {
 
       const tenant = await prisma.tenant.findUnique({
         where: { id: tenantId },
-        select: { name: true, email: true, billingEmail: true, stripeCustomerId: true, slug: true, plan: true, planStatus: true },
+        select: { name: true, email: true, billingEmail: true, stripeCustomerId: true, slug: true, plan: true, planStatus: true, onboardingCompletedAt: true },
       });
       if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
       if (!isSelfServeUpgrade(tenant.plan as PlanKey, tenant.planStatus, planKey)) {
@@ -234,12 +247,25 @@ export async function billingRoutes(app: FastifyInstance) {
         });
       }
 
+      // This endpoint serves two different moments: a brand-new tenant's
+      // very first checkout right after signup (planStatus is still the
+      // 'incomplete' state register() creates it with — nothing has ever
+      // been paid), and an existing tenant upgrading/resubscribing later.
+      // Signup now completes onboarding before checkout. Keep the fallback for
+      // older/in-flight accounts that have not completed the wizard yet.
+      const isFirstActivation = tenant.planStatus === 'incomplete';
+      const successUrl = isFirstActivation
+        ? tenant.onboardingCompletedAt
+          ? `${appUrl}/dashboard/billing?success=1&plan=${planKey}&interval=${interval}`
+          : `${appUrl}/onboarding?success=1&plan=${planKey}&interval=${interval}`
+        : `${appUrl}/dashboard/billing?success=1&plan=${planKey}&interval=${interval}`;
+
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
         mode: 'subscription',
         payment_method_types: ['card'],
         line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${appUrl}/dashboard/billing?success=1&plan=${planKey}&interval=${interval}`,
+        success_url: successUrl,
         cancel_url: `${appUrl}/dashboard/billing?canceled=1`,
         subscription_data: {
           metadata: { tenantId, planKey },
@@ -255,6 +281,7 @@ export async function billingRoutes(app: FastifyInstance) {
   // POST /billing/portal — Stripe customer portal (manage/cancel subscription)
   app.post('/portal', async (request, reply) => {
     await requireAuth(request, reply);
+    if (reply.sent) return;
     const { tenantId } = request.user as any;
 
     const tenant = await prisma.tenant.findUnique({
@@ -284,6 +311,7 @@ export async function billingRoutes(app: FastifyInstance) {
     '/checkout/bkash',
     async (request, reply) => {
       await requireAuth(request, reply);
+      if (reply.sent) return;
       const { tenantId } = request.user as any;
       const { planKey, interval = 'month' } = request.body;
 
@@ -365,6 +393,12 @@ export async function billingRoutes(app: FastifyInstance) {
         const days = interval === 'year' ? 365 : 30;
         const periodEnd = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
+        // Same "first activation → onboarding wizard, later upgrade → billing
+        // page" distinction as the Stripe /checkout path — captured before
+        // the update below flips planStatus to 'active'.
+        const before = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { planStatus: true, onboardingCompletedAt: true } });
+        const isFirstActivation = before?.planStatus === 'incomplete';
+
         await prisma.tenant.update({
           where: { id: tenantId },
           data: {
@@ -385,7 +419,12 @@ export async function billingRoutes(app: FastifyInstance) {
           linkPath: '/admin/billing',
         });
 
-        return reply.redirect(`${appUrl}/dashboard/billing?success=1&plan=${plan}&method=bkash`);
+        const redirectTarget = isFirstActivation
+          ? before?.onboardingCompletedAt
+            ? `${appUrl}/dashboard/billing?success=1&plan=${plan}&method=bkash`
+            : `${appUrl}/onboarding?success=1&plan=${plan}&method=bkash`
+          : `${appUrl}/dashboard/billing?success=1&plan=${plan}&method=bkash`;
+        return reply.redirect(redirectTarget);
       } catch (err: any) {
         request.log.error({ err }, 'bKash subscription callback failed');
         return fail('execute_failed');
@@ -396,6 +435,7 @@ export async function billingRoutes(app: FastifyInstance) {
   // GET /billing/invoices — list recent invoices
   app.get('/invoices', async (request, reply) => {
     await requireAuth(request, reply);
+    if (reply.sent) return;
     const { tenantId } = request.user as any;
 
     const tenant = await prisma.tenant.findUnique({

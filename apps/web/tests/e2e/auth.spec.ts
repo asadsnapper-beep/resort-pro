@@ -22,7 +22,8 @@ test.describe('Authentication', () => {
     await page.goto('/auth/register');
     await expect(page.getByText('Create your resort')).toBeVisible();
     await expect(page.getByPlaceholder('Palm Paradise Resort')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Create my resort' })).toBeVisible();
+    await expect(page.getByPlaceholder('Repeat your password')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Continue to secure checkout' })).toBeVisible();
   });
 
   test('slug auto-generates from resort name', async ({ page }) => {
@@ -34,7 +35,7 @@ test.describe('Authentication', () => {
 
   test('register shows validation errors on empty submit', async ({ page }) => {
     await page.goto('/auth/register');
-    await page.getByRole('button', { name: 'Create my resort' }).click();
+    await page.getByRole('button', { name: 'Continue to secure checkout' }).click();
     await expect(page.getByText(/required|must be/i).first()).toBeVisible();
   });
 });

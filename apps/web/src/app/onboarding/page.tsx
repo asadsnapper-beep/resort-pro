@@ -6,7 +6,7 @@ import { useLocale } from 'next-intl';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { api, tenantApi, roomsApi } from '@/lib/api';
+import { billingApi, tenantApi, roomsApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -324,7 +324,7 @@ function Step3({ onNext, onBack, onSkip }: { onNext: () => void; onBack: () => v
 // say "you're done" — it's to get them to share the link with a real guest in
 // the next 60 seconds. First real booking = the owner never churns.
 
-function DoneScreen({ onGo, slug, resortName }: { onGo: () => void; slug?: string; resortName?: string }) {
+function DoneScreen({ onGo, slug, resortName, requiresCheckout }: { onGo: () => void; slug?: string; resortName?: string; requiresCheckout: boolean }) {
   const [copied, setCopied] = useState(false);
   // Bangla only for Bangladesh visitors (locale is auto-set by middleware from
   // CF-IPCountry, or by explicit user toggle) — everyone else sees English.
@@ -396,7 +396,9 @@ function DoneScreen({ onGo, slug, resortName }: { onGo: () => void; slug?: strin
       </p>
 
       <button onClick={onGo} className="text-sm font-medium text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors">
-        {isBn ? 'Dashboard-এ যান' : 'Go to Dashboard'}
+        {requiresCheckout
+          ? (isBn ? 'পেমেন্ট সম্পন্ন করুন' : 'Continue to secure checkout')
+          : (isBn ? 'Dashboard-এ যান' : 'Go to Dashboard')}
       </button>
     </div>
   );
@@ -416,10 +418,29 @@ export default function OnboardingPage() {
   const router = useRouter();
   const { user, tenant } = useAuthStore();
   const [step, setStep] = useState(0); // 0=property, 1=times, 2=room, 3=done
+  const [leaving, setLeaving] = useState(false);
 
   const goNext = () => setStep(s => s + 1);
   const goBack = () => setStep(s => s - 1);
-  const goDashboard = () => router.push('/dashboard');
+  const finishSetup = async () => {
+    if (leaving) return;
+    setLeaving(true);
+    try {
+      await tenantApi.completeOnboarding();
+      if (tenant?.planStatus !== 'incomplete') {
+        router.push('/dashboard');
+        return;
+      }
+      const checkout = await billingApi.createCheckout(tenant.plan);
+      window.location.assign(checkout.data.data.url);
+    } catch (error: unknown) {
+      const message = (error as { response?: { data?: { error?: string } } })?.response?.data?.error
+        ?? 'Your setup could not be completed. Please try again.';
+      toast({ title: 'Setup needs attention', description: message, variant: 'destructive' });
+    } finally {
+      setLeaving(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-start justify-center p-4 pt-12">
@@ -447,14 +468,14 @@ export default function OnboardingPage() {
           {step === 0 && <Step1 onNext={goNext} />}
           {step === 1 && <Step2 onNext={goNext} onBack={goBack} />}
           {step === 2 && <Step3 onNext={goNext} onBack={goBack} onSkip={goNext} />}
-          {step === 3 && <DoneScreen onGo={goDashboard} slug={tenant?.slug} resortName={tenant?.name} />}
+          {step === 3 && <DoneScreen onGo={finishSetup} slug={tenant?.slug} resortName={tenant?.name} requiresCheckout={tenant?.planStatus === 'incomplete'} />}
         </div>
 
         {/* Footer skip */}
         {step < 3 && (
           <p className="text-center mt-4 text-sm text-gray-400">
-            <button onClick={goDashboard} className="hover:text-gray-600 underline underline-offset-2 transition-colors">
-              Skip setup — go to dashboard
+            <button onClick={finishSetup} disabled={leaving} className="hover:text-gray-600 underline underline-offset-2 transition-colors disabled:opacity-50">
+              {tenant?.planStatus === 'incomplete' ? 'Skip setup — continue to checkout' : 'Skip setup — go to dashboard'}
             </button>
           </p>
         )}
