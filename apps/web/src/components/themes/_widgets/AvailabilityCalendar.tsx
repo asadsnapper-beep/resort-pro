@@ -438,7 +438,7 @@ export function AvailabilityCalendar({
                         className="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
                         style={{ backgroundColor: accentColor }}
                       >
-                        Book Now
+                        Select →
                       </button>
                     </div>
                   );
