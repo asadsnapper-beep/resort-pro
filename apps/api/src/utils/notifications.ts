@@ -8,7 +8,9 @@ export type AdminNotificationType =
   | 'trial_expiring'
   | 'account_suspended'
   | 'subscription_paid'
-  | 'design_request';
+  | 'design_request'
+  | 'tenant_deleted'
+  | 'tenant_deletion_requested';
 
 interface CreateNotificationArgs {
   type: AdminNotificationType;

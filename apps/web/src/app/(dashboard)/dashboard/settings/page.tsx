@@ -15,6 +15,7 @@ import {
   CreditCard, Eye, EyeOff, ChevronDown, ChevronRight, Bell, LayoutGrid,
 } from 'lucide-react'
 import { PageShell, PageHeader } from '@/components/patterns';
+import { ModalShell } from '@/components/ui/modal-shell';
 import { paymentGatewayApi } from '@/lib/api';
 import { RoomTypeSettings } from '@/components/settings/RoomTypeSettings';
 
@@ -1311,10 +1312,68 @@ function PaymentGatewaysTab() {
 
 // ── GDPR Tab ──────────────────────────────────────────────────────────────
 
+type TenantDeletionRequest = {
+  id: string;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  createdAt: string;
+  adminNotes: string | null;
+};
+
 function GdprTab() {
   const [exportLoading, setExportLoading] = useState(false);
   const [erasureLoading, setErasureLoading] = useState(false);
   const [erasureRequested, setErasureRequested] = useState(false);
+
+  // ── Permanent tenant deletion (distinct from GDPR erasure above — this is
+  // a full hard delete, gated behind Super Admin review rather than a
+  // self-service 30-day grace period). See DELETE /api/admin/tenants/:id.
+  const [deletionRequest, setDeletionRequest] = useState<TenantDeletionRequest | null>(null);
+  const [deletionCheckLoading, setDeletionCheckLoading] = useState(true);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
+
+  useEffect(() => {
+    api.get('/tenant/deletion-request')
+      .then((res) => setDeletionRequest(res.data?.data?.request ?? null))
+      .catch(() => {})
+      .finally(() => setDeletionCheckLoading(false));
+  }, []);
+
+  const handleSubmitDeletionRequest = async () => {
+    if (deleteReason.trim().length < 10) {
+      toast({ title: 'Please explain a bit more (at least 10 characters).', variant: 'destructive' });
+      return;
+    }
+    setDeleteSubmitting(true);
+    try {
+      const res = await api.post('/tenant/deletion-request', { reason: deleteReason.trim() });
+      setDeletionRequest(res.data.data.request);
+      setShowDeleteModal(false);
+      setDeleteReason('');
+      toast({ title: 'Deletion request submitted', description: 'Our team will review it and get back to you.' });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.response?.data?.error || 'Failed to submit request', variant: 'destructive' });
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  };
+
+  const handleWithdrawDeletionRequest = async () => {
+    if (!deletionRequest) return;
+    setWithdrawing(true);
+    try {
+      await api.delete(`/tenant/deletion-request/${deletionRequest.id}`);
+      setDeletionRequest(null);
+      toast({ title: 'Deletion request withdrawn' });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.response?.data?.error || 'Failed to withdraw', variant: 'destructive' });
+    } finally {
+      setWithdrawing(false);
+    }
+  };
 
   const handleExport = async () => {
     setExportLoading(true);
@@ -1419,6 +1478,98 @@ function GdprTab() {
           We respond within 72 hours.
         </p>
       </div>
+
+      {/* Danger Zone — permanent account deletion, separate from GDPR erasure
+          above. This is a full hard delete: every booking, guest, staff
+          record, and invoice, gone immediately. It needs our team's
+          approval, not a 30-day grace period. */}
+      <Card className="border-red-300">
+        <CardContent className="p-6">
+          <div className="flex items-start gap-3 mb-5">
+            <Trash2 className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-semibold text-red-800">Danger Zone</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Permanently close and delete this resort's account. This is different from the GDPR
+                erasure above — it's immediate and irreversible once approved, with no grace period.
+              </p>
+            </div>
+          </div>
+
+          {deletionCheckLoading ? (
+            <p className="text-sm text-gray-400">Checking status…</p>
+          ) : deletionRequest?.status === 'PENDING' ? (
+            <div className="flex items-start justify-between gap-4 p-4 bg-amber-50 rounded-xl border border-amber-200">
+              <div>
+                <p className="text-sm font-medium text-amber-800">Deletion request pending review</p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  Submitted {new Date(deletionRequest.createdAt).toLocaleDateString()}. Our team will review it —
+                  your account stays fully active until then. You can withdraw anytime before it's decided.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                loading={withdrawing}
+                onClick={handleWithdrawDeletionRequest}
+                className="shrink-0"
+              >
+                Withdraw request
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-start justify-between gap-4 p-4 bg-red-50 rounded-xl border border-red-200">
+              <div>
+                <p className="text-sm font-medium text-red-800">Delete this resort permanently</p>
+                <p className="text-xs text-red-600 mt-0.5">
+                  Erases every booking, guest, staff record, and invoice. Submits a request for our team to
+                  review — nothing is deleted until it's approved.
+                  {deletionRequest?.status === 'REJECTED' && ' Your previous request was reviewed and not approved — you can submit a new one.'}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDeleteModal(true)}
+                className="shrink-0 gap-2 border-red-300 text-red-600 hover:bg-red-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Request Deletion
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {showDeleteModal && (
+        <ModalShell
+          open
+          onClose={() => { setShowDeleteModal(false); setDeleteReason(''); }}
+          title="Request permanent deletion"
+          description="Tell us why you're leaving. Our team reviews every request before anything is deleted."
+          footer={
+            <div className="flex justify-end gap-2.5">
+              <Button variant="outline" onClick={() => { setShowDeleteModal(false); setDeleteReason(''); }}>Cancel</Button>
+              <Button
+                loading={deleteSubmitting}
+                onClick={handleSubmitDeletionRequest}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                Submit request
+              </Button>
+            </div>
+          }
+        >
+          <textarea
+            autoFocus
+            value={deleteReason}
+            onChange={(e) => setDeleteReason(e.target.value)}
+            rows={4}
+            placeholder="e.g. closing the business, switching to another platform, no longer need it…"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
+          />
+        </ModalShell>
+      )}
     </div>
   );
 }

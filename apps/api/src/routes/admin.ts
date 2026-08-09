@@ -393,36 +393,163 @@ export async function adminRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: updated });
   });
 
-  // ── DELETE /api/admin/tenants/:id — soft delete (suspend) ──────────────
-  app.delete<{ Params: { id: string } }>(
+  // Shared by the direct-delete route below and the deletion-request approval
+  // route — same audit trail, same notification, regardless of which path
+  // triggered it. Caller must have already verified the tenant exists and
+  // that this action is actually authorized.
+  async function hardDeleteTenant(
+    tenant: { id: string; name: string; slug: string; plan: string; planStatus: string },
+    adminEmail: string,
+    ipAddress: string | undefined,
+    extraMetadata?: Record<string, unknown>,
+  ) {
+    // Log BEFORE deleting — the tenant row (and anything FK'd to it) is about
+    // to be cascaded away; the audit record must survive that regardless.
+    await logAdminAction({
+      adminEmail,
+      action: 'delete',
+      targetType: 'tenant',
+      targetId: tenant.id,
+      targetName: tenant.name,
+      metadata: { plan: tenant.plan, planStatus: tenant.planStatus, slug: tenant.slug, ...extraMetadata },
+      ipAddress,
+    });
+
+    await prisma.tenant.delete({ where: { id: tenant.id } });
+
+    await createAdminNotification({
+      type: 'tenant_deleted',
+      title: 'Tenant permanently deleted',
+      message: `${tenant.name} was permanently deleted by ${adminEmail}. All of its data is gone.`,
+      metadata: { tenantId: tenant.id, tenantName: tenant.name, deletedBy: adminEmail },
+      linkPath: `/admin/tenants`,
+    });
+  }
+
+  // ── DELETE /api/admin/tenants/:id — PERMANENT hard delete ──────────────
+  // Was a soft-suspend (isActive:false) — the same thing PATCH already does.
+  // "Suspend" now goes through PATCH (see adminEndpoints.suspendTenant on the
+  // web side); this DELETE is real: the tenant row and everything cascading
+  // from it (bookings, guests, staff, invoices, all of it) is gone for good.
+  // Guarded by requiring the caller to echo back the tenant's exact current
+  // name — cheap insurance against a stray click or a scripted mistake.
+  app.delete<{ Params: { id: string }; Body: { confirmName?: string } }>(
     '/tenants/:id',
     { preHandler: requireSuperAdmin },
     async (request, reply) => {
       const tenant = await prisma.tenant.findUnique({
         where: { id: request.params.id },
-        select: { name: true },
+        select: { id: true, name: true, slug: true, plan: true, planStatus: true },
       });
-      await prisma.tenant.update({
-        where: { id: request.params.id },
-        data: { isActive: false },
-      });
+      if (!tenant) {
+        return reply.status(404).send({ success: false, error: 'Tenant not found' });
+      }
+
+      const confirmName = request.body?.confirmName?.trim();
+      if (confirmName !== tenant.name) {
+        return reply.status(400).send({
+          success: false,
+          error: 'Type the resort name exactly to confirm permanent deletion.',
+        });
+      }
+
       const adminUser = request.user as any;
+      await hardDeleteTenant(tenant, adminUser.email, request.ip);
+
+      return reply.send({ success: true, data: { message: 'Tenant permanently deleted' } });
+    }
+  );
+
+  // ── Tenant self-deletion requests (Owner-initiated, Admin-approved) ─────
+
+  // GET /api/admin/tenant-deletion-requests — review queue
+  app.get<{ Querystring: { status?: string } }>(
+    '/tenant-deletion-requests',
+    { preHandler: requireSuperAdmin },
+    async (request, reply) => {
+      const status = request.query.status || 'PENDING';
+      const requests = await prisma.tenantDeletionRequest.findMany({
+        where: status === 'ALL' ? undefined : { status: status as any },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          tenant: { select: { id: true, name: true, slug: true, plan: true, planStatus: true, createdAt: true } },
+          requestedBy: { select: { firstName: true, lastName: true, email: true } },
+        },
+      });
+      return reply.send({ success: true, data: { requests } });
+    }
+  );
+
+  // POST /api/admin/tenant-deletion-requests/:id/approve — approve + hard-delete
+  app.post<{ Params: { id: string } }>(
+    '/tenant-deletion-requests/:id/approve',
+    { preHandler: requireSuperAdmin },
+    async (request, reply) => {
+      const deletionRequest = await prisma.tenantDeletionRequest.findUnique({
+        where: { id: request.params.id },
+        include: { tenant: { select: { id: true, name: true, slug: true, plan: true, planStatus: true } } },
+      });
+      if (!deletionRequest) {
+        return reply.status(404).send({ success: false, error: 'Deletion request not found' });
+      }
+      if (deletionRequest.status !== 'PENDING') {
+        return reply.status(400).send({ success: false, error: `Request already ${deletionRequest.status.toLowerCase()}` });
+      }
+
+      const adminUser = request.user as any;
+
+      // Mark resolved BEFORE deleting the tenant — this row cascades away
+      // with it (tenantId → Cascade), so it never actually persists in this
+      // APPROVED state; the audit log (written inside hardDeleteTenant) is
+      // what survives as the permanent record of this approval.
+      await prisma.tenantDeletionRequest.update({
+        where: { id: deletionRequest.id },
+        data: { status: 'APPROVED', resolvedAt: new Date(), resolvedByAdminEmail: adminUser.email },
+      });
+
+      await hardDeleteTenant(deletionRequest.tenant, adminUser.email, request.ip, {
+        deletionRequestId: deletionRequest.id,
+        requestedReason: deletionRequest.reason,
+      });
+
+      return reply.send({ success: true, data: { message: 'Request approved — tenant permanently deleted' } });
+    }
+  );
+
+  // POST /api/admin/tenant-deletion-requests/:id/reject
+  app.post<{ Params: { id: string }; Body: { adminNotes?: string } }>(
+    '/tenant-deletion-requests/:id/reject',
+    { preHandler: requireSuperAdmin },
+    async (request, reply) => {
+      const deletionRequest = await prisma.tenantDeletionRequest.findUnique({ where: { id: request.params.id } });
+      if (!deletionRequest) {
+        return reply.status(404).send({ success: false, error: 'Deletion request not found' });
+      }
+      if (deletionRequest.status !== 'PENDING') {
+        return reply.status(400).send({ success: false, error: `Request already ${deletionRequest.status.toLowerCase()}` });
+      }
+
+      const adminUser = request.user as any;
+      const updated = await prisma.tenantDeletionRequest.update({
+        where: { id: deletionRequest.id },
+        data: {
+          status: 'REJECTED',
+          resolvedAt: new Date(),
+          resolvedByAdminEmail: adminUser.email,
+          adminNotes: request.body?.adminNotes?.trim() || undefined,
+        },
+      });
+
       await logAdminAction({
         adminEmail: adminUser.email,
-        action: 'suspend',
+        action: 'reject_deletion_request',
         targetType: 'tenant',
-        targetId: request.params.id,
-        targetName: tenant?.name,
+        targetId: deletionRequest.tenantId,
+        metadata: { deletionRequestId: deletionRequest.id, adminNotes: updated.adminNotes },
         ipAddress: request.ip,
       });
-      await createAdminNotification({
-        type: 'account_suspended',
-        title: 'Account suspended',
-        message: `${tenant?.name ?? 'A tenant'} was manually suspended by ${adminUser.email}.`,
-        metadata: { tenantId: request.params.id, tenantName: tenant?.name, suspendedBy: adminUser.email },
-        linkPath: `/admin/tenants`,
-      });
-      return reply.send({ success: true, data: { message: 'Tenant suspended' } });
+
+      return reply.send({ success: true, data: { request: updated }, message: 'Deletion request rejected' });
     }
   );
 

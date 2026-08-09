@@ -512,6 +512,7 @@ model Tenant {
   corporateInvoices      CorporateInvoice[]
   designRequests         DesignRequest[]
   exclusiveThemes        Theme[]
+  deletionRequests       TenantDeletionRequest[]
 
   @@map("tenants")
 }
@@ -540,6 +541,7 @@ model User {
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
   shareholderProfile  ShareholderProfile?
+  tenantDeletionRequests TenantDeletionRequest[] @relation("TenantDeletionRequests")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -2620,6 +2622,39 @@ enum ThemeStatus {
   PUBLISHED // live — tenants can select it
 }
 
+/// Resort Owner submits a request to permanently delete their own tenant;
+/// Super Admin reviews and approves (triggers the real hard delete via the
+/// same code path as an admin-initiated delete) or rejects it. Owners never
+/// delete their own tenant directly — see DELETE /api/admin/tenants/:id.
+enum TenantDeletionRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model TenantDeletionRequest {
+  id       String @id @default(uuid())
+  tenantId String
+
+  requestedById String
+  reason        String
+
+  status               TenantDeletionRequestStatus @default(PENDING)
+  resolvedAt            DateTime?
+  resolvedByAdminEmail  String?
+  adminNotes            String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requestedBy User   @relation("TenantDeletionRequests", fields: [requestedById], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("tenant_deletion_requests")
+}
+
 /// Paid custom-design service — see plan/theme-studio-and-design-service.md.
 /// An owner asks for a bespoke website from the dashboard; admin quotes it,
 /// builds it, and ships it as a theme scoped to that tenant only.
@@ -2886,6 +2921,7 @@ model Venue {
   capacity    Int
   description String?
   photos      String[]
+  videos      String[] @default([])
   amenities   String[]
 
   halfDayRate  Float?
@@ -2980,6 +3016,8 @@ model Vehicle {
   depositAmount      Float?
   availability       VehicleAvailability @default(AVAILABLE)
   notes              String?
+  photos             String[]            @default([])
+  videos             String[]            @default([])
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 

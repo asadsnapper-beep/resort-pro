@@ -467,7 +467,7 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
       const venues = await prisma.venue.findMany({
         where: { tenantId: tenant.id, isActive: true, isVisible: true },
         select: {
-          id: true, name: true, type: true, capacity: true, description: true, photos: true, amenities: true,
+          id: true, name: true, type: true, capacity: true, description: true, photos: true, videos: true, amenities: true,
           halfDayRate: true, fullDayRate: true, hourlyRate: true, opensAt: true, closesAt: true,
         },
         orderBy: { sortOrder: 'asc' },
@@ -531,7 +531,7 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
 
       const vehicles = await prisma.vehicle.findMany({
         where: { tenantId: tenant.id, availability: { not: 'MAINTENANCE' } },
-        select: { id: true, type: true, name: true, capacity: true, hourlyRate: true, dailyRate: true },
+        select: { id: true, type: true, name: true, capacity: true, hourlyRate: true, dailyRate: true, photos: true, videos: true },
         orderBy: { name: 'asc' },
       });
       return ok(vehicles);
