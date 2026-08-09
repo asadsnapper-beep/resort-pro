@@ -606,7 +606,10 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
       const bookedRoomIds = await prisma.booking.findMany({
         where: {
           tenantId: tenant.id,
-          status: { in: ['CONFIRMED', 'CHECKED_IN'] },
+          // PENDING included — a "Pay at Hotel" booking is a real hold on the
+          // room even though staff hasn't confirmed it yet (matches the
+          // dashboard's own conflict logic in bookings.ts).
+          status: { in: ['CONFIRMED', 'CHECKED_IN', 'PENDING'] },
           AND: [{ checkIn: { lt: checkOut } }, { checkOut: { gt: checkIn } }],
         },
         select: { roomId: true },
@@ -687,7 +690,8 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
         where: {
           tenantId: tenant.id,
           roomId: { in: roomIds },
-          status: { in: ['CONFIRMED', 'CHECKED_IN'] },
+          // PENDING included — see the matching comment in /:slug/availability.
+          status: { in: ['CONFIRMED', 'CHECKED_IN', 'PENDING'] },
           AND: [
             { checkIn: { lt: lastDay } },
             { checkOut: { gt: firstDay } },
