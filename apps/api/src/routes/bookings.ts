@@ -1118,11 +1118,16 @@ export async function bookingRoutes(app: FastifyInstance) {
         roomId:        z.string(),
         checkIn:       z.string(), // YYYY-MM-DD
         checkOut:      z.string(), // YYYY-MM-DD
-        ratePerNight:  z.number().optional(), // override room base price
-        discount:      z.number().min(0).max(100).default(0), // percentage
+        ratePerNight:  z.number().optional(), // explicit staff override — wins over any rate plan
+        discount:      z.number().min(0).max(100).default(0), // percentage, applied on top of whichever rate wins
         paymentMethod: z.enum(['CASH', 'CARD', 'BANK_TRANSFER', 'LATER']).default('CASH'),
         advanceAmount: z.number().optional(),
         roomNotes:     z.string().optional(),
+        // Optional fields captured from an ID/passport scan at check-in time
+        idType:        z.enum(['PASSPORT', 'NATIONAL_ID', 'DRIVERS_LICENSE', 'OTHER']).optional(),
+        idNumber:      z.string().optional(),
+        nationality:   z.string().optional(),
+        dateOfBirth:   z.string().optional(), // ISO date string
       }).parse(request.body);
 
       const checkInDate  = new Date(body.checkIn);
@@ -1141,9 +1146,19 @@ export async function bookingRoutes(app: FastifyInstance) {
       if (externalCalendars.length > 0) await syncCalendarsForRoom(body.roomId, externalCalendars);
 
       // ── Atomic: conflict-check + create in serializable transaction ─────────
-      const nights      = calculateNights(checkInDate, checkOutDate);
-      const rate        = body.ratePerNight ?? Number(room.basePrice);
-      const totalAmount = rate * nights * (1 - body.discount / 100);
+      const nights = calculateNights(checkInDate, checkOutDate);
+      // An explicit staff-entered rate wins outright (that's what it's for).
+      // Otherwise resolve the best-matching rate plan for this room/date
+      // range, same as the regular booking-creation route — falls back to
+      // the room's plain nightly price when nothing matches.
+      let baseTotal: number;
+      if (body.ratePerNight != null) {
+        baseTotal = body.ratePerNight * nights;
+      } else {
+        const resolved = await resolveRate(tenantId, body.roomId, checkInDate, checkOutDate, Number(room.basePrice));
+        baseTotal = resolved?.totalPrice ?? Number(room.basePrice) * nights;
+      }
+      const totalAmount = baseTotal * (1 - body.discount / 100);
       const now         = new Date();
 
       let booking: Awaited<ReturnType<typeof prisma.booking.findFirst>> & object;
@@ -1162,8 +1177,18 @@ export async function bookingRoutes(app: FastifyInstance) {
 
           const [firstName, ...rest] = body.guestName.trim().split(' ');
           const lastName = rest.join(' ') || '-';
+          // Defense in depth: the scan-id endpoint already normalizes to ISO
+          // before this ever reaches us, but an invalid/unparseable string
+          // must never abort the whole check-in transaction — drop it instead.
+          const parsedDob = body.dateOfBirth ? new Date(body.dateOfBirth) : undefined;
+          const dateOfBirth = parsedDob && !isNaN(parsedDob.getTime()) ? parsedDob : undefined;
           const guest = await tx.guest.create({
-            data: { tenantId, firstName, lastName, email: `walkin-${Date.now()}@resortpro.local`, phone: body.guestPhone },
+            data: {
+              tenantId, firstName, lastName, phone: body.guestPhone,
+              email: `walkin-${Date.now()}@resortpro.local`,
+              idType: body.idType, idNumber: body.idNumber, nationality: body.nationality,
+              dateOfBirth,
+            },
           });
 
           const newBooking = await tx.booking.create({

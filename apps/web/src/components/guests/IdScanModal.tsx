@@ -18,6 +18,10 @@ export interface ScannedFields {
   documentNumber?: string;
   expiryDate?:    string;
   gender?:        string;
+  // The document type the staff selected before scanning (PASSPORT |
+  // NATIONAL_ID | DRIVERS_LICENSE | OTHER) — not an OCR-extracted field, so
+  // it's set directly in confirm() below rather than coming through editFields.
+  docType?:       string;
 }
 
 interface IdScanModalProps {
@@ -36,7 +40,9 @@ const DOC_TYPES = [
   { value: 'OTHER',           label: 'Other' },
 ];
 
-const FIELD_LABELS: Record<keyof ScannedFields, string> = {
+// docType is set from the capture-step selector, not an OCR field, so it's
+// deliberately excluded here — it must not get a second, editable input.
+const FIELD_LABELS: Record<Exclude<keyof ScannedFields, 'docType'>, string> = {
   firstName:      'First Name',
   lastName:       'Last Name',
   dateOfBirth:    'Date of Birth',
@@ -166,7 +172,7 @@ export function IdScanModal({ guestId, guestName, onConfirm, onClose }: IdScanMo
     const nonEmpty = Object.fromEntries(
       Object.entries(editFields).filter(([, v]) => v && String(v).trim()),
     ) as ScannedFields;
-    onConfirm(nonEmpty);
+    onConfirm({ ...nonEmpty, docType });
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
