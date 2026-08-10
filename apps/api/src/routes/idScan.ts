@@ -76,10 +76,23 @@ function parseRawText(text: string): Record<string, string> {
     }
   }
 
-  // Date of birth: DD/MM/YYYY or YYYY-MM-DD
-  const dobMatch = text.match(/(?:dob|birth|born|জন্ম)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i)
-    || text.match(/\b(\d{1,2}[/-]\d{1,2}[/-]\d{4})\b/);
-  if (dobMatch) fields.dateOfBirth = dobMatch[1];
+  // Date of birth — BD NIDs print this as "12 Feb 1994" (month name), not
+  // the numeric DD/MM/YYYY this used to assume exclusively. Try month-name
+  // form first since it's the actual NID format; fall back to numeric.
+  const MONTHS: Record<string, string> = {
+    jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+    jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
+  };
+  const dobMonthName = text.match(/\b(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})\b/);
+  if (dobMonthName) {
+    const month = MONTHS[dobMonthName[2].slice(0, 3).toLowerCase()];
+    if (month) fields.dateOfBirth = `${dobMonthName[3]}-${month}-${dobMonthName[1].padStart(2, '0')}`;
+  }
+  if (!fields.dateOfBirth) {
+    const dobMatch = text.match(/(?:dob|birth|born|জন্ম)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i)
+      || text.match(/\b(\d{1,2}[/-]\d{1,2}[/-]\d{4})\b/);
+    if (dobMatch) fields.dateOfBirth = dobMatch[1];
+  }
 
   return fields;
 }
