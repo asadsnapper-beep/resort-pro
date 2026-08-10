@@ -3,15 +3,15 @@
 import { ModalShell } from '@/components/ui/modal-shell';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { frontDeskApi, bookingsApi, roomsApi, ratePlansApi } from '@/lib/api';
+import { frontDeskApi, bookingsApi, roomsApi, ratePlansApi, guestsApi } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { useAuthStore } from '@/store/auth';
 import {
   BedDouble, Users, Sparkles, Wrench, LogIn, LogOut, Clock,
-  Plus, Phone, Banknote, LayoutGrid, List, RefreshCw, AlertTriangle, ScanLine, CheckCircle2,
+  Plus, Phone, Banknote, LayoutGrid, List, RefreshCw, AlertTriangle,
 } from 'lucide-react';
 import { PageShell, PageHeader } from '@/components/patterns';
-import { IdScanModal, type ScannedFields } from '@/components/guests/IdScanModal';
+import { AddDocumentInline, type PendingDocument } from '@/components/guests/AddDocumentInline';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Guest { id: string; firstName: string; lastName: string; phone?: string; email?: string }
@@ -198,8 +198,8 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
     paymentMethod: 'CASH' as 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'LATER',
     advanceAmount: '', roomNotes: '',
   });
-  const [scannedDoc, setScannedDoc] = useState<ScannedFields | null>(null);
-  const [showIdScan, setShowIdScan] = useState(false);
+  const [pendingDoc, setPendingDoc] = useState<PendingDocument | null>(null);
+  const [showDocPicker, setShowDocPicker] = useState(false);
 
   const { data: roomData } = useQuery({
     queryKey: ['rooms-available', form.checkIn, form.checkOut],
@@ -228,14 +228,23 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
   const balanceDue = Math.max(0, estimatedTotal - advanceNum);
 
   const mutation = useMutation({
-    mutationFn: () => bookingsApi.walkIn({
-      ...form,
-      advanceAmount: advanceNum || undefined,
-      idType: scannedDoc?.docType,
-      idNumber: scannedDoc?.documentNumber,
-      nationality: scannedDoc?.nationality,
-      dateOfBirth: scannedDoc?.dateOfBirth,
-    }),
+    mutationFn: async () => {
+      const res = await bookingsApi.walkIn({ ...form, advanceAmount: advanceNum || undefined });
+      const booking = res.data.data as { id: string; guestId: string };
+      // Document is attached after the guest/booking actually exist —
+      // best-effort: a failed upload shouldn't undo an otherwise-successful
+      // check-in, so it's swallowed rather than surfaced as the main error.
+      if (pendingDoc) {
+        const docForm = new FormData();
+        docForm.append('file', pendingDoc.file);
+        docForm.append('docType', pendingDoc.docType);
+        docForm.append('bookingId', booking.id);
+        await guestsApi.uploadDocument(booking.guestId, docForm).catch(() => {
+          toast({ title: 'Checked in, but document upload failed', description: 'You can add it later from the guest profile.', variant: 'destructive' });
+        });
+      }
+      return res;
+    },
     onSuccess: () => {
       toast({ title: 'Walk-in checked in!', description: `${form.guestName} — Room assigned` });
       qc.invalidateQueries({ queryKey: ['front-desk-today'] });
@@ -286,15 +295,18 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
                   <input value={form.guestName} onChange={e => set('guestName', e.target.value)} placeholder="Rahman Ahmed" className={inputCls} />
                 </ModalInput>
               </div>
-              <button type="button" onClick={() => setShowIdScan(true)}
+              <button type="button" onClick={() => setShowDocPicker(v => !v)}
                 className={`flex items-center gap-1.5 rounded-rp-ctrl border-2 px-3 py-[10px] text-rp-meta font-semibold shrink-0 transition-all ${
-                  scannedDoc ? 'border-rp-brand bg-rp-teal-bg text-rp-brand' : 'border-rp-border-md text-rp-muted'
-                }`}
-                title="Scan guest ID / passport">
-                {scannedDoc ? <CheckCircle2 className="h-3.5 w-3.5" /> : <ScanLine className="h-3.5 w-3.5" />}
-                {scannedDoc ? 'Scanned' : 'Scan ID'}
+                  pendingDoc ? 'border-rp-brand bg-rp-teal-bg text-rp-brand' : 'border-rp-border-md text-rp-muted'
+                }`}>
+                {pendingDoc ? 'Document added' : '+ Add Document'}
               </button>
             </div>
+            {showDocPicker && (
+              <div className="col-span-2">
+                <AddDocumentInline value={pendingDoc} onChange={setPendingDoc} />
+              </div>
+            )}
             <ModalInput label="Phone">
               <input value={form.guestPhone} onChange={e => set('guestPhone', e.target.value)} placeholder="01712-345678" className={inputCls} />
             </ModalInput>
@@ -362,22 +374,6 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
             <textarea value={form.roomNotes} onChange={e => set('roomNotes', e.target.value)} rows={2} placeholder="Key card issued, special requests…" className={`${inputCls} resize-none`} />
           </ModalInput>
       </div>
-      {showIdScan && (
-        <IdScanModal
-          guestId="walk-in-pending"
-          guestName={form.guestName || undefined}
-          onClose={() => setShowIdScan(false)}
-          onConfirm={(fields) => {
-            setScannedDoc(fields);
-            setForm(f => ({
-              ...f,
-              guestName: f.guestName || [fields.firstName, fields.lastName].filter(Boolean).join(' '),
-            }));
-            setShowIdScan(false);
-            toast({ title: 'ID scanned', description: 'Details will be saved with this guest.' });
-          }}
-        />
-      )}
     </ModalShell>
   );
 }

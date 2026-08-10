@@ -738,17 +738,20 @@ model GuestDocument {
   id         String   @id @default(uuid())
   guestId    String
   tenantId   String
+  bookingId  String? // optional — set when the doc was added at walk-in/new-booking time, so it shows up on that specific stay too
   docType    String // PASSPORT | NATIONAL_ID | DRIVERS_LICENSE | VISA | OTHER
   imageUrl   String
   notes      String?
   uploadedAt DateTime @default(now())
   uploadedBy String? // staff user ID
 
-  guest  Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  guest   Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
 
   @@index([guestId])
   @@index([tenantId])
+  @@index([bookingId])
   @@map("guest_documents")
 }
 
@@ -827,6 +830,7 @@ model Booking {
   minibarConsumptions MinibarConsumption[]
   laundryOrders       LaundryOrder[]
   vehicleRentals      VehicleRental[]
+  documents           GuestDocument[]
 
   @@index([tenantId])
   @@index([checkIn, checkOut])

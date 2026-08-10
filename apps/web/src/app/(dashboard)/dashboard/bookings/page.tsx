@@ -3,9 +3,10 @@
 import { useState, useCallback } from 'react';
 import { useTheme } from 'next-themes';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { bookingsApi, dashboardApi } from '@/lib/api';
+import { bookingsApi, dashboardApi, guestsApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { NewBookingModal } from '@/components/bookings/NewBookingModal';
+import type { PendingDocument } from '@/components/guests/AddDocumentInline';
 import { BookingDetailSheet } from '@/components/bookings/BookingDetailSheet';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -105,7 +106,23 @@ export default function BookingsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: unknown) => bookingsApi.create(data),
+    mutationFn: async ({ data, pendingDoc }: { data: { guestId: string; [k: string]: unknown }; pendingDoc?: PendingDocument }) => {
+      const res = await bookingsApi.create(data);
+      // Best-effort: attach the doc to the guest + this specific booking once
+      // both actually exist. A failed upload shouldn't undo the booking —
+      // just surface it separately and let staff retry from the guest profile.
+      if (pendingDoc) {
+        const booking = res.data.data as { id: string };
+        const docForm = new FormData();
+        docForm.append('file', pendingDoc.file);
+        docForm.append('docType', pendingDoc.docType);
+        docForm.append('bookingId', booking.id);
+        await guestsApi.uploadDocument(data.guestId, docForm).catch(() => {
+          toast({ title: 'Booking confirmed, but document upload failed', description: 'You can add it later from the guest profile.', variant: 'destructive' });
+        });
+      }
+      return res;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
       toast({ title: 'Booking confirmed!', description: 'Guest reservation has been created.' });
@@ -421,7 +438,7 @@ export default function BookingsPage() {
         open={newOpen}
         onClose={() => setNewOpen(false)}
         loading={createMutation.isPending}
-        onSubmit={(data) => createMutation.mutate(data)}
+        onSubmit={(data, pendingDoc) => createMutation.mutate({ data, pendingDoc })}
       />
       <BookingDetailSheet
         booking={selectedBooking}

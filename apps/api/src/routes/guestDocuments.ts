@@ -40,6 +40,7 @@ export async function guestDocumentRoutes(app: FastifyInstance) {
       let fileBuffer: Buffer | null = null;
       let mimeType = 'image/jpeg';
       let docType = 'OTHER';
+      let bookingId: string | undefined;
 
       for await (const part of parts) {
         if (part.type === 'file' && part.fieldname === 'file') {
@@ -57,7 +58,17 @@ export async function guestDocumentRoutes(app: FastifyInstance) {
 
         } else if (part.type === 'field' && part.fieldname === 'docType') {
           docType = String(part.value);
+        } else if (part.type === 'field' && part.fieldname === 'bookingId') {
+          bookingId = String(part.value) || undefined;
         }
+      }
+
+      // If a bookingId was supplied (walk-in / new-booking flows attach the
+      // doc at creation time), confirm it actually belongs to this guest —
+      // otherwise silently drop it rather than link to the wrong stay.
+      if (bookingId) {
+        const booking = await db.booking.findFirst({ where: { id: bookingId, guestId } });
+        if (!booking) bookingId = undefined;
       }
 
       if (!fileBuffer || fileBuffer.byteLength === 0) {
@@ -82,6 +93,7 @@ export async function guestDocumentRoutes(app: FastifyInstance) {
           docType,
           imageUrl: result.url,
           uploadedBy,
+          bookingId,
         },
       });
 
@@ -91,6 +103,7 @@ export async function guestDocumentRoutes(app: FastifyInstance) {
           id:         doc.id,
           imageUrl:   doc.imageUrl,
           docType:    doc.docType,
+          bookingId:  doc.bookingId,
           uploadedAt: doc.uploadedAt,
         },
       });
@@ -121,6 +134,7 @@ export async function guestDocumentRoutes(app: FastifyInstance) {
           notes:      true,
           uploadedAt: true,
           uploadedBy: true,
+          bookingId:  true,
         },
       });
 

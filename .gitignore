@@ -16,3 +16,6 @@ prisma/*.db-journal
 
 # Local file uploads (dev storage)
 apps/api/uploads/
+
+# Tesseract.js language models (auto-downloaded cache, not source)
+*.traineddata
