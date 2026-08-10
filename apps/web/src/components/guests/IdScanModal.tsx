@@ -75,8 +75,15 @@ export function IdScanModal({ guestId, guestName, onConfirm, onClose }: IdScanMo
 
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => {
-    if (mounted) document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
+    if (!mounted) return;
+    // Restore whatever was there before, not unconditionally ''. This is
+    // routinely opened from inside a ModalShell-based parent (walk-in, new
+    // booking) that already locked scroll — blindly clearing it on unmount
+    // was releasing the parent's lock too, letting the page scroll behind
+    // a still-open parent modal.
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previousOverflow; };
   }, [mounted]);
 
   // ── Camera helpers ────────────────────────────────────────────────────────
@@ -180,7 +187,10 @@ export function IdScanModal({ guestId, guestName, onConfirm, onClose }: IdScanMo
   if (!mounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    // z-[10000]: must render above ModalShell (zIndex 9999) — this modal is
+    // routinely opened from inside a ModalShell-based parent (walk-in, new
+    // booking), and at z-50 it was rendering invisibly behind that parent.
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4">
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
 
         {/* Header */}

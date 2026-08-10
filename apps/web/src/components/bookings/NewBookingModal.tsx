@@ -8,7 +8,8 @@ import { z } from 'zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { roomsApi, guestsApi, ratePlansApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
-import { Search, BedDouble, ChevronRight, ChevronLeft, Tags, UserPlus, X } from 'lucide-react';
+import { Search, BedDouble, ChevronRight, ChevronLeft, Tags, UserPlus, X, ScanLine, CheckCircle2 } from 'lucide-react';
+import { IdScanModal, type ScannedFields } from '@/components/guests/IdScanModal';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 
@@ -49,14 +50,26 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
   const [showNewGuest, setShowNewGuest] = useState(false);
   const [newGuestForm, setNewGuestForm] = useState({ firstName: '', lastName: '', email: '', phone: '' });
   const [newGuestError, setNewGuestError] = useState<string | null>(null);
+  const [scannedDoc, setScannedDoc] = useState<ScannedFields | null>(null);
+  const [showIdScan, setShowIdScan] = useState(false);
 
-  const { register: reg1, handleSubmit: hs1, formState: { errors: e1 }, reset: reset1, watch } = useForm<Step1Data>({
+  const { register: reg1, handleSubmit: hs1, formState: { errors: e1 }, reset: reset1, watch, setValue } = useForm<Step1Data>({
     resolver: zodResolver(step1Schema),
     defaultValues: { adults: 2, children: 0 },
   });
 
   const checkIn = watch('checkIn');
   const checkOut = watch('checkOut');
+  const dayAfter = (d: string) => new Date(new Date(d).getTime() + 86_400_000).toISOString().split('T')[0];
+
+  // Check-out follows check-in by one night until the guest picks something
+  // later themselves — and can never land on or before check-in (min on the
+  // input enforces that too).
+  useEffect(() => {
+    if (checkIn && (!checkOut || checkOut <= checkIn)) {
+      setValue('checkOut', dayAfter(checkIn));
+    }
+  }, [checkIn, checkOut, setValue]);
 
   // Load available rooms when dates selected
   const { data: availableData, isLoading: roomsLoading } = useQuery({
@@ -95,13 +108,20 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
 
   // Create new guest mutation
   const createGuestMut = useMutation({
-    mutationFn: (data: typeof newGuestForm) => guestsApi.create(data),
+    mutationFn: (data: typeof newGuestForm) => guestsApi.create({
+      ...data,
+      idType: scannedDoc?.docType,
+      idNumber: scannedDoc?.documentNumber,
+      nationality: scannedDoc?.nationality,
+      dateOfBirth: scannedDoc?.dateOfBirth,
+    }),
     onSuccess: (res) => {
       const guest = res.data.data;
       queryClient.invalidateQueries({ queryKey: ['guests-search'] });
       setSelectedGuest(guest);
       setShowNewGuest(false);
       setNewGuestForm({ firstName: '', lastName: '', email: '', phone: '' });
+      setScannedDoc(null);
       toast({ title: 'Guest created', description: `${guest.firstName} ${guest.lastName} added` });
       setStep(4);
     },
@@ -118,7 +138,7 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
       setStep(1); setStep1Data(null); setSelectedRoom(null);
       setSelectedGuest(null); setGuestSearch(''); setSpecialRequests('');
       setShowNewGuest(false); setNewGuestForm({ firstName: '', lastName: '', email: '', phone: '' });
-      setNewGuestError(null);
+      setNewGuestError(null); setScannedDoc(null); setShowIdScan(false);
       reset1({ adults: 2, children: 0 });
     }
   }, [open, reset1]);
@@ -200,7 +220,7 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
               <input
                 {...reg1('checkOut')}
                 type="date"
-                min={checkIn || new Date().toISOString().split('T')[0]}
+                min={checkIn ? dayAfter(checkIn) : new Date().toISOString().split('T')[0]}
                 style={{
                   width: '100%',
                   borderRadius: '8px',
@@ -425,10 +445,21 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
                 <p className="text-sm font-semibold text-resort-700 flex items-center gap-1.5">
                   <UserPlus className="h-4 w-4" /> New Guest
                 </p>
-                <button onClick={() => { setShowNewGuest(false); setNewGuestError(null); }}
-                  className="rounded-lg p-1 text-gray-400 hover:bg-white transition-colors">
-                  <X className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button type="button" onClick={() => setShowIdScan(true)}
+                    className={cn(
+                      'flex items-center gap-1 rounded-lg border px-2 py-1 text-xs font-medium transition-colors',
+                      scannedDoc ? 'border-resort-400 bg-resort-100 text-resort-700' : 'border-gray-200 text-gray-500 hover:border-resort-400',
+                    )}
+                    title="Scan guest ID / passport">
+                    {scannedDoc ? <CheckCircle2 className="h-3.5 w-3.5" /> : <ScanLine className="h-3.5 w-3.5" />}
+                    {scannedDoc ? 'Scanned' : 'Scan ID'}
+                  </button>
+                  <button onClick={() => { setShowNewGuest(false); setNewGuestError(null); }}
+                    className="rounded-lg p-1 text-gray-400 hover:bg-white transition-colors">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -647,6 +678,23 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
         </div>
       )}
       </div>
+      {showIdScan && (
+        <IdScanModal
+          guestId="new-booking-pending"
+          guestName={newGuestForm.firstName || undefined}
+          onClose={() => setShowIdScan(false)}
+          onConfirm={(fields) => {
+            setScannedDoc(fields);
+            setNewGuestForm(f => ({
+              ...f,
+              firstName: f.firstName || fields.firstName || '',
+              lastName: f.lastName || fields.lastName || '',
+            }));
+            setShowIdScan(false);
+            toast({ title: 'ID scanned', description: 'Details will be saved with this guest.' });
+          }}
+        />
+      )}
     </ModalShell>
   );
 }
