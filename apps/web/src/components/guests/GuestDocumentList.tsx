@@ -12,6 +12,7 @@ import { guestsApi } from '@/lib/api';
 import { DocumentScannerModal, type DocType } from './DocumentScannerModal';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -21,6 +22,7 @@ interface GuestDoc {
   imageUrl: string;
   notes?: string | null;
   uploadedAt: string;
+  bookingId?: string | null;
 }
 
 const DOC_LABELS: Record<DocType, string> = {
@@ -34,11 +36,16 @@ const DOC_LABELS: Record<DocType, string> = {
 interface Props {
   guestId: string;
   guestName: string;
+  // When shown from a specific booking's detail view, pass its id so
+  // documents collected for THIS stay can be told apart from documents
+  // the guest has from other stays (same guest, different booking).
+  currentBookingId?: string;
+  emptyStateText?: string;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function GuestDocumentList({ guestId, guestName }: Props) {
+export function GuestDocumentList({ guestId, guestName, currentBookingId, emptyStateText }: Props) {
   const [docs, setDocs]           = useState<GuestDoc[]>([]);
   const [loading, setLoading]     = useState(true);
   const [scanOpen, setScanOpen]   = useState(false);
@@ -114,7 +121,7 @@ export function GuestDocumentList({ guestId, guestName }: Props) {
       ) : docs.length === 0 ? (
         <div className="rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 py-8 text-center">
           <FileText className="mx-auto h-8 w-8 text-gray-300 dark:text-gray-600 mb-2" />
-          <p className="text-sm text-gray-400 dark:text-gray-500">No documents scanned yet</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500">{emptyStateText ?? 'No documents added for this guest yet'}</p>
           <p className="text-xs text-gray-300 dark:text-gray-600 mt-1">
             Click "Scan Document" to capture ID or passport
           </p>
@@ -133,6 +140,16 @@ export function GuestDocumentList({ guestId, guestName }: Props) {
                   alt={DOC_LABELS[doc.docType]}
                   className="h-full w-full object-cover transition-transform group-hover:scale-105"
                 />
+                {currentBookingId && (
+                  <span className={cn(
+                    'absolute top-1.5 left-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
+                    doc.bookingId === currentBookingId
+                      ? 'bg-[#1a6b5e] text-white'
+                      : 'bg-black/50 text-white',
+                  )}>
+                    {doc.bookingId === currentBookingId ? 'This booking' : 'Other stay'}
+                  </span>
+                )}
               </div>
 
               {/* Label */}

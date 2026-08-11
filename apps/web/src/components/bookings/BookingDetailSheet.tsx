@@ -14,6 +14,7 @@ import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { IdScanModal, type ScannedFields } from '@/components/guests/IdScanModal';
+import { GuestDocumentList } from '@/components/guests/GuestDocumentList';
 import { PrintReceiptButton } from '@/components/bookings/PrintReceiptButton';
 import { CancelBookingModal, type CancelBookingPayload } from '@/components/bookings/CancelBookingModal';
 import { ModifyBookingModal, type ModifyBookingPayload } from '@/components/bookings/ModifyBookingModal';
@@ -699,6 +700,18 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
                   }
                   setShowIdScan(false);
                 }}
+              />
+            )}
+
+            {/* Guest Documents — includes anything added at walk-in/new-booking
+                time via AddDocumentInline, plus anything scanned here or on the
+                guest profile. "This booking" badge distinguishes docs collected
+                for this stay from the guest's other stays. */}
+            {booking.guest.id && (
+              <GuestDocumentList
+                guestId={booking.guest.id}
+                guestName={`${booking.guest.firstName} ${booking.guest.lastName}`}
+                currentBookingId={booking.id}
               />
             )}
 
