@@ -477,6 +477,7 @@ model Tenant {
   invoices               Invoice[]
   invoicePayments        InvoicePayment[]
   ratePlans              RatePlan[]
+  numberCounters         NumberCounter[]
   emailSettings          EmailSettings?
   maintenanceTickets     MaintenanceTicket[]
   packages               Package[]
@@ -1004,9 +1005,29 @@ enum InvoiceItemCategory {
   OTHER
 }
 
+// Atomic per-tenant number sequence (invoices, corporate invoices, and any
+// future document that needs a gapless-ish, race-free running number).
+// One row per (tenantId, key) — `key` already includes the year, e.g.
+// "invoice:2026" — so the counter naturally resets each year. Incrementing
+// via Prisma's atomic `{ increment: 1 }` inside an upsert compiles to a
+// single `INSERT ... ON CONFLICT DO UPDATE SET value = value + 1` on
+// Postgres, so concurrent requests can never read-then-write the same
+// value — the previous bug this replaces (see utils/sequence.ts).
+model NumberCounter {
+  id       String @id @default(uuid())
+  tenantId String
+  key      String
+  value    Int    @default(0)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+  @@map("number_counters")
+}
+
 model Invoice {
   id            String  @id @default(uuid())
-  invoiceNumber String  @unique // INV-2026-0001 (auto-generated)
+  invoiceNumber String  @unique // INV-{tenantCode}-2026-0001 (auto-generated)
   tenantId      String
   bookingId     String? @unique // one invoice per booking
 

@@ -14,6 +14,8 @@ import { awardCheckoutPoints } from '../services/loyalty';
 import { syncCalendarsForRoom } from '../jobs/ical-sync';
 import { createGuestPaymentLink } from './billing';
 import { resolveRate } from './ratePlans';
+import { createAdminNotification } from '../utils/notifications';
+import { nextDocumentNumber } from '../utils/sequence';
 import type { JwtPayload } from '@resort-pro/types';
 
 /* ── Auto-create invoice when a booking is confirmed ────────────────────── */
@@ -60,15 +62,10 @@ async function autoCreateInvoice(bookingId: string, tenantId: string) {
     const taxAmt   = Math.round(subtotal * (taxRate / 100) * 100) / 100;
     const total    = subtotal + taxAmt;
 
-    // Generate invoice number (safe: use highest existing number, not COUNT)
-    const year       = new Date().getFullYear();
-    const prefix     = `INV-${year}-`;
-    const lastInv    = await prisma.invoice.findFirst({
-      where:   { tenantId, invoiceNumber: { startsWith: prefix } },
-      orderBy: { invoiceNumber: 'desc' },
-    });
-    const lastNum       = lastInv ? parseInt(lastInv.invoiceNumber.slice(prefix.length), 10) : 0;
-    const invoiceNumber = `${prefix}${String(lastNum + 1).padStart(4, '0')}`;
+    // Generate invoice number — atomic per-tenant counter, tenant code baked
+    // into the string itself. See utils/sequence.ts for why the previous
+    // findFirst/orderBy:desc approach could collide across tenants.
+    const invoiceNumber = await nextDocumentNumber(tenantId, tenant.slug, 'INV');
 
     await prisma.invoice.create({
       data: {
@@ -81,8 +78,17 @@ async function autoCreateInvoice(bookingId: string, tenantId: string) {
         items: { create: lineItems as any },
       },
     });
-  } catch {
-    // Non-critical — don't fail booking creation
+  } catch (err) {
+    // Booking creation must not fail because of this — but don't let the
+    // failure disappear silently either. Record it so someone actually
+    // notices a confirmed booking is missing its invoice.
+    await createAdminNotification({
+      type: 'invoice_creation_failed',
+      title: 'Auto invoice creation failed',
+      message: `Booking ${bookingId} (tenant ${tenantId}) was confirmed but its invoice could not be auto-created: ${err instanceof Error ? err.message : String(err)}`,
+      metadata: { bookingId, tenantId },
+      linkPath: `/bookings/${bookingId}`,
+    }).catch(() => {});
   }
 }
 

@@ -10,7 +10,8 @@ export type AdminNotificationType =
   | 'subscription_paid'
   | 'design_request'
   | 'tenant_deleted'
-  | 'tenant_deletion_requested';
+  | 'tenant_deletion_requested'
+  | 'invoice_creation_failed';
 
 interface CreateNotificationArgs {
   type: AdminNotificationType;

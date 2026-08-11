@@ -2,7 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireRole } from '../middleware/auth';
 import { ok } from '../utils/response';
-import type { TenantScopedPrisma } from '@resort-pro/database';
+import { prisma } from '@resort-pro/database';
+import { nextDocumentNumber } from '../utils/sequence';
+import type { JwtPayload } from '@resort-pro/types';
 
 const accountSchema = z.object({
   companyName: z.string().min(1),
@@ -17,10 +19,14 @@ const accountSchema = z.object({
   notes: z.string().optional(),
 });
 
-async function nextInvoiceNumber(db: TenantScopedPrisma): Promise<string> {
-  const year = new Date().getFullYear();
-  const count = await db.corporateInvoice.count({ where: { invoiceNumber: { startsWith: `CORP-${year}-` } } });
-  return `CORP-${year}-${String(count + 1).padStart(4, '0')}`;
+// Previously: `db.corporateInvoice.count({ where: { invoiceNumber: { startsWith } } })`.
+// That both races (two concurrent requests can count the same total and pick
+// the same next number) and drifts if any invoice is ever deleted. Replaced
+// with the same atomic per-tenant counter used for regular invoices — see
+// utils/sequence.ts.
+async function nextInvoiceNumber(tenantId: string): Promise<string> {
+  const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
+  return nextDocumentNumber(tenantId, tenant.slug, 'CORP');
 }
 
 export async function corporateAccountRoutes(app: FastifyInstance) {
@@ -145,6 +151,7 @@ export async function corporateAccountRoutes(app: FastifyInstance) {
     preHandler: requireRole('OWNER', 'MANAGER'),
     handler: async (request, reply) => {
       const { db } = request;
+      const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
       const body = z.object({ bookingIds: z.array(z.string()).min(1) }).parse(request.body);
 
@@ -164,7 +171,7 @@ export async function corporateAccountRoutes(app: FastifyInstance) {
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + account.paymentTermDays);
 
-      const invoiceNumber = await nextInvoiceNumber(db);
+      const invoiceNumber = await nextInvoiceNumber(tenantId);
 
       const invoice = await db.corporateInvoice.create({
         data: {
