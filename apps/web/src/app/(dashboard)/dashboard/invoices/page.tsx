@@ -61,8 +61,13 @@ export default function InvoicesPage() {
     queryFn:  () => invoiceApi.stats(),
   });
 
-  const invoices: InvoiceSummary[] = listData?.data?.data?.items ?? [];
-  const pagination = listData?.data?.data ?? { total: 0, page: 1, limit: 20, totalPages: 1 };
+  // GET /invoices returns { success, data: Invoice[], pagination: {...} } — a flat
+  // array plus a sibling pagination object (see utils/response.ts `paginated()`),
+  // not the nested `{ data: { items, total, ... } }` shape this used to assume.
+  // That mismatch made this page always resolve an empty list regardless of how
+  // many invoices actually existed.
+  const invoices: InvoiceSummary[] = listData?.data?.data ?? [];
+  const pagination = listData?.data?.pagination ?? { total: 0, page: 1, limit: 20, totalPages: 1 };
   const stats: Stats = statsData?.data?.data ?? { totalInvoiced: 0, totalCount: 0, collected: 0, paidCount: 0, outstanding: 0, thisMonth: 0, thisMonthCount: 0 };
 
   const fmt = (n: number) => `${currency} ${Number(n).toLocaleString()}`;
