@@ -4,25 +4,23 @@ import { prisma } from '@resort-pro/database';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams } from '../utils/response';
 import { sendEmail } from '../services/email';
+import { nextDocumentNumber } from '../utils/sequence';
 import type { JwtPayload } from '@resort-pro/types';
 import PDFDocument from 'pdfkit';
 
 /* ── helpers ─────────────────────────────────────────────────────────────── */
 
-/** Auto-generate invoice number: INV-YYYY-NNNN
- *  Uses the highest existing number for the year rather than COUNT, which
- *  avoids gaps from deletions and is more collision-resistant than COUNT.
- *  The invoiceNumber unique constraint acts as the final safety net.
- */
+// Was: `findFirst`/`orderBy: desc` against a per-tenant prefix, against a
+// globally-@unique invoiceNumber column — the exact same collision bug fixed
+// in bookings.ts's autoCreateInvoice and corporateAccounts.ts's
+// nextInvoiceNumber (two concurrent requests, or two tenants, could compute
+// the identical "INV-2026-0001" and one would fail the unique constraint).
+// This third copy of the bug was missed in that earlier pass because it
+// lives in a route that creates invoices manually rather than automatically.
+// Now uses the same atomic per-tenant counter + tenant-code-in-string scheme.
 async function nextInvoiceNumber(tenantId: string): Promise<string> {
-  const year   = new Date().getFullYear();
-  const prefix = `INV-${year}-`;
-  const last   = await prisma.invoice.findFirst({
-    where:   { tenantId, invoiceNumber: { startsWith: prefix } },
-    orderBy: { invoiceNumber: 'desc' },
-  });
-  const lastNum = last ? parseInt(last.invoiceNumber.slice(prefix.length), 10) : 0;
-  return `${prefix}${String(lastNum + 1).padStart(4, '0')}`;
+  const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
+  return nextDocumentNumber(tenantId, tenant.slug, 'INV');
 }
 
 /** Recalculate subtotal, taxAmount, total from items + rates */
