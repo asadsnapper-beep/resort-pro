@@ -1,41 +1,40 @@
 import { test, expect } from '@playwright/test';
+import { loginAsRole, ensureNavOpen, navItem } from './helpers';
 
-// Uses localStorage auth mock
-test.describe('Dashboard (authenticated)', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => {
-      localStorage.setItem('resort-pro-auth', JSON.stringify({
-        state: {
-          user: { id: 'u1', email: 'owner@test.com', firstName: 'Alex', lastName: 'Johnson', role: 'OWNER', tenantId: 't1' },
-          tenant: { id: 't1', name: 'Test Resort', slug: 'test-resort', plan: 'STARTER' },
-          token: 'mock-token-for-e2e',
-          refreshToken: 'mock-refresh-token',
-        },
-        version: 0,
-      }));
-    });
-  });
+// Used to hand-roll a localStorage auth mock (a fake `resort-pro-auth`
+// entry injected via addInitScript) instead of actually logging in. That
+// mock drifted out of sync with the real app twice over: the mocked
+// session was rejected outright (the app redirected to /auth/login instead
+// of showing the dashboard, so the assertions below were silently checking
+// the login page — see project-integration-test-results.md), and even if it
+// hadn't been, it asserted a retired nav label ("Rooms & Villas") that no
+// longer exists (current label is just "Rooms"). Switched to the same real
+// demo-role login helper roles.spec.ts already uses — see helpers.ts.
 
+test.describe('Dashboard', () => {
   test('redirects unauthenticated users to login', async ({ page }) => {
     await page.goto('/dashboard');
-    // Without mock token, should redirect
-    await expect(page).toHaveURL(/\/auth\/login|\/dashboard/);
+    await expect(page).toHaveURL(/\/auth\/login/, { timeout: 8000 });
   });
+});
 
-  test('sidebar shows all navigation items', async ({ page }) => {
-    await page.goto('/dashboard');
-    await expect(page.getByText('Rooms & Villas')).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('Bookings')).toBeVisible();
-    await expect(page.getByText('Guests')).toBeVisible();
-    await expect(page.getByText('Staff')).toBeVisible();
-    await expect(page.getByText('Housekeeping')).toBeVisible();
-    await expect(page.getByText('Support')).toBeVisible();
-    await expect(page.getByText('Website')).toBeVisible();
+test.describe('Dashboard (authenticated via demo)', () => {
+  test('sidebar shows core navigation items', async ({ page }) => {
+    await loginAsRole(page, 'OWNER');
+    await ensureNavOpen(page);
+    // Daily tier — always rendered on desktop (and always in the flattened
+    // mobile sheet), no group expand needed. "Guests" and everything else
+    // lives inside a collapsible group instead (confirmed by running this:
+    // asserting it here without expanding its group failed) — role-by-role
+    // coverage of the grouped/collapsible items lives in roles.spec.ts.
+    await expect(await navItem(page, 'Rooms')).toBeVisible({ timeout: 8000 });
+    await expect(await navItem(page, 'Bookings')).toBeVisible();
   });
 
   test('rooms page accessible from sidebar', async ({ page }) => {
-    await page.goto('/dashboard');
-    await page.getByText('Rooms & Villas').click();
+    await loginAsRole(page, 'OWNER');
+    await ensureNavOpen(page);
+    await (await navItem(page, 'Rooms')).click();
     await expect(page).toHaveURL('/dashboard/rooms');
   });
 });
