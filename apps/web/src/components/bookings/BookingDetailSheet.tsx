@@ -1088,7 +1088,16 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
           open={!!cancelModalMode}
           onClose={() => setCancelModalMode(null)}
           onConfirm={(payload) => cancel.mutate(payload)}
-          paidAmount={Number(booking.paidAmount)}
+          // Was `booking.paidAmount` — the same stale-prop bug the payment
+          // section and check-in/out dialogs already had (see
+          // paymentOverride above): recording a payment in this same sheet
+          // session left this modal's "Already paid" hint frozen at the
+          // pre-payment amount, which could mislead staff into under- or
+          // over-refunding. The server re-validates the real paidAmount
+          // from the DB regardless, so this was a display-only bug, not a
+          // data-integrity one — but a dangerous one to get wrong on a
+          // cancel-with-refund screen.
+          paidAmount={Number(effectiveBooking.paidAmount)}
           loading={cancel.isPending}
           isNoShow={cancelModalMode === 'noshow'}
         />
