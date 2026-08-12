@@ -15,9 +15,11 @@ const nextConfig = {
     outputFileTracingRoot: path.join(__dirname, '../../'),
   },
 
-  // Don't fail production builds on type errors (fix separately in dev)
+  // Type-checking is a real CI gate now that tsc --noEmit is actually clean
+  // (see the 7-error web TS-baseline fix). Flip back to true only alongside
+  // a note explaining what's temporarily broken and why — never silently.
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
 
   // Don't fail production builds on ESLint warnings
