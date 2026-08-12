@@ -5,8 +5,30 @@
 import { prisma } from '@resort-pro/database';
 import { sendEmail } from '../services/email';
 import { calculateNights } from './booking';
+import { createAdminNotification } from './notifications';
 
 // ── Shared helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Every guest-lifecycle email is fired-and-forgotten from bookings.ts as
+ * `sendXEmail(id).catch(() => {})` — a blank catch, so a genuine failure
+ * (Resend down, bad template, expired API key) vanished with zero trace,
+ * the exact same silently-swallowed-failure pattern the invoice-creation
+ * fix (see sequence.ts / autoCreateInvoice) already addressed elsewhere.
+ * Wrap each call site with this instead of a blank catch so a real send
+ * failure creates an admin notification instead of disappearing.
+ */
+export function trackGuestEmail(kind: string, bookingId: string, tenantId: string, promise: Promise<void>) {
+  promise.catch(err => {
+    createAdminNotification({
+      type: 'guest_email_failed',
+      title: `Guest email failed: ${kind}`,
+      message: `Booking ${bookingId} (tenant ${tenantId}) — ${kind} email failed to send: ${err instanceof Error ? err.message : String(err)}`,
+      metadata: { bookingId, tenantId, kind },
+      linkPath: `/bookings/${bookingId}`,
+    }).catch(() => {});
+  });
+}
 
 function fmt(amount: number, currency = 'USD') {
   try {
@@ -298,8 +320,13 @@ export async function sendCheckoutEmail(bookingId: string) {
     }),
   });
 
-  // Mark invoice as sent
-  await prisma.booking.update({
+  // Mark invoice as sent. updateMany (not update) so a booking that no
+  // longer exists by the time this fire-and-forget job gets here is a
+  // silent 0-row no-op instead of a thrown P2025 "record not found" — this
+  // function is always called as `sendCheckoutEmail(id).catch(() => {})`,
+  // so it can only run to completion after the email itself already sent;
+  // there's nothing to roll back or retry, just nothing left to stamp.
+  await prisma.booking.updateMany({
     where: { id: bookingId },
     data: { invoiceNumber, invoiceSentAt: new Date() },
   });

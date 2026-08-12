@@ -9,6 +9,7 @@ import {
   sendBookingConfirmation,
   sendCheckoutEmail,
   sendCancellationEmail,
+  trackGuestEmail,
 } from '../utils/guest-emails';
 import { awardCheckoutPoints } from '../services/loyalty';
 import { syncCalendarsForRoom } from '../jobs/ical-sync';
@@ -454,7 +455,7 @@ export async function bookingRoutes(app: FastifyInstance) {
 
       // Send confirmation email (skip for walk-in if opted out)
       if (!body.skipEmail) {
-        sendBookingConfirmation(booking.id).catch(() => {});
+        trackGuestEmail('confirmation', booking.id, tenantId, sendBookingConfirmation(booking.id));
       }
 
       // Auto-generate invoice draft (fire-and-forget)
@@ -589,7 +590,7 @@ export async function bookingRoutes(app: FastifyInstance) {
       const grandTotal = Number(booking.totalAmount) + foodTotal;
       const paidAfter  = Number(booking.paidAmount) + (body.additionalPayment ?? 0);
 
-      sendCheckoutEmail(id).catch(() => {});
+      trackGuestEmail('checkout', id, booking.tenantId, sendCheckoutEmail(id));
       awardCheckoutPoints(id).catch(() => {});
 
       return ok({
@@ -680,7 +681,7 @@ export async function bookingRoutes(app: FastifyInstance) {
       // Skipped for no-shows — the "Booking Cancelled" template's wording
       // doesn't fit a guest who simply never arrived.
       if (body.notifyGuest !== false && !body.isNoShow) {
-        sendCancellationEmail(id).catch(() => {});
+        trackGuestEmail('cancellation', id, booking.tenantId, sendCancellationEmail(id));
       }
 
       return ok(updated, body.isNoShow ? 'Booking marked as no-show' : 'Booking cancelled');
@@ -771,7 +772,7 @@ export async function bookingRoutes(app: FastifyInstance) {
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
         if (body.notifyGuest !== false) {
-          sendBookingConfirmation(updated.id).catch(() => {});
+          trackGuestEmail('modified-confirmation', updated.id, tenantId, sendBookingConfirmation(updated.id));
         }
 
         return ok({ booking: updated, priceDiff: newTotal - oldTotal, oldTotal, newTotal }, 'Booking updated');
