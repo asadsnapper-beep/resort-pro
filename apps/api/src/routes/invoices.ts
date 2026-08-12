@@ -265,7 +265,17 @@ export async function invoicesRoutes(app: FastifyInstance) {
       const all = await db.invoice.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        include: { items: { select: { id: true } }, payments: { select: { amount: true } } },
+        // `booking` was missing here — the web list page's "Booking" column
+        // (invoices/page.tsx) reads inv.booking.confirmationNo and falls
+        // back to "Manual" whenever inv.booking is undefined, so every
+        // invoice showed "Manual" regardless of whether it actually had a
+        // bookingId — GET /:id already included this relation correctly,
+        // this list endpoint just never did.
+        include: {
+          items: { select: { id: true } },
+          payments: { select: { amount: true } },
+          booking: { select: { confirmationNo: true } },
+        },
       });
 
       const bookingById = await loadLinkedBookings(db, all);

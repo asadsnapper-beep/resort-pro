@@ -279,16 +279,41 @@ async function main() {
   console.log(`✅ ${bookingsData.length} bookings + payments`);
 
   // ── Invoices ─────────────────────────────────────────────────────────────────
-  const invoiceStatuses = ['DRAFT', 'SENT', 'PAID', 'PAID', 'PAID', 'OVERDUE', 'PAID'];
+  // status/paidAmount used to come from an independent hardcoded array while
+  // paidAmount was never set at all (defaulted to 0) — so several rows
+  // showed e.g. "Paid" while a nonzero amount was still "Due", even though
+  // each invoice is linked to a real booking with its own consistent
+  // paidAmount/paymentStatus just above. Derive both from that booking
+  // instead, the same "booking is the real source of truth" rule
+  // withBookingPaymentTruth() enforces at read time in routes/invoices.ts —
+  // seeding it self-contradictory defeats that safety net for demo data
+  // nobody ever makes a real payment against afterwards.
   for (let i = 0; i < Math.min(7, createdBookings.length); i++) {
     const bk = createdBookings[i];
-    const status = invoiceStatuses[i] ?? 'PAID';
     const guest = createdGuests.find((g: any) => g.id === bk.guestId);
     const existing = await prisma.invoice.findFirst({ where: { tenantId: demo.id, bookingId: bk.id } });
     if (!existing) {
       const subtotal = Number(bk.totalAmount);
       const taxAmt = Math.round(subtotal * 0.10);
       const total = subtotal + taxAmt;
+
+      // i===0 and i===5 are deliberately shown as "never sent" / "overdue"
+      // demo examples (kept from the original hardcoded array) — everything
+      // else derives status straight from the booking's real paidAmount so
+      // it can never contradict the "Due" amount shown next to it.
+      let status: 'DRAFT' | 'SENT' | 'PAID' | 'PARTIAL' | 'OVERDUE';
+      let paidAmount: number;
+      if (i === 0) {
+        status = 'DRAFT';
+        paidAmount = 0;
+      } else if (i === 5) {
+        status = 'OVERDUE';
+        paidAmount = Math.min(Number(bk.paidAmount), total * 0.5);
+      } else {
+        paidAmount = Math.min(Number(bk.paidAmount), total);
+        status = paidAmount <= 0 ? 'SENT' : paidAmount >= total ? 'PAID' : 'PARTIAL';
+      }
+
       const inv = await prisma.invoice.create({
         data: {
           invoiceNumber: `INV-2026-${String(i + 1).padStart(3, '0')}`,
@@ -301,6 +326,7 @@ async function main() {
           subtotal,
           taxRate:       10,
           taxAmount:     taxAmt,
+          paidAmount,
           total,
           dueDate:       d(status === 'OVERDUE' ? -3 : 7),
           notes:         'Thank you for choosing Coral Bay Resort.',
