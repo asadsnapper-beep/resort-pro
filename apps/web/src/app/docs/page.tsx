@@ -252,15 +252,15 @@ export default function DocsLandingPage() {
   return (
     <>
       {/* ── Nav ──────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-20 border-b border-gray-200 bg-white/90 backdrop-blur-sm">
+      <header className="sticky top-0 z-20 border-b border-[#EDE7DD] bg-white/90 backdrop-blur-sm">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-5">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1a6b5e] text-sm font-bold text-[#d4a853]">R</div>
-            <span className="font-semibold text-gray-900">ResortPro</span>
-            <span className="hidden text-gray-300 sm:block">/</span>
-            <span className="hidden text-sm text-gray-500 sm:block">Help Center</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#14314D] text-sm font-bold text-[#CFA153]">R</div>
+            <span className="font-extrabold text-[#14314D]">ResortPro</span>
+            <span className="hidden text-[#EDE7DD] sm:block">/</span>
+            <span className="hidden text-sm text-[#5B6B79] sm:block">Help Center</span>
           </Link>
-          <Link href="/dashboard" className="rounded-lg bg-[#1a6b5e] px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#145a4f]">
+          <Link href="/dashboard" className="rounded-lg bg-[#14314D] px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:opacity-90">
             Go to Dashboard
           </Link>
         </div>
@@ -269,12 +269,12 @@ export default function DocsLandingPage() {
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="bg-white py-14 text-center">
         <div className="mx-auto max-w-2xl px-5">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#1a6b5e]/20 bg-[#f0faf8] px-3 py-1 text-xs font-medium text-[#1a6b5e]">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#CFA153]/30 bg-[#F7F3EE] px-3 py-1 text-xs font-medium text-[#CFA153]">
             <BookOpen className="h-3.5 w-3.5" />
             Resort Owner Documentation
           </div>
-          <h1 className="mb-4 text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">How can we help?</h1>
-          <p className="text-lg leading-relaxed text-gray-500">
+          <h1 className="mb-4 text-4xl font-extrabold tracking-tight text-[#14314D] sm:text-5xl">How can we help?</h1>
+          <p className="text-lg leading-relaxed text-[#5B6B79]">
             Step-by-step guides for every feature in your ResortPro dashboard —<br className="hidden sm:block" />
             from adding your first room to syncing with Airbnb.
           </p>
@@ -282,16 +282,16 @@ export default function DocsLandingPage() {
       </section>
 
       {/* ── Highlights strip ─────────────────────────────────────────────── */}
-      <div className="border-y border-gray-200 bg-white">
-        <div className="mx-auto grid max-w-5xl grid-cols-1 divide-y divide-gray-200 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+      <div className="border-y border-[#EDE7DD] bg-white">
+        <div className="mx-auto grid max-w-5xl grid-cols-1 divide-y divide-[#EDE7DD] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
           {HIGHLIGHTS.map(({ icon: Icon, label, sub }) => (
             <div key={label} className="flex items-center gap-4 px-8 py-5">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#f0faf8] text-[#1a6b5e]">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F7F3EE] text-[#CFA153]">
                 <Icon className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-gray-900">{label}</p>
-                <p className="mt-0.5 text-xs text-gray-500">{sub}</p>
+                <p className="text-sm font-semibold text-[#14314D]">{label}</p>
+                <p className="mt-0.5 text-xs text-[#5B6B79]">{sub}</p>
               </div>
             </div>
           ))}
@@ -303,10 +303,10 @@ export default function DocsLandingPage() {
         {/* ── Guide sections ───────────────────────────────────────────────── */}
         {SECTIONS.map((section) => (
           <section key={section.label}>
-            <h2 className="mb-5 flex items-center gap-3 text-xs font-semibold uppercase tracking-widest text-gray-400">
-              <span className="h-px flex-1 bg-gray-200" />
+            <h2 className="mb-5 flex items-center gap-3 text-xs font-semibold uppercase tracking-widest text-[#8B95A0]">
+              <span className="h-px flex-1 bg-[#EDE7DD]" />
               {section.label}
-              <span className="h-px flex-1 bg-gray-200" />
+              <span className="h-px flex-1 bg-[#EDE7DD]" />
             </h2>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {section.guides.map((g) => {
@@ -315,7 +315,7 @@ export default function DocsLandingPage() {
                   <Link
                     key={g.href}
                     href={g.href}
-                    className="group relative flex flex-col rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:border-[#1a6b5e]/40 hover:shadow-md"
+                    className="group relative flex flex-col rounded-2xl border border-[#EDE7DD] bg-white p-5 transition-all hover:border-[#CFA153]/50 hover:shadow-md"
                   >
                     <div className="mb-3 flex items-start justify-between">
                       <div className={`flex h-10 w-10 items-center justify-center rounded-xl border ${g.color}`}>
@@ -323,11 +323,11 @@ export default function DocsLandingPage() {
                       </div>
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${g.tagColor}`}>{g.tag}</span>
                     </div>
-                    <h3 className="mb-1.5 text-sm font-semibold text-gray-900 group-hover:text-[#1a6b5e]">{g.title}</h3>
-                    <p className="flex-1 text-xs leading-relaxed text-gray-500">{g.desc}</p>
+                    <h3 className="mb-1.5 text-sm font-semibold text-[#14314D] group-hover:opacity-80">{g.title}</h3>
+                    <p className="flex-1 text-xs leading-relaxed text-[#5B6B79]">{g.desc}</p>
                     <div className="mt-3 flex items-center justify-between">
-                      <span className="text-xs text-gray-400">{g.time} read</span>
-                      <span className="flex items-center gap-1 text-xs font-medium text-[#1a6b5e] opacity-0 transition-opacity group-hover:opacity-100">
+                      <span className="text-xs text-[#8B95A0]">{g.time} read</span>
+                      <span className="flex items-center gap-1 text-xs font-medium text-[#CFA153] opacity-0 transition-opacity group-hover:opacity-100">
                         Read <ArrowRight className="h-3 w-3" />
                       </span>
                     </div>
@@ -340,19 +340,19 @@ export default function DocsLandingPage() {
 
         {/* ── Quick links ──────────────────────────────────────────────────── */}
         <section>
-          <h2 className="mb-5 flex items-center gap-3 text-xs font-semibold uppercase tracking-widest text-gray-400">
-            <span className="h-px flex-1 bg-gray-200" />
+          <h2 className="mb-5 flex items-center gap-3 text-xs font-semibold uppercase tracking-widest text-[#8B95A0]">
+            <span className="h-px flex-1 bg-[#EDE7DD]" />
             Quick Answers
-            <span className="h-px flex-1 bg-gray-200" />
+            <span className="h-px flex-1 bg-[#EDE7DD]" />
           </h2>
           <div className="grid gap-2 sm:grid-cols-2">
             {QUICK_LINKS.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
-                className="group flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 transition-colors hover:border-[#1a6b5e]/40 hover:text-[#1a6b5e]"
+                className="group flex items-center gap-3 rounded-xl border border-[#EDE7DD] bg-white px-4 py-3 text-sm text-[#14314D] transition-colors hover:border-[#CFA153]/50"
               >
-                <ChevronRight className="h-4 w-4 shrink-0 text-gray-300 transition-colors group-hover:text-[#1a6b5e]" />
+                <ChevronRight className="h-4 w-4 shrink-0 text-[#8B95A0] transition-colors group-hover:text-[#CFA153]" />
                 {l.label}
               </Link>
             ))}
@@ -361,17 +361,17 @@ export default function DocsLandingPage() {
 
         {/* ── Support CTA ──────────────────────────────────────────────────── */}
         <section>
-          <div className="flex flex-col items-center gap-4 rounded-2xl border border-[#1a6b5e]/20 bg-[#f0faf8] px-8 py-10 text-center sm:flex-row sm:text-left">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#1a6b5e] text-white">
+          <div className="flex flex-col items-center gap-4 rounded-2xl bg-[#F7F3EE] px-8 py-10 text-center sm:flex-row sm:text-left">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#CFA153] text-white">
               <LifeBuoy className="h-6 w-6" />
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-gray-900">Still have questions?</h3>
-              <p className="mt-0.5 text-sm text-gray-500">
+              <h3 className="font-semibold text-[#14314D]">Still have questions?</h3>
+              <p className="mt-0.5 text-sm text-[#5B6B79]">
                 Open a support ticket directly from your dashboard — our team typically responds within a few hours.
               </p>
             </div>
-            <Link href="/dashboard/support" className="shrink-0 rounded-xl bg-[#1a6b5e] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#145a4f]">
+            <Link href="/dashboard/support" className="shrink-0 rounded-xl bg-[#14314D] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90">
               Open a Ticket
             </Link>
           </div>
@@ -380,10 +380,10 @@ export default function DocsLandingPage() {
       </main>
 
       {/* ── Footer ───────────────────────────────────────────────────────── */}
-      <footer className="mt-8 border-t border-gray-200 bg-white py-8 text-center text-xs text-gray-400">
+      <footer className="mt-8 border-t border-[#EDE7DD] bg-white py-8 text-center text-xs text-[#8B95A0]">
         <p>© {new Date().getFullYear()} ResortPro · All-in-one resort management platform</p>
         <p className="mt-1">
-          <a href="mailto:support@resortpro.site" className="hover:text-[#1a6b5e]">support@resortpro.site</a>
+          <a href="mailto:support@resortpro.site" className="hover:text-[#CFA153]">support@resortpro.site</a>
         </p>
       </footer>
     </>
