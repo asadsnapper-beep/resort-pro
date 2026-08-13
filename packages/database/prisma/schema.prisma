@@ -477,6 +477,7 @@ model Tenant {
   invoices               Invoice[]
   invoicePayments        InvoicePayment[]
   ratePlans              RatePlan[]
+  numberCounters         NumberCounter[]
   emailSettings          EmailSettings?
   maintenanceTickets     MaintenanceTicket[]
   packages               Package[]
@@ -512,6 +513,7 @@ model Tenant {
   corporateInvoices      CorporateInvoice[]
   designRequests         DesignRequest[]
   exclusiveThemes        Theme[]
+  deletionRequests       TenantDeletionRequest[]
 
   @@map("tenants")
 }
@@ -528,6 +530,9 @@ model User {
   avatarUrl    String?
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime?
+  // Existing/invited staff are trusted by default. Public resort signup
+  // explicitly writes null until the owner clicks the verification link.
+  emailVerifiedAt DateTime? @default(now())
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -539,11 +544,27 @@ model User {
   notifications       Notification[]
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
   shareholderProfile  ShareholderProfile?
+  tenantDeletionRequests TenantDeletionRequest[] @relation("TenantDeletionRequests")
 
   @@unique([tenantId, email])
   @@index([tenantId])
   @@map("users")
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verification_tokens")
 }
 
 model RefreshToken {
@@ -718,17 +739,20 @@ model GuestDocument {
   id         String   @id @default(uuid())
   guestId    String
   tenantId   String
+  bookingId  String? // optional — set when the doc was added at walk-in/new-booking time, so it shows up on that specific stay too
   docType    String // PASSPORT | NATIONAL_ID | DRIVERS_LICENSE | VISA | OTHER
   imageUrl   String
   notes      String?
   uploadedAt DateTime @default(now())
   uploadedBy String? // staff user ID
 
-  guest  Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  guest   Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
 
   @@index([guestId])
   @@index([tenantId])
+  @@index([bookingId])
   @@map("guest_documents")
 }
 
@@ -792,8 +816,8 @@ model Booking {
 
   // Relations
   tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  room             Room              @relation(fields: [roomId], references: [id])
-  guest            Guest             @relation(fields: [guestId], references: [id])
+  room             Room              @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  guest            Guest             @relation(fields: [guestId], references: [id], onDelete: Cascade)
   group            GroupBooking?     @relation(fields: [groupId], references: [id], onDelete: SetNull)
   corporateAccount CorporateAccount? @relation(fields: [corporateAccountId], references: [id], onDelete: SetNull)
   corporateInvoice CorporateInvoice? @relation(fields: [corporateInvoiceId], references: [id], onDelete: SetNull)
@@ -807,6 +831,7 @@ model Booking {
   minibarConsumptions MinibarConsumption[]
   laundryOrders       LaundryOrder[]
   vehicleRentals      VehicleRental[]
+  documents           GuestDocument[]
 
   @@index([tenantId])
   @@index([checkIn, checkOut])
@@ -900,7 +925,7 @@ model Payment {
   updatedAt   DateTime  @updatedAt
 
   tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  booking Booking? @relation(fields: [bookingId], references: [id])
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
   @@index([bookingId])
@@ -980,9 +1005,29 @@ enum InvoiceItemCategory {
   OTHER
 }
 
+// Atomic per-tenant number sequence (invoices, corporate invoices, and any
+// future document that needs a gapless-ish, race-free running number).
+// One row per (tenantId, key) — `key` already includes the year, e.g.
+// "invoice:2026" — so the counter naturally resets each year. Incrementing
+// via Prisma's atomic `{ increment: 1 }` inside an upsert compiles to a
+// single `INSERT ... ON CONFLICT DO UPDATE SET value = value + 1` on
+// Postgres, so concurrent requests can never read-then-write the same
+// value — the previous bug this replaces (see utils/sequence.ts).
+model NumberCounter {
+  id       String @id @default(uuid())
+  tenantId String
+  key      String
+  value    Int    @default(0)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+  @@map("number_counters")
+}
+
 model Invoice {
   id            String  @id @default(uuid())
-  invoiceNumber String  @unique // INV-2026-0001 (auto-generated)
+  invoiceNumber String  @unique // INV-{tenantCode}-2026-0001 (auto-generated)
   tenantId      String
   bookingId     String? @unique // one invoice per booking
 
@@ -1356,8 +1401,8 @@ model HousekeepingTask {
 
   // Relations
   tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  room       Room   @relation(fields: [roomId], references: [id])
-  assignedTo Staff? @relation(fields: [assignedToId], references: [id])
+  room       Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  assignedTo Staff? @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
   @@index([scheduledDate])
@@ -1427,7 +1472,7 @@ model MinibarConsumption {
   tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   room        Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
   booking     Booking?    @relation(fields: [bookingId], references: [id], onDelete: SetNull)
-  minibarItem MinibarItem @relation(fields: [minibarItemId], references: [id])
+  minibarItem MinibarItem @relation(fields: [minibarItemId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([roomId])
@@ -1512,9 +1557,9 @@ model FoodOrder {
   updatedAt         DateTime       @updatedAt
 
   tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  booking         Booking?         @relation(fields: [bookingId], references: [id])
-  guest           Guest?           @relation(fields: [guestId], references: [id])
-  restaurantTable RestaurantTable? @relation(fields: [restaurantTableId], references: [id])
+  booking         Booking?         @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  guest           Guest?           @relation(fields: [guestId], references: [id], onDelete: SetNull)
+  restaurantTable RestaurantTable? @relation(fields: [restaurantTableId], references: [id], onDelete: SetNull)
   items           FoodOrderItem[]
 
   @@index([tenantId])
@@ -1551,7 +1596,7 @@ model FoodOrderItem {
   notes      String?
 
   order    FoodOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  menuItem MenuItem  @relation(fields: [menuItemId], references: [id])
+  menuItem MenuItem  @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
 
   @@map("food_order_items")
 }
@@ -1741,7 +1786,7 @@ model InventoryMovement {
   createdAt       DateTime @default(now())
 
   tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([inventoryItemId])
@@ -1783,7 +1828,7 @@ model PurchaseOrder {
   updatedAt  DateTime  @updatedAt
 
   tenant Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  vendor Vendor              @relation(fields: [vendorId], references: [id])
+  vendor Vendor              @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   items  PurchaseOrderItem[]
 
   @@index([tenantId])
@@ -1799,7 +1844,7 @@ model PurchaseOrderItem {
   unitCost         Float
 
   purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
 
   @@index([purchaseOrderId])
   @@map("purchase_order_items")
@@ -1886,9 +1931,9 @@ model SupportTicket {
   updatedAt      DateTime       @updatedAt
 
   tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  guest      Guest?        @relation(fields: [guestId], references: [id])
-  assignedTo User?         @relation("AssignedTickets", fields: [assignedToId], references: [id])
-  booking    Booking?      @relation(fields: [bookingId], references: [id])
+  guest      Guest?        @relation(fields: [guestId], references: [id], onDelete: SetNull)
+  assignedTo User?         @relation("AssignedTickets", fields: [assignedToId], references: [id], onDelete: SetNull)
+  booking    Booking?      @relation(fields: [bookingId], references: [id], onDelete: SetNull)
   messages   ChatMessage[]
 
   @@index([tenantId])
@@ -1908,7 +1953,7 @@ model ChatMessage {
   createdAt     DateTime       @default(now())
 
   ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  sender User          @relation(fields: [senderId], references: [id])
+  sender User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([ticketId])
   @@map("chat_messages")
@@ -2181,7 +2226,7 @@ model Campaign {
   updatedAt      DateTime       @updatedAt
 
   tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  template EmailTemplate? @relation(fields: [templateId], references: [id])
+  template EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
   sends    EmailSend[]
   stats    CampaignStats?
 
@@ -2226,8 +2271,8 @@ model EmailSend {
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   guest        Guest         @relation(fields: [guestId], references: [id], onDelete: Cascade)
-  campaign     Campaign?     @relation(fields: [campaignId], references: [id])
-  sequenceStep SequenceStep? @relation(fields: [sequenceStepId], references: [id])
+  campaign     Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  sequenceStep SequenceStep? @relation(fields: [sequenceStepId], references: [id], onDelete: SetNull)
   clicks       EmailClick[]
 
   @@index([tenantId])
@@ -2310,7 +2355,7 @@ model SequenceStep {
   updatedAt  DateTime @updatedAt
 
   sequence Sequence       @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
-  template EmailTemplate? @relation(fields: [templateId], references: [id])
+  template EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
   sends    EmailSend[]
 
   @@index([sequenceId])
@@ -2620,6 +2665,39 @@ enum ThemeStatus {
   PUBLISHED // live — tenants can select it
 }
 
+/// Resort Owner submits a request to permanently delete their own tenant;
+/// Super Admin reviews and approves (triggers the real hard delete via the
+/// same code path as an admin-initiated delete) or rejects it. Owners never
+/// delete their own tenant directly — see DELETE /api/admin/tenants/:id.
+enum TenantDeletionRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model TenantDeletionRequest {
+  id       String @id @default(uuid())
+  tenantId String
+
+  requestedById String
+  reason        String
+
+  status               TenantDeletionRequestStatus @default(PENDING)
+  resolvedAt            DateTime?
+  resolvedByAdminEmail  String?
+  adminNotes            String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requestedBy User   @relation("TenantDeletionRequests", fields: [requestedById], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("tenant_deletion_requests")
+}
+
 /// Paid custom-design service — see plan/theme-studio-and-design-service.md.
 /// An owner asks for a bespoke website from the dashboard; admin quotes it,
 /// builds it, and ships it as a theme scoped to that tenant only.
@@ -2886,6 +2964,7 @@ model Venue {
   capacity    Int
   description String?
   photos      String[]
+  videos      String[] @default([])
   amenities   String[]
 
   halfDayRate  Float?
@@ -2980,6 +3059,8 @@ model Vehicle {
   depositAmount      Float?
   availability       VehicleAvailability @default(AVAILABLE)
   notes              String?
+  photos             String[]            @default([])
+  videos             String[]            @default([])
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 

@@ -9,6 +9,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { roomsApi, guestsApi, ratePlansApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { Search, BedDouble, ChevronRight, ChevronLeft, Tags, UserPlus, X } from 'lucide-react';
+import { AddDocumentInline, type PendingDocument } from '@/components/guests/AddDocumentInline';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 
@@ -27,7 +28,10 @@ type Step1Data = z.infer<typeof step1Schema>;
 interface Props {
   open: boolean;
   onClose: () => void;
-  onSubmit: (data: { roomId: string; guestId: string; checkIn: string; checkOut: string; adults: number; children: number; specialRequests?: string }) => void;
+  onSubmit: (
+    data: { roomId: string; guestId: string; checkIn: string; checkOut: string; adults: number; children: number; specialRequests?: string },
+    pendingDoc?: PendingDocument,
+  ) => void;
   loading: boolean;
 }
 
@@ -49,14 +53,26 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
   const [showNewGuest, setShowNewGuest] = useState(false);
   const [newGuestForm, setNewGuestForm] = useState({ firstName: '', lastName: '', email: '', phone: '' });
   const [newGuestError, setNewGuestError] = useState<string | null>(null);
+  const [pendingDoc, setPendingDoc] = useState<PendingDocument | null>(null);
+  const [showDocPicker, setShowDocPicker] = useState(false);
 
-  const { register: reg1, handleSubmit: hs1, formState: { errors: e1 }, reset: reset1, watch } = useForm<Step1Data>({
+  const { register: reg1, handleSubmit: hs1, formState: { errors: e1 }, reset: reset1, watch, setValue } = useForm<Step1Data>({
     resolver: zodResolver(step1Schema),
     defaultValues: { adults: 2, children: 0 },
   });
 
   const checkIn = watch('checkIn');
   const checkOut = watch('checkOut');
+  const dayAfter = (d: string) => new Date(new Date(d).getTime() + 86_400_000).toISOString().split('T')[0];
+
+  // Check-out follows check-in by one night until the guest picks something
+  // later themselves — and can never land on or before check-in (min on the
+  // input enforces that too).
+  useEffect(() => {
+    if (checkIn && (!checkOut || checkOut <= checkIn)) {
+      setValue('checkOut', dayAfter(checkIn));
+    }
+  }, [checkIn, checkOut, setValue]);
 
   // Load available rooms when dates selected
   const { data: availableData, isLoading: roomsLoading } = useQuery({
@@ -118,7 +134,7 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
       setStep(1); setStep1Data(null); setSelectedRoom(null);
       setSelectedGuest(null); setGuestSearch(''); setSpecialRequests('');
       setShowNewGuest(false); setNewGuestForm({ firstName: '', lastName: '', email: '', phone: '' });
-      setNewGuestError(null);
+      setNewGuestError(null); setPendingDoc(null); setShowDocPicker(false);
       reset1({ adults: 2, children: 0 });
     }
   }, [open, reset1]);
@@ -138,7 +154,7 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
       adults: step1Data.adults,
       children: step1Data.children,
       specialRequests: specialRequests || undefined,
-    });
+    }, pendingDoc ?? undefined);
   };
 
   const stepTitles = ['Select Dates', 'Choose Room', 'Select Guest', 'Confirm'];
@@ -200,7 +216,7 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
               <input
                 {...reg1('checkOut')}
                 type="date"
-                min={checkIn || new Date().toISOString().split('T')[0]}
+                min={checkIn ? dayAfter(checkIn) : new Date().toISOString().split('T')[0]}
                 style={{
                   width: '100%',
                   borderRadius: '8px',
@@ -601,6 +617,17 @@ export function NewBookingModal({ open, onClose, onSubmit, loading }: Props) {
               placeholder="Early check-in, high floor, extra pillows..."
               className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
             />
+          </div>
+
+          <div>
+            <button type="button" onClick={() => setShowDocPicker(v => !v)}
+              className="flex items-center gap-1.5 text-sm font-medium text-resort-600 hover:text-resort-700">
+              <UserPlus className="h-3.5 w-3.5" />
+              {pendingDoc ? 'Document added ✓' : '+ Add ID document (optional)'}
+            </button>
+            {showDocPicker && (
+              <AddDocumentInline value={pendingDoc} onChange={setPendingDoc} className="mt-2" />
+            )}
           </div>
 
           <div className="flex justify-between pt-2">

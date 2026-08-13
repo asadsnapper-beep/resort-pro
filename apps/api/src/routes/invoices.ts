@@ -1,28 +1,27 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '@resort-pro/database';
+import type { TenantScopedPrisma } from '@resort-pro/database';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams } from '../utils/response';
 import { sendEmail } from '../services/email';
+import { nextDocumentNumber } from '../utils/sequence';
 import type { JwtPayload } from '@resort-pro/types';
 import PDFDocument from 'pdfkit';
 
 /* ── helpers ─────────────────────────────────────────────────────────────── */
 
-/** Auto-generate invoice number: INV-YYYY-NNNN
- *  Uses the highest existing number for the year rather than COUNT, which
- *  avoids gaps from deletions and is more collision-resistant than COUNT.
- *  The invoiceNumber unique constraint acts as the final safety net.
- */
+// Was: `findFirst`/`orderBy: desc` against a per-tenant prefix, against a
+// globally-@unique invoiceNumber column — the exact same collision bug fixed
+// in bookings.ts's autoCreateInvoice and corporateAccounts.ts's
+// nextInvoiceNumber (two concurrent requests, or two tenants, could compute
+// the identical "INV-2026-0001" and one would fail the unique constraint).
+// This third copy of the bug was missed in that earlier pass because it
+// lives in a route that creates invoices manually rather than automatically.
+// Now uses the same atomic per-tenant counter + tenant-code-in-string scheme.
 async function nextInvoiceNumber(tenantId: string): Promise<string> {
-  const year   = new Date().getFullYear();
-  const prefix = `INV-${year}-`;
-  const last   = await prisma.invoice.findFirst({
-    where:   { tenantId, invoiceNumber: { startsWith: prefix } },
-    orderBy: { invoiceNumber: 'desc' },
-  });
-  const lastNum = last ? parseInt(last.invoiceNumber.slice(prefix.length), 10) : 0;
-  return `${prefix}${String(lastNum + 1).padStart(4, '0')}`;
+  const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
+  return nextDocumentNumber(tenantId, tenant.slug, 'INV');
 }
 
 /** Recalculate subtotal, taxAmount, total from items + rates */
@@ -56,6 +55,50 @@ async function syncTotals(invoiceId: string) {
     where: { id: invoiceId },
     data: { subtotal, taxAmount, total, paidAmount, status },
   });
+}
+
+/**
+ * Booking-linked invoices vs. the booking they came from — two payment
+ * ledgers that never talked to each other. autoCreateInvoice snapshots an
+ * invoice at booking-confirm time, but the day-to-day "Record Payment" flow
+ * (Front Desk / BookingDetailSheet) writes straight to Booking.paidAmount —
+ * it has no idea a linked Invoice row exists, so that invoice sat frozen at
+ * DRAFT/0 forever regardless of how much the guest actually paid. The
+ * per-booking print/PDF page (bookings/[id]/invoice) already sidesteps this
+ * by reading straight from the booking's own payment fields instead of the
+ * Invoice's stored ones — this applies that same "booking is the real
+ * source of truth" rule here, for the Invoices list + stats.
+ *
+ * Never overrides CANCELLED (a cancelled invoice stays cancelled regardless
+ * of what the booking's payment state looks like now). PAID/PARTIAL from
+ * the booking always wins over a stale DRAFT/SENT/OVERDUE — real money
+ * received should always show, even on an invoice nobody ever manually
+ * "sent" through this feature. An unpaid booking never overrides an
+ * existing SENT/OVERDUE — that distinction (has it been sent yet) isn't
+ * something the booking has an opinion on.
+ */
+function withBookingPaymentTruth<T extends { status: string; paidAmount: number; bookingId: string | null }>(
+  invoice: T,
+  booking: { paidAmount: number; paymentStatus: string } | undefined,
+): T {
+  if (!booking || invoice.status === 'CANCELLED') return invoice;
+  const status =
+    booking.paymentStatus === 'PAID'    ? 'PAID' :
+    booking.paymentStatus === 'PARTIAL' ? 'PARTIAL' :
+    invoice.status;
+  return { ...invoice, paidAmount: booking.paidAmount, status };
+}
+
+/** Bulk-fetch the {paidAmount, paymentStatus} of every booking referenced by
+ *  `invoices`, keyed by booking id, for withBookingPaymentTruth() above. */
+async function loadLinkedBookings(db: TenantScopedPrisma, invoices: { bookingId: string | null }[]) {
+  const bookingIds = [...new Set(invoices.map(i => i.bookingId).filter((id): id is string => !!id))];
+  if (bookingIds.length === 0) return new Map<string, { paidAmount: number; paymentStatus: string }>();
+  const bookings = await db.booking.findMany({
+    where: { id: { in: bookingIds } },
+    select: { id: true, paidAmount: true, paymentStatus: true },
+  });
+  return new Map(bookings.map(b => [b.id, { paidAmount: Number(b.paidAmount), paymentStatus: b.paymentStatus }]));
 }
 
 /* ── PDF builder ─────────────────────────────────────────────────────────── */
@@ -206,24 +249,41 @@ export async function invoicesRoutes(app: FastifyInstance) {
     schema: { tags: ['invoices'], summary: 'List invoices', security: [{ bearerAuth: [] }] },
     handler: async (request, reply) => {
       const { db } = request;
-      const { page, limit, skip } = parsePageParams(request.query as Record<string, string>);
+      const { page, limit } = parsePageParams(request.query as Record<string, string>);
       const q = request.query as Record<string, string>;
 
+      // NOT filtering by q.status at the DB level — a booking-linked
+      // invoice's real status can differ from its stored one (see
+      // withBookingPaymentTruth), so the status filter has to apply after
+      // that override, not before it. Search stays DB-side; it's unrelated.
       const where: Record<string, unknown> = {};
-      if (q.status)  where.status  = q.status;
-      if (q.search)  where.OR = [
+      if (q.search) where.OR = [
         { invoiceNumber: { contains: q.search, mode: 'insensitive' } },
         { guestName:     { contains: q.search, mode: 'insensitive' } },
       ];
 
-      const [items, total] = await Promise.all([
-        db.invoice.findMany({
-          where, skip, take: limit,
-          orderBy: { createdAt: 'desc' },
-          include: { items: { select: { id: true } }, payments: { select: { amount: true } } },
-        }),
-        db.invoice.count({ where }),
-      ]);
+      const all = await db.invoice.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        // `booking` was missing here — the web list page's "Booking" column
+        // (invoices/page.tsx) reads inv.booking.confirmationNo and falls
+        // back to "Manual" whenever inv.booking is undefined, so every
+        // invoice showed "Manual" regardless of whether it actually had a
+        // bookingId — GET /:id already included this relation correctly,
+        // this list endpoint just never did.
+        include: {
+          items: { select: { id: true } },
+          payments: { select: { amount: true } },
+          booking: { select: { confirmationNo: true } },
+        },
+      });
+
+      const bookingById = await loadLinkedBookings(db, all);
+      const withTruth = all.map(inv => withBookingPaymentTruth(inv, inv.bookingId ? bookingById.get(inv.bookingId) : undefined));
+      const filtered  = q.status ? withTruth.filter(inv => inv.status === q.status) : withTruth;
+
+      const total = filtered.length;
+      const items = filtered.slice((page - 1) * limit, (page - 1) * limit + limit);
 
       return paginated(items, total, page, limit);
     },
@@ -238,28 +298,33 @@ export async function invoicesRoutes(app: FastifyInstance) {
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-      const [agg, paid, outstanding, thisMonth] = await Promise.all([
-        db.invoice.aggregate({ where: {}, _sum: { total: true }, _count: true }),
-        db.invoice.aggregate({ where: { status: 'PAID' }, _sum: { total: true }, _count: true }),
-        db.invoice.aggregate({
-          where: { status: { in: ['SENT', 'PARTIAL', 'OVERDUE'] } },
-          _sum: { total: true, paidAmount: true },
-        }),
-        db.invoice.aggregate({
-          where: { createdAt: { gte: monthStart, lte: monthEnd } },
-          _sum: { total: true },
-          _count: true,
-        }),
-      ]);
-      const outstandingAmt = (outstanding._sum.total ?? 0) - (outstanding._sum.paidAmount ?? 0);
+      // Can't do this with a plain aggregate anymore — "PAID"/"outstanding"
+      // has to mean the booking-corrected status (withBookingPaymentTruth),
+      // not the stored one, or these numbers would keep saying "Collected:
+      // 0" for a tenant whose guests have actually paid in full via Front
+      // Desk. Tenant-scale invoice counts make an in-memory pass over all of
+      // them completely fine — this isn't a table scan across tenants.
+      const all = await db.invoice.findMany({
+        select: { id: true, bookingId: true, total: true, paidAmount: true, status: true, createdAt: true },
+      });
+      const bookingById = await loadLinkedBookings(db, all);
+      const withTruth = all.map(inv => withBookingPaymentTruth(inv, inv.bookingId ? bookingById.get(inv.bookingId) : undefined));
+
+      const paidRows        = withTruth.filter(i => i.status === 'PAID');
+      const outstandingRows = withTruth.filter(i => ['SENT', 'PARTIAL', 'OVERDUE'].includes(i.status));
+      const thisMonthRows   = withTruth.filter(i => i.createdAt >= monthStart && i.createdAt <= monthEnd);
+
+      const sum = (rows: typeof withTruth, pick: (i: typeof withTruth[number]) => number) =>
+        rows.reduce((s, i) => s + pick(i), 0);
+
       return ok({
-        totalInvoiced:  agg._sum.total          ?? 0,
-        totalCount:     agg._count,
-        collected:      paid._sum.total         ?? 0,
-        paidCount:      paid._count,
-        outstanding:    outstandingAmt,
-        thisMonth:      thisMonth._sum.total    ?? 0,
-        thisMonthCount: thisMonth._count,
+        totalInvoiced:  sum(withTruth, i => i.total),
+        totalCount:     withTruth.length,
+        collected:      sum(paidRows, i => i.total),
+        paidCount:      paidRows.length,
+        outstanding:    sum(outstandingRows, i => i.total - i.paidAmount),
+        thisMonth:      sum(thisMonthRows, i => i.total),
+        thisMonthCount: thisMonthRows.length,
       });
     },
   });

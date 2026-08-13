@@ -90,9 +90,14 @@ export default function LoginPage() {
         return; // don't navigate yet — wait for user choice
       }
 
-      router.push('/dashboard');
+      router.push(tenant.onboardingCompletedAt ? '/dashboard' : '/onboarding');
     } catch (err: unknown) {
-      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || t('invalidCredentials');
+      const apiError = (err as { response?: { data?: { error?: string; code?: string } } })?.response?.data;
+      if (apiError?.code === 'EMAIL_VERIFICATION_REQUIRED') {
+        router.push(`/auth/verify-email?email=${encodeURIComponent(data.email)}&workspace=${encodeURIComponent(data.slug)}`);
+        return;
+      }
+      const message = apiError?.error || t('invalidCredentials');
       setLoginError(message);
       toast({ title: 'Error', description: message, variant: 'destructive' });
     } finally {
@@ -115,7 +120,7 @@ export default function LoginPage() {
       const { user, tenant, token, refreshToken } = res.data.data;
       setAuth(user, tenant, token, refreshToken);
       toast({ title: 'Welcome back!', description: user.firstName });
-      router.push('/dashboard');
+      router.push(tenant.onboardingCompletedAt ? '/dashboard' : '/onboarding');
     } catch {
       toast({ title: 'Login failed', variant: 'destructive' });
     } finally {
@@ -130,7 +135,8 @@ export default function LoginPage() {
     setHasSavedCreds(true);
     setShowSavePrompt(false);
     toast({ title: 'Touch ID enabled', description: 'You can login with Touch ID next time' });
-    router.push('/dashboard');
+    const currentTenant = useAuthStore.getState().tenant;
+    router.push(currentTenant?.onboardingCompletedAt ? '/dashboard' : '/onboarding');
   };
 
   return (

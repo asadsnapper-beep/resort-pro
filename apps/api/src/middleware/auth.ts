@@ -6,8 +6,15 @@ import { resolveTenantEntitlement } from '../utils/entitlement';
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const BILLING_EXEMPT_PATHS = ['/api/billing', '/api/stripe'];
 
-function isBillingPath(request: FastifyRequest) {
-  return BILLING_EXEMPT_PATHS.some((path) => request.url.startsWith(path));
+function isInactiveSubscriptionWriteAllowed(request: FastifyRequest) {
+  if (BILLING_EXEMPT_PATHS.some((path) => request.url.startsWith(path))) return true;
+
+  // A verified new owner can complete the tightly-scoped setup wizard before
+  // checkout. Other writes remain read-only while planStatus is incomplete.
+  const pathname = request.url.split('?')[0].replace(/\/$/, '');
+  return (request.method === 'PATCH' && pathname === '/api/tenant')
+    || (request.method === 'PATCH' && pathname === '/api/tenant/onboarding')
+    || (request.method === 'POST' && pathname === '/api/rooms');
 }
 
 /** Authenticate a tenant-scoped request and enforce subscription read-only mode. */
@@ -21,7 +28,24 @@ async function authenticateTenant(request: FastifyRequest, reply: FastifyReply):
       return null;
     }
 
-    if (MUTATING_METHODS.has(request.method) && !isBillingPath(request)) {
+    const account = await prisma.user.findUnique({
+      where: { id: user.sub },
+      select: { emailVerifiedAt: true, isActive: true, tenantId: true },
+    });
+    if (!account || !account.isActive || account.tenantId !== user.tenantId) {
+      reply.status(401).send({ success: false, error: 'Unauthorized' });
+      return null;
+    }
+    if (!account.emailVerifiedAt) {
+      reply.status(403).send({
+        success: false,
+        error: 'Verify your email before continuing.',
+        code: 'EMAIL_VERIFICATION_REQUIRED',
+      });
+      return null;
+    }
+
+    if (MUTATING_METHODS.has(request.method) && !isInactiveSubscriptionWriteAllowed(request)) {
       const tenant = await prisma.tenant.findUnique({
         where: { id: user.tenantId },
         select: { planStatus: true },

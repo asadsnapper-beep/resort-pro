@@ -279,11 +279,17 @@ jobs:
 
       - name: Wait for servers to be ready
         run: |
-          npx wait-on http://localhost:4000/api/health http://localhost:3000 --timeout 60000
+          npx wait-on http://localhost:4000/health http://localhost:3000 --timeout 60000
 
       - name: Install Playwright browsers
         working-directory: apps/web
-        run: pnpm exec playwright install --with-deps chromium
+        # playwright.config.ts defines both a "chromium" and a "Mobile
+        # Safari" (webkit) project, and the test step below runs every
+        # project by default (no --project flag) — installing only chromium
+        # here meant every Mobile Safari test would fail 100% of the time
+        # with "Executable doesn't exist" the moment the suite got far
+        # enough to actually run.
+        run: pnpm exec playwright install --with-deps chromium webkit
 
       - name: Run E2E role tests
         working-directory: apps/web
@@ -369,10 +375,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: '20'
+          cache: 'pnpm'
 
       - name: Check for design system regressions
         run: node scripts/design-system-ratchet.mjs

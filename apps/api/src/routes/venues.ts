@@ -14,6 +14,7 @@ const venueSchema = z.object({
   capacity: z.number().int().positive(),
   description: z.string().optional(),
   photos: z.array(z.string()).default([]),
+  videos: z.array(z.string()).default([]),
   amenities: z.array(z.string()).default([]),
   halfDayRate: z.number().min(0).optional(),
   fullDayRate: z.number().min(0).optional(),

@@ -12,7 +12,7 @@ import { requireAuth } from '../middleware/auth';
 import { uploadToStorage } from '../services/storage';
 import type { JwtPayload } from '@resort-pro/types';
 
-const ALLOWED_FOLDERS = new Set(['profiles', 'rooms', 'menu', 'website', 'misc']);
+const ALLOWED_FOLDERS = new Set(['profiles', 'rooms', 'menu', 'website', 'venues', 'vehicles', 'misc']);
 
 export async function uploadRoutes(app: FastifyInstance) {
   app.post('/', {

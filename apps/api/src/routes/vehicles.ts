@@ -14,6 +14,8 @@ const vehicleSchema = z.object({
   dailyRate: z.number().min(0).optional(),
   depositAmount: z.number().min(0).optional(),
   notes: z.string().optional(),
+  photos: z.array(z.string()).default([]),
+  videos: z.array(z.string()).default([]),
 });
 
 const rentalSchema = z.object({

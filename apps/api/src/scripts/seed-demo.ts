@@ -119,8 +119,8 @@ async function main() {
   // ── Staff Records ─────────────────────────────────────────────────────────────
   await prisma.staff.upsert({ where: { userId: demoOwner.id }, update: {}, create: { tenantId: demo.id, userId: demoOwner.id, department: StaffDepartment.MANAGEMENT, position: 'Resort Owner', hireDate: new Date('2022-01-01') } });
   await prisma.staff.upsert({ where: { userId: demoManager.id }, update: {}, create: { tenantId: demo.id, userId: demoManager.id, department: StaffDepartment.MANAGEMENT, position: 'General Manager', hireDate: new Date('2022-03-15') } });
-  await prisma.staff.upsert({ where: { userId: demoStaff1.id }, update: {}, create: { tenantId: demo.id, userId: demoStaff1.id, department: StaffDepartment.FRONT_DESK, position: 'Senior Receptionist', hireDate: new Date('2022-06-01') } });
-  await prisma.staff.upsert({ where: { userId: demoStaff2.id }, update: {}, create: { tenantId: demo.id, userId: demoStaff2.id, department: StaffDepartment.HOUSEKEEPING, position: 'Housekeeping Supervisor', hireDate: new Date('2023-01-10') } });
+  const staff1 = await prisma.staff.upsert({ where: { userId: demoStaff1.id }, update: {}, create: { tenantId: demo.id, userId: demoStaff1.id, department: StaffDepartment.FRONT_DESK, position: 'Senior Receptionist', hireDate: new Date('2022-06-01') } });
+  const staff2 = await prisma.staff.upsert({ where: { userId: demoStaff2.id }, update: {}, create: { tenantId: demo.id, userId: demoStaff2.id, department: StaffDepartment.HOUSEKEEPING, position: 'Housekeeping Supervisor', hireDate: new Date('2023-01-10') } });
   console.log('✅ Staff records');
 
   // ── Rooms ────────────────────────────────────────────────────────────────────
@@ -279,16 +279,41 @@ async function main() {
   console.log(`✅ ${bookingsData.length} bookings + payments`);
 
   // ── Invoices ─────────────────────────────────────────────────────────────────
-  const invoiceStatuses = ['DRAFT', 'SENT', 'PAID', 'PAID', 'PAID', 'OVERDUE', 'PAID'];
+  // status/paidAmount used to come from an independent hardcoded array while
+  // paidAmount was never set at all (defaulted to 0) — so several rows
+  // showed e.g. "Paid" while a nonzero amount was still "Due", even though
+  // each invoice is linked to a real booking with its own consistent
+  // paidAmount/paymentStatus just above. Derive both from that booking
+  // instead, the same "booking is the real source of truth" rule
+  // withBookingPaymentTruth() enforces at read time in routes/invoices.ts —
+  // seeding it self-contradictory defeats that safety net for demo data
+  // nobody ever makes a real payment against afterwards.
   for (let i = 0; i < Math.min(7, createdBookings.length); i++) {
     const bk = createdBookings[i];
-    const status = invoiceStatuses[i] ?? 'PAID';
     const guest = createdGuests.find((g: any) => g.id === bk.guestId);
     const existing = await prisma.invoice.findFirst({ where: { tenantId: demo.id, bookingId: bk.id } });
     if (!existing) {
       const subtotal = Number(bk.totalAmount);
       const taxAmt = Math.round(subtotal * 0.10);
       const total = subtotal + taxAmt;
+
+      // i===0 and i===5 are deliberately shown as "never sent" / "overdue"
+      // demo examples (kept from the original hardcoded array) — everything
+      // else derives status straight from the booking's real paidAmount so
+      // it can never contradict the "Due" amount shown next to it.
+      let status: 'DRAFT' | 'SENT' | 'PAID' | 'PARTIAL' | 'OVERDUE';
+      let paidAmount: number;
+      if (i === 0) {
+        status = 'DRAFT';
+        paidAmount = 0;
+      } else if (i === 5) {
+        status = 'OVERDUE';
+        paidAmount = Math.min(Number(bk.paidAmount), total * 0.5);
+      } else {
+        paidAmount = Math.min(Number(bk.paidAmount), total);
+        status = paidAmount <= 0 ? 'SENT' : paidAmount >= total ? 'PAID' : 'PARTIAL';
+      }
+
       const inv = await prisma.invoice.create({
         data: {
           invoiceNumber: `INV-2026-${String(i + 1).padStart(3, '0')}`,
@@ -301,6 +326,7 @@ async function main() {
           subtotal,
           taxRate:       10,
           taxAmount:     taxAmt,
+          paidAmount,
           total,
           dueDate:       d(status === 'OVERDUE' ? -3 : 7),
           notes:         'Thank you for choosing Coral Bay Resort.',
@@ -336,7 +362,12 @@ async function main() {
       data: {
         tenantId:      demo.id,
         roomId:        createdRooms[hk.r].id,
-        assignedToId:  demoStaff2.id,
+        // HousekeepingTask.assignedToId is a Staff FK, not a User FK — using
+        // demoStaff2.id (the User id) here violated the FK constraint on any
+        // fresh DB where housekeeping_tasks didn't already have stale rows
+        // from before this bug (this is what broke CI's E2E job, which seeds
+        // against a brand-new database every run).
+        assignedToId:  staff2.id,
         type:          hk.type,
         status:        hk.status,
         notes:         hk.notes,

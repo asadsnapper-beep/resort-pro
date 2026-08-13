@@ -10,6 +10,7 @@ import { resolveTenantEntitlement } from '../utils/entitlement';
 import { sendTestEmail } from '../utils/guest-emails';
 import crypto from 'crypto';
 import { ensureTenantReferralCode, referralRegistrationUrl } from '../utils/referral';
+import { createAdminNotification } from '../utils/notifications';
 
 const updateTenantSchema = z.object({
   name: z.string().min(2).max(100).optional(),
@@ -239,6 +240,21 @@ export async function tenantRoutes(app: FastifyInstance) {
       const body = updateTenantSchema.parse(request.body);
       const tenant = await db.tenant.update({ where: { id: tenantId }, data: body });
       return ok(tenant, 'Settings updated');
+    },
+  });
+
+  app.patch('/onboarding', {
+    schema: { tags: ['tenant'], summary: 'Mark the owner setup wizard complete', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER'),
+    handler: async (request) => {
+      const { db } = request;
+      const { tenantId } = request.user as JwtPayload;
+      const tenant = await db.tenant.update({
+        where: { id: tenantId },
+        data: { onboardingStep: 6, onboardingCompletedAt: new Date() },
+        select: { onboardingStep: true, onboardingCompletedAt: true },
+      });
+      return ok(tenant, 'Onboarding completed');
     },
   });
 
@@ -895,6 +911,77 @@ export async function tenantRoutes(app: FastifyInstance) {
 
       const labels = { ...DEFAULT_ROOM_TYPE_LABELS, ...current };
       return ok({ labels, defaults: DEFAULT_ROOM_TYPE_LABELS }, 'Reset to default');
+    },
+  });
+
+  // ── Tenant self-deletion request ──────────────────────────────────────────
+  // An Owner never deletes their own tenant directly — they submit a request
+  // that a Super Admin reviews and approves (real hard delete) or rejects.
+  // See DELETE /api/admin/tenants/:id for the actual deletion.
+
+  // GET /api/tenant/deletion-request — the tenant's current request, if any
+  // (so the Settings UI can show "pending" instead of the request form).
+  app.get('/deletion-request', {
+    schema: { tags: ['tenants'], summary: 'Get this tenant\'s pending/most-recent deletion request', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER'),
+    handler: async (request) => {
+      const { db } = request;
+      const latest = await db.tenantDeletionRequest.findFirst({
+        orderBy: { createdAt: 'desc' },
+      });
+      return ok({ request: latest });
+    },
+  });
+
+  // POST /api/tenant/deletion-request — submit a request to delete this tenant
+  app.post('/deletion-request', {
+    schema: { tags: ['tenants'], summary: 'Request permanent deletion of this tenant', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER'),
+    handler: async (request, reply) => {
+      const { db } = request;
+      const { tenantId, sub } = request.user as JwtPayload;
+      const body = validate(z.object({ reason: z.string().min(10).max(1000) }), request.body, reply);
+      if (!body) return;
+
+      const existingPending = await db.tenantDeletionRequest.findFirst({
+        where: { status: 'PENDING' },
+      });
+      if (existingPending) {
+        return reply.status(409).send({ success: false, error: 'A deletion request is already pending review.' });
+      }
+
+      const [tenant, created] = await Promise.all([
+        prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true } }),
+        db.tenantDeletionRequest.create({
+          data: { requestedById: sub, reason: body.reason },
+        }),
+      ]);
+
+      await createAdminNotification({
+        type: 'tenant_deletion_requested',
+        title: 'Tenant requested account deletion',
+        message: `${tenant?.name ?? 'A tenant'} asked to permanently delete their resort. Reason: "${body.reason}"`,
+        metadata: { tenantId, tenantName: tenant?.name, requestId: created.id },
+        linkPath: '/admin/tenants',
+      });
+
+      return reply.status(201).send({ success: true, data: { request: created }, message: 'Deletion request submitted for review' });
+    },
+  });
+
+  // DELETE /api/tenant/deletion-request/:id — withdraw a still-pending request
+  app.delete('/deletion-request/:id', {
+    schema: { tags: ['tenants'], summary: 'Withdraw a pending deletion request', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER'),
+    handler: async (request, reply) => {
+      const { db } = request;
+      const { id } = request.params as { id: string };
+      const existing = await db.tenantDeletionRequest.findUnique({ where: { id } });
+      if (!existing || existing.status !== 'PENDING') {
+        return reply.status(404).send({ success: false, error: 'No pending request found' });
+      }
+      await db.tenantDeletionRequest.delete({ where: { id } });
+      return ok(null, 'Deletion request withdrawn');
     },
   });
 }

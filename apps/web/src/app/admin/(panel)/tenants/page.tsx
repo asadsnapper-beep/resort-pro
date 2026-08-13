@@ -7,7 +7,7 @@ import { adminEndpoints } from '@/lib/admin-api';
 import { useAuthStore } from '@/store/auth';
 import { toast } from '@/hooks/use-toast';
 import {
-  ChevronLeft, ChevronRight, Loader2, Download, Flag,
+  ChevronLeft, ChevronRight, Loader2, Download, Flag, AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { DataTable, type DataColumn, FilterBar, FormField, ConfirmDialog } from '@/components/patterns';
@@ -30,6 +30,16 @@ type Tenant = {
   ownerLastLoginAt: string | null;
   churnRisk: ChurnRisk;
   _count: { users: number; rooms: number; bookings: number };
+};
+
+type DeletionRequest = {
+  id: string;
+  tenantId: string;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  createdAt: string;
+  tenant: { id: string; name: string; slug: string; plan: string; planStatus: string; createdAt: string };
+  requestedBy: { firstName: string; lastName: string; email: string };
 };
 
 const RISK_BADGE: Record<string, { label: string; cls: string }> = {
@@ -68,8 +78,25 @@ export default function AdminTenantsPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [editTenant, setEditTenant] = useState<Tenant | null>(null);
   const [suspendTarget, setSuspendTarget] = useState<Tenant | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Tenant | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [editPlan, setEditPlan] = useState('');
   const [editTrialDays, setEditTrialDays] = useState('');
+  const [deletionRequests, setDeletionRequests] = useState<DeletionRequest[]>([]);
+  const [approveTarget, setApproveTarget] = useState<DeletionRequest | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<DeletionRequest | null>(null);
+  const [rejectNotes, setRejectNotes] = useState('');
+
+  const fetchDeletionRequests = useCallback(async () => {
+    try {
+      const res = await adminEndpoints.deletionRequests('PENDING');
+      setDeletionRequests(res.data.data.requests);
+    } catch {
+      // Non-critical — the main tenant list still works without this.
+    }
+  }, []);
+
+  useEffect(() => { fetchDeletionRequests(); }, [fetchDeletionRequests]);
 
   const fetchTenants = useCallback(async () => {
     setLoading(true);
@@ -116,6 +143,54 @@ export default function AdminTenantsPage() {
     } catch {
       toast({ title: 'Failed to suspend', variant: 'destructive' });
       throw new Error('Failed to suspend');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget || deleteConfirmText !== deleteTarget.name) return;
+    setActionLoading(`del-${deleteTarget.id}`);
+    try {
+      await adminEndpoints.deleteTenant(deleteTarget.id, deleteConfirmText);
+      toast({ title: `${deleteTarget.name} permanently deleted` });
+      setDeleteTarget(null);
+      setDeleteConfirmText('');
+      fetchTenants();
+    } catch (err: any) {
+      toast({ title: err?.response?.data?.error || 'Failed to delete', variant: 'destructive' });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleApproveDeletion = async () => {
+    if (!approveTarget) return;
+    setActionLoading(`apr-${approveTarget.id}`);
+    try {
+      await adminEndpoints.approveDeletionRequest(approveTarget.id);
+      toast({ title: `${approveTarget.tenant.name} permanently deleted` });
+      setApproveTarget(null);
+      fetchDeletionRequests();
+      fetchTenants();
+    } catch (err: any) {
+      toast({ title: err?.response?.data?.error || 'Failed to approve', variant: 'destructive' });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRejectDeletion = async () => {
+    if (!rejectTarget) return;
+    setActionLoading(`rej-${rejectTarget.id}`);
+    try {
+      await adminEndpoints.rejectDeletionRequest(rejectTarget.id, rejectNotes || undefined);
+      toast({ title: `Request for ${rejectTarget.tenant.name} rejected` });
+      setRejectTarget(null);
+      setRejectNotes('');
+      fetchDeletionRequests();
+    } catch (err: any) {
+      toast({ title: err?.response?.data?.error || 'Failed to reject', variant: 'destructive' });
     } finally {
       setActionLoading(null);
     }
@@ -216,6 +291,7 @@ export default function AdminTenantsPage() {
         <button onClick={() => handleExport(tenant)} disabled={actionLoading === `exp-${tenant.id}`} title="Export data as JSON" className="border border-transparent p-1.5 text-rp-subtle hover:border-rp-border-md hover:bg-rp-surface-3 disabled:opacity-40">{actionLoading === `exp-${tenant.id}` ? '…' : <Download className="h-3.5 w-3.5" />}</button>
         <button onClick={() => handleImpersonate(tenant)} disabled={actionLoading === `imp-${tenant.id}` || !tenant.isActive} className="border border-transparent px-2 py-1 text-rp-brand-deep hover:border-rp-brand hover:bg-rp-teal-bg disabled:opacity-40">{actionLoading === `imp-${tenant.id}` ? '…' : 'Login as →'}</button>
         {tenant.isActive ? <button onClick={() => setSuspendTarget(tenant)} disabled={actionLoading === `sus-${tenant.id}`} className="border border-transparent px-2 py-1 text-rp-brand-deep hover:border-rp-brand hover:bg-rp-teal-bg disabled:opacity-40">Suspend</button> : <button onClick={() => handleReactivate(tenant)} disabled={actionLoading === `act-${tenant.id}`} className="border border-transparent px-2 py-1 text-rp-brand-deep hover:border-rp-brand hover:bg-rp-teal-bg disabled:opacity-40">Reactivate</button>}
+        <button onClick={() => { setDeleteTarget(tenant); setDeleteConfirmText(''); }} disabled={actionLoading === `del-${tenant.id}`} title="Permanently delete" className="border border-transparent px-2 py-1 text-rp-danger hover:bg-rp-red-bg disabled:opacity-40">Delete</button>
       </div>,
     },
   ];
@@ -232,6 +308,30 @@ export default function AdminTenantsPage() {
       <h1 className="admin-page-title text-rp-text">Tenants</h1>
       <p className="mt-1 text-sm text-rp-muted">{total} total tenants</p>
     </div>
+
+    {deletionRequests.length > 0 && (
+      <div className="border border-rp-danger bg-rp-red-bg p-4">
+        <div className="flex items-center gap-2 text-sm font-semibold text-rp-danger">
+          <AlertTriangle className="h-4 w-4" />
+          {deletionRequests.length} resort{deletionRequests.length > 1 ? 's' : ''} requested account deletion — needs your review
+        </div>
+        <div className="mt-3 space-y-2">
+          {deletionRequests.map((req) => (
+            <div key={req.id} className="flex items-start justify-between gap-4 border border-rp-border-md bg-rp-surface p-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-rp-text">{req.tenant.name} <span className="text-rp-muted">· {req.tenant.slug}</span></p>
+                <p className="mt-0.5 text-rp-meta text-rp-muted">Requested by {req.requestedBy.firstName} {req.requestedBy.lastName} ({req.requestedBy.email}) on {new Date(req.createdAt).toLocaleDateString()}</p>
+                <p className="mt-1.5 text-rp-body text-rp-text">"{req.reason}"</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button onClick={() => { setRejectTarget(req); setRejectNotes(''); }} disabled={actionLoading === `rej-${req.id}`} className="h-8 border border-rp-border-md px-3 text-rp-meta font-semibold text-rp-text hover:bg-rp-surface-3">Reject</button>
+                <button onClick={() => setApproveTarget(req)} disabled={actionLoading === `apr-${req.id}`} className="h-8 bg-rp-danger px-3 text-rp-meta font-semibold text-white hover:opacity-90">Approve & delete</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
 
     <FilterBar
       search={search}
@@ -256,6 +356,35 @@ export default function AdminTenantsPage() {
       <div className="space-y-4"><FormField label="Plan"><select value={editPlan} onChange={(event) => setEditPlan(event.target.value)} className="h-10 w-full border border-rp-border-md bg-rp-surface px-3 text-sm text-rp-text outline-none focus:border-rp-brand focus:ring-2 focus:ring-rp-teal-bg"><option value="FREE">{PLAN_PRICING.FREE.displayName}</option><option value="STARTER">{PLAN_PRICING.STARTER.displayName} (${PLAN_PRICING.STARTER.monthlyUsd}/mo)</option><option value="PROFESSIONAL">{PLAN_PRICING.PROFESSIONAL.displayName} (${PLAN_PRICING.PROFESSIONAL.monthlyUsd}/mo)</option><option value="ENTERPRISE">{PLAN_PRICING.ENTERPRISE.displayName} (${PLAN_PRICING.ENTERPRISE.monthlyUsd}/mo)</option></select></FormField><FormField label="Extend trial (days)" help="Leave blank to keep the current trial date."><input type="number" value={editTrialDays} onChange={(event) => setEditTrialDays(event.target.value)} placeholder="e.g. 30" className="h-10 w-full border border-rp-border-md bg-rp-surface px-3 text-sm text-rp-text outline-none placeholder:text-rp-faint focus:border-rp-brand focus:ring-2 focus:ring-rp-teal-bg" /></FormField></div>
     </ModalShell>}
 
+    {deleteTarget && <ModalShell
+      variant="admin"
+      open
+      onClose={() => { setDeleteTarget(null); setDeleteConfirmText(''); }}
+      title="Permanently delete tenant"
+      description="This cannot be undone. Every booking, guest, staff record, and invoice belonging to this tenant is erased immediately."
+      footer={<div className="flex justify-end gap-2">
+        <button onClick={() => { setDeleteTarget(null); setDeleteConfirmText(''); }} className="h-9 border border-rp-border-md px-4 text-sm font-semibold text-rp-text hover:bg-rp-surface-3">Cancel</button>
+        <button
+          onClick={handleDelete}
+          disabled={deleteConfirmText !== deleteTarget.name || actionLoading === `del-${deleteTarget.id}`}
+          className="inline-flex h-9 items-center gap-2 bg-rp-danger px-4 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {actionLoading === `del-${deleteTarget.id}` && <Loader2 className="h-4 w-4 animate-spin" />}
+          Delete permanently
+        </button>
+      </div>}
+    >
+      <FormField label={`Type "${deleteTarget.name}" to confirm`}>
+        <input
+          autoFocus
+          value={deleteConfirmText}
+          onChange={(event) => setDeleteConfirmText(event.target.value)}
+          placeholder={deleteTarget.name}
+          className="h-10 w-full border border-rp-border-md bg-rp-surface px-3 text-sm text-rp-text outline-none focus:border-rp-danger focus:ring-2 focus:ring-rp-red-bg"
+        />
+      </FormField>
+    </ModalShell>}
+
     <ConfirmDialog
       open={!!suspendTarget}
       onClose={() => setSuspendTarget(null)}
@@ -265,5 +394,40 @@ export default function AdminTenantsPage() {
       confirmLabel="Suspend"
       tone="danger"
     />
+
+    <ConfirmDialog
+      open={!!approveTarget}
+      onClose={() => setApproveTarget(null)}
+      onConfirm={handleApproveDeletion}
+      title="Approve deletion request"
+      description={`"${approveTarget?.tenant.name}" will be permanently deleted — every booking, guest, staff record, and invoice, gone for good. This cannot be undone.`}
+      confirmLabel="Approve & delete permanently"
+      tone="danger"
+    />
+
+    {rejectTarget && <ModalShell
+      variant="admin"
+      open
+      onClose={() => { setRejectTarget(null); setRejectNotes(''); }}
+      title="Reject deletion request"
+      description={`"${rejectTarget.tenant.name}" keeps its account. They can submit a new request later if they still want to leave.`}
+      footer={<div className="flex justify-end gap-2">
+        <button onClick={() => { setRejectTarget(null); setRejectNotes(''); }} className="h-9 border border-rp-border-md px-4 text-sm font-semibold text-rp-text hover:bg-rp-surface-3">Cancel</button>
+        <button onClick={handleRejectDeletion} disabled={actionLoading === `rej-${rejectTarget.id}`} className="inline-flex h-9 items-center gap-2 bg-rp-brand px-4 text-sm font-semibold text-rp-btn-accent-text hover:bg-rp-brand-hover disabled:opacity-50">
+          {actionLoading === `rej-${rejectTarget.id}` && <Loader2 className="h-4 w-4 animate-spin" />}
+          Reject request
+        </button>
+      </div>}
+    >
+      <FormField label="Note to yourself (optional)" help="Not shown to the owner — just for your own records.">
+        <textarea
+          value={rejectNotes}
+          onChange={(event) => setRejectNotes(event.target.value)}
+          rows={3}
+          placeholder="e.g. reached out to understand why, offering a discount"
+          className="w-full border border-rp-border-md bg-rp-surface px-3 py-2 text-sm text-rp-text outline-none placeholder:text-rp-faint focus:border-rp-brand focus:ring-2 focus:ring-rp-teal-bg"
+        />
+      </FormField>
+    </ModalShell>}
   </div>;
 }

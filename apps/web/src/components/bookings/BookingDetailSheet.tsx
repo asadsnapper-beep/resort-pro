@@ -14,6 +14,7 @@ import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { IdScanModal, type ScannedFields } from '@/components/guests/IdScanModal';
+import { GuestDocumentList } from '@/components/guests/GuestDocumentList';
 import { PrintReceiptButton } from '@/components/bookings/PrintReceiptButton';
 import { CancelBookingModal, type CancelBookingPayload } from '@/components/bookings/CancelBookingModal';
 import { ModifyBookingModal, type ModifyBookingPayload } from '@/components/bookings/ModifyBookingModal';
@@ -476,6 +477,16 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
   const [cancelModalMode, setCancelModalMode] = useState<'cancel' | 'noshow' | null>(null);
   const [showModifyModal, setShowModifyModal] = useState(false);
   const [showIdScan,   setShowIdScan]   = useState(false);
+  // The `booking` prop is a snapshot the parent page captured on click — it
+  // does NOT update when a mutation below invalidates the `['bookings']`
+  // query, because that only refetches the list, it doesn't push new data
+  // into this already-rendered prop. Record Payment used to leave the sheet
+  // showing "Unpaid"/₳0 until the whole page was reloaded. This override
+  // patches paidAmount/paymentStatus/payments locally right after a payment
+  // succeeds, so the sheet reflects it immediately without needing onClose().
+  const [paymentOverride, setPaymentOverride] = useState<{
+    paidAmount: number; paymentStatus: string; payments: NonNullable<Booking['payments']>;
+  } | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -484,6 +495,10 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
       document.body.style.overflow = '';
     };
   }, []);
+
+  useEffect(() => {
+    setPaymentOverride(null);
+  }, [booking?.id]);
 
   const checkInMutation = useMutation({
     mutationFn: () => bookingsApi.checkIn(booking!.id),
@@ -534,8 +549,22 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
   const addPayment = useMutation({
     mutationFn: () => bookingsApi.addPayment(booking!.id, { amount: Number(payAmount), method: payMethod }),
     onSuccess: () => {
+      // Mirror the server's own paidAmount/paymentStatus computation
+      // (bookings.ts POST /:id/payment) so the sheet updates instantly
+      // instead of waiting on a refetch that never reaches this prop.
+      const amount = Number(payAmount);
+      const newPaid = Number(booking!.paidAmount) + amount;
+      const newStatus = newPaid >= Number(booking!.totalAmount) ? 'PAID' : 'PARTIAL';
+      setPaymentOverride({
+        paidAmount: newPaid,
+        paymentStatus: newStatus,
+        payments: [
+          ...(booking!.payments ?? []),
+          { amount, method: payMethod, status: 'PAID', processedAt: new Date().toISOString() },
+        ],
+      });
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
-      toast({ title: `Payment of ${formatCurrency(Number(payAmount))} recorded` });
+      toast({ title: `Payment of ${formatCurrency(amount)} recorded` });
       setShowPayment(false); setPayAmount('');
     },
     onError: () => toast({ title: 'Payment failed', variant: 'destructive' }),
@@ -555,9 +584,14 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
 
   if (!booking) return null;
 
+  // See paymentOverride above — applies an instant local patch after Record
+  // Payment succeeds so this render (and ConfirmModal below) reflect the new
+  // paid amount without waiting on a page reload.
+  const effectiveBooking: Booking = paymentOverride ? { ...booking, ...paymentOverride } : booking;
+
   const nights = Math.ceil((new Date(booking.checkOut).getTime() - new Date(booking.checkIn).getTime()) / 86_400_000);
-  const outstanding = Number(booking.totalAmount) - Number(booking.paidAmount);
-  const paymentPct = Math.min(100, Math.round((Number(booking.paidAmount) / Number(booking.totalAmount)) * 100));
+  const outstanding = Number(effectiveBooking.totalAmount) - Number(effectiveBooking.paidAmount);
+  const paymentPct = Math.min(100, Math.round((Number(effectiveBooking.paidAmount) / Number(effectiveBooking.totalAmount)) * 100));
 
   // Status timeline
   const isCheckedIn  = booking.status === 'CHECKED_IN';
@@ -702,6 +736,18 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
               />
             )}
 
+            {/* Guest Documents — includes anything added at walk-in/new-booking
+                time via AddDocumentInline, plus anything scanned here or on the
+                guest profile. "This booking" badge distinguishes docs collected
+                for this stay from the guest's other stays. */}
+            {booking.guest.id && (
+              <GuestDocumentList
+                guestId={booking.guest.id}
+                guestName={`${booking.guest.firstName} ${booking.guest.lastName}`}
+                currentBookingId={booking.id}
+              />
+            )}
+
             {/* Stay Details */}
             <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 divide-y divide-gray-100 dark:divide-gray-700 overflow-hidden">
               <div className="grid grid-cols-2 divide-x divide-gray-100 dark:divide-gray-700">
@@ -746,25 +792,25 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
                   style={{
                     display: 'inline-block',
                     borderRadius: '6px',
-                    background: booking.paymentStatus === 'PAID' ? '#d1fae5' : booking.paymentStatus === 'PARTIAL' ? '#fef3c7' : '#fee2e2',
-                    color: booking.paymentStatus === 'PAID' ? '#065f46' : booking.paymentStatus === 'PARTIAL' ? '#92400e' : '#991b1b',
+                    background: effectiveBooking.paymentStatus === 'PAID' ? '#d1fae5' : effectiveBooking.paymentStatus === 'PARTIAL' ? '#fef3c7' : '#fee2e2',
+                    color: effectiveBooking.paymentStatus === 'PAID' ? '#065f46' : effectiveBooking.paymentStatus === 'PARTIAL' ? '#92400e' : '#991b1b',
                     fontSize: '12px',
                     fontWeight: 600,
                     padding: '4px 8px',
                   }}
                 >
-                  {booking.paymentStatus === 'PAID' ? 'Paid' : booking.paymentStatus === 'PARTIAL' ? 'Partial' : 'Unpaid'}
+                  {effectiveBooking.paymentStatus === 'PAID' ? 'Paid' : effectiveBooking.paymentStatus === 'PARTIAL' ? 'Partial' : 'Unpaid'}
                 </span>
               </div>
 
               <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4 space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Total</span>
-                  <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(Number(booking.totalAmount))}</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(Number(effectiveBooking.totalAmount))}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Paid</span>
-                  <span className="font-semibold text-emerald-600">{formatCurrency(Number(booking.paidAmount))}</span>
+                  <span className="font-semibold text-emerald-600">{formatCurrency(Number(effectiveBooking.paidAmount))}</span>
                 </div>
                 {outstanding > 0 && (
                   <div className="flex justify-between text-sm">
@@ -780,9 +826,9 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
                 </div>
               </div>
 
-              {booking.payments && booking.payments.length > 0 && (
+              {effectiveBooking.payments && effectiveBooking.payments.length > 0 && (
                 <div className="mt-3 space-y-2">
-                  {booking.payments.map((p, i) => (
+                  {effectiveBooking.payments.map((p, i) => (
                     <div key={i} className="flex items-center justify-between rounded-lg border border-gray-100 dark:border-gray-800 px-3 py-2 text-sm">
                       <div>
                         <span className="font-medium capitalize text-gray-800 dark:text-gray-200">{p.method.toLowerCase().replace('_', ' ')}</span>
@@ -1018,7 +1064,7 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
       {confirmModal && (
         <ConfirmModal
           type={confirmModal}
-          booking={booking}
+          booking={effectiveBooking}
           onConfirm={() => confirmModal === 'checkin' ? checkInMutation.mutate() : checkOutMutation.mutate()}
           onCancel={() => setConfirmModal(null)}
           loading={checkInMutation.isPending || checkOutMutation.isPending}
@@ -1042,7 +1088,16 @@ export function BookingDetailSheet({ booking, onClose }: Props) {
           open={!!cancelModalMode}
           onClose={() => setCancelModalMode(null)}
           onConfirm={(payload) => cancel.mutate(payload)}
-          paidAmount={Number(booking.paidAmount)}
+          // Was `booking.paidAmount` — the same stale-prop bug the payment
+          // section and check-in/out dialogs already had (see
+          // paymentOverride above): recording a payment in this same sheet
+          // session left this modal's "Already paid" hint frozen at the
+          // pre-payment amount, which could mislead staff into under- or
+          // over-refunding. The server re-validates the real paidAmount
+          // from the DB regardless, so this was a display-only bug, not a
+          // data-integrity one — but a dangerous one to get wrong on a
+          // cancel-with-refund screen.
+          paidAmount={Number(effectiveBooking.paidAmount)}
           loading={cancel.isPending}
           isNoShow={cancelModalMode === 'noshow'}
         />

@@ -12,6 +12,7 @@ interface Vehicle {
   capacity?: number;
   hourlyRate?: number;
   dailyRate?: number;
+  photos?: string[];
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -84,7 +85,7 @@ export function VehiclesWidget({ slug, primaryColor, accentColor, currency }: Wi
             <div key={v.id}
               className="group bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 flex flex-col">
               <div className="relative h-36 overflow-hidden flex-shrink-0">
-                <img src={galleryImg(undefined, i)} alt={v.name} loading="lazy"
+                <img src={galleryImg(v.photos?.[0], i)} alt={v.name} loading="lazy"
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                 <div className="absolute top-3 left-3">
                   <span className="text-xs font-bold text-white px-2.5 py-1 rounded-full" style={{ backgroundColor: primaryColor + 'dd' }}>

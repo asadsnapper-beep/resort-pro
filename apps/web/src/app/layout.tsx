@@ -6,6 +6,14 @@ import { ClarityScript } from '@/components/analytics/ClarityScript';
 import './globals.css';
 
 export const metadata: Metadata = {
+  // Without this, Next resolves relative OG/twitter image URLs (below)
+  // against http://localhost:3000 even in the production build, so social
+  // scrapers on the live marketing site got a dead localhost image link.
+  // This root layout serves the bare apex/marketing domain (see
+  // middleware.ts's ALLOWED_HOSTS comment); the (stay) segment already sets
+  // its own metadataBase for stay.resortpro.site, which overrides this one
+  // for pages under that segment.
+  metadataBase: new URL('https://resortpro.site'),
   title: { template: '%s | ResortPro', default: 'ResortPro – Resort Management Platform' },
   description: 'All-in-one resort management software for small resort owners',
   icons: { icon: '/favicon.ico' },

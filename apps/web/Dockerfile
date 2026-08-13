@@ -16,8 +16,13 @@ WORKDIR /app
 # Copy full repo so pnpm workspace resolves all packages
 COPY . .
 
-# Install all deps
-RUN pnpm install --no-frozen-lockfile
+# Install only @resort-pro/web + its workspace dependencies — NOT the whole
+# workspace. An unscoped `pnpm install` here also installed apps/desktop's
+# electron (a package this image never uses), whose postinstall downloads
+# a large Chromium binary from GitHub's CDN — that download hung/reset
+# ("socket hang up") twice in a row and failed the whole build both times,
+# even though nothing about electron was ever needed to build the web app.
+RUN pnpm install --no-frozen-lockfile --filter "@resort-pro/web..."
 
 # NEXT_PUBLIC_* vars bake into the client bundle at build time — must be
 # passed as build args, not just runtime env, or they silently stay unset.

@@ -1,10 +1,10 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { prisma } from '@resort-pro/database';
 import { requireAuth } from '../middleware/auth';
-import { applyPlanFlagsToTenant } from '../utils/entitlement';
+import { getPlanConfigs } from '../utils/entitlement';
 import { ok, validate } from '../utils/response';
 import { sendEmail } from '../services/email';
 import { createAdminNotification } from '../utils/notifications';
@@ -14,6 +14,47 @@ import type { JwtPayload } from '@resort-pro/types';
 const REFRESH_COOKIE = 'rp_refresh';
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60; // 7 days in seconds
 const LAUNCH_PROMOTION_KEY = 'launch_three_months_2026';
+const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+
+function hashToken(token: string) {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+function webAppUrl() {
+  return (
+    process.env.WEB_URL
+    || process.env.NEXT_PUBLIC_APP_URL
+    || process.env.CORS_ORIGIN?.split(',')[0]
+    || 'http://localhost:3000'
+  ).replace(/\/$/, '');
+}
+
+async function sendVerificationEmail(input: {
+  email: string;
+  firstName: string;
+  resortName: string;
+  token: string;
+}) {
+  const verifyUrl = `${webAppUrl()}/auth/verify-email?token=${encodeURIComponent(input.token)}`;
+  return sendEmail({
+    to: input.email,
+    subject: 'Verify your email to continue with ResortPro',
+    html: `
+      <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+        <h2 style="color:#1a6b5e">Verify your email</h2>
+        <p>Hi ${input.firstName},</p>
+        <p>Confirm this email address to finish creating <strong>${input.resortName}</strong>. This link expires in 24 hours.</p>
+        <p style="margin:24px 0">
+          <a href="${verifyUrl}" style="background:#1a6b5e;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600">
+            Verify email
+          </a>
+        </p>
+        <p>Or copy this link: <a href="${verifyUrl}">${verifyUrl}</a></p>
+        <p>If you did not create this account, you can ignore this email.</p>
+      </div>
+    `,
+  });
+}
 
 function normalized(value: string | undefined) {
   return value?.trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US') || undefined;
@@ -85,7 +126,7 @@ const loginSchema = z.object({
 export async function authRoutes(app: FastifyInstance) {
   // POST /api/auth/register
   app.post('/register', {
-    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+    config: { rateLimit: { max: 1, timeWindow: '10 minutes' } },
     schema: {
       tags: ['auth'],
       summary: 'Register a new resort (tenant)',
@@ -156,62 +197,96 @@ export async function authRoutes(app: FastifyInstance) {
       const existing = await prisma.tenant.findUnique({ where: { referralCode } });
       if (existing) referralCode = generateReferralCode(body.slug + Date.now());
 
-      const tenant = await prisma.tenant.create({
-        data: {
-          name: body.resortName,
-          slug: body.slug,
-          ...(body.address && { address: body.address }),
-          plan: selectedPlan,
-          // Accounts are created first so a Stripe/bKash checkout can be tied
-          // to the tenant. They become active only after the payment webhook.
-          planStatus: promotionGranted ? 'trialing' : 'incomplete',
-          trialEndsAt,
-          priceProtectedUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-          billingEmail: body.email,
-          referralCode,
-          ...(referredById && { referredById }),
-          ...(campaignSource && { campaignSource }),
-          users: {
-            create: {
-              email: body.email,
-              passwordHash,
-              firstName: body.firstName,
-              lastName: body.lastName,
-              role: 'OWNER',
-            },
-          },
-          websiteContent: {
-            create: {
-              heroTitle: `Welcome to ${body.resortName}`,
-              heroSubtitle: 'Experience luxury and comfort',
-            },
-          },
-        },
-        include: { users: true },
-      });
+      // Resolve the plan flags before opening the transaction, then persist all
+      // signup state atomically. No half-created tenant remains if a core write
+      // (owner, website, flags, referral, promotion or verification token) fails.
+      const planConfigs = await getPlanConfigs();
+      const selectedConfig = planConfigs.find((plan) => plan.key === selectedPlan);
+      const selectedFlags = new Set(selectedConfig?.flags ?? []);
+      const allFlags = new Set(planConfigs.flatMap((plan) => plan.flags));
+      const emailVerificationToken = randomBytes(32).toString('hex');
 
-      await applyPlanFlagsToTenant(tenant.id, selectedPlan);
-      if (promotionGranted && promotion) {
-        await prisma.promotionRedemption.create({
-          data: {
-            promotionKey: promotion.key,
-            tenantId: tenant.id,
-            normalizedBusinessName,
-            normalizedAddress,
-            expiresAt: trialEndsAt!,
-          },
+      let tenant;
+      try {
+        tenant = await prisma.$transaction(async (tx) => {
+          const created = await tx.tenant.create({
+            data: {
+              name: body.resortName,
+              slug: body.slug,
+              ...(body.address && { address: body.address }),
+              plan: selectedPlan,
+              // The workspace exists before checkout, but stays read-only
+              // outside onboarding/billing until the plan becomes active.
+              planStatus: promotionGranted ? 'trialing' : 'incomplete',
+              trialEndsAt,
+              priceProtectedUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+              billingEmail: body.email,
+              referralCode,
+              ...(referredById && { referredById }),
+              ...(campaignSource && { campaignSource }),
+              users: {
+                create: {
+                  email: body.email,
+                  passwordHash,
+                  firstName: body.firstName,
+                  lastName: body.lastName,
+                  role: 'OWNER',
+                  emailVerifiedAt: null,
+                },
+              },
+              websiteContent: {
+                create: {
+                  heroTitle: `Welcome to ${body.resortName}`,
+                  heroSubtitle: 'Experience luxury and comfort',
+                },
+              },
+            },
+            include: { users: true },
+          });
+
+          if (allFlags.size > 0) {
+            await tx.tenantFeatureFlag.createMany({
+              data: Array.from(allFlags, (flag) => ({
+                tenantId: created.id,
+                flag,
+                enabled: selectedFlags.has(flag),
+              })),
+            });
+          }
+
+          if (promotionGranted && promotion) {
+            await tx.promotionRedemption.create({
+              data: {
+                promotionKey: promotion.key,
+                tenantId: created.id,
+                normalizedBusinessName,
+                normalizedAddress,
+                expiresAt: trialEndsAt!,
+              },
+            });
+          }
+
+          if (referredById) {
+            await tx.referral.create({
+              data: { referrerId: referredById, referredId: created.id, status: 'PENDING' },
+            });
+          }
+
+          await tx.emailVerificationToken.create({
+            data: {
+              userId: created.users[0].id,
+              tokenHash: hashToken(emailVerificationToken),
+              expiresAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
+            },
+          });
+
+          return created;
         });
-      }
-
-      // Create Referral record if referred
-      if (referredById) {
-        await prisma.referral.create({
-          data: {
-            referrerId: referredById,
-            referredId: tenant.id,
-            status: 'PENDING',
-          },
-        }).catch(() => {}); // non-blocking
+      } catch (error: unknown) {
+        if ((error as { code?: string }).code === 'P2002') {
+          return reply.status(409).send({ success: false, error: 'Resort slug or referral code already taken' });
+        }
+        throw error;
       }
 
       // Notify admin of new signup
@@ -232,74 +307,144 @@ export async function authRoutes(app: FastifyInstance) {
           referredById,
         },
         linkPath: referredById ? `/admin/referrals` : `/admin/tenants`,
-      });
+      }).catch(() => {}); // operational notifications must not invalidate signup
 
-      const user = tenant.users[0];
+      await sendVerificationEmail({
+        email: body.email,
+        firstName: body.firstName,
+        resortName: body.resortName,
+        token: emailVerificationToken,
+      }).catch(() => {}); // account remains valid; resend endpoint can retry
+
+      return reply.status(201).send(ok({
+        requiresEmailVerification: true,
+        email: body.email,
+        slug: tenant.slug,
+        plan: tenant.plan,
+        user: {
+          id: tenant.users[0].id,
+          email: tenant.users[0].email,
+          firstName: tenant.users[0].firstName,
+          lastName: tenant.users[0].lastName,
+          role: tenant.users[0].role,
+        },
+        tenant: {
+          id: tenant.id,
+          name: tenant.name,
+          slug: tenant.slug,
+          plan: tenant.plan,
+          planStatus: tenant.planStatus,
+          trialEndsAt: tenant.trialEndsAt,
+          isActive: tenant.isActive,
+          onboardingStep: tenant.onboardingStep,
+          onboardingCompletedAt: tenant.onboardingCompletedAt,
+        },
+      }, 'Check your email to verify your account.'));
+    },
+  });
+
+  // POST /api/auth/verify-email — exchange the one-time email link for a session
+  app.post('/verify-email', {
+    config: { rateLimit: { max: 10, timeWindow: '10 minutes' } },
+    schema: { tags: ['auth'], summary: 'Verify owner email and start a session' },
+    handler: async (request, reply) => {
+      const body = validate(z.object({ token: z.string().min(32).max(256) }), request.body, reply);
+      if (!body) return;
+
+      const verification = await prisma.emailVerificationToken.findUnique({
+        where: { tokenHash: hashToken(body.token) },
+        include: { user: { include: { tenant: true } } },
+      });
+      if (!verification || verification.usedAt || verification.expiresAt < new Date()) {
+        return reply.status(400).send({ success: false, error: 'Invalid or expired verification link.' });
+      }
+
+      const user = verification.user;
+      const tenant = user.tenant;
       const payload: Omit<JwtPayload, 'iat' | 'exp'> = {
         sub: user.id,
         email: user.email,
-        role: 'OWNER',
+        role: user.role as JwtPayload['role'],
         tenantId: tenant.id,
       };
-
       const token = app.jwt.sign(payload);
-      const refreshToken = app.jwt.sign(
-        { sub: user.id, type: 'refresh' },
-        { expiresIn: '7d' },
-      );
+      const refreshToken = app.jwt.sign({ sub: user.id, type: 'refresh' }, { expiresIn: '7d' });
 
-      await prisma.refreshToken.create({
-        data: {
-          userId: user.id,
-          token: refreshToken,
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        },
+      const claimed = await prisma.$transaction(async (tx) => {
+        const used = await tx.emailVerificationToken.updateMany({
+          where: { id: verification.id, usedAt: null, expiresAt: { gt: new Date() } },
+          data: { usedAt: new Date() },
+        });
+        if (used.count !== 1) return false;
+        await tx.user.update({ where: { id: user.id }, data: { emailVerifiedAt: new Date() } });
+        await tx.refreshToken.create({
+          data: {
+            userId: user.id,
+            token: refreshToken,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          },
+        });
+        return true;
       });
-
-      // Send welcome email. Dashboard routes are platform-level, so never put
-      // the internal tenant slug in the path (e.g. /demopro/dashboard). The
-      // sign-in screen can safely use it to prefill the workspace instead.
-      const webUrl = (
-        process.env.WEB_URL
-        || process.env.NEXT_PUBLIC_APP_URL
-        || process.env.CORS_ORIGIN?.split(',')[0]
-        || 'http://localhost:3000'
-      ).replace(/\/$/, '');
-      const signInUrl = `${webUrl}/auth/login?workspace=${encodeURIComponent(body.slug)}`;
-
-      await sendEmail({
-        to: body.email,
-        subject: promotionGranted ? 'Welcome to ResortPro — your launch offer is active' : 'Welcome to ResortPro — finish setting up your plan',
-        html: `
-          <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
-            <h2 style="color:#1a6b5e">Welcome to ResortPro, ${body.firstName}!</h2>
-            <p>Your resort <strong>${body.resortName}</strong> is ready. ${promotionGranted ? `Your three-month launch offer is active until <strong>${trialEndsAt!.toLocaleDateString('en-US', { dateStyle: 'long', timeZone: 'Asia/Dhaka' })}</strong>.` : 'Complete checkout to activate your selected ResortPro plan.'}</p>
-            <p style="margin:24px 0">
-              <a href="${signInUrl}"
-                 style="background:#1a6b5e;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600">
-                ${promotionGranted ? 'Open Your Dashboard' : 'Sign in to finish setup'}
-              </a>
-            </p>
-            <p><strong>After activation, you can:</strong></p>
-            <ul>
-              <li>Full booking management</li>
-              <li>Guest CRM</li>
-              <li>Room management</li>
-              <li>Website builder</li>
-            </ul>
-            <p>You can always view and export your data if you decide not to continue.</p>
-            <p>Questions? Reply to this email anytime.</p>
-            <p style="color:#666;font-size:13px">— The ResortPro Team</p>
-          </div>
-        `,
-      }).catch(() => {}); // don't block registration if email fails
+      if (!claimed) {
+        return reply.status(400).send({ success: false, error: 'This verification link has already been used.' });
+      }
 
       setRefreshCookie(reply, refreshToken);
-      return reply.status(201).send(ok({
+      return reply.send(ok({
         token,
         user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role },
-        tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug, plan: tenant.plan, planStatus: tenant.planStatus, trialEndsAt: tenant.trialEndsAt, isActive: tenant.isActive },
-      }, 'Resort registered successfully'));
+        tenant: {
+          id: tenant.id,
+          name: tenant.name,
+          slug: tenant.slug,
+          plan: tenant.plan,
+          planStatus: tenant.planStatus,
+          trialEndsAt: tenant.trialEndsAt,
+          isActive: tenant.isActive,
+          onboardingStep: tenant.onboardingStep,
+          onboardingCompletedAt: tenant.onboardingCompletedAt,
+        },
+      }, 'Email verified successfully.'));
+    },
+  });
+
+  // POST /api/auth/resend-verification — generic response prevents enumeration
+  app.post('/resend-verification', {
+    config: { rateLimit: { max: 3, timeWindow: '15 minutes' } },
+    schema: { tags: ['auth'], summary: 'Resend owner email verification' },
+    handler: async (request, reply) => {
+      const body = validate(z.object({ email: z.string().email(), slug: z.string().min(2).max(50) }), request.body, reply);
+      if (!body) return;
+      const tenant = await prisma.tenant.findUnique({ where: { slug: body.slug } });
+      const user = tenant
+        ? await prisma.user.findUnique({ where: { tenantId_email: { tenantId: tenant.id, email: body.email } } })
+        : null;
+
+      if (tenant && user && !user.emailVerifiedAt) {
+        const rawToken = randomBytes(32).toString('hex');
+        await prisma.$transaction([
+          prisma.emailVerificationToken.updateMany({
+            where: { userId: user.id, usedAt: null },
+            data: { usedAt: new Date() },
+          }),
+          prisma.emailVerificationToken.create({
+            data: {
+              userId: user.id,
+              tokenHash: hashToken(rawToken),
+              expiresAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
+            },
+          }),
+        ]);
+        await sendVerificationEmail({
+          email: user.email,
+          firstName: user.firstName,
+          resortName: tenant.name,
+          token: rawToken,
+        }).catch(() => {});
+      }
+
+      return reply.send(ok(null, 'If the account is awaiting verification, a new link has been sent.'));
     },
   });
 
@@ -345,6 +490,13 @@ export async function authRoutes(app: FastifyInstance) {
       if (!valid) {
         return reply.status(401).send({ success: false, error: 'Invalid credentials' });
       }
+      if (!user.emailVerifiedAt) {
+        return reply.status(403).send({
+          success: false,
+          error: 'Verify your email before signing in.',
+          code: 'EMAIL_VERIFICATION_REQUIRED',
+        });
+      }
 
       await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
 
@@ -370,7 +522,17 @@ export async function authRoutes(app: FastifyInstance) {
       return ok({
         token,
         user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role },
-        tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug, plan: tenant.plan, planStatus: tenant.planStatus, trialEndsAt: tenant.trialEndsAt, isActive: tenant.isActive },
+        tenant: {
+          id: tenant.id,
+          name: tenant.name,
+          slug: tenant.slug,
+          plan: tenant.plan,
+          planStatus: tenant.planStatus,
+          trialEndsAt: tenant.trialEndsAt,
+          isActive: tenant.isActive,
+          onboardingStep: tenant.onboardingStep,
+          onboardingCompletedAt: tenant.onboardingCompletedAt,
+        },
       });
     },
   });
@@ -393,6 +555,15 @@ export async function authRoutes(app: FastifyInstance) {
       await prisma.refreshToken.delete({ where: { id: stored.id } });
 
       const user = stored.user;
+      if (!user.emailVerifiedAt) {
+        await prisma.refreshToken.deleteMany({ where: { userId: user.id } });
+        clearRefreshCookie(reply);
+        return reply.status(403).send({
+          success: false,
+          error: 'Verify your email before continuing.',
+          code: 'EMAIL_VERIFICATION_REQUIRED',
+        });
+      }
       const tenant = await prisma.tenant.findUnique({ where: { id: user.tenantId } });
       if (!tenant) return reply.status(401).send({ success: false, error: 'Tenant not found' });
 
@@ -704,6 +875,17 @@ export async function authRoutes(app: FastifyInstance) {
     return reply.send(ok({ name: tenant.name }));
   });
 
+  // ── GET /api/auth/launch-promotion ────────────────────────────────────────
+  // Public, unauthenticated — lets marketing surfaces (landing page, /plans)
+  // ask "is the launch offer currently on?" without hardcoding dates/copy.
+  // Per plan/launch-pricing-and-trial-abuse-prevention.md §5: the promotion
+  // window is server-controlled (env-driven, see launchPromotionWindow())
+  // and must never be hardcoded into landing/registration copy — this is
+  // the read-only signal that lets those pages stay accurate automatically.
+  app.get('/launch-promotion', async (_req, reply) => {
+    return reply.send(ok({ active: !!launchPromotionWindow() }));
+  });
+
   // ── POST /api/auth/demo-login ─────────────────────────────────────────────
   // No password required — issues a short-lived JWT for the demo tenant.
   // Accepts { role, email }. Access is still instant (no verification step),
@@ -712,7 +894,12 @@ export async function authRoutes(app: FastifyInstance) {
   // the product. Safe: demo tenant is completely isolated (separate
   // tenantId, isDemo=true).
   app.post('/demo-login', {
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    // Was 10/min — easily exceeded by a normal shared-IP burst (an office
+    // or school trying the demo together) since this endpoint is meant to
+    // be frictionless, and by the E2E role suite itself (17 logins/run from
+    // one IP), which started intermittently failing mid-suite once it hit
+    // this ceiling. Still meaningfully bot-resistant at 30/min.
+    config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
   }, async (req, reply) => {
     const { role: requestedRole, email } = (req.body as any) ?? {};
 

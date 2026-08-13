@@ -47,17 +47,17 @@ interface WebsiteContent {
 // Orderable site sections. `fixed: true` = always visible (no hide toggle),
 // but still reorderable. Order here is the default page order.
 const SITE_SECTIONS = [
-  { id: 'about',        label: 'About / Our Story',     desc: 'Resort story, about image' },
-  { id: 'amenities',    label: 'Amenities',              desc: 'Pool, spa, gym etc. (Coastal theme)' },
-  { id: 'rooms',        label: 'Rooms & Villas',         desc: 'Room cards with prices & booking', fixed: true },
-  { id: 'menu',         label: 'Restaurant Menu',        desc: 'Food menu with in-room ordering' },
-  { id: 'venues',       label: 'Venues & Events',        desc: 'Conference hall, banquet, lawn — with enquiry form' },
-  { id: 'vehicles',     label: 'Vehicle Rental',         desc: 'Cars, bikes, scooties, cycles — with enquiry form' },
-  { id: 'gallery',      label: 'Photo Gallery',          desc: 'Image gallery grid' },
-  { id: 'testimonials', label: 'Testimonials',           desc: 'Guest reviews & ratings' },
-  { id: 'availability', label: 'Availability Calendar',  desc: 'Date picker to check open rooms' },
-  { id: 'booking',      label: 'Booking Form',           desc: 'Direct reservation form', fixed: true },
-  { id: 'contact',      label: 'Contact / Feedback',     desc: 'Contact form and map' },
+  { id: 'about',        label: 'About / Our Story',     desc: 'Resort story, about image',                          fixed: false },
+  { id: 'amenities',    label: 'Amenities',              desc: 'Pool, spa, gym etc. (Coastal theme)',                fixed: false },
+  { id: 'rooms',        label: 'Rooms & Villas',         desc: 'Room cards with prices & booking',                   fixed: true },
+  { id: 'menu',         label: 'Restaurant Menu',        desc: 'Food menu with in-room ordering',                    fixed: false },
+  { id: 'venues',       label: 'Venues & Events',        desc: 'Conference hall, banquet, lawn — with enquiry form', fixed: false },
+  { id: 'vehicles',     label: 'Vehicle Rental',         desc: 'Cars, bikes, scooties, cycles — with enquiry form',  fixed: false },
+  { id: 'gallery',      label: 'Photo Gallery',          desc: 'Image gallery grid',                                 fixed: false },
+  { id: 'testimonials', label: 'Testimonials',           desc: 'Guest reviews & ratings',                            fixed: false },
+  { id: 'availability', label: 'Availability Calendar',  desc: 'Date picker to check open rooms',                    fixed: false },
+  { id: 'booking',      label: 'Booking Form',           desc: 'Direct reservation form',                           fixed: true },
+  { id: 'contact',      label: 'Contact / Feedback',     desc: 'Contact form and map',                              fixed: false },
 ] as const;
 
 const DEFAULT_SECTION_ORDER = SITE_SECTIONS.map(s => s.id);

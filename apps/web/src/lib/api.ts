@@ -70,6 +70,8 @@ api.interceptors.response.use(
 export const authApi = {
   register: (data: { resortName: string; slug: string; firstName: string; lastName: string; email: string; password: string; referralCode?: string; plan?: string }) =>
     api.post('/auth/register', data),
+  verifyEmail: (token: string) => api.post('/auth/verify-email', { token }),
+  resendVerification: (data: { email: string; slug: string }) => api.post('/auth/resend-verification', data),
   login: (data: { email: string; password: string; slug: string }) =>
     api.post('/auth/login', data),
   me: () => api.get('/auth/me'),
@@ -403,6 +405,7 @@ export const publicWebsiteApi = {
 export const tenantApi = {
   get: () => api.get('/tenant'),
   update: (data: unknown) => api.patch('/tenant', data),
+  completeOnboarding: () => api.patch('/tenant/onboarding', {}),
   getEmailSettings: () => api.get('/tenant/email-settings'),
   updateEmailSettings: (data: unknown) => api.patch('/tenant/email-settings', data),
   sendTestEmail: (toEmail: string) => api.post('/tenant/email-settings/test', { toEmail }),

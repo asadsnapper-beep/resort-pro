@@ -467,7 +467,7 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
       const venues = await prisma.venue.findMany({
         where: { tenantId: tenant.id, isActive: true, isVisible: true },
         select: {
-          id: true, name: true, type: true, capacity: true, description: true, photos: true, amenities: true,
+          id: true, name: true, type: true, capacity: true, description: true, photos: true, videos: true, amenities: true,
           halfDayRate: true, fullDayRate: true, hourlyRate: true, opensAt: true, closesAt: true,
         },
         orderBy: { sortOrder: 'asc' },
@@ -531,7 +531,7 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
 
       const vehicles = await prisma.vehicle.findMany({
         where: { tenantId: tenant.id, availability: { not: 'MAINTENANCE' } },
-        select: { id: true, type: true, name: true, capacity: true, hourlyRate: true, dailyRate: true },
+        select: { id: true, type: true, name: true, capacity: true, hourlyRate: true, dailyRate: true, photos: true, videos: true },
         orderBy: { name: 'asc' },
       });
       return ok(vehicles);
@@ -606,7 +606,10 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
       const bookedRoomIds = await prisma.booking.findMany({
         where: {
           tenantId: tenant.id,
-          status: { in: ['CONFIRMED', 'CHECKED_IN'] },
+          // PENDING included — a "Pay at Hotel" booking is a real hold on the
+          // room even though staff hasn't confirmed it yet (matches the
+          // dashboard's own conflict logic in bookings.ts).
+          status: { in: ['CONFIRMED', 'CHECKED_IN', 'PENDING'] },
           AND: [{ checkIn: { lt: checkOut } }, { checkOut: { gt: checkIn } }],
         },
         select: { roomId: true },
@@ -687,7 +690,8 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
         where: {
           tenantId: tenant.id,
           roomId: { in: roomIds },
-          status: { in: ['CONFIRMED', 'CHECKED_IN'] },
+          // PENDING included — see the matching comment in /:slug/availability.
+          status: { in: ['CONFIRMED', 'CHECKED_IN', 'PENDING'] },
           AND: [
             { checkIn: { lt: lastDay } },
             { checkOut: { gt: firstDay } },

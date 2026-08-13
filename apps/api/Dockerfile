@@ -14,7 +14,12 @@ WORKDIR /app
 
 COPY . .
 
-RUN pnpm install --no-frozen-lockfile
+# Scoped to @resort-pro/api + its workspace deps, not the whole workspace —
+# see apps/web/Dockerfile's identical fix for why: an unscoped install here
+# has the same latent risk of pulling in apps/desktop's electron (irrelevant
+# to this image) and failing on its large, occasionally-flaky binary
+# download. This build happened not to hit it yet, but it's the same bug.
+RUN pnpm install --no-frozen-lockfile --filter "@resort-pro/api..."
 
 # Generate Prisma client (explicit schema path — works with shamefully-hoist)
 RUN cd packages/database && npx prisma generate --schema=prisma/schema.prisma

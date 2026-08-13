@@ -550,11 +550,22 @@ function DiscoverInner() {
               <ResortMap
                 pins={mapPins}
                 selected={selected}
-                onSelect={(r) => {
+                onSelect={(pin) => {
+                  // ResortMap only knows the narrow marker shape it renders
+                  // (Pin) — it hands the pin straight back on click, so we
+                  // resolve it to the full Resort object (same slug, same
+                  // underlying object at runtime) before touching state or
+                  // anything that needs fields Pin doesn't carry, like
+                  // affiliateSource below.
+                  const r = mapPins.find(m => m.slug === pin.slug);
+                  if (!r) return;
                   setSelected(r);
                   trackClick(r.slug, 'map_pin').catch(() => {});
                 }}
-                onOpen={(r) => goToResort(r, 'map_pin')}
+                onOpen={(pin) => {
+                  const r = mapPins.find(m => m.slug === pin.slug);
+                  if (r) goToResort(r, 'map_pin');
+                }}
               />
               {!loading && mapPins.length === 0 && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -601,11 +612,16 @@ function DiscoverInner() {
             <ResortMap
               pins={mapPins}
               selected={selected}
-              onSelect={(r) => {
+              onSelect={(pin) => {
+                const r = mapPins.find(m => m.slug === pin.slug);
+                if (!r) return;
                 setSelected(r);
                 trackClick(r.slug, 'map_pin').catch(() => {});
               }}
-              onOpen={(r) => goToResort(r, 'map_pin')}
+              onOpen={(pin) => {
+                const r = mapPins.find(m => m.slug === pin.slug);
+                if (r) goToResort(r, 'map_pin');
+              }}
             />
             <MobileBottomSheet
               resorts={resorts}

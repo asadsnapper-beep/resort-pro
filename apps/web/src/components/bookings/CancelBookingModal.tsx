@@ -86,7 +86,15 @@ export function CancelBookingModal({
     setError('');
     onConfirm({
       reason: reason === 'Other' ? (customReason || 'Other') : reason,
-      cancellationFee: feeNum || undefined,
+      // Was `feeNum || undefined` — 0 is the common, default "no fee"
+      // case, and 0 is falsy in JS, so that omitted the field from every
+      // request where staff didn't charge a fee. Prisma's update treats an
+      // undefined field as "leave unchanged," not "set to 0," so
+      // cancellationFee stayed NULL forever on the vast majority of
+      // cancellations (confirmed via direct DB check after cancelling a
+      // test booking with fee=0: cancellationFee was NULL, not 0). feeNum
+      // is always >= 0 (Math.max(0, ...) above), so just send it plainly.
+      cancellationFee: feeNum,
       refund: refundNum > 0 ? { amount: refundNum, method: refundMethod, reference: refundReference || undefined } : undefined,
       notifyGuest,
       isNoShow: isNoShow || undefined,

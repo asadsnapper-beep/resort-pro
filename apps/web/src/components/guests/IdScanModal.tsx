@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X, Camera, Upload, Loader2, CheckCircle2, AlertCircle,
-  ScanLine, RefreshCw, User, CreditCard,
+  ScanLine, RefreshCw, User, CreditCard, RotateCw,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 
@@ -18,6 +18,10 @@ export interface ScannedFields {
   documentNumber?: string;
   expiryDate?:    string;
   gender?:        string;
+  // The document type the staff selected before scanning (PASSPORT |
+  // NATIONAL_ID | DRIVERS_LICENSE | OTHER) — not an OCR-extracted field, so
+  // it's set directly in confirm() below rather than coming through editFields.
+  docType?:       string;
 }
 
 interface IdScanModalProps {
@@ -36,7 +40,9 @@ const DOC_TYPES = [
   { value: 'OTHER',           label: 'Other' },
 ];
 
-const FIELD_LABELS: Record<keyof ScannedFields, string> = {
+// docType is set from the capture-step selector, not an OCR field, so it's
+// deliberately excluded here — it must not get a second, editable input.
+const FIELD_LABELS: Record<Exclude<keyof ScannedFields, 'docType'>, string> = {
   firstName:      'First Name',
   lastName:       'Last Name',
   dateOfBirth:    'Date of Birth',
@@ -61,6 +67,7 @@ export function IdScanModal({ guestId, guestName, onConfirm, onClose }: IdScanMo
   const [errorMsg,   setErrorMsg]   = useState('');
   const [useCamera,  setUseCamera]  = useState(false);
   const [cameraOn,   setCameraOn]   = useState(false);
+  const [rotation,   setRotation]   = useState(0); // 0 | 90 | 180 | 270 — sideways ID photos are a common OCR-quality killer
 
   const fileRef   = useRef<HTMLInputElement>(null);
   const videoRef  = useRef<HTMLVideoElement>(null);
@@ -69,8 +76,15 @@ export function IdScanModal({ guestId, guestName, onConfirm, onClose }: IdScanMo
 
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => {
-    if (mounted) document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
+    if (!mounted) return;
+    // Restore whatever was there before, not unconditionally ''. This is
+    // routinely opened from inside a ModalShell-based parent (walk-in, new
+    // booking) that already locked scroll — blindly clearing it on unmount
+    // was releasing the parent's lock too, letting the page scroll behind
+    // a still-open parent modal.
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previousOverflow; };
   }, [mounted]);
 
   // ── Camera helpers ────────────────────────────────────────────────────────
@@ -110,6 +124,7 @@ export function IdScanModal({ guestId, guestName, onConfirm, onClose }: IdScanMo
       const file = new File([blob], 'capture.jpg', { type: 'image/jpeg' });
       setFileObj(file);
       setPreview(URL.createObjectURL(blob));
+      setRotation(0);
       stopCamera();
     }, 'image/jpeg', 0.95);
   }, [stopCamera]);
@@ -121,7 +136,39 @@ export function IdScanModal({ guestId, guestName, onConfirm, onClose }: IdScanMo
     if (!file) return;
     setFileObj(file);
     setPreview(URL.createObjectURL(file));
+    setRotation(0);
   };
+
+  // ── Rotate ────────────────────────────────────────────────────────────────
+  // A sideways ID photo is one of the biggest OCR-quality killers — Tesseract
+  // expects roughly-horizontal text and silently produces garbage/low-confidence
+  // output on a 90°-rotated card rather than failing loudly. Rotate happens on
+  // the actual pixels via canvas (not just a CSS preview) so the file sent for
+  // OCR matches what's shown.
+  const rotateFile = (file: File, degrees: number): Promise<File> => new Promise((resolve, reject) => {
+    if (degrees === 0) { resolve(file); return; }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const swap = degrees === 90 || degrees === 270;
+      canvas.width  = swap ? img.height : img.width;
+      canvas.height = swap ? img.width  : img.height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((degrees * Math.PI) / 180);
+      ctx.drawImage(img, -img.width / 2, -img.height / 2);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(blob => {
+        if (!blob) { reject(new Error('Rotate failed')); return; }
+        resolve(new File([blob], file.name, { type: file.type }));
+      }, file.type, 0.95);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Rotate failed')); };
+    img.src = url;
+  });
+
+  const rotatePreview = () => setRotation(r => (r + 90) % 360);
 
   // ── OCR scan ─────────────────────────────────────────────────────────────
 
@@ -130,8 +177,9 @@ export function IdScanModal({ guestId, guestName, onConfirm, onClose }: IdScanMo
     setStep('scanning');
     setErrorMsg('');
     try {
+      const uploadFile = await rotateFile(fileObj, rotation);
       const form = new FormData();
-      form.append('file',    fileObj);
+      form.append('file',    uploadFile);
       form.append('docType', docType);
 
       const res = await api.post('/guests/scan-id', form, {
@@ -158,6 +206,7 @@ export function IdScanModal({ guestId, guestName, onConfirm, onClose }: IdScanMo
     setFields({});
     setEditFields({});
     setErrorMsg('');
+    setRotation(0);
   };
 
   // ── Confirm ───────────────────────────────────────────────────────────────
@@ -166,7 +215,7 @@ export function IdScanModal({ guestId, guestName, onConfirm, onClose }: IdScanMo
     const nonEmpty = Object.fromEntries(
       Object.entries(editFields).filter(([, v]) => v && String(v).trim()),
     ) as ScannedFields;
-    onConfirm(nonEmpty);
+    onConfirm({ ...nonEmpty, docType });
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -174,7 +223,10 @@ export function IdScanModal({ guestId, guestName, onConfirm, onClose }: IdScanMo
   if (!mounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    // z-[10000]: must render above ModalShell (zIndex 9999) — this modal is
+    // routinely opened from inside a ModalShell-based parent (walk-in, new
+    // booking), and at z-50 it was rendering invisibly behind that parent.
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4">
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
 
         {/* Header */}
@@ -264,10 +316,20 @@ export function IdScanModal({ guestId, guestName, onConfirm, onClose }: IdScanMo
               {/* Image preview */}
               {preview && !cameraOn && (
                 <div className="space-y-3">
-                  <div className="relative rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800">
+                  <div className="relative rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 flex items-center justify-center min-h-[140px]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={preview} alt="ID preview" className="w-full object-contain max-h-56" />
+                    <img src={preview} alt="ID preview" className="max-w-full max-h-56 object-contain transition-transform"
+                      style={{ transform: `rotate(${rotation}deg)` }} />
+                    <button onClick={rotatePreview} title="Rotate 90°"
+                      className="absolute top-2 right-2 rounded-full bg-black/50 hover:bg-black/70 text-white p-2">
+                      <RotateCw className="w-4 h-4" />
+                    </button>
                   </div>
+                  {rotation !== 0 && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
+                      Sideways photo? Tap the rotate icon until the text reads upright — a tilted scan is the #1 reason OCR comes back garbled.
+                    </p>
+                  )}
                   <div className="flex gap-2">
                     <button onClick={runScan}
                       className="flex-1 flex items-center justify-center gap-2 bg-[#1a6b5e] hover:bg-[#145a4f] text-white rounded-xl py-3 text-sm font-semibold">

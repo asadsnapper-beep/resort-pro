@@ -13,6 +13,8 @@ interface Tenant {
   isDemo?: boolean;
   currency?: string;
   taxRate?: number;
+  onboardingStep?: number;
+  onboardingCompletedAt?: string | null;
 }
 
 interface AuthState {

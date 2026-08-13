@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { bookingsApi, roomsApi } from '@/lib/api';
+import { bookingsApi, roomsApi, guestsApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import {
   X, UserPlus, BedDouble, Loader2, CheckCircle2,
   CreditCard, Banknote, Clock, Zap,
 } from 'lucide-react';
+import { AddDocumentInline, type PendingDocument } from '@/components/guests/AddDocumentInline';
 
 interface WalkInForm {
   checkIn: string;
@@ -34,6 +35,7 @@ const tomorrow = () => {
   d.setDate(d.getDate() + 1);
   return d.toISOString().slice(0, 10);
 };
+const dayAfter = (d: string) => new Date(new Date(d).getTime() + 86_400_000).toISOString().slice(0, 10);
 
 interface Props {
   onClose: () => void;
@@ -65,6 +67,15 @@ export function WalkInModal({ onClose }: Props) {
   const set = <K extends keyof WalkInForm>(k: K, v: WalkInForm[K]) =>
     setForm(f => ({ ...f, [k]: v }));
 
+  // Check-out follows check-in by one night until the guest picks something
+  // later themselves — matches Front Desk's Walk-in and New Booking.
+  const setCheckIn = (ci: string) => {
+    setForm(f => ({ ...f, checkIn: ci, checkOut: f.checkOut > ci ? f.checkOut : dayAfter(ci) }));
+  };
+
+  const [pendingDoc, setPendingDoc] = useState<PendingDocument | null>(null);
+  const [showDocPicker, setShowDocPicker] = useState(false);
+
   const { data: roomsRes, isLoading: roomsLoading } = useQuery({
     queryKey: ['walkin-rooms', form.checkIn, form.checkOut],
     queryFn: () => roomsApi.availability(form.checkIn, form.checkOut),
@@ -87,15 +98,31 @@ export function WalkInModal({ onClose }: Props) {
   const totalAmount = selectedRoom ? Number(selectedRoom.basePrice) * nights : 0;
 
   const { mutate, isPending } = useMutation({
-    mutationFn: () => bookingsApi.create({
-      roomId: form.roomId, checkIn: form.checkIn, checkOut: form.checkOut,
-      adults: form.adults, children: form.children,
-      notes: form.notes || undefined, source: 'WALK_IN',
-      skipEmail: form.skipEmail, autoCheckIn: form.autoCheckIn,
-      paymentMethod: form.paymentMethod === 'PENDING' ? undefined : form.paymentMethod,
-      guestFirstName: form.firstName, guestLastName: form.lastName,
-      guestEmail: form.email || undefined, guestPhone: form.phone || undefined,
-    }),
+    mutationFn: async () => {
+      const res = await bookingsApi.create({
+        roomId: form.roomId, checkIn: form.checkIn, checkOut: form.checkOut,
+        adults: form.adults, children: form.children,
+        notes: form.notes || undefined, source: 'WALK_IN',
+        skipEmail: form.skipEmail, autoCheckIn: form.autoCheckIn,
+        paymentMethod: form.paymentMethod === 'PENDING' ? undefined : form.paymentMethod,
+        guestFirstName: form.firstName, guestLastName: form.lastName,
+        guestEmail: form.email || undefined, guestPhone: form.phone || undefined,
+      });
+      // Best-effort, same as Front Desk Walk-in and New Booking: attach the
+      // doc once the guest + booking actually exist, never undo a successful
+      // check-in over a failed upload.
+      if (pendingDoc) {
+        const booking = res.data.data as { id: string; guestId: string };
+        const docForm = new FormData();
+        docForm.append('file', pendingDoc.file);
+        docForm.append('docType', pendingDoc.docType);
+        docForm.append('bookingId', booking.id);
+        await guestsApi.uploadDocument(booking.guestId, docForm).catch(() => {
+          toast({ title: 'Booked, but document upload failed', description: 'You can add it later from the guest profile.', variant: 'destructive' });
+        });
+      }
+      return res;
+    },
     onSuccess: (res) => {
       const booking = res.data.data;
       qc.invalidateQueries({ queryKey: ['bookings'] });
@@ -145,11 +172,11 @@ export function WalkInModal({ onClose }: Props) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
               <label className={lbl}>Check-in</label>
-              <input type="date" value={form.checkIn} min={today()} onChange={e => set('checkIn', e.target.value)} className={inp} />
+              <input type="date" value={form.checkIn} min={today()} onChange={e => setCheckIn(e.target.value)} className={inp} />
             </div>
             <div>
               <label className={lbl}>Check-out</label>
-              <input type="date" value={form.checkOut} min={form.checkIn || today()} onChange={e => set('checkOut', e.target.value)} className={inp} />
+              <input type="date" value={form.checkOut} min={form.checkIn ? dayAfter(form.checkIn) : today()} onChange={e => set('checkOut', e.target.value)} className={inp} />
             </div>
           </div>
 
@@ -193,15 +220,26 @@ export function WalkInModal({ onClose }: Props) {
 
           {/* Guest Info */}
           <div>
-            <label className={lbl} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <UserPlus style={{ width: '12px', height: '12px' }} /> Guest
-            </label>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <label className={lbl} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: 0 }}>
+                <UserPlus style={{ width: '12px', height: '12px' }} /> Guest
+              </label>
+              <button type="button" onClick={() => setShowDocPicker(v => !v)}
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', borderRadius: '8px', border: `1.5px solid ${pendingDoc ? '#1a6b5e' : 'var(--rp-border-md)'}`, background: pendingDoc ? '#f0faf8' : 'transparent', color: pendingDoc ? '#1a6b5e' : 'var(--rp-text-muted)', fontSize: '11.5px', fontWeight: 600, padding: '4px 9px', cursor: 'pointer' }}>
+                {pendingDoc ? 'Document added' : '+ Add Document'}
+              </button>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               <input placeholder="First name *" value={form.firstName} onChange={e => set('firstName', e.target.value)} className={inp} />
               <input placeholder="Last name *" value={form.lastName} onChange={e => set('lastName', e.target.value)} className={inp} />
               <input type="tel" placeholder="Phone (optional)" value={form.phone} onChange={e => set('phone', e.target.value)} className={inp} />
               <input type="email" placeholder="Email (optional)" value={form.email} onChange={e => set('email', e.target.value)} className={inp} />
             </div>
+            {showDocPicker && (
+              <div style={{ marginTop: '10px' }}>
+                <AddDocumentInline value={pendingDoc} onChange={setPendingDoc} />
+              </div>
+            )}
           </div>
 
           {/* Counts + notes */}

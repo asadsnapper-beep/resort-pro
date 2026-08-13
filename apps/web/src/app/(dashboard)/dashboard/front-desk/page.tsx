@@ -3,7 +3,7 @@
 import { ModalShell } from '@/components/ui/modal-shell';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { frontDeskApi, bookingsApi, roomsApi } from '@/lib/api';
+import { frontDeskApi, bookingsApi, roomsApi, ratePlansApi, guestsApi } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { useAuthStore } from '@/store/auth';
 import {
@@ -11,6 +11,7 @@ import {
   Plus, Phone, Banknote, LayoutGrid, List, RefreshCw, AlertTriangle,
 } from 'lucide-react';
 import { PageShell, PageHeader } from '@/components/patterns';
+import { AddDocumentInline, type PendingDocument } from '@/components/guests/AddDocumentInline';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Guest { id: string; firstName: string; lastName: string; phone?: string; email?: string }
@@ -188,7 +189,8 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
   const { tenant } = useAuthStore();
   const qc = useQueryClient();
   const todayStr = new Date().toISOString().split('T')[0];
-  const tomorrowStr = new Date(Date.now() + 86_400_000).toISOString().split('T')[0];
+  const dayAfter = (d: string) => new Date(new Date(d).getTime() + 86_400_000).toISOString().split('T')[0];
+  const tomorrowStr = dayAfter(todayStr);
 
   const [form, setForm] = useState({
     guestName: '', guestPhone: '', adults: 1, children: 0,
@@ -196,6 +198,8 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
     paymentMethod: 'CASH' as 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'LATER',
     advanceAmount: '', roomNotes: '',
   });
+  const [pendingDoc, setPendingDoc] = useState<PendingDocument | null>(null);
+  const [showDocPicker, setShowDocPicker] = useState(false);
 
   const { data: roomData } = useQuery({
     queryKey: ['rooms-available', form.checkIn, form.checkOut],
@@ -204,10 +208,43 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
 
   const n = nights(form.checkIn, form.checkOut);
   const selectedRoom = (roomData as { id: string; number: string; name: string; basePrice: number }[] | undefined)?.find(r => r.id === form.roomId);
-  const estimatedTotal = selectedRoom ? Number(selectedRoom.basePrice) * Math.max(n, 1) : 0;
+
+  // Rate-plan-aware price preview — mirrors what the backend will actually
+  // charge (resolveRate), so staff aren't quoting a base-price estimate that
+  // turns out wrong once a seasonal/weekend/promo plan kicks in.
+  const { data: rateResolved } = useQuery({
+    queryKey: ['walkin-rate-resolve', form.roomId, form.checkIn, form.checkOut],
+    queryFn: () => ratePlansApi.resolve(form.roomId, form.checkIn, form.checkOut).then(r => r.data.data),
+    enabled: !!form.roomId && !!form.checkIn && !!form.checkOut && form.checkOut > form.checkIn,
+  });
+  const effectiveNightlyRate = (rateResolved as { effectivePrice?: number } | undefined)?.effectivePrice
+    ?? (selectedRoom ? Number(selectedRoom.basePrice) : 0);
+  const activePlanName = (rateResolved as { resolved?: { planName?: string } | null } | undefined)?.resolved?.planName ?? null;
+  const estimatedTotal = selectedRoom ? effectiveNightlyRate * Math.max(n, 1) : 0;
+  // "Later" never records a payment on the backend (see /walk-in), so an
+  // amount typed here before switching to Later must not be shown as paid —
+  // selectPaymentMethod() below already clears it, this is defense in depth.
+  const advanceNum = form.paymentMethod !== 'LATER' && form.advanceAmount ? Number(form.advanceAmount) : 0;
+  const balanceDue = Math.max(0, estimatedTotal - advanceNum);
 
   const mutation = useMutation({
-    mutationFn: () => bookingsApi.walkIn({ ...form, advanceAmount: form.advanceAmount ? Number(form.advanceAmount) : undefined }),
+    mutationFn: async () => {
+      const res = await bookingsApi.walkIn({ ...form, advanceAmount: advanceNum || undefined });
+      const booking = res.data.data as { id: string; guestId: string };
+      // Document is attached after the guest/booking actually exist —
+      // best-effort: a failed upload shouldn't undo an otherwise-successful
+      // check-in, so it's swallowed rather than surfaced as the main error.
+      if (pendingDoc) {
+        const docForm = new FormData();
+        docForm.append('file', pendingDoc.file);
+        docForm.append('docType', pendingDoc.docType);
+        docForm.append('bookingId', booking.id);
+        await guestsApi.uploadDocument(booking.guestId, docForm).catch(() => {
+          toast({ title: 'Checked in, but document upload failed', description: 'You can add it later from the guest profile.', variant: 'destructive' });
+        });
+      }
+      return res;
+    },
     onSuccess: () => {
       toast({ title: 'Walk-in checked in!', description: `${form.guestName} — Room assigned` });
       qc.invalidateQueries({ queryKey: ['front-desk-today'] });
@@ -219,6 +256,20 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
   });
 
   const set = (k: string, v: unknown) => setForm(f => ({ ...f, [k]: v }));
+
+  // Changing check-in keeps check-out one night later unless the guest has
+  // already pushed check-out further out than that — and check-out can
+  // never land on or before check-in (min enforces this in the input too).
+  const setCheckIn = (ci: string) => {
+    setForm(f => ({ ...f, checkIn: ci, checkOut: f.checkOut > ci ? f.checkOut : dayAfter(ci) }));
+  };
+
+  // Switching to "Later" clears any typed advance — the backend never
+  // records a payment for LATER, so leaving a stale amount here would show
+  // staff a "paid" balance that was never actually collected.
+  const selectPaymentMethod = (m: 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'LATER') => {
+    setForm(f => ({ ...f, paymentMethod: m, advanceAmount: m === 'LATER' ? '' : f.advanceAmount }));
+  };
 
   return (
     <ModalShell
@@ -238,11 +289,24 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
     >
       <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <ModalInput label="Guest name *">
-                <input value={form.guestName} onChange={e => set('guestName', e.target.value)} placeholder="Rahman Ahmed" className={inputCls} />
-              </ModalInput>
+            <div className="col-span-2 flex items-end gap-2">
+              <div className="flex-1">
+                <ModalInput label="Guest name *">
+                  <input value={form.guestName} onChange={e => set('guestName', e.target.value)} placeholder="Rahman Ahmed" className={inputCls} />
+                </ModalInput>
+              </div>
+              <button type="button" onClick={() => setShowDocPicker(v => !v)}
+                className={`flex items-center gap-1.5 rounded-rp-ctrl border-2 px-3 py-[10px] text-rp-meta font-semibold shrink-0 transition-all ${
+                  pendingDoc ? 'border-rp-brand bg-rp-teal-bg text-rp-brand' : 'border-rp-border-md text-rp-muted'
+                }`}>
+                {pendingDoc ? 'Document added' : '+ Add Document'}
+              </button>
             </div>
+            {showDocPicker && (
+              <div className="col-span-2">
+                <AddDocumentInline value={pendingDoc} onChange={setPendingDoc} />
+              </div>
+            )}
             <ModalInput label="Phone">
               <input value={form.guestPhone} onChange={e => set('guestPhone', e.target.value)} placeholder="01712-345678" className={inputCls} />
             </ModalInput>
@@ -257,10 +321,10 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
           </div>
           <div className="grid grid-cols-2 gap-3">
             <ModalInput label="Check-in">
-              <input type="date" value={form.checkIn} onChange={e => set('checkIn', e.target.value)} className={inputCls} />
+              <input type="date" value={form.checkIn} min={todayStr} onChange={e => setCheckIn(e.target.value)} className={inputCls} />
             </ModalInput>
             <ModalInput label="Check-out">
-              <input type="date" value={form.checkOut} onChange={e => set('checkOut', e.target.value)} className={inputCls} />
+              <input type="date" value={form.checkOut} min={dayAfter(form.checkIn)} onChange={e => set('checkOut', e.target.value)} className={inputCls} />
             </ModalInput>
           </div>
           <ModalInput label="Room *">
@@ -272,16 +336,31 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
             </select>
           </ModalInput>
           {estimatedTotal > 0 && (
-            <div className="flex justify-between rounded-[10px] border p-3 text-[13px]" style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)' }}>
-              <span className="text-[#183153]">{n} night{n !== 1 ? 's' : ''} × {fmt(Number(selectedRoom?.basePrice), tenant?.currency)}</span>
-              <span className="font-bold text-[#183153]">{fmt(estimatedTotal, tenant?.currency)}</span>
+            <div className="rounded-[10px] border p-3 text-[13px] space-y-1.5" style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)' }}>
+              <div className="flex justify-between">
+                <span className="text-[#183153]">{n} night{n !== 1 ? 's' : ''} × {fmt(effectiveNightlyRate, tenant?.currency)}</span>
+                <span className="font-bold text-[#183153]">{fmt(estimatedTotal, tenant?.currency)}</span>
+              </div>
+              {activePlanName && (
+                <p className="text-rp-micro font-medium text-rp-brand">Rate plan applied: {activePlanName}</p>
+              )}
+              {advanceNum > 0 && (
+                <>
+                  <div className="flex justify-between text-rp-text">
+                    <span>Advance paid</span><span>-{fmt(advanceNum, tenant?.currency)}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-rp-border-md pt-1.5 font-bold text-rp-text">
+                    <span>Balance due</span><span>{fmt(balanceDue, tenant?.currency)}</span>
+                  </div>
+                </>
+              )}
             </div>
           )}
           <ModalInput label="Advance payment">
             <input type="number" value={form.advanceAmount} onChange={e => set('advanceAmount', e.target.value)} placeholder="0" className={`${inputCls} mb-2`} />
             <div className="flex gap-2">
               {(['CASH', 'CARD', 'BANK_TRANSFER', 'LATER'] as const).map(m => (
-                <button key={m} onClick={() => set('paymentMethod', m)}
+                <button key={m} onClick={() => selectPaymentMethod(m)}
                   className="flex-1 rounded-[8px] border-2 py-[7px] text-[11.5px] font-semibold transition-all"
                   style={form.paymentMethod === m
                     ? { borderColor: '#183153', background: 'var(--rp-teal-bg)', color: '#183153' }

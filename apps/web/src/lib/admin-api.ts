@@ -39,11 +39,25 @@ export const adminEndpoints = {
   tenant: (id: string) => adminApi.get(`/tenants/${id}`),
   updateTenant: (id: string, data: Record<string, unknown>) =>
     adminApi.patch(`/tenants/${id}`, data),
-  suspendTenant: (id: string) => adminApi.delete(`/tenants/${id}`),
+  // Was calling DELETE /tenants/:id — harmless while that route only ever
+  // soft-suspended, but DELETE now permanently erases the tenant, so
+  // "Suspend" has to go through the same PATCH path reactivate already uses.
+  suspendTenant: (id: string) => adminApi.patch(`/tenants/${id}`, { isActive: false }),
   reactivateTenant: (id: string) => adminApi.patch(`/tenants/${id}`, { isActive: true }),
+  // Permanent, irreversible. confirmName must exactly match the tenant's
+  // current name — the server rejects anything else.
+  deleteTenant: (id: string, confirmName: string) =>
+    adminApi.delete(`/tenants/${id}`, { data: { confirmName } }),
   impersonate: (id: string) => adminApi.post(`/tenants/${id}/impersonate`),
   exportTenant: (id: string) => adminApi.get(`/tenants/${id}/export`, { responseType: 'blob' }),
   extendTrial: (id: string, days: number) => adminApi.post(`/tenants/${id}/extend-trial`, { days }),
+  // Owner-submitted requests to permanently delete their own tenant.
+  deletionRequests: (status: string = 'PENDING') =>
+    adminApi.get('/tenant-deletion-requests', { params: { status } }),
+  approveDeletionRequest: (id: string) =>
+    adminApi.post(`/tenant-deletion-requests/${id}/approve`),
+  rejectDeletionRequest: (id: string, adminNotes?: string) =>
+    adminApi.post(`/tenant-deletion-requests/${id}/reject`, { adminNotes }),
   // Users
   users: (params?: Record<string, string>) =>
     adminApi.get('/users', { params }),

@@ -9,11 +9,14 @@ import {
   sendBookingConfirmation,
   sendCheckoutEmail,
   sendCancellationEmail,
+  trackGuestEmail,
 } from '../utils/guest-emails';
 import { awardCheckoutPoints } from '../services/loyalty';
 import { syncCalendarsForRoom } from '../jobs/ical-sync';
 import { createGuestPaymentLink } from './billing';
 import { resolveRate } from './ratePlans';
+import { createAdminNotification } from '../utils/notifications';
+import { nextDocumentNumber } from '../utils/sequence';
 import type { JwtPayload } from '@resort-pro/types';
 
 /* ── Auto-create invoice when a booking is confirmed ────────────────────── */
@@ -60,15 +63,10 @@ async function autoCreateInvoice(bookingId: string, tenantId: string) {
     const taxAmt   = Math.round(subtotal * (taxRate / 100) * 100) / 100;
     const total    = subtotal + taxAmt;
 
-    // Generate invoice number (safe: use highest existing number, not COUNT)
-    const year       = new Date().getFullYear();
-    const prefix     = `INV-${year}-`;
-    const lastInv    = await prisma.invoice.findFirst({
-      where:   { tenantId, invoiceNumber: { startsWith: prefix } },
-      orderBy: { invoiceNumber: 'desc' },
-    });
-    const lastNum       = lastInv ? parseInt(lastInv.invoiceNumber.slice(prefix.length), 10) : 0;
-    const invoiceNumber = `${prefix}${String(lastNum + 1).padStart(4, '0')}`;
+    // Generate invoice number — atomic per-tenant counter, tenant code baked
+    // into the string itself. See utils/sequence.ts for why the previous
+    // findFirst/orderBy:desc approach could collide across tenants.
+    const invoiceNumber = await nextDocumentNumber(tenantId, tenant.slug, 'INV');
 
     await prisma.invoice.create({
       data: {
@@ -81,8 +79,17 @@ async function autoCreateInvoice(bookingId: string, tenantId: string) {
         items: { create: lineItems as any },
       },
     });
-  } catch {
-    // Non-critical — don't fail booking creation
+  } catch (err) {
+    // Booking creation must not fail because of this — but don't let the
+    // failure disappear silently either. Record it so someone actually
+    // notices a confirmed booking is missing its invoice.
+    await createAdminNotification({
+      type: 'invoice_creation_failed',
+      title: 'Auto invoice creation failed',
+      message: `Booking ${bookingId} (tenant ${tenantId}) was confirmed but its invoice could not be auto-created: ${err instanceof Error ? err.message : String(err)}`,
+      metadata: { bookingId, tenantId },
+      linkPath: `/bookings/${bookingId}`,
+    }).catch(() => {});
   }
 }
 
@@ -448,7 +455,7 @@ export async function bookingRoutes(app: FastifyInstance) {
 
       // Send confirmation email (skip for walk-in if opted out)
       if (!body.skipEmail) {
-        sendBookingConfirmation(booking.id).catch(() => {});
+        trackGuestEmail('confirmation', booking.id, tenantId, sendBookingConfirmation(booking.id));
       }
 
       // Auto-generate invoice draft (fire-and-forget)
@@ -583,7 +590,7 @@ export async function bookingRoutes(app: FastifyInstance) {
       const grandTotal = Number(booking.totalAmount) + foodTotal;
       const paidAfter  = Number(booking.paidAmount) + (body.additionalPayment ?? 0);
 
-      sendCheckoutEmail(id).catch(() => {});
+      trackGuestEmail('checkout', id, booking.tenantId, sendCheckoutEmail(id));
       awardCheckoutPoints(id).catch(() => {});
 
       return ok({
@@ -674,7 +681,7 @@ export async function bookingRoutes(app: FastifyInstance) {
       // Skipped for no-shows — the "Booking Cancelled" template's wording
       // doesn't fit a guest who simply never arrived.
       if (body.notifyGuest !== false && !body.isNoShow) {
-        sendCancellationEmail(id).catch(() => {});
+        trackGuestEmail('cancellation', id, booking.tenantId, sendCancellationEmail(id));
       }
 
       return ok(updated, body.isNoShow ? 'Booking marked as no-show' : 'Booking cancelled');
@@ -765,7 +772,7 @@ export async function bookingRoutes(app: FastifyInstance) {
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
         if (body.notifyGuest !== false) {
-          sendBookingConfirmation(updated.id).catch(() => {});
+          trackGuestEmail('modified-confirmation', updated.id, tenantId, sendBookingConfirmation(updated.id));
         }
 
         return ok({ booking: updated, priceDiff: newTotal - oldTotal, oldTotal, newTotal }, 'Booking updated');
@@ -1118,11 +1125,16 @@ export async function bookingRoutes(app: FastifyInstance) {
         roomId:        z.string(),
         checkIn:       z.string(), // YYYY-MM-DD
         checkOut:      z.string(), // YYYY-MM-DD
-        ratePerNight:  z.number().optional(), // override room base price
-        discount:      z.number().min(0).max(100).default(0), // percentage
+        ratePerNight:  z.number().optional(), // explicit staff override — wins over any rate plan
+        discount:      z.number().min(0).max(100).default(0), // percentage, applied on top of whichever rate wins
         paymentMethod: z.enum(['CASH', 'CARD', 'BANK_TRANSFER', 'LATER']).default('CASH'),
         advanceAmount: z.number().optional(),
         roomNotes:     z.string().optional(),
+        // Optional fields captured from an ID/passport scan at check-in time
+        idType:        z.enum(['PASSPORT', 'NATIONAL_ID', 'DRIVERS_LICENSE', 'OTHER']).optional(),
+        idNumber:      z.string().optional(),
+        nationality:   z.string().optional(),
+        dateOfBirth:   z.string().optional(), // ISO date string
       }).parse(request.body);
 
       const checkInDate  = new Date(body.checkIn);
@@ -1141,9 +1153,19 @@ export async function bookingRoutes(app: FastifyInstance) {
       if (externalCalendars.length > 0) await syncCalendarsForRoom(body.roomId, externalCalendars);
 
       // ── Atomic: conflict-check + create in serializable transaction ─────────
-      const nights      = calculateNights(checkInDate, checkOutDate);
-      const rate        = body.ratePerNight ?? Number(room.basePrice);
-      const totalAmount = rate * nights * (1 - body.discount / 100);
+      const nights = calculateNights(checkInDate, checkOutDate);
+      // An explicit staff-entered rate wins outright (that's what it's for).
+      // Otherwise resolve the best-matching rate plan for this room/date
+      // range, same as the regular booking-creation route — falls back to
+      // the room's plain nightly price when nothing matches.
+      let baseTotal: number;
+      if (body.ratePerNight != null) {
+        baseTotal = body.ratePerNight * nights;
+      } else {
+        const resolved = await resolveRate(tenantId, body.roomId, checkInDate, checkOutDate, Number(room.basePrice));
+        baseTotal = resolved?.totalPrice ?? Number(room.basePrice) * nights;
+      }
+      const totalAmount = baseTotal * (1 - body.discount / 100);
       const now         = new Date();
 
       let booking: Awaited<ReturnType<typeof prisma.booking.findFirst>> & object;
@@ -1162,8 +1184,18 @@ export async function bookingRoutes(app: FastifyInstance) {
 
           const [firstName, ...rest] = body.guestName.trim().split(' ');
           const lastName = rest.join(' ') || '-';
+          // Defense in depth: the scan-id endpoint already normalizes to ISO
+          // before this ever reaches us, but an invalid/unparseable string
+          // must never abort the whole check-in transaction — drop it instead.
+          const parsedDob = body.dateOfBirth ? new Date(body.dateOfBirth) : undefined;
+          const dateOfBirth = parsedDob && !isNaN(parsedDob.getTime()) ? parsedDob : undefined;
           const guest = await tx.guest.create({
-            data: { tenantId, firstName, lastName, email: `walkin-${Date.now()}@resortpro.local`, phone: body.guestPhone },
+            data: {
+              tenantId, firstName, lastName, phone: body.guestPhone,
+              email: `walkin-${Date.now()}@resortpro.local`,
+              idType: body.idType, idNumber: body.idNumber, nationality: body.nationality,
+              dateOfBirth,
+            },
           });
 
           const newBooking = await tx.booking.create({

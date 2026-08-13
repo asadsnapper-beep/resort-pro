@@ -76,12 +76,62 @@ function parseRawText(text: string): Record<string, string> {
     }
   }
 
-  // Date of birth: DD/MM/YYYY or YYYY-MM-DD
-  const dobMatch = text.match(/(?:dob|birth|born|জন্ম)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i)
-    || text.match(/\b(\d{1,2}[/-]\d{1,2}[/-]\d{4})\b/);
-  if (dobMatch) fields.dateOfBirth = dobMatch[1];
+  // Date of birth — BD NIDs print this as "12 Feb 1994" (month name), not
+  // the numeric DD/MM/YYYY this used to assume exclusively. Try month-name
+  // form first since it's the actual NID format; fall back to numeric.
+  const MONTHS: Record<string, string> = {
+    jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+    jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
+  };
+  const dobMonthName = text.match(/\b(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})\b/);
+  if (dobMonthName) {
+    const month = MONTHS[dobMonthName[2].slice(0, 3).toLowerCase()];
+    if (month) fields.dateOfBirth = `${dobMonthName[3]}-${month}-${dobMonthName[1].padStart(2, '0')}`;
+  }
+  if (!fields.dateOfBirth) {
+    const dobMatch = text.match(/(?:dob|birth|born|জন্ম)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i)
+      || text.match(/\b(\d{1,2}[/-]\d{1,2}[/-]\d{4})\b/);
+    if (dobMatch) fields.dateOfBirth = dobMatch[1];
+  }
 
   return fields;
+}
+
+// ── Date normalization ─────────────────────────────────────────────────────────
+// OCR/MRZ extraction hands back raw, ambiguous date strings (commonly
+// DD/MM/YYYY for BD ID documents). Passing that straight to `new Date()`
+// downstream either misparses silently (JS reads slash dates as MM/DD/YYYY)
+// or produces an Invalid Date whenever the day exceeds 12 — which then
+// throws deep inside a booking/guest-update transaction. Normalize to ISO
+// here, once, for every caller, and drop the field rather than guess wrong.
+function isValidYMD(y: number, m: number, d: number): boolean {
+  if (m < 1 || m > 12 || d < 1 || d > 31) return false;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
+function normalizeDate(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+
+  const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (iso) {
+    const [, y, m, d] = iso;
+    return isValidYMD(+y, +m, +d) ? `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}` : undefined;
+  }
+
+  // Day-first (DD/MM/YYYY or DD-MM-YYYY) — the convention used by BD IDs
+  // and by this file's own regexes above.
+  const dmy = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (dmy) {
+    const [, d, m, yRaw] = dmy;
+    const currentYY = new Date().getFullYear() % 100;
+    const year = yRaw.length === 2
+      ? (Number(yRaw) <= currentYY ? 2000 + Number(yRaw) : 1900 + Number(yRaw))
+      : Number(yRaw);
+    return isValidYMD(year, +m, +d) ? `${year}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` : undefined;
+  }
+
+  return undefined; // unrecognized shape — drop rather than guess
 }
 
 // ── Route ─────────────────────────────────────────────────────────────────────
@@ -136,6 +186,11 @@ export async function idScanRoutes(app: FastifyInstance) {
       // ── Parse fields ─────────────────────────────────────────────────────
       const mrzFields = await tryParseMRZ(rawText);
       const fields = mrzFields ?? parseRawText(rawText);
+      if (fields.dateOfBirth) {
+        const normalized = normalizeDate(fields.dateOfBirth);
+        if (normalized) fields.dateOfBirth = normalized;
+        else delete fields.dateOfBirth;
+      }
 
       return reply.send({
         success: true,

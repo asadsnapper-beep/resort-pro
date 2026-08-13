@@ -24,6 +24,17 @@ import {
 import { useAuthStore } from '@/store/auth';
 import { api } from '@/lib/api';
 
+// Palette matches the landing page's design system
+// (claude.ai/design/p/d56b55b0-882c-44d6-aecd-3667a5499d43 — "ResortPro Landing.dc.html").
+// Keep these in sync with LandingPage.tsx if that source changes.
+const NAVY = '#14314D';
+const GOLD = '#CFA153';
+const GOLD_HOVER = '#B98B3E';
+const CREAM = '#F7F3EE';
+const BORDER = '#EDE7DD';
+const MUTED = '#5B6B79';
+const MUTED_LIGHT = '#8B95A0';
+
 const DEMO_EMAIL_KEY = 'rp_demo_email';
 
 const ROLES = [
@@ -136,13 +147,16 @@ const ROLES = [
 
 function BrandMark() {
   return (
-    <span className="relative block h-7 w-7 overflow-hidden bg-white">
+    <span
+      className="relative flex h-9 w-9 flex-none items-center justify-center overflow-hidden rounded-lg"
+      style={{ background: NAVY }}
+    >
       <Image
-        src="/brand/resortpro-logo-concept-v2.png"
+        src="/brand/resortpro-icon-mark.png"
         alt="ResortPro"
         fill
-        sizes="28px"
-        className="translate-y-[5px] scale-[1.8] object-cover mix-blend-multiply"
+        sizes="36px"
+        className="scale-125 object-cover mix-blend-screen"
       />
     </span>
   );
@@ -217,27 +231,27 @@ export default function DemoPage() {
   };
 
   return (
-    <main className="min-h-screen overflow-hidden bg-white text-[#183153]">
-      <header className="border-b-2 border-[#183153] bg-white">
+    <main className="min-h-screen overflow-hidden bg-white font-sans" style={{ color: NAVY }}>
+      <header className="border-b bg-white" style={{ borderColor: BORDER }}>
         <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-5 sm:px-8">
           <Link href="/" className="flex items-center gap-2.5" aria-label="ResortPro home">
             <BrandMark />
-            <span className="font-display text-xl font-semibold tracking-[-0.045em]">
-              ResortPro
-            </span>
+            <span className="text-lg font-extrabold tracking-[-0.02px]">ResortPro</span>
           </Link>
           <div className="flex items-center gap-2 text-sm font-bold">
             <button
               type="button"
               onClick={switchLocale}
-              className="flex items-center gap-1.5 px-2 py-2 text-[#475569] transition-colors hover:text-[#ef725c] sm:px-3"
+              className="flex items-center gap-1.5 px-2 py-2 transition-colors hover:opacity-70 sm:px-3"
+              style={{ color: MUTED }}
             >
               <Languages className="h-4 w-4" />
               <span>{isBn ? 'English' : 'বাংলা'}</span>
             </button>
             <Link
               href="/"
-              className="hidden items-center gap-1.5 px-2 py-2 text-[#475569] transition-colors hover:text-[#ef725c] sm:flex"
+              className="hidden items-center gap-1.5 px-2 py-2 transition-colors hover:opacity-70 sm:flex"
+              style={{ color: MUTED }}
             >
               <ArrowLeft className="h-4 w-4" />
               {isBn ? 'হোমে ফিরুন' : 'Back home'}
@@ -246,34 +260,39 @@ export default function DemoPage() {
         </div>
       </header>
 
-      <section className="relative border-b-2 border-[#183153] bg-[#fff1ea]">
-        <div className="pointer-events-none absolute inset-0 opacity-30 [background-image:linear-gradient(#183153_1px,transparent_1px),linear-gradient(90deg,#183153_1px,transparent_1px)] [background-size:48px_48px]" />
-        <div className="relative mx-auto grid max-w-7xl gap-8 px-5 py-14 sm:px-8 lg:grid-cols-[1fr_300px] lg:items-end lg:py-20">
+      <section className="border-b" style={{ background: CREAM, borderColor: BORDER }}>
+        <div className="mx-auto grid max-w-7xl gap-8 px-5 py-14 sm:px-8 lg:grid-cols-[1fr_300px] lg:items-end lg:py-20">
           <div>
-            <p className="font-bitcount text-[11px] font-medium uppercase tracking-[0.18em] text-[#b2402c]">
-              Interactive product tour
-            </p>
-            <h1 className="font-display mt-4 max-w-3xl text-5xl font-semibold leading-[0.94] tracking-[-0.065em] text-[#183153] sm:text-6xl">
+            <span
+              className="font-bitcount block text-[13px] font-medium uppercase tracking-[0.14em]"
+              style={{ color: GOLD }}
+            >
+              {isBn ? 'ইন্টারঅ্যাক্টিভ প্রোডাক্ট ট্যুর' : 'Interactive product tour'}
+            </span>
+            <h1 className="mt-4 max-w-3xl text-[clamp(2.4rem,5vw,3.2rem)] font-extrabold leading-[1.15]">
               {isBn
-                ? 'আপনার কাজের জায়গা থেকে ResortPro দেখুন।'
+                ? 'আপনার কাজের জায়গা থেকে ResortPro দেখুন।'
                 : 'See ResortPro from the desk where work actually happens.'}
             </h1>
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-[#475569]">
+            <p className="mt-6 max-w-2xl text-lg leading-8" style={{ color: MUTED }}>
               {isBn
                 ? 'একটি role বেছে নিন। dashboard, booking, guest এবং daily operations কীভাবে একসাথে কাজ করে তা দেখুন।'
                 : 'Choose a role, then step into a live workspace for bookings, guests and the daily operational work around them.'}
             </p>
           </div>
-          <aside className="border-2 border-[#183153] bg-[#183153] p-5 text-white shadow-[8px_8px_0_#ef725c]">
-            <p className="font-bitcount text-[10px] font-medium uppercase tracking-[0.14em] text-[#f4c76b]">
-              A real workspace
-            </p>
-            <p className="font-display mt-3 text-2xl font-semibold leading-none tracking-[-0.04em]">
-              Not a slideshow.
+          <aside className="rounded-2xl p-6 text-white" style={{ background: NAVY }}>
+            <span
+              className="font-bitcount block text-[11px] font-medium uppercase tracking-[0.12em]"
+              style={{ color: GOLD }}
+            >
+              {isBn ? 'একটি প্রকৃত ওয়ার্কস্পেস' : 'A real workspace'}
+            </span>
+            <p className="mt-3 text-2xl font-extrabold leading-none">
+              {isBn ? 'কোনো স্লাইডশো নয়।' : 'Not a slideshow.'}
             </p>
             <p className="mt-4 text-sm leading-6 text-white/65">
               {isBn
-                ? 'কোনো card দেখানোর জন্য নয়—প্রতিটি role-এর নিজের কাজের জায়গা আছে।'
+                ? 'কোনো card দেখানোর জন্য নয়—প্রতিটি role-এর নিজের কাজের জায়গা আছে।'
                 : 'Every role enters a real, role-specific workspace — not a sales deck.'}
             </p>
           </aside>
@@ -281,58 +300,77 @@ export default function DemoPage() {
       </section>
 
       <section className="mx-auto max-w-7xl px-5 py-12 sm:px-8 sm:py-16">
-        <div className="mb-8 flex flex-col gap-3 border-b-2 border-[#183153] pb-6 sm:flex-row sm:items-end sm:justify-between">
+        <div
+          className="mb-10 flex flex-col gap-3 border-b pb-6 sm:flex-row sm:items-end sm:justify-between"
+          style={{ borderColor: BORDER }}
+        >
           <div>
-            <p className="font-bitcount text-[10px] font-medium uppercase tracking-[0.16em] text-[#b2402c]">
-              Choose your view
-            </p>
-            <h2 className="font-display mt-2 text-3xl font-semibold tracking-[-0.05em]">
+            <span
+              className="font-bitcount block text-[11px] font-medium uppercase tracking-[0.12em]"
+              style={{ color: GOLD }}
+            >
+              {isBn ? 'আপনার ভিউ বেছে নিন' : 'Choose your view'}
+            </span>
+            <h2 className="mt-2 text-3xl font-extrabold">
               {isBn ? 'কোন role-এ explore করতে চান?' : 'Which role do you want to explore?'}
             </h2>
           </div>
-          <p className="text-sm text-[#64748b]">
-            {isBn
-              ? 'শুরু করতে ১ মিনিটেরও কম লাগবে।'
-              : 'It takes less than a minute to get oriented.'}
+          <p className="text-sm" style={{ color: MUTED }}>
+            {isBn ? 'শুরু করতে ১ মিনিটেরও কম লাগবে।' : 'It takes less than a minute to get oriented.'}
           </p>
         </div>
 
-        <div className="grid border-l-2 border-t-2 border-[#183153] sm:grid-cols-2 lg:grid-cols-4">
-          {ROLES.map((role, index) => {
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {ROLES.map((role) => {
             const Icon = role.icon;
-            const mutedBackground =
-              index % 3 === 1 ? 'bg-[#e5f0f7]' : index % 3 === 2 ? 'bg-[#fff1ea]' : 'bg-white';
             return (
               <button
                 key={role.role}
                 type="button"
                 onClick={() => handleRoleSelect(role.role)}
                 disabled={loading !== null}
-                className={`group relative min-h-[304px] border-b-2 border-r-2 border-[#183153] p-5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${role.primary ? 'bg-[#183153] text-white hover:bg-[#ef725c]' : `${mutedBackground} hover:bg-[#f4c76b]`}`}
+                className="group relative flex min-h-[300px] flex-col rounded-2xl border p-6 text-left transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                style={
+                  role.primary
+                    ? { background: NAVY, borderColor: NAVY, color: '#fff' }
+                    : { background: CREAM, borderColor: BORDER }
+                }
+                onMouseEnter={(e) => {
+                  if (!role.primary) e.currentTarget.style.borderColor = GOLD;
+                }}
+                onMouseLeave={(e) => {
+                  if (!role.primary) e.currentTarget.style.borderColor = BORDER;
+                }}
               >
                 {loading === role.role && (
-                  <span className="absolute inset-0 z-10 flex items-center justify-center bg-[#183153]/90 text-sm font-extrabold text-white">
+                  <span
+                    className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl text-sm font-extrabold text-white"
+                    style={{ background: `${NAVY}e6` }}
+                  >
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                     {isBn ? 'লগইন হচ্ছে...' : 'Opening demo...'}
                   </span>
                 )}
                 <span
-                  className={`flex h-10 w-10 items-center justify-center border-2 ${role.primary ? 'border-[#f4c76b] text-[#f4c76b]' : 'border-[#183153] text-[#ef725c]'}`}
+                  className="flex h-10 w-10 items-center justify-center rounded-lg"
+                  style={role.primary ? { background: 'rgba(255,255,255,0.12)', color: GOLD } : { background: '#fff', color: GOLD }}
                 >
                   <Icon className="h-5 w-5" />
                 </span>
                 <div className="mt-6 flex items-start justify-between gap-3">
-                  <h3 className="font-display text-2xl font-semibold leading-none tracking-[-0.045em]">
+                  <h3 className="text-xl font-extrabold leading-none">
                     {isBn ? role.titleBn : role.title}
                   </h3>
                   <span
-                    className={`font-bitcount shrink-0 text-[9px] uppercase tracking-[0.1em] ${role.primary ? 'text-[#f4c76b]' : 'text-[#b2402c]'}`}
+                    className="font-bitcount shrink-0 text-[9px] uppercase tracking-[0.1em]"
+                    style={{ color: role.primary ? GOLD : GOLD }}
                   >
                     {role.badge}
                   </span>
                 </div>
                 <p
-                  className={`mt-4 text-sm leading-6 ${role.primary ? 'text-white/70' : 'text-[#475569]'}`}
+                  className="mt-4 text-sm leading-6"
+                  style={{ color: role.primary ? 'rgba(255,255,255,0.7)' : MUTED }}
                 >
                   {isBn ? role.descBn : role.description}
                 </p>
@@ -340,14 +378,16 @@ export default function DemoPage() {
                   {role.features.slice(0, 3).map((feature) => (
                     <span
                       key={feature}
-                      className={`text-[11px] ${role.primary ? 'text-white/55' : 'text-[#64748b]'}`}
+                      className="text-[11px]"
+                      style={{ color: role.primary ? 'rgba(255,255,255,0.55)' : MUTED_LIGHT }}
                     >
                       • {feature}
                     </span>
                   ))}
                 </div>
                 <span
-                  className={`absolute bottom-5 left-5 flex items-center gap-2 text-sm font-extrabold ${role.primary ? 'text-[#f4c76b]' : 'text-[#183153]'}`}
+                  className="mt-auto flex items-center gap-2 pt-5 text-sm font-extrabold"
+                  style={{ color: role.primary ? GOLD : NAVY }}
                 >
                   {isBn ? 'এই role-এ দেখুন' : 'Explore this role'}
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
@@ -356,12 +396,12 @@ export default function DemoPage() {
             );
           })}
         </div>
-        <p className="mt-8 text-center text-xs leading-6 text-[#64748b]">
+        <p className="mt-10 text-center text-xs leading-6" style={{ color: MUTED }}>
           {isBn ? (
             <>
               এটি একটি sandbox demo — কোনো real data বা account দরকার নেই।
               <br />
-              Demo session ৯০ মিনিট পর শেষ হয়।
+              Demo session ৯০ মিনিট পর শেষ হয়।
             </>
           ) : (
             <>
@@ -373,16 +413,15 @@ export default function DemoPage() {
         </p>
       </section>
 
-      <footer className="border-t-2 border-[#183153] bg-[#183153] text-white">
+      <footer style={{ background: NAVY }} className="text-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-7 text-sm sm:px-8 md:flex-row md:items-center md:justify-between">
           <p className="text-white/65">
-            See how a direct booking system can feel like your own front office.
+            {isBn
+              ? 'একটি ডাইরেক্ট বুকিং সিস্টেম কীভাবে আপনার নিজের ফ্রন্ট অফিসের মতো অনুভব হতে পারে দেখুন।'
+              : 'See how a direct booking system can feel like your own front office.'}
           </p>
-          <Link
-            href="/plans"
-            className="font-extrabold text-[#f4c76b] underline decoration-2 underline-offset-4"
-          >
-            View simple pricing
+          <Link href="/plans" className="font-extrabold underline decoration-2 underline-offset-4" style={{ color: GOLD }}>
+            {isBn ? 'সহজ প্রাইসিং দেখুন' : 'View simple pricing'}
           </Link>
         </div>
       </footer>
@@ -390,18 +429,21 @@ export default function DemoPage() {
       {checkedStorage &&
         !capturedEmail &&
         createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#183153]/70 px-4 backdrop-blur-sm">
-            <div className="w-full max-w-md border-2 border-[#183153] bg-white p-6 shadow-[10px_10px_0_#ef725c] sm:p-8">
-              <span className="flex h-11 w-11 items-center justify-center bg-[#ef725c] text-white">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl sm:p-8">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl text-white" style={{ background: GOLD }}>
                 <Mail className="h-5 w-5" />
               </span>
-              <p className="font-bitcount mt-6 text-[10px] font-medium uppercase tracking-[0.16em] text-[#b2402c]">
-                One quick detail
-              </p>
-              <h2 className="font-display mt-2 text-3xl font-semibold leading-none tracking-[-0.05em] text-[#183153]">
+              <span
+                className="font-bitcount mt-6 block text-[11px] font-medium uppercase tracking-[0.14em]"
+                style={{ color: GOLD }}
+              >
+                {isBn ? 'একটি ছোট তথ্য' : 'One quick detail'}
+              </span>
+              <h2 className="mt-2 text-3xl font-extrabold leading-none" style={{ color: NAVY }}>
                 {isBn ? 'Demo দেখতে email দিন' : 'Enter your email, then explore freely.'}
               </h2>
-              <p className="mt-4 text-sm leading-6 text-[#64748b]">
+              <p className="mt-4 text-sm leading-6" style={{ color: MUTED }}>
                 {isBn
                   ? 'একবার email দিলেই হবে। এরপর যেকোনো role-এর demo দেখতে পারবেন—আবার চাইবে না। স্প্যাম নেই।'
                   : 'We ask once, then every role is yours to explore on this browser. No spam.'}
@@ -420,14 +462,20 @@ export default function DemoPage() {
                     setEmailError(null);
                   }}
                   placeholder="you@example.com"
-                  className="w-full border-2 border-[#183153] bg-white px-4 py-3 text-sm text-[#183153] outline-none placeholder:text-[#94a3b8] focus:border-[#ef725c]"
+                  className="w-full rounded-lg border px-4 py-3 text-sm outline-none transition-colors placeholder:text-[#94a3b8]"
+                  style={{ borderColor: BORDER, color: NAVY }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = GOLD; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = BORDER; }}
                 />
                 {emailError && (
-                  <p className="mt-2 text-xs font-bold text-[#b2402c]">{emailError}</p>
+                  <p className="mt-2 text-xs font-bold" style={{ color: '#b2402c' }}>{emailError}</p>
                 )}
                 <button
                   type="submit"
-                  className="mt-4 flex w-full items-center justify-center gap-2 border-2 border-[#183153] bg-[#183153] px-4 py-3.5 text-sm font-extrabold text-white transition-colors hover:border-[#ef725c] hover:bg-[#ef725c]"
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3.5 text-sm font-extrabold text-white transition-colors"
+                  style={{ background: GOLD }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = GOLD_HOVER; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = GOLD; }}
                 >
                   {isBn ? 'Demo দেখুন' : 'Continue to demo'}
                   <ArrowRight className="h-4 w-4" />

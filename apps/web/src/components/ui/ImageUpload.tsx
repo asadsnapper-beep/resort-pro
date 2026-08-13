@@ -8,7 +8,7 @@ import { api } from '@/lib/api';
 interface ImageUploadProps {
   value?: string | null;
   onChange: (url: string | null) => void;
-  folder?: 'profiles' | 'rooms' | 'menu' | 'website' | 'misc';
+  folder?: 'profiles' | 'rooms' | 'menu' | 'website' | 'venues' | 'vehicles' | 'misc';
   label?: string;
   hint?: string;
   aspectRatio?: 'square' | 'video' | 'wide' | 'free';

@@ -2,13 +2,18 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+// Palette matches the landing page's design system
+// (claude.ai/design/p/d56b55b0-882c-44d6-aecd-3667a5499d43 — "ResortPro Landing.dc.html").
+// Keep these in sync with LandingPage.tsx if that source changes.
+const NAVY = '#14314D';
+const GOLD = '#CFA153';
+const CREAM = '#F7F3EE';
+const BORDER = '#EDE7DD';
+const MUTED = '#5B6B79';
+
 /**
  * Shared shell for legal pages (Terms, Privacy, Refund).
  * Server component — good for SEO and fast static render.
- *
- * Matches the landing page's design system exactly: navy #183153 / coral
- * #ef725c / cream #fff1ea, bold extrabold type, thick 2px borders, zero
- * corner radius. See apps/web/src/app/page.tsx for the source of truth.
  */
 export function LegalPage({
   title,
@@ -20,23 +25,26 @@ export function LegalPage({
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-[#fff1ea] text-[#183153]">
+    <div className="min-h-screen bg-white font-sans" style={{ color: NAVY }}>
       {/* Header */}
-      <header className="border-b-2 border-[#183153] bg-white">
-        <div className="mx-auto flex min-h-[74px] max-w-[900px] items-center justify-between px-5 sm:px-8">
+      <header className="border-b bg-white" style={{ borderColor: BORDER }}>
+        <div className="mx-auto flex min-h-[72px] max-w-[900px] items-center justify-between px-5 sm:px-8">
           <Link href="/" className="flex items-center gap-2.5" aria-label="ResortPro home">
-            <span className="relative block h-7 w-7 overflow-hidden bg-[#fff]">
+            <span
+              className="relative flex h-9 w-9 flex-none items-center justify-center overflow-hidden rounded-lg"
+              style={{ background: NAVY }}
+            >
               <Image
                 src="/brand/resortpro-icon-mark.png"
                 alt="ResortPro"
                 fill
-                sizes="28px"
-                className="object-cover"
+                sizes="36px"
+                className="scale-125 object-cover mix-blend-screen"
               />
             </span>
-            <span className="text-lg font-extrabold tracking-[-0.04em]">ResortPro</span>
+            <span className="text-lg font-extrabold">ResortPro</span>
           </Link>
-          <Link href="/" className="text-sm font-bold hover:text-[#ef725c]">
+          <Link href="/" className="text-sm font-semibold transition-colors hover:opacity-70">
             ← Back to home
           </Link>
         </div>
@@ -44,20 +52,23 @@ export function LegalPage({
 
       {/* Body */}
       <main className="mx-auto max-w-[760px] px-5 py-14 sm:px-8">
-        <p className="font-bitcount m-0 text-[11px] font-medium uppercase tracking-[0.18em] text-[#b2402c]">
+        <span
+          className="font-bitcount block text-[13px] font-medium uppercase tracking-[0.14em]"
+          style={{ color: GOLD }}
+        >
           Legal
-        </p>
-        <h1 className="mt-3 max-w-[620px] text-[clamp(2.2rem,4.5vw,3.4rem)] font-extrabold leading-[.98] tracking-[-0.05em] text-[#183153]">
+        </span>
+        <h1 className="mt-3 text-[clamp(2rem,4vw,2.8rem)] font-extrabold leading-[1.15]">
           {title}
         </h1>
-        <p className="mt-4 text-sm font-semibold text-[#64748b]">Last updated: {updated}</p>
+        <p className="mt-4 text-sm font-semibold" style={{ color: MUTED }}>Last updated: {updated}</p>
 
         <div className="legal-prose mt-10">{children}</div>
 
-        <div className="mt-16 border-2 border-[#183153] bg-white p-6">
-          <p className="text-[15px] leading-[1.7] text-[#183153]">
+        <div className="mt-16 rounded-2xl p-6" style={{ background: CREAM }}>
+          <p className="text-[15px] leading-[1.7]">
             Questions about this page? Email{' '}
-            <a href="mailto:support@resortpro.site" className="font-bold text-[#ef725c] underline">
+            <a href="mailto:support@resortpro.site" className="font-bold underline" style={{ color: GOLD }}>
               support@resortpro.site
             </a>
             .
@@ -65,33 +76,31 @@ export function LegalPage({
         </div>
       </main>
 
-      {/* Footer — matches apps/web/src/app/page.tsx exactly */}
-      <footer className="bg-[#183153] text-white">
-        <div className="mx-auto flex max-w-[900px] flex-col justify-between gap-8 px-5 py-12 sm:flex-row sm:items-end sm:px-8">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <span className="relative block h-7 w-7 overflow-hidden bg-white">
-                <Image
-                  src="/brand/resortpro-icon-mark.png"
-                  alt="ResortPro"
-                  fill
-                  sizes="28px"
-                  className="object-cover"
-                />
-              </span>
-              <span className="text-lg font-extrabold tracking-[-0.04em]">ResortPro</span>
-            </div>
-            <p className="mt-4 max-w-[330px] text-sm leading-6 text-white/70">
-              The operating system for resorts that want every stay to feel personal.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-x-7 gap-y-3 text-sm font-bold text-white/85">
-            <Link href="/terms" className="hover:text-[#f4c76b]">Terms</Link>
-            <Link href="/privacy" className="hover:text-[#f4c76b]">Privacy</Link>
-            <Link href="/refund" className="hover:text-[#f4c76b]">Refund</Link>
+      {/* Footer — matches apps/web/src/components/landing/LandingPage.tsx */}
+      <footer style={{ background: NAVY }} className="text-white">
+        <div className="mx-auto flex max-w-[900px] flex-col items-center gap-6 px-5 py-10 sm:flex-row sm:justify-between sm:px-8">
+          <Link href="/" className="flex items-center gap-2.5">
+            <span
+              className="relative flex h-9 w-9 flex-none items-center justify-center overflow-hidden rounded-lg"
+              style={{ background: '#fff' }}
+            >
+              <Image
+                src="/brand/resortpro-icon-mark.png"
+                alt="ResortPro"
+                fill
+                sizes="36px"
+                className="scale-125 object-cover"
+              />
+            </span>
+            <span className="text-base font-extrabold">ResortPro</span>
+          </Link>
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm font-semibold">
+            <Link href="/terms" className="transition-colors hover:opacity-70" style={{ color: GOLD }}>Terms</Link>
+            <Link href="/privacy" className="transition-colors hover:opacity-70" style={{ color: GOLD }}>Privacy</Link>
+            <Link href="/refund" className="transition-colors hover:opacity-70" style={{ color: GOLD }}>Refund</Link>
           </div>
         </div>
-        <div className="mx-auto max-w-[900px] border-t border-white/25 px-5 py-6 text-xs text-white/55 sm:px-8">
+        <div className="border-t px-5 py-6 text-center text-xs text-white/55 sm:px-8" style={{ borderColor: 'rgba(255,255,255,0.15)' }}>
           © {new Date().getFullYear()} ResortPro.
         </div>
       </footer>
@@ -101,11 +110,11 @@ export function LegalPage({
 
 /** Small typographic helpers so pages read cleanly without a prose plugin. */
 export function H2({ children }: { children: ReactNode }) {
-  return <h2 className="mt-10 mb-3 text-[1.4rem] font-extrabold tracking-[-0.02em] text-[#183153]">{children}</h2>;
+  return <h2 className="mt-10 mb-3 text-[1.35rem] font-extrabold" style={{ color: NAVY }}>{children}</h2>;
 }
 export function P({ children }: { children: ReactNode }) {
-  return <p className="mb-4 text-[15px] leading-[1.75] text-[#3f4a47]">{children}</p>;
+  return <p className="mb-4 text-[15px] leading-[1.75]" style={{ color: MUTED }}>{children}</p>;
 }
 export function UL({ children }: { children: ReactNode }) {
-  return <ul className="mb-4 ml-5 list-disc space-y-2 text-[15px] leading-[1.7] text-[#3f4a47]">{children}</ul>;
+  return <ul className="mb-4 ml-5 list-disc space-y-2 text-[15px] leading-[1.7]" style={{ color: MUTED }}>{children}</ul>;
 }

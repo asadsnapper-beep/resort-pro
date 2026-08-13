@@ -4,10 +4,11 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { vehiclesApi, bookingsApi } from '@/lib/api';
 import { ModalShell } from '@/components/ui/modal-shell';
+import { ImageUpload } from '@/components/ui/ImageUpload';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import {
-  Plus, Car, Bike, Loader2, Receipt, LogOut, LogIn, X,
+  Plus, Car, Bike, Loader2, Receipt, LogOut, LogIn, X, Film,
 } from 'lucide-react';
 import { PageShell, PageHeader } from '@/components/patterns';
 
@@ -22,6 +23,8 @@ interface Vehicle {
   depositAmount?: number;
   availability: 'AVAILABLE' | 'RENTED' | 'MAINTENANCE';
   notes?: string;
+  photos?: string[];
+  videos?: string[];
 }
 
 interface Rental {
@@ -61,8 +64,8 @@ const RENTAL_STATUS_META: Record<string, { bg: string; text: string }> = {
   CANCELLED: { bg: 'var(--rp-red-bg)', text: '#c43c3c' },
 };
 
-const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
-const labelCls = 'block text-[11.5px] font-medium text-[#64748b] mb-1.5';
+const inputCls = 'w-full rounded-rp-ctrl border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
+const labelCls = 'block text-rp-label font-medium text-[#64748b] mb-1.5';
 
 function formatType(t: string) { return t.charAt(0) + t.slice(1).toLowerCase(); }
 
@@ -74,6 +77,19 @@ function VehicleModal({ open, onClose, loading, onSubmit, vehicle }: {
 }) {
   const [form, setForm] = useState({ type: 'CAR', name: '', registrationNumber: '', capacity: '', hourlyRate: '', dailyRate: '', depositAmount: '', notes: '' });
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [videos, setVideos] = useState<string[]>([]);
+  const [videoInput, setVideoInput] = useState('');
+  const [videoError, setVideoError] = useState('');
+
+  const addVideo = () => {
+    const t = videoInput.trim();
+    if (!t) return;
+    if (videos.includes(t)) { setVideoError('Already added'); return; }
+    setVideos(p => [...p, t]);
+    setVideoInput('');
+    setVideoError('');
+  };
 
   useEffect(() => {
     if (open) {
@@ -82,6 +98,8 @@ function VehicleModal({ open, onClose, loading, onSubmit, vehicle }: {
         capacity: vehicle?.capacity?.toString() ?? '', hourlyRate: vehicle?.hourlyRate?.toString() ?? '',
         dailyRate: vehicle?.dailyRate?.toString() ?? '', depositAmount: vehicle?.depositAmount?.toString() ?? '', notes: vehicle?.notes ?? '',
       });
+      setPhotos(vehicle?.photos ?? []);
+      setVideos(vehicle?.videos ?? []);
     }
   }, [open, vehicle]);
 
@@ -95,6 +113,7 @@ function VehicleModal({ open, onClose, loading, onSubmit, vehicle }: {
       dailyRate: form.dailyRate ? parseFloat(form.dailyRate) : undefined,
       depositAmount: form.depositAmount ? parseFloat(form.depositAmount) : undefined,
       notes: form.notes || undefined,
+      photos, videos,
     });
   };
 
@@ -102,8 +121,8 @@ function VehicleModal({ open, onClose, loading, onSubmit, vehicle }: {
     <ModalShell open={open} onClose={onClose} title={vehicle ? 'Edit Vehicle' : 'Add Vehicle'} maxWidth="520px"
       footer={
         <div className="flex gap-3 justify-end">
-          <button type="button" onClick={onClose} className="rounded-[9px] border px-4 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>Cancel</button>
-          <button type="submit" form="veh-form" disabled={loading} className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium disabled:opacity-50" style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+          <button type="button" onClick={onClose} className="rounded-rp-ctrl border px-4 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>Cancel</button>
+          <button type="submit" form="veh-form" disabled={loading} className="flex items-center gap-2 rounded-rp-ctrl px-4 py-2 text-[13px] font-medium disabled:opacity-50" style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
             {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} {vehicle ? 'Save Changes' : 'Add Vehicle'}
           </button>
         </div>
@@ -149,6 +168,73 @@ function VehicleModal({ open, onClose, loading, onSubmit, vehicle }: {
           <label className={labelCls}>Notes</label>
           <input value={form.notes} onChange={e => set('notes', e.target.value)} className={inputCls} />
         </div>
+
+        {/* Photos — shown on the public website so guests know what they're
+            booking; without these the site falls back to generic stock photos. */}
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <label className={labelCls} style={{ margin: 0 }}>Photos</label>
+            <span className="text-rp-label" style={{ color: 'var(--rp-text-faint)' }}>{photos.length} / 8</span>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {photos.map((img, i) => (
+              <div key={i} className="group relative overflow-hidden rounded-rp-ctrl" style={{ aspectRatio: '16/9', background: 'var(--rp-surface-4)' }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={img} alt="" className="h-full w-full object-cover" />
+                <button type="button" onClick={() => setPhotos(p => p.filter((_, idx) => idx !== i))}
+                  className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full border-none bg-black/65 text-white">
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            ))}
+            {photos.length < 8 && (
+              <ImageUpload value={null} onChange={(url) => { if (url) setPhotos(p => [...p, url]); }}
+                folder="vehicles" aspectRatio="video" className="col-span-1" />
+            )}
+          </div>
+        </div>
+
+        {/* Videos */}
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Film className="h-3.5 w-3.5" style={{ color: '#9bbdb7' }} />
+              <label className={labelCls} style={{ margin: 0 }}>Videos</label>
+            </div>
+            <span className="text-rp-label" style={{ color: 'var(--rp-text-faint)' }}>{videos.length} / 4</span>
+          </div>
+          <p className="mb-2 text-rp-label" style={{ color: 'var(--rp-text-faint)' }}>YouTube, Vimeo, or direct MP4 link</p>
+          {videos.length < 4 && (
+            <div className="mb-2 flex gap-2">
+              <input value={videoInput}
+                onChange={e => { setVideoInput(e.target.value); setVideoError(''); }}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addVideo(); } }}
+                placeholder="https://youtube.com/watch?v=…" className={inputCls} />
+              <button type="button" onClick={addVideo}
+                className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-rp-ctrl border" style={{ borderColor: 'rgba(0,0,0,0.08)', background: 'var(--rp-surface-3)', color: 'var(--rp-text-subtle)' }}>
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+          {videoError && <p className="mb-1.5 text-rp-label text-red-500">{videoError}</p>}
+          {videos.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              {videos.map((url, i) => (
+                <div key={i} className="flex items-center gap-2 rounded-rp-ctrl border px-3 py-2" style={{ borderColor: 'rgba(0,0,0,0.06)', background: 'var(--rp-surface-3)' }}>
+                  <Film className="h-3.5 w-3.5 shrink-0" style={{ color: '#9bbdb7' }} />
+                  <a href={url} target="_blank" rel="noopener noreferrer"
+                    className="flex-1 truncate text-rp-meta" style={{ color: '#23766a', textDecoration: 'none' }}>
+                    {url}
+                  </a>
+                  <button type="button" onClick={() => setVideos(p => p.filter((_, idx) => idx !== i))}
+                    className="shrink-0 border-none bg-transparent" style={{ color: 'var(--rp-text-faint)' }}>
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </form>
     </ModalShell>
   );
@@ -175,15 +261,15 @@ function FleetTab() {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <button onClick={() => setAddOpen(true)} className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium" style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+        <button onClick={() => setAddOpen(true)} className="flex items-center gap-2 rounded-rp-ctrl px-4 py-2 text-[13px] font-medium" style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
           <Plus className="h-4 w-4" /> Add Vehicle
         </button>
       </div>
 
       {isLoading ? (
-        <div className="h-32 animate-pulse rounded-[14px]" style={{ background: 'var(--rp-surface-2)' }} />
+        <div className="h-32 animate-pulse rounded-rp-card" style={{ background: 'var(--rp-surface-2)' }} />
       ) : vehicles.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-[14px] border bg-white py-14 text-center" style={{ borderColor: 'var(--rp-border)' }}>
+        <div className="flex flex-col items-center gap-2 rounded-rp-card border bg-white py-14 text-center" style={{ borderColor: 'var(--rp-border)' }}>
           <Car className="h-10 w-10" style={{ color: '#94a3b8' }} />
           <p className="text-[13px]" style={{ color: 'var(--rp-text-muted)' }}>No vehicles in the fleet yet</p>
         </div>
@@ -193,25 +279,31 @@ function FleetTab() {
             const Icon = TYPE_ICON[v.type] ?? Car;
             const am = AVAIL_META[v.availability];
             return (
-              <div key={v.id} className="rounded-[14px] border bg-white p-5" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+              <div key={v.id} className="rounded-rp-card border bg-white p-5" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+                {v.photos?.[0] && (
+                  <div className="mb-3 overflow-hidden rounded-rp-btn" style={{ aspectRatio: '16/9', background: 'var(--rp-surface-4)' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={v.photos[0]} alt={v.name} className="h-full w-full object-cover" />
+                  </div>
+                )}
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2.5">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-[9px]" style={{ background: 'var(--rp-teal-bg)' }}>
+                    <div className="flex h-9 w-9 items-center justify-center rounded-rp-ctrl" style={{ background: 'var(--rp-teal-bg)' }}>
                       <Icon className="h-4 w-4" style={{ color: '#183153' }} />
                     </div>
                     <div>
                       <p className="text-[14px] font-semibold text-[#183153] dark:text-[#f8fafc]">{v.name}</p>
-                      <p className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">{formatType(v.type)}{v.registrationNumber ? ` · ${v.registrationNumber}` : ''}</p>
+                      <p className="text-rp-label text-[#64748b] dark:text-[#a9c1d0]">{formatType(v.type)}{v.registrationNumber ? ` · ${v.registrationNumber}` : ''}</p>
                     </div>
                   </div>
                   <span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: am.bg, color: am.text }}>{am.label}</span>
                 </div>
-                <div className="flex items-center gap-3 text-[12.5px] mt-3" style={{ color: 'var(--rp-text-muted)' }}>
+                <div className="flex items-center gap-3 text-rp-meta mt-3" style={{ color: 'var(--rp-text-muted)' }}>
                   {v.hourlyRate != null && <span>{formatCurrency(v.hourlyRate)}/hr</span>}
                   {v.dailyRate != null && <span>{formatCurrency(v.dailyRate)}/day</span>}
                   {v.depositAmount != null && <span>Deposit {formatCurrency(v.depositAmount)}</span>}
                 </div>
-                <button onClick={() => setEditVehicle(v)} className="mt-3 rounded-[8px] border px-3 py-1.5 text-[12px] font-medium hover:bg-[#f4f1eb]" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>Edit</button>
+                <button onClick={() => setEditVehicle(v)} className="mt-3 rounded-rp-ctrl border px-3 py-1.5 text-rp-meta font-medium hover:bg-[#f4f1eb]" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>Edit</button>
               </div>
             );
           })}
@@ -256,8 +348,8 @@ function NewRentalModal({ open, onClose, vehicles, activeBookings, loading, onSu
     <ModalShell open={open} onClose={onClose} title="New Rental" maxWidth="520px"
       footer={
         <div className="flex gap-3 justify-end">
-          <button type="button" onClick={onClose} className="rounded-[9px] border px-4 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>Cancel</button>
-          <button type="submit" form="rental-form" disabled={loading} className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium disabled:opacity-50" style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+          <button type="button" onClick={onClose} className="rounded-rp-ctrl border px-4 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>Cancel</button>
+          <button type="submit" form="rental-form" disabled={loading} className="flex items-center gap-2 rounded-rp-ctrl px-4 py-2 text-[13px] font-medium disabled:opacity-50" style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
             {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Reserve
           </button>
         </div>
@@ -302,7 +394,7 @@ function NewRentalModal({ open, onClose, vehicles, activeBookings, loading, onSu
           <div className="grid grid-cols-2 gap-2">
             {(['HOURLY', 'DAILY'] as const).map(r => (
               <button key={r} type="button" onClick={() => set('rateType', r)}
-                className="rounded-[9px] border-2 p-2.5 text-[12.5px] font-medium"
+                className="rounded-rp-ctrl border-2 p-2.5 text-rp-meta font-medium"
                 style={form.rateType === r ? { background: 'var(--rp-teal-bg)', borderColor: '#183153', color: '#183153' } : { background: 'var(--rp-surface-2)', borderColor: 'var(--rp-border)', color: 'var(--rp-text-muted)' }}>
                 {r === 'HOURLY' ? 'Hourly' : 'Daily'}
               </button>
@@ -329,9 +421,9 @@ function PickupModal({ open, onClose, rental, deposit, loading, onSubmit }: {
     <ModalShell open={open} onClose={onClose} title="Mark Picked Up" description={rental ? `${rental.vehicle.name} — ${rental.guestName}` : ''} maxWidth="460px"
       footer={
         <div className="flex gap-3 justify-end">
-          <button onClick={onClose} className="rounded-[9px] border px-4 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>Cancel</button>
+          <button onClick={onClose} className="rounded-rp-ctrl border px-4 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>Cancel</button>
           <button onClick={() => onSubmit({ odometerOut: odometerOut ? parseInt(odometerOut, 10) : undefined, fuelOut, conditionNotesOut: conditionNotesOut || undefined, depositCollected: depositCollected ? parseFloat(depositCollected) : undefined })}
-            disabled={loading} className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium disabled:opacity-50" style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+            disabled={loading} className="flex items-center gap-2 rounded-rp-ctrl px-4 py-2 text-[13px] font-medium disabled:opacity-50" style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
             {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} <LogOut className="h-3.5 w-3.5" /> Confirm Pickup
           </button>
         </div>
@@ -381,13 +473,13 @@ function ReturnModal({ open, onClose, rental, loading, onSubmit }: {
     <ModalShell open={open} onClose={onClose} title="Mark Returned" description={rental ? `${rental.vehicle.name} — ${rental.guestName}` : ''} maxWidth="460px"
       footer={
         <div className="flex gap-3 justify-end">
-          <button onClick={onClose} className="rounded-[9px] border px-4 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>Cancel</button>
+          <button onClick={onClose} className="rounded-rp-ctrl border px-4 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>Cancel</button>
           <button onClick={() => onSubmit({
             odometerIn: odometerIn ? parseInt(odometerIn, 10) : undefined, fuelIn: fuelIn || undefined,
             conditionNotesIn: conditionNotesIn || undefined,
             depositReturned: depositReturned ? parseFloat(depositReturned) : undefined,
             finalAmount: finalAmount ? parseFloat(finalAmount) : undefined,
-          })} disabled={loading} className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium disabled:opacity-50" style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+          })} disabled={loading} className="flex items-center gap-2 rounded-rp-ctrl px-4 py-2 text-[13px] font-medium disabled:opacity-50" style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
             {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} <LogIn className="h-3.5 w-3.5" /> Confirm Return
           </button>
         </div>
@@ -474,18 +566,18 @@ function RentalsTab() {
         <div className="flex gap-1.5 flex-wrap">
           {['', 'RESERVED', 'OUT', 'RETURNED', 'CANCELLED'].map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
-              className="rounded-[8px] border px-3 py-1.5 text-[12px] font-medium transition-colors"
+              className="rounded-rp-ctrl border px-3 py-1.5 text-rp-meta font-medium transition-colors"
               style={statusFilter === s ? { background: 'var(--rp-btn-accent)', borderColor: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' } : { background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border)', color: 'var(--rp-text-subtle)' }}>
               {s || 'All'}
             </button>
           ))}
         </div>
-        <button onClick={() => setAddOpen(true)} className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium" style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
+        <button onClick={() => setAddOpen(true)} className="flex items-center gap-2 rounded-rp-ctrl px-4 py-2 text-[13px] font-medium" style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
           <Plus className="h-4 w-4" /> New Rental
         </button>
       </div>
 
-      <div className="rounded-[14px] border bg-white overflow-hidden" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+      <div className="rounded-rp-card border bg-white overflow-hidden" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
         {isLoading ? (
           <div className="h-32 animate-pulse" style={{ background: 'var(--rp-surface-2)' }} />
         ) : rentals.length === 0 ? (
@@ -508,7 +600,7 @@ function RentalsTab() {
                   <tr key={r.id} className="hover:bg-[#faf9f7] dark:hover:bg-white/5" style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}>
                     <td className="px-5 py-3.5 text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{r.vehicle.name}</td>
                     <td className="px-5 py-3.5 text-[13px] text-[#64748b] dark:text-[#a9c1d0]">{r.guestName}</td>
-                    <td className="px-5 py-3.5 text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">{new Date(r.startAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} → {new Date(r.endAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                    <td className="px-5 py-3.5 text-rp-meta text-[#64748b] dark:text-[#a9c1d0]">{new Date(r.startAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} → {new Date(r.endAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                     <td className="px-5 py-3.5 text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{r.totalAmount != null ? formatCurrency(r.totalAmount) : '—'}</td>
                     <td className="px-5 py-3.5"><span className="rounded-[6px] px-[9px] py-[3px] text-[11px] font-semibold" style={{ background: sm.bg, color: sm.text }}>{r.status}</span></td>
                     <td className="px-5 py-3.5">
@@ -519,21 +611,21 @@ function RentalsTab() {
                       <div className="flex gap-1 flex-wrap">
                         {r.status === 'RESERVED' && (
                           <>
-                            <button onClick={() => setPickupRental(r)} className="flex items-center gap-1 rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e5f0f7]" style={{ borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
+                            <button onClick={() => setPickupRental(r)} className="flex items-center gap-1 rounded-[7px] border px-2.5 py-1 text-rp-label font-medium hover:bg-[#e5f0f7]" style={{ borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
                               <LogOut className="h-3 w-3" /> Pickup
                             </button>
-                            <button onClick={() => cancelMutation.mutate(r.id)} className="rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#faf0ee]" style={{ borderColor: 'rgba(200,60,60,0.2)', color: '#c43c3c' }}>
+                            <button onClick={() => cancelMutation.mutate(r.id)} className="rounded-[7px] border px-2.5 py-1 text-rp-label font-medium hover:bg-[#faf0ee]" style={{ borderColor: 'rgba(200,60,60,0.2)', color: '#c43c3c' }}>
                               <X className="h-3 w-3" />
                             </button>
                           </>
                         )}
                         {r.status === 'OUT' && (
-                          <button onClick={() => setReturnRental(r)} className="flex items-center gap-1 rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e5f0f7]" style={{ borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
+                          <button onClick={() => setReturnRental(r)} className="flex items-center gap-1 rounded-[7px] border px-2.5 py-1 text-rp-label font-medium hover:bg-[#e5f0f7]" style={{ borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
                             <LogIn className="h-3 w-3" /> Return
                           </button>
                         )}
                         {!r.billed && r.bookingId && r.status === 'RETURNED' && (
-                          <button onClick={() => billMutation.mutate(r)} className="flex items-center gap-1 rounded-[7px] border px-2.5 py-1 text-[11.5px] font-medium hover:bg-[#e5f0f7]" style={{ borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
+                          <button onClick={() => billMutation.mutate(r)} className="flex items-center gap-1 rounded-[7px] border px-2.5 py-1 text-rp-label font-medium hover:bg-[#e5f0f7]" style={{ borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
                             <Receipt className="h-3 w-3" /> Bill
                           </button>
                         )}
@@ -564,7 +656,7 @@ export default function VehiclesPage() {
   return (
     <PageShell gap={6}>
       <div className="flex items-center gap-3">
-        <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px]" style={{ background: 'var(--rp-teal-bg)' }}>
+        <div className="flex h-[34px] w-[34px] items-center justify-center rounded-rp-ctrl" style={{ background: 'var(--rp-teal-bg)' }}>
           <Car className="h-4 w-4" style={{ color: '#183153' }} />
         </div>
         <PageHeader
@@ -574,10 +666,10 @@ export default function VehiclesPage() {
         />
       </div>
 
-      <div className="flex gap-1 rounded-[10px] p-1 w-fit" style={{ background: 'var(--rp-surface-3)' }}>
+      <div className="flex gap-1 rounded-rp-btn p-1 w-fit" style={{ background: 'var(--rp-surface-3)' }}>
         {([{ key: 'fleet', label: 'Fleet' }, { key: 'rentals', label: 'Rentals' }] as const).map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className="rounded-[8px] px-4 py-1.5 text-[13px] font-medium transition-colors"
+            className="rounded-rp-ctrl px-4 py-1.5 text-[13px] font-medium transition-colors"
             style={tab === t.key ? { background: 'var(--rp-surface)', color: 'var(--rp-text)', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' } : { color: 'var(--rp-text-muted)' }}>
             {t.label}
           </button>
