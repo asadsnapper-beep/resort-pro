@@ -7,6 +7,17 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Check, ChevronDown, Sparkles } from 'lucide-react';
 import { PLAN_PRICING, PUBLIC_PLAN_ORDER } from '@resort-pro/types';
 
+// Palette matches the landing page's design system
+// (claude.ai/design/p/d56b55b0-882c-44d6-aecd-3667a5499d43 — "ResortPro Landing.dc.html").
+// Keep these in sync with LandingPage.tsx if that source changes.
+const NAVY = '#14314D';
+const GOLD = '#CFA153';
+const GOLD_HOVER = '#B98B3E';
+const CREAM = '#F7F3EE';
+const BORDER = '#EDE7DD';
+const MUTED = '#5B6B79';
+const MUTED_LIGHT = '#8B95A0';
+
 const PLANS = [
   {
     id: 'FREE' as const,
@@ -97,13 +108,16 @@ const COMPARE_ROWS = [
 
 function BrandMark() {
   return (
-    <span className="relative block h-7 w-7 overflow-hidden bg-white">
+    <span
+      className="relative flex h-9 w-9 flex-none items-center justify-center overflow-hidden rounded-lg"
+      style={{ background: NAVY }}
+    >
       <Image
-        src="/brand/resortpro-logo-concept-v2.png"
+        src="/brand/resortpro-icon-mark.png"
         alt="ResortPro"
         fill
-        sizes="28px"
-        className="translate-y-[5px] scale-[1.8] object-cover mix-blend-multiply"
+        sizes="36px"
+        className="scale-125 object-cover mix-blend-screen"
       />
     </span>
   );
@@ -114,10 +128,10 @@ function Price({ plan, billing }: { plan: (typeof PLANS)[number]; billing: 'mont
 
   return (
     <div className="flex items-end gap-2">
-      <span className="font-display text-5xl font-semibold tracking-[-0.06em] text-[#183153]">
+      <span className="font-bitcount text-5xl font-normal" style={{ color: NAVY }}>
         ${price}
       </span>
-      <span className="mb-1.5 text-sm font-bold text-[#64748b]">
+      <span className="mb-1.5 text-sm font-bold" style={{ color: MUTED }}>
         {billing === 'annual' ? '/ year' : '/ month'}
       </span>
     </div>
@@ -130,25 +144,27 @@ export default function PlansPage() {
   const [showCompare, setShowCompare] = useState(false);
 
   return (
-    <main className="min-h-screen overflow-hidden bg-white text-[#183153]">
-      <header className="border-b-2 border-[#183153] bg-white">
+    <main className="min-h-screen overflow-hidden bg-white font-sans" style={{ color: NAVY }}>
+      <header className="border-b bg-white" style={{ borderColor: BORDER }}>
         <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-5 sm:px-8">
           <Link href="/" className="flex items-center gap-2.5" aria-label="ResortPro home">
             <BrandMark />
-            <span className="font-display text-xl font-semibold tracking-[-0.045em]">
-              ResortPro
-            </span>
+            <span className="text-lg font-extrabold">ResortPro</span>
           </Link>
-          <div className="flex items-center gap-3 text-sm font-bold">
+          <div className="flex items-center gap-4 text-sm font-bold">
             <Link
               href="/auth/login"
-              className="hidden text-[#475569] transition-colors hover:text-[#ef725c] sm:block"
+              className="hidden transition-colors hover:opacity-70 sm:block"
+              style={{ color: MUTED }}
             >
               Sign in
             </Link>
             <Link
               href="/try"
-              className="border-2 border-[#183153] bg-[#183153] px-4 py-2 text-white transition-colors hover:border-[#ef725c] hover:bg-[#ef725c]"
+              className="rounded-lg px-5 py-2.5 text-white transition-colors"
+              style={{ background: GOLD }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = GOLD_HOVER; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = GOLD; }}
             >
               Try the demo
             </Link>
@@ -156,95 +172,134 @@ export default function PlansPage() {
         </div>
       </header>
 
-      <section className="relative border-b-2 border-[#183153] bg-[#fff1ea]">
-        <div className="pointer-events-none absolute inset-0 opacity-30 [background-image:linear-gradient(#183153_1px,transparent_1px),linear-gradient(90deg,#183153_1px,transparent_1px)] [background-size:48px_48px]" />
-        <div className="relative mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[1fr_330px] lg:items-end lg:py-20">
+      <section className="border-b" style={{ background: CREAM, borderColor: BORDER }}>
+        <div className="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[1fr_330px] lg:items-end lg:py-20">
           <div>
-            <p className="font-bitcount mb-5 text-[11px] font-medium uppercase tracking-[0.18em] text-[#b2402c]">
+            <span
+              className="font-bitcount mb-5 block text-[13px] font-medium uppercase tracking-[0.14em]"
+              style={{ color: GOLD }}
+            >
               Simple prices. Serious operations.
-            </p>
-            <h1 className="font-display max-w-3xl text-5xl font-semibold leading-[0.94] tracking-[-0.065em] text-[#183153] sm:text-6xl lg:text-7xl">
+            </span>
+            <h1 className="max-w-3xl text-[clamp(2.6rem,5.5vw,4rem)] font-extrabold leading-[1.1]">
               Pick the plan that matches your next season.
             </h1>
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-[#475569]">
+            <p className="mt-6 max-w-2xl text-lg leading-8" style={{ color: MUTED }}>
               One workspace for bookings, guests, staff and direct revenue. Start small without
               buying a smaller version of your business.
             </p>
           </div>
-          <aside className="border-2 border-[#183153] bg-white p-5 shadow-[8px_8px_0_#183153]">
+          <aside className="rounded-2xl bg-white p-6">
             <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center bg-[#ef725c] text-white">
+              <span
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white"
+                style={{ background: GOLD }}
+              >
                 <Sparkles className="h-5 w-5" />
               </span>
               <div>
-                <p className="font-bitcount text-[10px] font-medium uppercase tracking-[0.14em] text-[#b2402c]">
+                <span
+                  className="font-bitcount block text-[11px] font-medium uppercase tracking-[0.12em]"
+                  style={{ color: GOLD }}
+                >
                   Fair, predictable pricing
-                </p>
-                <p className="mt-1 text-sm font-extrabold leading-5 text-[#183153]">
+                </span>
+                <p className="mt-1 text-sm font-extrabold leading-5">
                   Choose the capacity and tools that match your operation today.
                 </p>
               </div>
             </div>
-            <p className="mt-4 border-t border-[#d9e4ea] pt-4 text-xs leading-5 text-[#64748b]">
+            <p className="mt-4 border-t pt-4 text-xs leading-5" style={{ borderColor: BORDER, color: MUTED }}>
               Your selected price is protected for your first 12 months.
             </p>
           </aside>
         </div>
       </section>
 
-      <section className="border-b-2 border-[#183153] bg-white">
+      <section className="border-b bg-white" style={{ borderColor: BORDER }}>
         <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-7 sm:px-8 md:flex-row md:items-center md:justify-between">
-          <p className="text-sm font-bold text-[#475569]">
+          <p className="text-sm font-bold" style={{ color: MUTED }}>
             No setup fee. Cancel whenever your season changes. Your data stays yours.
           </p>
-          <div className="flex w-fit border-2 border-[#183153] bg-white p-1 text-sm font-extrabold">
+          <div className="flex w-fit rounded-lg border p-1 text-sm font-extrabold" style={{ borderColor: BORDER }}>
             <button
               type="button"
               onClick={() => setBilling('monthly')}
-              className={`px-4 py-2 transition-colors ${billing === 'monthly' ? 'bg-[#183153] text-white' : 'text-[#64748b] hover:text-[#183153]'}`}
+              className="rounded-md px-4 py-2 transition-colors"
+              style={billing === 'monthly' ? { background: NAVY, color: '#fff' } : { color: MUTED }}
             >
               Monthly
             </button>
             <button
               type="button"
               onClick={() => setBilling('annual')}
-              className={`px-4 py-2 transition-colors ${billing === 'annual' ? 'bg-[#183153] text-white' : 'text-[#64748b] hover:text-[#183153]'}`}
+              className="rounded-md px-4 py-2 transition-colors"
+              style={billing === 'annual' ? { background: NAVY, color: '#fff' } : { color: MUTED }}
             >
-              Annual <span className="ml-1 text-[#ef725c]">2 months free</span>
+              Annual <span className="ml-1" style={{ color: billing === 'annual' ? GOLD : GOLD }}>2 months free</span>
             </button>
           </div>
         </div>
       </section>
 
       <section className="mx-auto max-w-7xl px-5 py-14 sm:px-8 sm:py-20">
-        <div className="grid border-l-2 border-t-2 border-[#183153] lg:grid-cols-3">
+        <div className="grid gap-5 lg:grid-cols-3">
           {PLANS.map((plan) => (
             <article
               key={plan.id}
-              className={`relative flex min-w-0 flex-col border-b-2 border-r-2 border-[#183153] p-6 sm:p-8 ${plan.featured ? 'bg-[#e5f0f7]' : plan.id === 'PROFESSIONAL' ? 'bg-[#fff1ea]' : 'bg-white'}`}
+              className="relative flex min-w-0 flex-col rounded-2xl border p-6 sm:p-8"
+              style={
+                plan.featured
+                  ? { background: NAVY, borderColor: NAVY, color: '#fff' }
+                  : { background: plan.id === 'PROFESSIONAL' ? CREAM : '#fff', borderColor: BORDER }
+              }
             >
               {plan.badge && (
-                <span className="font-bitcount absolute right-0 top-0 bg-[#ef725c] px-3 py-2 text-[10px] font-medium uppercase tracking-[0.13em] text-white">
+                <span
+                  className="font-bitcount absolute right-6 top-6 rounded-full px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-white"
+                  style={{ background: GOLD }}
+                >
                   {plan.badge}
                 </span>
               )}
-              <p className="font-bitcount text-[10px] font-medium uppercase tracking-[0.15em] text-[#b2402c]">
+              <span
+                className="font-bitcount text-[11px] font-medium uppercase tracking-[0.12em]"
+                style={{ color: GOLD }}
+              >
                 {plan.eyebrow}
+              </span>
+              <h2 className="mt-3 text-3xl font-extrabold">{plan.name}</h2>
+              <p className="mt-3 min-h-12 text-sm leading-6" style={{ color: plan.featured ? 'rgba(255,255,255,0.75)' : MUTED }}>
+                {plan.title}
               </p>
-              <h2 className="font-display mt-3 text-3xl font-semibold tracking-[-0.055em] text-[#183153]">
-                {plan.name}
-              </h2>
-              <p className="mt-3 min-h-12 text-sm leading-6 text-[#475569]">{plan.title}</p>
-              <div className="mt-7 border-y-2 border-[#183153] py-5">
-                <Price plan={plan} billing={billing} />
+              <div className="mt-7 border-y py-5" style={{ borderColor: plan.featured ? 'rgba(255,255,255,0.2)' : BORDER }}>
+                {plan.featured ? (
+                  <div className="flex items-end gap-2">
+                    <span className="font-bitcount text-5xl font-normal text-white">
+                      ${billing === 'annual' ? plan.annualPrice : plan.price}
+                    </span>
+                    <span className="mb-1.5 text-sm font-bold text-white/70">
+                      {billing === 'annual' ? '/ year' : '/ month'}
+                    </span>
+                  </div>
+                ) : (
+                  <Price plan={plan} billing={billing} />
+                )}
               </div>
-              <p className="mt-4 text-xs font-bold uppercase tracking-[0.06em] text-[#64748b]">
+              <p
+                className="mt-4 text-xs font-bold uppercase tracking-[0.06em]"
+                style={{ color: plan.featured ? 'rgba(255,255,255,0.6)' : MUTED_LIGHT }}
+              >
                 {plan.capacity}
               </p>
               <ul className="mt-7 flex flex-1 flex-col gap-3">
                 {plan.features.map((feature) => (
-                  <li key={feature} className="flex gap-2.5 text-sm leading-5 text-[#475569]">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#ef725c]" strokeWidth={3} />
+                  <li
+                    key={feature}
+                    className="flex gap-2.5 text-sm leading-5"
+                    style={{ color: plan.featured ? 'rgba(255,255,255,0.85)' : MUTED }}
+                  >
+                    <Check className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={3} style={{ color: GOLD }} />
                     {feature}
                   </li>
                 ))}
@@ -252,7 +307,16 @@ export default function PlansPage() {
               <button
                 type="button"
                 onClick={() => router.push(`/auth/register?plan=${plan.id}`)}
-                className={`mt-8 flex w-full items-center justify-center gap-2 border-2 border-[#183153] px-4 py-3.5 text-sm font-extrabold transition-colors ${plan.featured ? 'bg-[#183153] text-white hover:border-[#ef725c] hover:bg-[#ef725c]' : 'bg-white text-[#183153] hover:bg-[#183153] hover:text-white'}`}
+                className="mt-8 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3.5 text-sm font-extrabold transition-colors"
+                style={plan.featured ? { background: GOLD, color: '#fff' } : { border: `1px solid ${BORDER}`, color: NAVY }}
+                onMouseEnter={(e) => {
+                  if (plan.featured) e.currentTarget.style.background = GOLD_HOVER;
+                  else e.currentTarget.style.borderColor = GOLD;
+                }}
+                onMouseLeave={(e) => {
+                  if (plan.featured) e.currentTarget.style.background = GOLD;
+                  else e.currentTarget.style.borderColor = BORDER;
+                }}
               >
                 {plan.cta}
                 <ArrowRight className="h-4 w-4" />
@@ -260,43 +324,35 @@ export default function PlansPage() {
             </article>
           ))}
         </div>
-        <p className="mt-6 text-center text-sm leading-6 text-[#64748b]">
+        <p className="mt-8 text-center text-sm leading-6" style={{ color: MUTED }}>
           Have more than {PLAN_PRICING.PROFESSIONAL.propertyLimit} properties, need SSO, or want
           white-label support?{' '}
-          <Link
-            href="/contact"
-            className="font-extrabold text-[#b2402c] underline decoration-2 underline-offset-4"
-          >
+          <Link href="/contact" className="font-extrabold underline decoration-2 underline-offset-4" style={{ color: GOLD }}>
             Talk to us
           </Link>
           .
         </p>
       </section>
 
-      <section className="border-y-2 border-[#183153] bg-[#183153] text-white">
-        <div className="mx-auto grid max-w-7xl gap-8 px-5 py-12 sm:px-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
+      <section className="text-white" style={{ background: NAVY }}>
+        <div className="mx-auto grid max-w-7xl gap-8 px-5 py-14 sm:px-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
           <div>
-            <p className="font-bitcount text-[10px] font-medium uppercase tracking-[0.16em] text-[#f4c76b]">
+            <span className="font-bitcount block text-[11px] font-medium uppercase tracking-[0.12em]" style={{ color: GOLD }}>
               Built for the day-to-day
-            </p>
-            <h2 className="font-display mt-3 text-4xl font-semibold leading-none tracking-[-0.055em]">
+            </span>
+            <h2 className="mt-3 text-[clamp(1.8rem,3.5vw,2.4rem)] font-extrabold leading-[1.2]">
               Your booking desk, front office and restaurant finally agree.
             </h2>
           </div>
-          <div className="grid grid-cols-2 border-l border-white/25 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-5 sm:grid-cols-4">
             {[
               ['$10', 'a month to start with Solo'],
               ['1 place', 'for every guest detail'],
               ['0%', 'setup fee'],
               ['24/7', 'your operations stay visible'],
             ].map(([number, label]) => (
-              <div
-                key={number}
-                className="border-b border-r border-t border-white/25 px-4 py-5 sm:border-t-0"
-              >
-                <p className="font-display text-3xl font-semibold tracking-[-0.05em] text-[#f4c76b]">
-                  {number}
-                </p>
+              <div key={number} className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                <p className="font-bitcount text-3xl font-normal" style={{ color: GOLD }}>{number}</p>
                 <p className="mt-2 text-xs leading-5 text-white/60">{label}</p>
               </div>
             ))}
@@ -308,50 +364,40 @@ export default function PlansPage() {
         <button
           type="button"
           onClick={() => setShowCompare((value) => !value)}
-          className="flex w-full items-center justify-between border-2 border-[#183153] bg-white px-5 py-5 text-left transition-colors hover:bg-[#e5f0f7]"
+          className="flex w-full items-center justify-between rounded-2xl border bg-white px-6 py-6 text-left transition-colors"
+          style={{ borderColor: BORDER }}
         >
           <span>
-            <span className="font-bitcount block text-[10px] font-medium uppercase tracking-[0.15em] text-[#b2402c]">
+            <span className="font-bitcount block text-[11px] font-medium uppercase tracking-[0.12em]" style={{ color: GOLD }}>
               No hidden tiers
             </span>
-            <span className="font-display mt-1 block text-2xl font-semibold tracking-[-0.045em]">
-              Compare every plan in detail
-            </span>
+            <span className="mt-1 block text-2xl font-extrabold">Compare every plan in detail</span>
           </span>
-          <ChevronDown
-            className={`h-5 w-5 shrink-0 transition-transform ${showCompare ? 'rotate-180' : ''}`}
-          />
+          <ChevronDown className={`h-5 w-5 shrink-0 transition-transform ${showCompare ? 'rotate-180' : ''}`} />
         </button>
         {showCompare && (
-          <div className="overflow-x-auto border-b-2 border-l-2 border-r-2 border-[#183153]">
+          <div className="mt-4 overflow-x-auto rounded-2xl border" style={{ borderColor: BORDER }}>
             <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-              <thead className="bg-[#e5f0f7]">
+              <thead style={{ background: CREAM }}>
                 <tr>
-                  <th className="font-bitcount border-r border-[#183153] px-5 py-4 text-[10px] font-medium uppercase tracking-[0.13em]">
-                    Included
-                  </th>
-                  <th className="border-r border-[#183153] px-5 py-4 font-bold">Solo</th>
-                  <th className="border-r border-[#183153] px-5 py-4 font-bold">Independent Resort</th>
+                  <th className="font-bitcount px-5 py-4 text-[10px] font-medium uppercase tracking-[0.1em]">Included</th>
+                  <th className="px-5 py-4 font-bold">Solo</th>
+                  <th className="px-5 py-4 font-bold">Independent Resort</th>
                   <th className="px-5 py-4 font-bold">Resort Group</th>
                 </tr>
               </thead>
               <tbody>
                 {COMPARE_ROWS.map((row) => (
-                  <tr key={row.label} className="border-t border-[#183153]">
-                    <td className="border-r border-[#183153] px-5 py-4 font-bold text-[#475569]">
-                      {row.label}
-                    </td>
+                  <tr key={row.label} className="border-t" style={{ borderColor: BORDER }}>
+                    <td className="px-5 py-4 font-bold" style={{ color: MUTED }}>{row.label}</td>
                     {(['starter', 'pro', 'group'] as const).map((tier) => (
-                      <td
-                        key={tier}
-                        className="border-r border-[#183153] px-5 py-4 last:border-r-0"
-                      >
+                      <td key={tier} className="px-5 py-4">
                         {row[tier] === true ? (
-                          <Check className="h-4 w-4 text-[#ef725c]" strokeWidth={3} />
+                          <Check className="h-4 w-4" strokeWidth={3} style={{ color: GOLD }} />
                         ) : row[tier] === false ? (
-                          <span className="text-[#94a3b8]">—</span>
+                          <span style={{ color: MUTED_LIGHT }}>—</span>
                         ) : (
-                          <span className="text-[#475569]">{row[tier]}</span>
+                          <span style={{ color: MUTED }}>{row[tier]}</span>
                         )}
                       </td>
                     ))}
@@ -363,18 +409,15 @@ export default function PlansPage() {
         )}
       </section>
 
-      <footer className="border-t-2 border-[#183153] bg-[#fff1ea]">
+      <footer className="border-t" style={{ background: CREAM, borderColor: BORDER }}>
         <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-8 sm:px-8 md:flex-row md:items-center md:justify-between">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-sm font-extrabold text-[#183153] hover:text-[#ef725c]"
-          >
+          <Link href="/" className="inline-flex items-center gap-2 text-sm font-extrabold transition-colors hover:opacity-70">
             <ArrowLeft className="h-4 w-4" />
             Back to home
           </Link>
-          <p className="text-xs text-[#64748b]">
+          <p className="text-xs" style={{ color: MUTED }}>
             Questions before you choose?{' '}
-            <Link href="/try" className="font-bold text-[#b2402c] underline underline-offset-4">
+            <Link href="/try" className="font-bold underline underline-offset-4" style={{ color: GOLD }}>
               Explore a live role demo
             </Link>
             .

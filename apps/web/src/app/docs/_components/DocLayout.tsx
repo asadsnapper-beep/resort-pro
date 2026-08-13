@@ -1,6 +1,11 @@
 import Link from 'next/link';
 import { ArrowLeft, BookOpen } from 'lucide-react';
 
+// Palette matches the landing page's design system
+// (claude.ai/design/p/d56b55b0-882c-44d6-aecd-3667a5499d43 — "ResortPro Landing.dc.html").
+const NAVY = '#14314D';
+const GOLD = '#CFA153';
+
 interface TocItem {
   id: string;
   label: string;
@@ -20,19 +25,25 @@ export function DocLayout({ title, description, readTime, tag, tagColor, toc, ch
   return (
     <>
       {/* ── Nav ──────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-20 border-b border-gray-200 bg-white/90 backdrop-blur-sm">
+      <header className="sticky top-0 z-20 border-b border-[#EDE7DD] bg-white/90 backdrop-blur-sm">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-5">
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1a6b5e] text-sm font-bold text-[#d4a853]">
-              R
-            </div>
-            <span className="font-semibold text-gray-900">ResortPro</span>
-            <span className="text-gray-300">/</span>
-            <Link href="/docs" className="text-sm text-gray-500 hover:text-[#1a6b5e]">Help Center</Link>
-          </Link>
+          <div className="flex items-center gap-2.5">
+            <Link href="/" className="flex items-center gap-2.5">
+              <div
+                className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg"
+                style={{ background: NAVY }}
+              >
+                <span className="text-sm font-bold" style={{ color: GOLD }}>R</span>
+              </div>
+              <span className="font-extrabold" style={{ color: NAVY }}>ResortPro</span>
+            </Link>
+            <span className="text-[#EDE7DD]">/</span>
+            <Link href="/docs" className="text-sm text-[#5B6B79] transition-colors hover:opacity-70">Help Center</Link>
+          </div>
           <Link
             href="/dashboard"
-            className="rounded-lg bg-[#1a6b5e] px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#145a4f]"
+            className="rounded-lg px-3.5 py-1.5 text-xs font-semibold text-white transition-colors"
+            style={{ background: NAVY }}
           >
             Go to Dashboard
           </Link>
@@ -47,12 +58,12 @@ export function DocLayout({ title, description, readTime, tag, tagColor, toc, ch
             <div className="sticky top-24">
               <Link
                 href="/docs"
-                className="mb-6 flex items-center gap-2 text-sm text-gray-500 hover:text-[#1a6b5e]"
+                className="mb-6 flex items-center gap-2 text-sm text-[#5B6B79] transition-colors hover:opacity-70"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Help Center
               </Link>
-              <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+              <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-[#8B95A0]">
                 On this page
               </p>
               <nav className="space-y-1">
@@ -60,7 +71,8 @@ export function DocLayout({ title, description, readTime, tag, tagColor, toc, ch
                   <a
                     key={item.id}
                     href={`#${item.id}`}
-                    className="block rounded-lg px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
+                    className="block rounded-lg px-3 py-1.5 text-sm text-[#5B6B79] transition-colors hover:bg-[#F7F3EE]"
+                    style={{ color: '#5B6B79' }}
                   >
                     {item.label}
                   </a>
@@ -72,23 +84,23 @@ export function DocLayout({ title, description, readTime, tag, tagColor, toc, ch
           {/* ── Main content ──────────────────────────────────────────────── */}
           <main className="min-w-0 flex-1">
             {/* Header */}
-            <div className="mb-8 border-b border-gray-200 pb-8">
+            <div className="mb-8 border-b border-[#EDE7DD] pb-8">
               <div className="mb-3 flex items-center gap-3">
                 <Link
                   href="/docs"
-                  className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#1a6b5e]"
+                  className="flex items-center gap-1.5 text-xs text-[#8B95A0] transition-colors hover:opacity-70"
                 >
                   <BookOpen className="h-3.5 w-3.5" />
                   Help Center
                 </Link>
-                <span className="text-gray-200">/</span>
+                <span className="text-[#EDE7DD]">/</span>
                 <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${tagColor}`}>
                   {tag}
                 </span>
               </div>
-              <h1 className="mb-3 font-display text-3xl font-bold text-gray-900">{title}</h1>
-              <p className="text-gray-500">{description}</p>
-              <p className="mt-2 text-xs text-gray-400">{readTime}</p>
+              <h1 className="mb-3 text-3xl font-extrabold" style={{ color: NAVY }}>{title}</h1>
+              <p className="text-[#5B6B79]">{description}</p>
+              <p className="mt-2 text-xs text-[#8B95A0]">{readTime}</p>
             </div>
 
             {/* Doc content */}
@@ -97,17 +109,18 @@ export function DocLayout({ title, description, readTime, tag, tagColor, toc, ch
             </div>
 
             {/* Footer nav */}
-            <div className="mt-12 flex items-center justify-between border-t border-gray-200 pt-6">
+            <div className="mt-12 flex items-center justify-between border-t border-[#EDE7DD] pt-6">
               <Link
                 href="/docs"
-                className="flex items-center gap-2 text-sm text-gray-500 hover:text-[#1a6b5e]"
+                className="flex items-center gap-2 text-sm text-[#5B6B79] transition-colors hover:opacity-70"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to Help Center
               </Link>
               <Link
                 href="/dashboard/support"
-                className="text-sm text-[#1a6b5e] hover:underline"
+                className="text-sm font-semibold hover:underline"
+                style={{ color: GOLD }}
               >
                 Need help? Open a ticket →
               </Link>
@@ -166,8 +179,8 @@ export function DocLayout({ title, description, readTime, tag, tagColor, toc, ch
         .doc-content code {
           font-family: ui-monospace, monospace;
           font-size: 0.8125rem;
-          background: #f3f4f6;
-          color: #1a6b5e;
+          background: #F7F3EE;
+          color: #14314D;
           padding: 0.125rem 0.375rem;
           border-radius: 0.25rem;
         }
@@ -188,8 +201,8 @@ export function DocLayout({ title, description, readTime, tag, tagColor, toc, ch
           border-radius: 0;
         }
         .doc-content blockquote {
-          border-left: 3px solid #d4a853;
-          background: #fffbeb;
+          border-left: 3px solid #CFA153;
+          background: #F7F3EE;
           border-radius: 0 0.5rem 0.5rem 0;
           padding: 0.875rem 1.25rem;
           margin-bottom: 1.25rem;
@@ -197,12 +210,12 @@ export function DocLayout({ title, description, readTime, tag, tagColor, toc, ch
           font-size: 0.9rem;
         }
         .doc-content .info-box {
-          border-left: 3px solid #1a6b5e;
-          background: #f0faf8;
+          border-left: 3px solid #14314D;
+          background: #F7F3EE;
           border-radius: 0 0.5rem 0.5rem 0;
           padding: 0.875rem 1.25rem;
           margin-bottom: 1.25rem;
-          color: #134e4a;
+          color: #14314D;
           font-size: 0.9rem;
         }
         .doc-content strong {

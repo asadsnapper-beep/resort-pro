@@ -875,6 +875,17 @@ export async function authRoutes(app: FastifyInstance) {
     return reply.send(ok({ name: tenant.name }));
   });
 
+  // ── GET /api/auth/launch-promotion ────────────────────────────────────────
+  // Public, unauthenticated — lets marketing surfaces (landing page, /plans)
+  // ask "is the launch offer currently on?" without hardcoding dates/copy.
+  // Per plan/launch-pricing-and-trial-abuse-prevention.md §5: the promotion
+  // window is server-controlled (env-driven, see launchPromotionWindow())
+  // and must never be hardcoded into landing/registration copy — this is
+  // the read-only signal that lets those pages stay accurate automatically.
+  app.get('/launch-promotion', async (_req, reply) => {
+    return reply.send(ok({ active: !!launchPromotionWindow() }));
+  });
+
   // ── POST /api/auth/demo-login ─────────────────────────────────────────────
   // No password required — issues a short-lived JWT for the demo tenant.
   // Accepts { role, email }. Access is still instant (no verification step),
