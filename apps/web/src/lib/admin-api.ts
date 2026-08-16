@@ -169,6 +169,10 @@ export const adminEndpoints = {
     author?: string; version?: string; tags?: string[];
     isActive?: boolean; isPremium?: boolean; isDefault?: boolean;
     requiredPlan?: string; sortOrder?: number;
+    /** One-time sale price. 0 = free theme. See plan/theme-studio-and-design-service.md. */
+    priceUsd?: number; priceBdt?: number;
+    /** Temporary discount — send null to clear a running offer. */
+    offerPriceUsd?: number | null; offerPriceBdt?: number | null; offerEndsAt?: string | null;
   }) => adminApi.put(`/themes/${key}`, data),
   toggleTheme: (key: string) => adminApi.patch(`/themes/${key}/toggle`),
   // Themes — dynamic (upload + AI)

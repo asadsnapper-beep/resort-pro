@@ -7,6 +7,7 @@ import type { JwtPayload } from '@resort-pro/types';
 import { resolveRate } from './ratePlans';
 import { sendWebBookingEmails } from '../utils/guest-emails';
 import { PENDING_HOLD_MINUTES } from '../utils/booking';
+import { effectiveThemePrice, themeAccessFor } from '../utils/theme-access';
 
 // Accept absolute http(s) URLs OR site-relative upload paths (/uploads/…) —
 // the app's own ImageUpload produces relative paths, so strict .url() broke saves.
@@ -73,18 +74,39 @@ export async function websiteRoutes(app: FastifyInstance) {
       const body = websiteSchema.parse(request.body);
 
       // templateId is a free-form string, so without this check a tenant who
-      // learns another tenant's bespoke theme key could simply set it and use a
-      // design they didn't pay for. Reject anything exclusive to someone else.
+      // learns another tenant's bespoke theme key — or the key of a paid theme
+      // they never bought — could simply set it and use a design they have no
+      // claim to. This is the one gate on that, so it covers both cases.
       if (body.templateId) {
         const theme = await prisma.theme.findUnique({
           where: { key: body.templateId },
-          select: { exclusiveToTenantId: true },
+          select: {
+            key: true, exclusiveToTenantId: true,
+            priceUsd: true, priceBdt: true,
+            offerPriceUsd: true, offerPriceBdt: true, offerEndsAt: true,
+          },
         });
-        if (theme?.exclusiveToTenantId && theme.exclusiveToTenantId !== tenantId) {
-          return reply.status(403).send({
-            success: false,
-            error: 'That theme is not available for your resort.',
+        // An unknown key is left alone deliberately: the renderer already falls
+        // back to the default theme for one, and rejecting here would lock out
+        // any tenant sitting on a stale templateId from saving anything at all.
+        if (theme) {
+          const owned = await prisma.themePurchase.findUnique({
+            where: { tenantId_themeKey: { tenantId, themeKey: theme.key } },
+            select: { id: true },
           });
+          const access = themeAccessFor(theme, tenantId, !!owned);
+          if (!access.allowed) {
+            return reply.status(403).send({
+              success: false,
+              error: access.message,
+              code: access.code,
+              // Sent so the dashboard can offer to buy it right there rather
+              // than leaving the owner at a dead end.
+              ...(access.code === 'THEME_NOT_PURCHASED'
+                ? { themeKey: theme.key, priceUsd: access.price.usd, priceBdt: access.price.bdt }
+                : {}),
+            });
+          }
         }
       }
 
@@ -760,10 +782,48 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
           ],
         },
         orderBy: { sortOrder: 'asc' },
-        select: { key: true, name: true, description: true, previewImage: true, isPremium: true, exclusiveToTenantId: true },
+        select: {
+          key: true, name: true, description: true, previewImage: true,
+          // tags is what the picker's search box matches against — it was
+          // never selected here, so searching threw on `undefined.some(...)`.
+          isPremium: true, tags: true, exclusiveToTenantId: true,
+          priceUsd: true, priceBdt: true,
+          offerPriceUsd: true, offerPriceBdt: true, offerEndsAt: true,
+        },
       });
 
-      return ok(themes);
+      // The picker has to show a lock and a price on themes this resort has not
+      // bought, otherwise the owner picks one, saves, and only then discovers
+      // it is refused. One query for the whole list rather than one per theme.
+      const purchases = await prisma.themePurchase.findMany({
+        where: { tenantId: tenant.id },
+        select: { themeKey: true },
+      });
+      const ownedKeys = new Set(purchases.map(p => p.themeKey));
+
+      const data = themes.map(t => {
+        const price = effectiveThemePrice(t);
+        const owned = ownedKeys.has(t.key);
+        return {
+          key: t.key,
+          name: t.name,
+          description: t.description,
+          previewImage: t.previewImage,
+          isPremium: t.isPremium,
+          tags: t.tags,
+          exclusiveToTenantId: t.exclusiveToTenantId,
+          priceUsd: price.usd,
+          priceBdt: price.bdt,
+          listPriceUsd: price.listUsd,
+          listPriceBdt: price.listBdt,
+          onOffer: price.onOffer,
+          isFree: price.isFree,
+          /** Already bought, commissioned bespoke, or free — usable right now. */
+          owned: themeAccessFor(t, tenant.id, owned).allowed,
+        };
+      });
+
+      return ok(data);
     },
   });
 
