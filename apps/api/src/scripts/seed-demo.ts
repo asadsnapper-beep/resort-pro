@@ -20,18 +20,86 @@ const d = (offsetDays: number, h = 12) => {
   return date;
 };
 
+/**
+ * A date pinned to a day inside the current (or a previous) calendar month.
+ *
+ * The dashboard's revenue figure sums payments by `processedAt >= startOfMonth`,
+ * so day-offset dates are not good enough: seed on the 3rd and `d(-15)` lands in
+ * the previous month, making "this month's revenue" collapse for no reason a
+ * visitor could understand. Anchoring to the month directly keeps the headline
+ * number stable whichever day the demo is refreshed.
+ *
+ * Days are clamped to 28 so February behaves like every other month.
+ */
+const monthDay = (monthsAgo: number, day: number, h = 12) => {
+  const date = new Date();
+  date.setDate(1); // set day first — going to a short month from the 31st would skip one
+  date.setMonth(date.getMonth() - monthsAgo);
+  date.setDate(Math.min(day, 28));
+  date.setHours(h, 0, 0, 0);
+  return date;
+};
+const thisMonth = (day: number, h = 12) => monthDay(0, day, h);
+const lastMonth = (day: number, h = 12) => monthDay(1, day, h);
+
+/** Yesterday, so a "collected today" payment never sits in the future. */
+const notFuture = (date: Date) => (date.getTime() > Date.now() ? d(-1) : date);
+
+
+/**
+ * Seed inserts used to end in `.catch(softFail)`, which meant a broken row was
+ * indistinguishable from a written one — the script printed "20 expenses" for a
+ * table that had none, and nobody found out until the demo looked empty. These
+ * still do not abort the run (one bad section should not cost the whole seed),
+ * but every failure is now reported and summarised at the end.
+ */
+const seedFailures: string[] = [];
+const softFail = (err: unknown) => {
+  const msg = String((err as Error)?.message ?? err)
+    .split('\n').map((l) => l.trim()).filter(Boolean).pop() ?? 'unknown error';
+  seedFailures.push(msg);
+};
+
 async function main() {
   console.log('🎭 Seeding full demo tenant...\n');
 
-  // ── Idempotency guard ─────────────────────────────────────────────────────────
+  // ── Idempotency guard / refresh ───────────────────────────────────────────────
   // Operational data below uses create() (not upsert), so re-running would
   // duplicate bookings/payments/etc. Skip if the demo tenant is already seeded.
   // This makes the script safe to run on every deploy.
-  const existing = await prisma.tenant.findUnique({ where: { slug: 'demo' }, select: { id: true } });
-  if (existing) {
+  //
+  // `--refresh` (or SEED_DEMO_REFRESH=1) instead rebuilds it from scratch. The
+  // demo's dates are all relative to the day it was seeded, so without this it
+  // decays: arrivals drift into the past, "today" empties out, and within a
+  // month a prospective customer is shown a dead resort. A daily refresh keeps
+  // the tour looking like the business it is meant to be selling.
+  const REFRESH = process.argv.includes('--refresh') || process.env.SEED_DEMO_REFRESH === '1';
+
+  const existing = await prisma.tenant.findUnique({
+    where: { slug: 'demo' },
+    select: { id: true, isDemo: true, name: true },
+  });
+
+  if (existing && REFRESH) {
+    // Deleting a tenant destroys every booking, guest and payment under it, so
+    // this refuses to run unless the row is both the `demo` slug AND flagged
+    // isDemo. A real resort must never reach this line, however the script is
+    // invoked or whatever a future env var is set to.
+    if (!existing.isDemo) {
+      console.error(`❌ Refusing to refresh: tenant "${existing.name}" (slug 'demo') is not flagged isDemo.`);
+      await prisma.$disconnect();
+      process.exit(1);
+    }
+    // Relations cascade from Tenant (migration 20260809000000_tenant_delete_cascade_relations),
+    // so this clears operational data, config rows and users in one step —
+    // everything below recreates them.
+    await prisma.tenant.delete({ where: { id: existing.id } });
+    console.log('♻️  Refresh: previous demo tenant removed, rebuilding with today\'s dates…');
+  } else if (existing) {
     const bookingCount = await prisma.booking.count({ where: { tenantId: existing.id } });
     if (bookingCount > 0) {
       console.log(`✅ Demo tenant already seeded (${bookingCount} bookings). Skipping to avoid duplicates.`);
+      console.log('   Run with --refresh to rebuild it with current dates.');
       await prisma.$disconnect();
       return;
     }
@@ -124,15 +192,20 @@ async function main() {
   console.log('✅ Staff records');
 
   // ── Rooms ────────────────────────────────────────────────────────────────────
+  // Room status drives the dashboard's occupancy figure directly
+  // (occupancy = OCCUPIED / active rooms), and the demo exists to show a resort
+  // worth running. Eight of ten sold, one being turned over, one free reads as a
+  // strong week — a fuller board would look staged, an emptier one dead.
+  // The eight OCCUPIED rooms match the eight CHECKED_IN bookings below.
   const roomsData = [
-    { number: '101', name: 'Sea View Standard',   type: RoomType.STANDARD, floor: 1, maxOccupancy: 2, basePrice: 4500,  status: RoomStatus.AVAILABLE },
+    { number: '101', name: 'Sea View Standard',   type: RoomType.STANDARD, floor: 1, maxOccupancy: 2, basePrice: 4500,  status: RoomStatus.OCCUPIED  },
     { number: '102', name: 'Sea View Standard',   type: RoomType.STANDARD, floor: 1, maxOccupancy: 2, basePrice: 4500,  status: RoomStatus.OCCUPIED  },
     { number: '103', name: 'Garden Standard',     type: RoomType.STANDARD, floor: 1, maxOccupancy: 2, basePrice: 3800,  status: RoomStatus.CLEANING  },
-    { number: '201', name: 'Ocean Deluxe',        type: RoomType.DELUXE,   floor: 2, maxOccupancy: 3, basePrice: 7500,  status: RoomStatus.AVAILABLE },
+    { number: '201', name: 'Ocean Deluxe',        type: RoomType.DELUXE,   floor: 2, maxOccupancy: 3, basePrice: 7500,  status: RoomStatus.OCCUPIED  },
     { number: '202', name: 'Ocean Deluxe',        type: RoomType.DELUXE,   floor: 2, maxOccupancy: 3, basePrice: 7500,  status: RoomStatus.OCCUPIED  },
-    { number: '301', name: 'Sunset Suite',        type: RoomType.SUITE,    floor: 3, maxOccupancy: 4, basePrice: 14000, status: RoomStatus.AVAILABLE },
+    { number: '301', name: 'Sunset Suite',        type: RoomType.SUITE,    floor: 3, maxOccupancy: 4, basePrice: 14000, status: RoomStatus.OCCUPIED  },
     { number: '302', name: 'Honeymoon Suite',     type: RoomType.SUITE,    floor: 3, maxOccupancy: 2, basePrice: 16000, status: RoomStatus.OCCUPIED  },
-    { number: 'V1',  name: 'Beachfront Villa',    type: RoomType.VILLA,    floor: 0, maxOccupancy: 6, basePrice: 28000, status: RoomStatus.AVAILABLE },
+    { number: 'V1',  name: 'Beachfront Villa',    type: RoomType.VILLA,    floor: 0, maxOccupancy: 6, basePrice: 28000, status: RoomStatus.OCCUPIED  },
     { number: 'V2',  name: 'Garden Pool Villa',   type: RoomType.VILLA,    floor: 0, maxOccupancy: 6, basePrice: 24000, status: RoomStatus.OCCUPIED  },
     { number: 'C1',  name: 'Tropical Bungalow',   type: RoomType.BUNGALOW, floor: 0, maxOccupancy: 2, basePrice: 9500,  status: RoomStatus.AVAILABLE },
   ];
@@ -149,26 +222,33 @@ async function main() {
   console.log(`✅ ${createdRooms.length} rooms`);
 
   // ── Rate Plans ────────────────────────────────────────────────────────────────
+  // RatePlan has no `description` or `multiplier` column — passing them made
+  // every one of these fail silently, so the demo had no rate plans at all.
+  // `price` is the nightly rate the plan actually charges; the old `price: 0`
+  // would have shown a resort selling rooms for nothing even had they saved.
   const ratePlans = [
-    { name: 'Best Available Rate', description: 'Our standard flexible rate. Free cancellation up to 24h before check-in.', multiplier: 1.0, minNights: 1, isActive: true },
-    { name: 'Non-Refundable Rate', description: 'Save 15% with our non-refundable rate. Full payment at booking.', multiplier: 0.85, minNights: 1, isActive: true },
-    { name: 'Weekly Saver',        description: 'Stay 7+ nights and save 20%. Perfect for longer getaways.',            multiplier: 0.80, minNights: 7, isActive: true },
-    { name: 'Early Bird (30 days)',description: 'Book 30 days ahead and save 10%.',                                      multiplier: 0.90, minNights: 2, isActive: true },
+    { name: 'Best Available Rate',  type: 'STANDARD'   as const, price: 7500, minNights: 1, isActive: true },
+    { name: 'Non-Refundable Rate',  type: 'PROMO'      as const, price: 6375, minNights: 1, isActive: true },
+    { name: 'Weekly Saver',         type: 'PROMO'      as const, price: 6000, minNights: 7, isActive: true },
+    { name: 'Early Bird (30 days)', type: 'EARLY_BIRD' as const, price: 6750, minNights: 2, isActive: true },
+    { name: 'Weekend Premium',      type: 'WEEKEND'    as const, price: 9000, minNights: 2, isActive: true },
   ];
+  let ratePlansCreated = 0;
   for (const rp of ratePlans) {
-    await prisma.ratePlan.create({ data: { tenantId: demo.id, price: 0, ...rp } }).catch(() => {});
+    await prisma.ratePlan.create({ data: { tenantId: demo.id, ...rp } });
+    ratePlansCreated++;
   }
-  console.log('✅ Rate plans');
+  console.log(`✅ ${ratePlansCreated} rate plans`);
 
   // ── Packages ─────────────────────────────────────────────────────────────────
   const packages = [
-    { name: 'Romantic Getaway', description: 'Perfect for couples — includes couple spa, candlelit dinner, and rose petal room decor.', price: 8500, duration: 2, isActive: true, inclusions: ['Couple Spa (60 min)', 'Candlelit Dinner', 'Rose Petal Decoration', 'Late Checkout (2 PM)', 'Welcome Drink'] },
-    { name: 'Family Fun Package', description: 'Everything your family needs — water sports, kids club, and buffet breakfast included.', price: 12000, duration: 3, isActive: true, inclusions: ['Buffet Breakfast (daily)', 'Water Sports Session', 'Kids Club Access', 'Family Room Upgrade', 'Airport Transfer'] },
-    { name: 'Business Stay', description: 'For the corporate traveler — fast WiFi, meeting room access, and express laundry.', price: 6000, duration: 2, isActive: true, inclusions: ['Meeting Room (2hrs)', 'Express Laundry', 'Airport Transfer', 'Daily Breakfast', 'High-Speed WiFi'] },
-    { name: 'Honeymoon Bliss', description: 'Start your new journey in paradise — champagne, spa, and a private beach picnic.', price: 22000, duration: 3, isActive: true, inclusions: ['Champagne on Arrival', 'Private Beach Picnic', 'Couple Spa (90 min)', 'Honeymoon Suite Upgrade', 'Professional Photo Session'] },
+    { name: 'Romantic Getaway', description: 'Perfect for couples — includes couple spa, candlelit dinner, and rose petal room decor.', price: 8500, isActive: true, inclusions: ['Couple Spa (60 min)', 'Candlelit Dinner', 'Rose Petal Decoration', 'Late Checkout (2 PM)', 'Welcome Drink'] },
+    { name: 'Family Fun Package', description: 'Everything your family needs — water sports, kids club, and buffet breakfast included.', price: 12000, isActive: true, inclusions: ['Buffet Breakfast (daily)', 'Water Sports Session', 'Kids Club Access', 'Family Room Upgrade', 'Airport Transfer'] },
+    { name: 'Business Stay', description: 'For the corporate traveler — fast WiFi, meeting room access, and express laundry.', price: 6000, isActive: true, inclusions: ['Meeting Room (2hrs)', 'Express Laundry', 'Airport Transfer', 'Daily Breakfast', 'High-Speed WiFi'] },
+    { name: 'Honeymoon Bliss', description: 'Start your new journey in paradise — champagne, spa, and a private beach picnic.', price: 22000, isActive: true, inclusions: ['Champagne on Arrival', 'Private Beach Picnic', 'Couple Spa (90 min)', 'Honeymoon Suite Upgrade', 'Professional Photo Session'] },
   ];
   for (const pkg of packages) {
-    await prisma.package.create({ data: { tenantId: demo.id, ...pkg } }).catch(() => {});
+    await prisma.package.create({ data: { tenantId: demo.id, ...pkg } }).catch(softFail);
   }
   console.log('✅ Packages');
 
@@ -198,29 +278,111 @@ async function main() {
   console.log(`✅ ${createdGuests.length} guests`);
 
   // ── Bookings + Payments ───────────────────────────────────────────────────────
-  const bookingsData = [
-    // Active / checked-in
-    { g: 0, r: 1,  ci: d(-2),  co: d(1),  status: BookingStatus.CHECKED_IN,  total: 13500,  paid: 13500,  adults: 2, ch: 0, cn: 'CBR-2026-001', src: 'DIRECT' },
-    { g: 4, r: 4,  ci: d(-1),  co: d(3),  status: BookingStatus.CHECKED_IN,  total: 30000,  paid: 15000,  adults: 2, ch: 1, cn: 'CBR-2026-002', src: 'BOOKING_COM' },
-    { g: 6, r: 6,  ci: d(-3),  co: d(0),  status: BookingStatus.CHECKED_IN,  total: 48000,  paid: 48000,  adults: 2, ch: 0, cn: 'CBR-2026-003', src: 'AIRBNB' },
-    { g: 7, r: 8,  ci: d(-1),  co: d(4),  status: BookingStatus.CHECKED_IN,  total: 120000, paid: 60000,  adults: 4, ch: 2, cn: 'CBR-2026-004', src: 'DIRECT' },
-    // Upcoming confirmed
-    { g: 1, r: 0,  ci: d(1),   co: d(4),  status: BookingStatus.CONFIRMED,   total: 13500,  paid: 6750,   adults: 2, ch: 0, cn: 'CBR-2026-005', src: 'DIRECT' },
-    { g: 2, r: 3,  ci: d(2),   co: d(6),  status: BookingStatus.CONFIRMED,   total: 30000,  paid: 30000,  adults: 1, ch: 0, cn: 'CBR-2026-006', src: 'BOOKING_COM' },
-    { g: 5, r: 5,  ci: d(3),   co: d(7),  status: BookingStatus.CONFIRMED,   total: 56000,  paid: 28000,  adults: 2, ch: 0, cn: 'CBR-2026-007', src: 'DIRECT' },
-    { g: 3, r: 9,  ci: d(5),   co: d(8),  status: BookingStatus.CONFIRMED,   total: 28500,  paid: 28500,  adults: 2, ch: 0, cn: 'CBR-2026-008', src: 'AIRBNB' },
-    { g: 8, r: 2,  ci: d(8),   co: d(11), status: BookingStatus.CONFIRMED,   total: 11400,  paid: 0,      adults: 2, ch: 0, cn: 'CBR-2026-009', src: 'DIRECT' },
-    { g: 9, r: 7,  ci: d(10),  co: d(13), status: BookingStatus.CONFIRMED,   total: 84000,  paid: 42000,  adults: 3, ch: 1, cn: 'CBR-2026-010', src: 'DIRECT' },
-    // Past check-outs (for revenue/analytics)
-    { g: 0, r: 2,  ci: d(-15), co: d(-12),status: BookingStatus.CHECKED_OUT, total: 11400,  paid: 11400,  adults: 2, ch: 0, cn: 'CBR-2026-011', src: 'DIRECT' },
-    { g: 2, r: 3,  ci: d(-20), co: d(-17),status: BookingStatus.CHECKED_OUT, total: 22500,  paid: 22500,  adults: 1, ch: 0, cn: 'CBR-2026-012', src: 'BOOKING_COM' },
-    { g: 6, r: 7,  ci: d(-30), co: d(-27),status: BookingStatus.CHECKED_OUT, total: 72000,  paid: 72000,  adults: 4, ch: 0, cn: 'CBR-2026-013', src: 'AIRBNB' },
-    { g: 1, r: 4,  ci: d(-45), co: d(-42),status: BookingStatus.CHECKED_OUT, total: 22500,  paid: 22500,  adults: 2, ch: 1, cn: 'CBR-2026-014', src: 'DIRECT' },
-    { g: 3, r: 5,  ci: d(-60), co: d(-57),status: BookingStatus.CHECKED_OUT, total: 42000,  paid: 42000,  adults: 2, ch: 0, cn: 'CBR-2026-015', src: 'DIRECT' },
-    { g: 5, r: 9,  ci: d(-25), co: d(-22),status: BookingStatus.CHECKED_OUT, total: 28500,  paid: 28500,  adults: 2, ch: 0, cn: 'CBR-2026-016', src: 'WALK_IN' },
-    { g: 4, r: 6,  ci: d(-10), co: d(-8), status: BookingStatus.CHECKED_OUT, total: 32000,  paid: 32000,  adults: 2, ch: 0, cn: 'CBR-2026-017', src: 'DIRECT' },
-    // Cancelled
-    { g: 8, r: 1,  ci: d(-5),  co: d(-2), status: BookingStatus.CANCELLED,   total: 9000,   paid: 0,      adults: 2, ch: 0, cn: 'CBR-2026-018', src: 'BOOKING_COM' },
+  // A visitor judges the product on one screen: today's board and this month's
+  // money. So the set below is built backwards from the dashboard's own queries
+  // — arrivals need `checkIn` inside today with CONFIRMED status, departures
+  // need `checkOut` inside today with CHECKED_IN, occupancy needs eight rooms
+  // held, and revenue needs paid Payment rows dated inside this calendar month.
+  // `payAt` is the date money actually changed hands; it defaults to check-in.
+  type Seed = {
+    g: number; r: number; ci: Date; co: Date; status: BookingStatus;
+    total: number; paid: number; adults: number; ch: number; cn: string;
+    src: string; payAt?: Date; notes?: string;
+  };
+
+  /** Historical stays: money in the bank, and the graphs behind it. */
+  const past = (
+    n: number, g: number, r: number, monthsAgo: number, day: number,
+    nights: number, total: number, src: string,
+  ): Seed => ({
+    g, r,
+    ci: monthDay(monthsAgo, day),
+    co: monthDay(monthsAgo, day + nights),
+    status: BookingStatus.CHECKED_OUT,
+    total, paid: total, adults: 2, ch: 0,
+    cn: `CBR-H-${String(n).padStart(3, '0')}`,
+    src,
+    payAt: monthDay(monthsAgo, day),
+  });
+
+  const bookingsData: Seed[] = [
+    // ── In-house right now — these eight match the eight OCCUPIED rooms ──────
+    { g: 0, r: 0, ci: d(-2), co: d(2),  status: BookingStatus.CHECKED_IN, total: 18000,  paid: 18000,  adults: 2, ch: 0, cn: 'CBR-2026-001', src: 'DIRECT' },
+    { g: 4, r: 1, ci: d(-1), co: d(3),  status: BookingStatus.CHECKED_IN, total: 18000,  paid: 9000,   adults: 2, ch: 1, cn: 'CBR-2026-002', src: 'BOOKING_COM' },
+    { g: 6, r: 3, ci: d(-3), co: d(0),  status: BookingStatus.CHECKED_IN, total: 22500,  paid: 22500,  adults: 2, ch: 0, cn: 'CBR-2026-003', src: 'AIRBNB' },
+    { g: 7, r: 4, ci: d(-1), co: d(4),  status: BookingStatus.CHECKED_IN, total: 37500,  paid: 20000,  adults: 3, ch: 1, cn: 'CBR-2026-004', src: 'DIRECT' },
+    { g: 2, r: 5, ci: d(-4), co: d(0),  status: BookingStatus.CHECKED_IN, total: 56000,  paid: 56000,  adults: 2, ch: 2, cn: 'CBR-2026-005', src: 'DIRECT' },
+    { g: 5, r: 6, ci: d(-2), co: d(5),  status: BookingStatus.CHECKED_IN, total: 112000, paid: 56000,  adults: 2, ch: 0, cn: 'CBR-2026-006', src: 'DIRECT' },
+    { g: 3, r: 7, ci: d(-5), co: d(1),  status: BookingStatus.CHECKED_IN, total: 168000, paid: 168000, adults: 5, ch: 2, cn: 'CBR-2026-007', src: 'AIRBNB' },
+    { g: 9, r: 8, ci: d(-1), co: d(6),  status: BookingStatus.CHECKED_IN, total: 168000, paid: 84000,  adults: 4, ch: 2, cn: 'CBR-2026-008', src: 'BOOKING_COM' },
+
+    // ── Arriving today — this is what fills "Today's Arrivals" ───────────────
+    { g: 1, r: 9, ci: d(0),  co: d(3),  status: BookingStatus.CONFIRMED, total: 28500, paid: 28500, adults: 2, ch: 0, cn: 'CBR-2026-009', src: 'DIRECT' },
+    { g: 8, r: 2, ci: d(0),  co: d(2),  status: BookingStatus.CONFIRMED, total: 7600,  paid: 3800,  adults: 2, ch: 0, cn: 'CBR-2026-010', src: 'WALK_IN' },
+    { g: 5, r: 3, ci: d(0),  co: d(4),  status: BookingStatus.CONFIRMED, total: 30000, paid: 30000, adults: 2, ch: 1, cn: 'CBR-2026-011', src: 'BOOKING_COM' },
+
+    // ── Upcoming — a booked-out week ahead ───────────────────────────────────
+    { g: 2, r: 0, ci: d(1),  co: d(4),  status: BookingStatus.CONFIRMED, total: 13500,  paid: 6750,  adults: 2, ch: 0, cn: 'CBR-2026-012', src: 'DIRECT' },
+    { g: 6, r: 5, ci: d(2),  co: d(6),  status: BookingStatus.CONFIRMED, total: 56000,  paid: 56000, adults: 2, ch: 0, cn: 'CBR-2026-013', src: 'DIRECT' },
+    { g: 0, r: 7, ci: d(3),  co: d(7),  status: BookingStatus.CONFIRMED, total: 112000, paid: 56000, adults: 4, ch: 2, cn: 'CBR-2026-014', src: 'AIRBNB' },
+    { g: 4, r: 4, ci: d(4),  co: d(7),  status: BookingStatus.CONFIRMED, total: 22500,  paid: 22500, adults: 2, ch: 0, cn: 'CBR-2026-015', src: 'BOOKING_COM' },
+    { g: 7, r: 6, ci: d(6),  co: d(9),  status: BookingStatus.CONFIRMED, total: 48000,  paid: 24000, adults: 2, ch: 0, cn: 'CBR-2026-016', src: 'DIRECT' },
+    { g: 3, r: 8, ci: d(8),  co: d(12), status: BookingStatus.CONFIRMED, total: 96000,  paid: 48000, adults: 4, ch: 1, cn: 'CBR-2026-017', src: 'DIRECT' },
+    { g: 9, r: 1, ci: d(9),  co: d(11), status: BookingStatus.CONFIRMED, total: 9000,   paid: 0,     adults: 2, ch: 0, cn: 'CBR-2026-018', src: 'WALK_IN' },
+    { g: 1, r: 5, ci: d(12), co: d(16), status: BookingStatus.CONFIRMED, total: 56000,  paid: 28000, adults: 2, ch: 0, cn: 'CBR-2026-019', src: 'DIRECT' },
+
+    // ── This month, already collected ────────────────────────────────────────
+    past(1,  0, 0, 0, 2,  3, 13500,  'DIRECT'),
+    past(2,  1, 3, 0, 3,  2, 15000,  'BOOKING_COM'),
+    past(3,  2, 7, 0, 4,  3, 84000,  'AIRBNB'),
+    past(4,  3, 6, 0, 5,  2, 32000,  'DIRECT'),
+    past(5,  4, 2, 0, 6,  4, 15200,  'WALK_IN'),
+    past(6,  5, 8, 0, 7,  3, 72000,  'DIRECT'),
+    past(7,  6, 1, 0, 9,  2, 9000,   'DIRECT'),
+    past(8,  7, 5, 0, 10, 3, 42000,  'BOOKING_COM'),
+    past(9,  8, 4, 0, 11, 2, 15000,  'DIRECT'),
+    past(10, 9, 7, 0, 12, 4, 112000, 'DIRECT'),
+    past(11, 0, 6, 0, 14, 2, 32000,  'AIRBNB'),
+    past(12, 2, 0, 0, 15, 3, 13500,  'DIRECT'),
+    past(13, 4, 8, 0, 16, 2, 48000,  'DIRECT'),
+    past(14, 6, 3, 0, 18, 3, 22500,  'BOOKING_COM'),
+    past(15, 8, 5, 0, 19, 2, 28000,  'DIRECT'),
+    past(16, 1, 9, 0, 20, 3, 28500,  'WALK_IN'),
+
+    // ── Last month, for the growth comparison ────────────────────────────────
+    // Deliberately close to this month's total. A demo showing +180% growth
+    // reads as invented data; a strong-but-plausible high-teens rise is what a
+    // real resort having a good season looks like, and it is what a prospective
+    // buyer will believe.
+    past(20, 0, 7, 1, 3,  3, 84000,  'DIRECT'),
+    past(21, 1, 5, 1, 5,  2, 28000,  'AIRBNB'),
+    past(22, 2, 4, 1, 7,  4, 30000,  'DIRECT'),
+    past(23, 3, 6, 1, 9,  2, 32000,  'BOOKING_COM'),
+    past(24, 4, 8, 1, 11, 3, 72000,  'DIRECT'),
+    past(25, 5, 0, 1, 13, 2, 9000,   'WALK_IN'),
+    past(26, 6, 2, 1, 15, 3, 11400,  'DIRECT'),
+    past(27, 7, 9, 1, 17, 2, 19000,  'DIRECT'),
+    past(28, 8, 3, 1, 19, 3, 22500,  'BOOKING_COM'),
+    past(29, 9, 7, 1, 21, 4, 112000, 'AIRBNB'),
+    past(30, 0, 1, 1, 23, 2, 9000,   'DIRECT'),
+    past(31, 2, 5, 1, 25, 3, 42000,  'DIRECT'),
+    past(32, 1, 7, 1, 4,  3, 84000,  'DIRECT'),
+    past(33, 3, 8, 1, 6,  4, 96000,  'AIRBNB'),
+    past(34, 5, 5, 1, 8,  3, 42000,  'DIRECT'),
+    past(35, 7, 6, 1, 10, 2, 32000,  'BOOKING_COM'),
+    past(36, 9, 4, 1, 12, 3, 22500,  'DIRECT'),
+    past(37, 2, 7, 1, 14, 4, 112000, 'DIRECT'),
+    past(38, 4, 3, 1, 16, 2, 15000,  'WALK_IN'),
+    past(39, 6, 8, 1, 18, 3, 72000,  'DIRECT'),
+    past(40, 8, 5, 1, 20, 2, 28000,  'AIRBNB'),
+    past(41, 0, 6, 1, 22, 3, 48000,  'DIRECT'),
+    past(42, 1, 9, 1, 24, 2, 19000,  'DIRECT'),
+    past(43, 3, 0, 1, 26, 3, 13500,  'BOOKING_COM'),
+    past(44, 5, 7, 1, 25, 2, 56000,  'DIRECT'),
+
+    // ── The honest bits — a real resort loses some too ───────────────────────
+    { g: 8, r: 1, ci: d(-5), co: d(-2), status: BookingStatus.CANCELLED, total: 9000,  paid: 0, adults: 2, ch: 0, cn: 'CBR-2026-090', src: 'BOOKING_COM', notes: 'Guest requested cancellation' },
+    { g: 3, r: 2, ci: d(-8), co: d(-6), status: BookingStatus.NO_SHOW,   total: 7600,  paid: 0, adults: 2, ch: 0, cn: 'CBR-2026-091', src: 'WALK_IN',     notes: 'Guest never arrived' },
   ];
 
   const createdBookings: any[] = [];
@@ -249,17 +411,23 @@ async function main() {
           paymentStatus: paymentStatus as any,
           confirmationNo: b.cn,
           source: b.src as any,
-          notes: b.status === BookingStatus.CANCELLED ? 'Guest requested cancellation' : undefined,
+          notes: b.notes,
         },
       });
       createdBookings.push(booking);
 
       // Add payment records for paid bookings. `status` must be a real
       // PaymentStatus enum value ('PAID', not 'COMPLETED' — that value never
-      // existed) — the previous 'COMPLETED' + a silent .catch(() => {}) meant
+      // existed) — the previous 'COMPLETED' + a silent .catch(softFail) meant
       // every one of these inserts had been failing invisibly, leaving every
       // "paid" demo booking with zero backing Payment rows.
       if (b.paid > 0 && b.status !== BookingStatus.CANCELLED) {
+        // processedAt is not optional in practice, whatever the schema says:
+        // the dashboard sums revenue with `processedAt >= startOfMonth`, so a
+        // payment without one is invisible to it. Leaving it unset is why the
+        // demo showed ৳0 earned while displaying eighteen paid bookings —
+        // the single most damaging thing a visitor could see.
+        const paidOn = notFuture(b.payAt ?? b.ci);
         await prisma.payment.create({
           data: {
             tenantId: demo.id,
@@ -269,6 +437,9 @@ async function main() {
             status: 'PAID',
             reference: `PAY-${b.cn}`,
             notes: 'Demo payment',
+            processedAt: paidOn,
+            paidAt: paidOn,
+            createdAt: paidOn,
           },
         }).catch((err) => console.error(`⚠️  Payment create failed for ${b.cn}:`, err.message));
       }
@@ -341,7 +512,7 @@ async function main() {
           unitPrice:   subtotal,
           total:       subtotal,
         },
-      }).catch(() => {});
+      }).catch(softFail);
     }
   }
   console.log('✅ Invoices');
@@ -374,7 +545,7 @@ async function main() {
         scheduledDate: hk.scheduledDate,
         completedAt:   hk.status === HousekeepingStatus.COMPLETED ? d(-1) : null,
       },
-    }).catch(() => {});
+    }).catch(softFail);
   }
   console.log(`✅ ${hkTasks.length} housekeeping tasks`);
 
@@ -400,7 +571,7 @@ async function main() {
         description: mt.desc,
         resolvedAt:  mt.status === MaintenanceStatus.RESOLVED ? d(-1) : null,
       },
-    }).catch(() => {});
+    }).catch(softFail);
   }
   console.log(`✅ ${maintenanceTasks.length} maintenance tickets`);
 
@@ -427,7 +598,7 @@ async function main() {
         category:    t.category,
         resolvedAt:  t.status === TicketStatus.RESOLVED ? d(-1) : null,
       },
-    }).catch(() => {});
+    }).catch(softFail);
   }
   console.log(`✅ ${tickets.length} support tickets`);
 
@@ -448,7 +619,7 @@ async function main() {
       { name: "Chef's Special",         category: 'SPECIAL',   price: 1250 },
     ];
     for (const item of menuItems) {
-      await prisma.menuItem.create({ data: { tenantId: demo.id, ...(item as any), isAvailable: true } }).catch(() => {});
+      await prisma.menuItem.create({ data: { tenantId: demo.id, ...(item as any), isAvailable: true } }).catch(softFail);
     }
   }
   const menuItems2 = await prisma.menuItem.findMany({ where: { tenantId: demo.id } });
@@ -474,38 +645,45 @@ async function main() {
           ],
         },
       },
-    }).catch(() => {});
+    }).catch(softFail);
   }
   console.log('✅ Food orders');
 
   // ── Expenses ──────────────────────────────────────────────────────────────────
   const expenses = [
-    { description: 'Electricity Bill — May',       amount: 45000,  category: 'UTILITIES',     date: d(-5),  isPaid: true },
-    { description: 'Water Supply — May',           amount: 8500,   category: 'UTILITIES',     date: d(-5),  isPaid: true },
-    { description: 'Internet & WiFi — May',        amount: 5000,   category: 'UTILITIES',     date: d(-10), isPaid: true },
-    { description: 'Staff Salary — May',           amount: 280000, category: 'SALARIES',      date: d(-3),  isPaid: true },
-    { description: 'Contract Housekeeping Staff',  amount: 45000,  category: 'SALARIES',      date: d(-3),  isPaid: true },
-    { description: 'Pool Maintenance & Chemicals', amount: 12000,  category: 'MAINTENANCE',   date: d(-7),  isPaid: true },
-    { description: 'AC Servicing (4 units)',       amount: 8000,   category: 'MAINTENANCE',   date: d(-12), isPaid: true },
-    { description: 'Food & Beverage Supplies',     amount: 38000,  category: 'SUPPLIES',      date: d(-2),  isPaid: true },
-    { description: 'Laundry & Linen Service',      amount: 8500,   category: 'HOUSEKEEPING',  date: d(-1),  isPaid: true },
-    { description: 'Towels & Linens (restock)',    amount: 22000,  category: 'SUPPLIES',      date: d(-4),  isPaid: true },
-    { description: 'Marketing — Social Media',     amount: 15000,  category: 'MARKETING',     date: d(-8),  isPaid: true },
-    { description: 'Google Ads Campaign',          amount: 20000,  category: 'MARKETING',     date: d(-15), isPaid: true },
-    { description: 'Property Insurance — Q2',      amount: 35000,  category: 'OTHER',         date: d(-20), isPaid: true },
-    { description: 'Garden & Landscaping',         amount: 9500,   category: 'MAINTENANCE',   date: d(-6),  isPaid: false },
-    { description: 'CCTV Maintenance Contract',    amount: 6000,   category: 'MAINTENANCE',   date: d(-30), isPaid: true },
+    { description: 'Electricity Bill — May',       amount: 45000,  category: 'UTILITIES',     date: d(-5), paymentMode: 'BANK' },
+    { description: 'Water Supply — May',           amount: 8500,   category: 'UTILITIES',     date: d(-5), paymentMode: 'BANK' },
+    { description: 'Internet & WiFi — May',        amount: 5000,   category: 'UTILITIES',     date: d(-10), paymentMode: 'BANK' },
+    { description: 'Staff Salary — May',           amount: 280000, category: 'SALARIES',      date: d(-3), paymentMode: 'BANK' },
+    { description: 'Contract Housekeeping Staff',  amount: 45000,  category: 'SALARIES',      date: d(-3), paymentMode: 'BANK' },
+    { description: 'Pool Maintenance & Chemicals', amount: 12000,  category: 'MAINTENANCE',   date: d(-7), paymentMode: 'BANK' },
+    { description: 'AC Servicing (4 units)',       amount: 8000,   category: 'MAINTENANCE',   date: d(-12), paymentMode: 'BANK' },
+    { description: 'Food & Beverage Supplies',     amount: 38000,  category: 'SUPPLIES',      date: d(-2), paymentMode: 'BANK' },
+    { description: 'Laundry & Linen Service',      amount: 8500,   category: 'CLEANING',      date: d(-1), paymentMode: 'BANK' },
+    { description: 'Towels & Linens (restock)',    amount: 22000,  category: 'SUPPLIES',      date: d(-4), paymentMode: 'BANK' },
+    { description: 'Marketing — Social Media',     amount: 15000,  category: 'MARKETING',     date: d(-8), paymentMode: 'BANK' },
+    { description: 'Google Ads Campaign',          amount: 20000,  category: 'MARKETING',     date: d(-15), paymentMode: 'BANK' },
+    { description: 'Property Insurance — Q2',      amount: 35000,  category: 'OTHER',         date: d(-20), paymentMode: 'BANK' },
+    { description: 'Garden & Landscaping',         amount: 9500,   category: 'MAINTENANCE',   date: d(-6), paymentMode: 'CASH' },
+    { description: 'CCTV Maintenance Contract',    amount: 6000,   category: 'MAINTENANCE',   date: d(-30), paymentMode: 'BANK' },
     // Previous months for analytics
-    { description: 'Electricity Bill — April',     amount: 42000,  category: 'UTILITIES',     date: d(-35), isPaid: true },
-    { description: 'Staff Salary — April',         amount: 280000, category: 'SALARIES',      date: d(-33), isPaid: true },
-    { description: 'Food & Beverage — April',      amount: 35000,  category: 'SUPPLIES',      date: d(-32), isPaid: true },
-    { description: 'Electricity Bill — March',     amount: 40000,  category: 'UTILITIES',     date: d(-65), isPaid: true },
-    { description: 'Staff Salary — March',         amount: 275000, category: 'SALARIES',      date: d(-63), isPaid: true },
+    { description: 'Electricity Bill — April',     amount: 42000,  category: 'UTILITIES',     date: d(-35), paymentMode: 'BANK' },
+    { description: 'Staff Salary — April',         amount: 280000, category: 'SALARIES',      date: d(-33), paymentMode: 'BANK' },
+    { description: 'Food & Beverage — April',      amount: 35000,  category: 'SUPPLIES',      date: d(-32), paymentMode: 'BANK' },
+    { description: 'Electricity Bill — March',     amount: 40000,  category: 'UTILITIES',     date: d(-65), paymentMode: 'BANK' },
+    { description: 'Staff Salary — March',         amount: 275000, category: 'SALARIES',      date: d(-63), paymentMode: 'BANK' },
   ];
+  // No silent catch here. An earlier version swallowed every error and then
+  // logged the array length, so the seed cheerfully reported "20 expenses"
+  // while the table stayed empty — the expense page, the P&L and every
+  // profitability figure in the demo were quietly blank because of it.
+  // createdBy wants a user id, not a staff id.
+  let expensesCreated = 0;
   for (const e of expenses) {
-    await prisma.expense.create({ data: { tenantId: demo.id, createdBy: demoStaff1.id, ...e as any } }).catch(() => {});
+    await prisma.expense.create({ data: { tenantId: demo.id, createdBy: demoOwner.id, ...e as any } });
+    expensesCreated++;
   }
-  console.log(`✅ ${expenses.length} expenses`);
+  console.log(`✅ ${expensesCreated} expenses`);
 
   // ── Inventory ─────────────────────────────────────────────────────────────────
   const inventory = [
@@ -523,7 +701,7 @@ async function main() {
     { name: 'Laundry Detergent',        category: 'CLEANING',      unit: 'kg',      currentStock: 25,  minimumStock: 10,  unitCost: 320  },
   ];
   for (const item of inventory) {
-    await prisma.inventoryItem.create({ data: { tenantId: demo.id, ...item as any } }).catch(() => {});
+    await prisma.inventoryItem.create({ data: { tenantId: demo.id, ...item as any } }).catch(softFail);
   }
   console.log(`✅ ${inventory.length} inventory items`);
 
@@ -533,7 +711,7 @@ async function main() {
   for (const name of tagNames) {
     const t = await prisma.guestTag.create({
       data: { tenantId: demo.id, name, color: name === 'VIP' ? '#gold' : '#3b82f6' },
-    }).catch(() => null);
+    }).catch(softFail);
     if (t) createdTags.push(t);
   }
 
@@ -554,7 +732,7 @@ async function main() {
       if (tag) {
         await prisma.guestTagRelation.create({
           data: { guestId: createdGuests[gtp.g].id, tagId: tag.id },
-        }).catch(() => {});
+        }).catch(softFail);
       }
     }
   }
@@ -570,7 +748,7 @@ async function main() {
         totalStays:    i < 4 ? Math.floor(Math.random() * 5) + 1 : 1,
         totalSpend:    [13500, 22500, 30000, 28500, 120000, 28500, 48000, 120000, 11400, 84000][i] ?? 10000,
       },
-    }).catch(() => {});
+    }).catch(softFail);
   }
   console.log('✅ CRM: guest tags + scores');
 
@@ -587,7 +765,7 @@ async function main() {
     { name: 'Kids Club',          category: 'ENTERTAINMENT', icon: '🎠' },
   ];
   for (const a of amenities) {
-    await prisma.amenity.create({ data: { tenantId: demo.id, ...a as any } }).catch(() => {});
+    await prisma.amenity.create({ data: { tenantId: demo.id, ...a as any } }).catch(softFail);
   }
   console.log('✅ Amenities');
 
@@ -618,7 +796,7 @@ async function main() {
           tier:          points >= 50000 ? 'PLATINUM' : points >= 15000 ? 'GOLD' : points >= 5000 ? 'SILVER' : 'BRONZE',
           lifetimePoints:points + Math.floor(points * 0.2),
         },
-      }).catch(() => {});
+      }).catch(softFail);
     }
   }
   console.log('✅ Loyalty program + accounts');
@@ -704,7 +882,7 @@ async function main() {
           status:     i < 4 ? 'delivered' : 'failed',
           sentAt:     i < 4 ? d(-7) : null,
         },
-      }).catch(() => {});
+      }).catch(softFail);
     }
   }
   console.log('✅ Marketing campaigns (sent, scheduled, draft)');
@@ -717,7 +895,7 @@ async function main() {
     { name: 'Feedback Request',       channel: 'sms',  message: '{resort_name}: প্রিয় {guest_name}, আমাদের সেবা কেমন লাগলো? আপনার মতামত আমাদের অনুপ্রেরণা।' },
   ];
   for (const t of templates) {
-    await prisma.messageTemplate.create({ data: { tenantId: demo.id, ...t as any } }).catch(() => {});
+    await prisma.messageTemplate.create({ data: { tenantId: demo.id, ...t as any } }).catch(softFail);
   }
   console.log('✅ Message templates');
 
@@ -736,37 +914,39 @@ async function main() {
         status:        'CONFIRMED' as any,
         notes:         'Corporate team-building event. Meeting room required on Day 1 and Day 2.',
       },
-    }).catch(() => {});
+    }).catch(softFail);
   }
   console.log('✅ Group booking');
 
   // ── Notifications ─────────────────────────────────────────────────────────────
   const notifData = [
-    { title: 'New Booking',         message: 'Ahmed Rahman booked Ocean Deluxe for 3 nights.',          type: 'BOOKING',     isRead: false },
-    { title: 'Payment Received',    message: 'Payment of ৳30,000 received from James Miller.',          type: 'PAYMENT',     isRead: false },
-    { title: 'Check-in Alert',      message: 'Rina Begum is due to check in to Room 101 today.',        type: 'CHECKIN',     isRead: true  },
-    { title: 'Support Ticket',      message: 'Guest in Villa V2 reported AC not cooling properly.',     type: 'MAINTENANCE', isRead: false },
-    { title: 'Low Inventory Alert', message: 'Mineral Water (500ml) stock is below minimum level.',     type: 'SYSTEM',      isRead: false },
-    { title: 'New Review',          message: 'Michael Chen left a 5-star review on Booking.com.',       type: 'REVIEW',      isRead: true  },
+    { title: 'New Booking',         body: 'Ahmed Rahman booked Ocean Deluxe for 3 nights.',          type: 'BOOKING',     isRead: false },
+    { title: 'Payment Received',    body: 'Payment of ৳30,000 received from James Miller.',          type: 'PAYMENT',     isRead: false },
+    { title: 'Check-in Alert',      body: 'Rina Begum is due to check in to Room 101 today.',        type: 'CHECKIN',     isRead: true  },
+    { title: 'Support Ticket',      body: 'Guest in Villa V2 reported AC not cooling properly.',     type: 'MAINTENANCE', isRead: false },
+    { title: 'Low Inventory Alert', body: 'Mineral Water (500ml) stock is below minimum level.',     type: 'SYSTEM',      isRead: false },
+    { title: 'New Review',          body: 'Michael Chen left a 5-star review on Booking.com.',       type: 'REVIEW',      isRead: true  },
   ];
+  let notifsCreated = 0;
   for (const n of notifData) {
     await prisma.notification.create({
       data: { tenantId: demo.id, userId: demoOwner.id, ...n as any, createdAt: d(-Math.floor(Math.random() * 3)) },
-    }).catch(() => {});
+    });
+    notifsCreated++;
   }
-  console.log('✅ Notifications');
+  console.log(`✅ ${notifsCreated} notifications`);
+
+  if (seedFailures.length > 0) {
+    console.warn(`\n⚠️  ${seedFailures.length} row(s) failed to insert:`);
+    for (const f of new Set(seedFailures)) console.warn('   •', f);
+  }
 
   console.log('\n🎉 Demo tenant fully seeded!');
-  console.log('   Tenant:  Coral Bay Resort (slug: demo)');
-  console.log('   Rooms:   10 (mix of available/occupied/cleaning)');
-  console.log('   Guests:  10 with profiles, tags, scores');
-  console.log('   Bookings: 18 (active, upcoming, past, cancelled)');
-  console.log('   Revenue: Payments + Invoices populated');
-  console.log('   Ops:     HK tasks, Maintenance, Support tickets');
-  console.log('   Food:    Orders + Menu items');
-  console.log('   Marketing: 3 campaigns + templates');
-  console.log('   CRM:     Tags, Scores, Loyalty program');
-  console.log('   Website: Content + Testimonials');
+  console.log(`   Tenant:   ${demo.name} (slug: demo)`);
+  console.log(`   Rooms:    ${createdRooms.length}`);
+  console.log(`   Guests:   ${createdGuests.length}`);
+  console.log(`   Bookings: ${createdBookings.length}`);
+  console.log('   Refresh daily so "today" stays today: pnpm seed:demo --refresh');
 }
 
 main()
