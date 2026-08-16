@@ -413,11 +413,25 @@ Subscription plan-এর সাথে বাঁধা নয় — theme আল
 
 | # | কাজ | আকার | কেন এই order |
 |---|---|---|---|
-| ১ | Theme-এর দাম + `ThemePurchase` + ownership enforce (`website.ts:78`) + offer | ছোট-মাঝারি | আয়ের তালা খোলে — এরপর প্রতি সপ্তাহের কাজ বিক্রিযোগ্য |
+| ১ | ✅ **শেষ** — Theme-এর দাম + `ThemePurchase` + ownership enforce + offer + bKash checkout + admin grant + owner picker UI | ছোট-মাঝারি | আয়ের তালা খোলে — এরপর প্রতি সপ্তাহের কাজ বিক্রিযোগ্য |
+| ৪ | ✅ **শেষ** — `/theme` skill → Tier 2 HTML | ছোট | সাপ্তাহিক template বানানো দ্রুত হবে |
 | ২ | Section-ভিত্তিক bg (রঙ/ছবি) + auto-contrast — `WebsiteContent.sectionStyles Json` | ছোট | Tenant-এর আসল value, চোখে দেখা যায় |
 | ৩ | Video section widget (YouTube/Vimeo embed) | ছোট | |
-| ৪ | `/theme` skill → Tier 2 HTML (Phase 5) | ছোট | সাপ্তাহিক template বানানো দ্রুত হবে |
 | ৫ | Live preview (customize করার সময় সাথে সাথে দেখা) | বড় | সবচেয়ে বড়, সবার শেষে |
+
+**ধাপ ৪ কেন ২-এর আগে করা হলো:** owner সপ্তাহে ১টা template বানাবেন, অথচ
+`/theme` skill তখনো পুরনো Tier 1 JSON বানাত — মানে সাপ্তাহিক কাজটাই আটকে ছিল।
+ধাপ ২/৩ একবারের ফিচার, ধাপ ৪ প্রতি সপ্তাহে সময় বাঁচায়। তাছাড়া template না
+থাকলে customize করার মতো কিছুই থাকে না।
+
+**ধাপ ৪-এ যা হলো (২০২৬-০৮-১৩):** `.claude/commands/theme.md` এখন contract-মাফিক
+এক-ফাইল `.html` বানায় — data token, required section id (`rooms`/`booking`),
+`data-rp-widget` mount point, নিষিদ্ধ তালিকা (JS নেই, motion শুধু CSS), আর
+filename→key নিয়ম সব skill-এ লেখা। ডিজাইন-মানের অংশ (৯টা প্রশ্ন, color theory,
+typography, CSS signature) অপরিবর্তিত। নতুন `themes-out/` ফোল্ডার — generated
+theme git-এ রাখা হয়, কারণ ওগুলোই বিক্রির পণ্য; DB-র কপি deployed state, backup নয়।
+আসল uploader দিয়ে যাচাই করা: নিয়ম-মানা template 201 (key/CSS extraction/দাম ঠিক),
+`<script>` ও required-id ছাড়া template 400।
 
 ## সিদ্ধান্ত ৩ — দাম: **$30 (৳3000)**, তবে সবসময় বদলানো যাবে
 
