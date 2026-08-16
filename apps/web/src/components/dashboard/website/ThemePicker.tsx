@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import {
   CheckCircle2, ExternalLink, Sparkles, Loader2,
-  X, Eye, Zap, Crown, Shield, Search,
+  X, Eye, Search, Lock, ShoppingCart,
 } from 'lucide-react';
-import { useAuthStore } from '@/store/auth';
+import { api } from '@/lib/api';
+import { toast } from '@/hooks/use-toast';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -16,9 +17,16 @@ interface Theme {
   description:  string;
   previewImage?: string;
   isPremium:    boolean;
-  requiredPlan: string;
   tags:         string[];
-  isDefault:    boolean;
+  /** Usable right now — bought, commissioned, or free. From the API. */
+  owned?:       boolean;
+  isFree?:      boolean;
+  /** Price to pay today, offer applied. */
+  priceUsd?:    number;
+  priceBdt?:    number;
+  /** Undiscounted price, shown struck through while an offer runs. */
+  listPriceUsd?: number;
+  onOffer?:     boolean;
 }
 
 interface ThemePickerProps {
@@ -27,38 +35,59 @@ interface ThemePickerProps {
   onSelect:     (key: string) => void;
 }
 
-/* ── Plan hierarchy ────────────────────────────────────────────────────────── */
-const PLAN_RANK: Record<string, number> = { FREE: 0, STARTER: 1, PROFESSIONAL: 2, ENTERPRISE: 3 };
-const PLAN_ICON: Record<string, React.ReactNode> = {
-  STARTER:      <Zap className="h-3 w-3" />,
-  PROFESSIONAL: <Crown className="h-3 w-3" />,
-  ENTERPRISE:   <Shield className="h-3 w-3" />,
-};
-const PLAN_LABEL: Record<string, string> = {
-  STARTER: 'Starter+', PROFESSIONAL: 'Pro+', ENTERPRISE: 'Enterprise',
-};
+/* ── Fallback static list ──────────────────────────────────────────────────── */
+// Only used if the themes request fails outright; these three have always been
+// free, so treating them as owned keeps the picker usable rather than showing
+// a wall of locks during an outage.
+const FALLBACK: Theme[] = [
+  { key: 'luxe',    name: 'Luxe Gold',      description: 'Elegant luxury design with gold accents',   isPremium: false, tags: ['Luxury', 'Gold Accents'], owned: true, isFree: true },
+  { key: 'minimal', name: 'Minimal Clean',  description: 'Clean modern design with focus on content', isPremium: false, tags: ['Clean', 'Modern'],        owned: true, isFree: true },
+  { key: 'coastal', name: 'Coastal Breeze', description: 'Ocean-inspired design for beach properties', isPremium: false, tags: ['Beach', 'Ocean'],         owned: true, isFree: true },
+];
 
-function canUsePlan(userPlan: string, required: string): boolean {
-  return (PLAN_RANK[userPlan] ?? 0) >= (PLAN_RANK[required] ?? 0);
+/** A theme is locked when it costs money and this resort has not bought it. */
+function isLockedTheme(t: Theme) {
+  return t.owned === false;
 }
 
-/* ── Fallback static list ──────────────────────────────────────────────────── */
-const FALLBACK: Theme[] = [
-  { key: 'luxe',    name: 'Luxe Gold',      description: 'Elegant luxury design with gold accents', isPremium: false, requiredPlan: 'STARTER', tags: ['Luxury', 'Gold Accents', 'Full-Screen Hero'], isDefault: true },
-  { key: 'minimal', name: 'Minimal Clean',  description: 'Clean modern design with focus on content', isPremium: false, requiredPlan: 'STARTER', tags: ['Clean', 'Modern', 'Content-First'], isDefault: false },
-  { key: 'coastal', name: 'Coastal Breeze', description: 'Ocean-inspired design for beach properties', isPremium: false, requiredPlan: 'STARTER', tags: ['Beach', 'Ocean', 'Wave Animations'], isDefault: false },
-];
+function priceLabel(t: Theme) {
+  const usd = t.priceUsd ?? 0;
+  const bdt = t.priceBdt ?? 0;
+  return bdt ? `৳${bdt.toLocaleString('en-BD')}` : `$${usd}`;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
 export function ThemePicker({ currentTheme, slug, onSelect }: ThemePickerProps) {
-  const { tenant } = useAuthStore();
-  const userPlan   = tenant?.plan ?? 'STARTER';
-
   const [themes,   setThemes]   = useState<Theme[]>(FALLBACK);
   const [loading,  setLoading]  = useState(true);
   const [search,   setSearch]   = useState('');
   const [filter,   setFilter]   = useState<'all' | 'free' | 'premium'>('all');
   const [preview,  setPreview]  = useState<Theme | null>(null);
+  const [buying,   setBuying]   = useState<string | null>(null);
+
+  /**
+   * Send the owner to bKash for a theme they don't own yet. The server decides
+   * the amount from the database — nothing about the price travels from here,
+   * so a tampered page cannot buy a $30 theme for one taka.
+   */
+  const buyTheme = async (theme: Theme) => {
+    setBuying(theme.key);
+    try {
+      const res = await api.post('/theme-purchases/checkout/bkash', { themeKey: theme.key });
+      const url = res.data?.data?.url;
+      if (url) { window.location.href = url; return; }
+      toast({ title: 'Could not start payment', description: 'Please try again.', variant: 'destructive' });
+    } catch (err: unknown) {
+      const e = err as { response?: { status?: number; data?: { error?: string } } };
+      toast({
+        title: e.response?.status === 503 ? 'Payments not set up yet' : 'Purchase failed',
+        description: e.response?.data?.error ?? 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setBuying(null);
+    }
+  };
 
   /* ── Fetch active themes from DB ─────────────────────────────────────────── */
   useEffect(() => {
@@ -76,18 +105,23 @@ export function ThemePicker({ currentTheme, slug, onSelect }: ThemePickerProps) 
 
   /* ── Filter & search ─────────────────────────────────────────────────────── */
   const filtered = themes.filter(t => {
+    const q = search.toLowerCase();
+    // `?? []` because a theme may legitimately carry no tags — before, this
+    // threw as soon as anyone typed in the search box.
     const matchSearch = !search ||
-      t.name.toLowerCase().includes(search.toLowerCase()) ||
-      t.tags.some(tag => tag.toLowerCase().includes(search.toLowerCase()));
+      t.name.toLowerCase().includes(q) ||
+      (t.tags ?? []).some(tag => tag.toLowerCase().includes(q));
+    // "free" and "premium" now mean what they cost, not which plan they need.
+    const paid = !(t.isFree ?? !t.isPremium);
     const matchFilter =
       filter === 'all'     ? true :
-      filter === 'free'    ? !t.isPremium :
-      filter === 'premium' ? t.isPremium : true;
+      filter === 'free'    ? !paid :
+      filter === 'premium' ? paid : true;
     return matchSearch && matchFilter;
   });
 
   /* ── Unlock check ────────────────────────────────────────────────────────── */
-  const isLocked = (theme: Theme) => !canUsePlan(userPlan, theme.requiredPlan);
+  const isLocked = (theme: Theme) => isLockedTheme(theme);
 
   /* ────────────────────────────────────────────────────────────────────────── */
   return (
@@ -181,25 +215,29 @@ export function ThemePicker({ currentTheme, slug, onSelect }: ThemePickerProps) 
                   )
                 }
 
-                {/* Hover overlay with Preview button */}
-                {!locked && (
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-200 flex items-center justify-center">
-                    <button
-                      onClick={e => { e.stopPropagation(); setPreview(theme); }}
-                      className="flex items-center gap-2 bg-white/90 dark:bg-gray-900/90 text-gray-900 dark:text-white text-xs font-semibold px-4 py-2 rounded-full shadow-lg
-                                 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-2 group-hover:translate-y-0 hover:bg-white dark:hover:bg-gray-800">
-                      <Eye className="h-3.5 w-3.5" /> Preview
-                    </button>
-                  </div>
-                )}
+                {/* Hover overlay with Preview button — offered for locked themes
+                    too: nobody buys a design they were not allowed to look at. */}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-200 flex items-center justify-center">
+                  <button
+                    onClick={e => { e.stopPropagation(); setPreview(theme); }}
+                    className="flex items-center gap-2 bg-white/90 dark:bg-gray-900/90 text-gray-900 dark:text-white text-xs font-semibold px-4 py-2 rounded-full shadow-lg
+                               opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-2 group-hover:translate-y-0 hover:bg-white dark:hover:bg-gray-800">
+                    <Eye className="h-3.5 w-3.5" /> Preview
+                  </button>
+                </div>
 
-                {/* Lock overlay */}
+                {/* Price tag on themes this resort has not bought */}
                 {locked && (
-                  <div className="absolute inset-0 bg-black/30 flex flex-col items-center justify-center gap-2">
-                    <div className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-black/60 text-white`}>
-                      {PLAN_ICON[theme.requiredPlan]}
-                      Requires {PLAN_LABEL[theme.requiredPlan]}
-                    </div>
+                  <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
+                    <Lock className="h-3 w-3" />
+                    {theme.onOffer && theme.listPriceUsd ? (
+                      <>
+                        <span className="text-white/60 line-through">${theme.listPriceUsd}</span>
+                        <span className="text-amber-300">{priceLabel(theme)}</span>
+                      </>
+                    ) : (
+                      priceLabel(theme)
+                    )}
                   </div>
                 )}
 
@@ -222,12 +260,19 @@ export function ThemePicker({ currentTheme, slug, onSelect }: ThemePickerProps) 
               <div className="p-4">
                 <div className="flex items-start justify-between mb-1">
                   <h4 className="font-bold text-gray-900 dark:text-white text-sm">{theme.name}</h4>
-                  {!theme.isPremium
-                    ? <span className="text-xs font-medium text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-400 px-2 py-0.5 rounded-full">Free</span>
-                    : <span className="text-xs font-medium text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400 px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <Sparkles className="h-3 w-3" /> Premium
-                      </span>
-                  }
+                  {theme.isFree ?? !theme.isPremium ? (
+                    <span className="text-xs font-medium text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-400 px-2 py-0.5 rounded-full">Free</span>
+                  ) : locked ? (
+                    <span className="text-xs font-medium text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      {priceLabel(theme)}
+                    </span>
+                  ) : (
+                    // Paid, and already theirs — say so plainly, so nobody
+                    // wonders whether they are about to be charged again.
+                    <span className="text-xs font-medium text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-400 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3" /> Owned
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed mb-3">{theme.description}</p>
 
@@ -250,11 +295,17 @@ export function ThemePicker({ currentTheme, slug, onSelect }: ThemePickerProps) 
                     <Eye className="h-3.5 w-3.5" /> Preview
                   </button>
 
-                  {/* Select / Locked */}
+                  {/* Buy / Select / Selected */}
                   {locked ? (
-                    <div className={`flex-1 flex items-center justify-center gap-1 text-xs font-semibold rounded-lg py-1.5 ${PLAN_ICON[theme.requiredPlan] ? 'text-amber-600 bg-amber-50 dark:bg-amber-900/20' : ''}`}>
-                      {PLAN_ICON[theme.requiredPlan]} {PLAN_LABEL[theme.requiredPlan]}
-                    </div>
+                    <button
+                      onClick={e => { e.stopPropagation(); buyTheme(theme); }}
+                      disabled={buying === theme.key}
+                      className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-1.5 bg-amber-500 text-white
+                                 hover:bg-amber-600 disabled:opacity-60 transition-colors">
+                      {buying === theme.key
+                        ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Starting…</>
+                        : <><ShoppingCart className="h-3.5 w-3.5" /> Buy {priceLabel(theme)}</>}
+                    </button>
                   ) : isSelected ? (
                     <div className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-1.5 bg-resort-600 text-white">
                       <CheckCircle2 className="h-3.5 w-3.5" /> Selected
@@ -296,9 +347,10 @@ export function ThemePicker({ currentTheme, slug, onSelect }: ThemePickerProps) 
       {preview && (
         <ThemePreviewModal theme={preview} slug={slug} onClose={() => setPreview(null)}
           onSelect={() => { if (!isLocked(preview)) { onSelect(preview.key); setPreview(null); } }}
+          onBuy={() => buyTheme(preview)}
+          buying={buying === preview.key}
           isSelected={currentTheme === preview.key}
           locked={isLocked(preview)}
-          userPlan={userPlan}
         />
       )}
     </div>
@@ -307,10 +359,11 @@ export function ThemePicker({ currentTheme, slug, onSelect }: ThemePickerProps) 
 
 /* ── Preview Modal Component ───────────────────────────────────────────────── */
 function ThemePreviewModal({
-  theme, slug, onClose, onSelect, isSelected, locked, userPlan,
+  theme, slug, onClose, onSelect, onBuy, buying, isSelected, locked,
 }: {
   theme: Theme; slug: string; onClose: () => void;
-  onSelect: () => void; isSelected: boolean; locked: boolean; userPlan: string;
+  onSelect: () => void; onBuy: () => void; buying: boolean;
+  isSelected: boolean; locked: boolean;
 }) {
   const [iframeLoading, setIframeLoading] = useState(true);
   const previewUrl = `/${slug}?preview=${theme.key}`;
@@ -353,11 +406,14 @@ function ThemePreviewModal({
               <ExternalLink className="h-3.5 w-3.5" /> Open in new tab
             </a>
 
-            {/* Select / Locked */}
+            {/* Buy / Select / Active */}
             {locked ? (
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 bg-amber-500/10 px-4 py-2 rounded-lg">
-                {PLAN_ICON[theme.requiredPlan]} Requires {PLAN_LABEL[theme.requiredPlan]}
-              </div>
+              <button onClick={onBuy} disabled={buying}
+                className="flex items-center gap-1.5 text-xs font-semibold text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-60 px-4 py-2 rounded-lg transition-colors">
+                {buying
+                  ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Starting…</>
+                  : <><ShoppingCart className="h-3.5 w-3.5" /> Buy {priceLabel(theme)}</>}
+              </button>
             ) : isSelected ? (
               <div className="flex items-center gap-1.5 text-xs font-semibold text-white bg-resort-600 px-4 py-2 rounded-lg">
                 <CheckCircle2 className="h-3.5 w-3.5" /> Currently Active
@@ -395,16 +451,16 @@ function ThemePreviewModal({
           />
         </div>
 
-        {/* Upgrade prompt for locked themes */}
+        {/* Purchase prompt for themes this resort does not own yet */}
         {locked && (
           <div className="flex items-center justify-between px-5 py-3 bg-amber-950/80 border-t border-amber-800 flex-shrink-0">
             <p className="text-sm text-amber-300">
-              Upgrade to <strong>{PLAN_LABEL[theme.requiredPlan]}</strong> to use this theme.
+              Buy <strong>{theme.name}</strong> once for <strong>{priceLabel(theme)}</strong> and it stays yours — no renewal.
             </p>
-            <a href="/dashboard/billing"
-              className="text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 px-4 py-2 rounded-lg transition-colors">
-              Upgrade Plan →
-            </a>
+            <button onClick={onBuy} disabled={buying}
+              className="text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 disabled:opacity-60 px-4 py-2 rounded-lg transition-colors">
+              {buying ? 'Starting…' : 'Buy with bKash →'}
+            </button>
           </div>
         )}
       </div>

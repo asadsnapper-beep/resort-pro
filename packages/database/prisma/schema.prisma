@@ -513,6 +513,7 @@ model Tenant {
   corporateInvoices      CorporateInvoice[]
   designRequests         DesignRequest[]
   exclusiveThemes        Theme[]
+  themePurchases         ThemePurchase[]
   deletionRequests       TenantDeletionRequest[]
 
   @@map("tenants")
@@ -2781,11 +2782,67 @@ model Theme {
   exclusiveToTenantId String?
   exclusiveToTenant   Tenant? @relation(fields: [exclusiveToTenantId], references: [id], onDelete: SetNull)
 
+  // ── One-time sale price (see plan/theme-studio-and-design-service.md) ──────
+  // Price lives on the row, NOT in packages/types/src/plans.ts: there are only
+  // 3 plans, but themes grow ~1 per week — 50 prices in code would mean a
+  // deploy every time one changed, which is exactly what the owner asked to
+  // avoid. USD and BDT are both stored explicitly rather than converted at
+  // runtime, so a BD owner's price never moves with the exchange rate — the
+  // same rule PLAN_PRICING follows, at the fixed ৳100 = $1 rate.
+  // priceUsd 0 = free theme.
+  priceUsd Decimal @default(30) @db.Decimal(10, 2)
+  priceBdt Decimal @default(3000) @db.Decimal(10, 2)
+
+  /// Temporary discount. Null = no offer running. Once offerEndsAt has passed
+  /// the full price applies again (null offerEndsAt = runs until cleared).
+  offerPriceUsd Decimal?  @db.Decimal(10, 2)
+  offerPriceBdt Decimal?  @db.Decimal(10, 2)
+  offerEndsAt   DateTime?
+
+  purchases ThemePurchase[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
   @@index([exclusiveToTenantId])
   @@map("themes")
+}
+
+/// A resort's one-time purchase of a paid theme.
+///
+/// Owner-confirmed policy (2026-08-13): buying is permanent and per-resort —
+/// there is no renewal, no expiry, and the theme survives a lapsed
+/// subscription, because they paid for it. So a row here is never deleted and
+/// carries no validity window: ownership is simply "does a row exist for this
+/// (tenant, theme) pair?".
+model ThemePurchase {
+  id       String @id @default(uuid())
+  tenantId String
+  themeKey String
+
+  /// What was actually charged, captured at purchase time so that later
+  /// editing the theme's price never rewrites history. 0 = granted free, in
+  /// which case `note` says why (e.g. grandfathered).
+  amountPaid Decimal @db.Decimal(10, 2)
+  currency   String  @default("BDT") // "BDT" | "USD"
+
+  /// Payment trail. Null on rows we granted rather than sold.
+  paymentMethod String? // "bkash" | "sslcommerz" | "stripe" | "manual"
+  paymentRef    String?
+  note          String? // "grandfathered" | "gifted" | free-text admin note
+
+  purchasedAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  // Restrict, not Cascade: a theme somebody paid for must not be deletable in
+  // a way that silently erases the sale record and breaks their live site.
+  theme  Theme  @relation(fields: [themeKey], references: [key], onDelete: Restrict)
+
+  /// One purchase per resort per theme — buying twice is always a mistake.
+  @@unique([tenantId, themeKey])
+  @@index([tenantId])
+  @@index([themeKey])
+  @@map("theme_purchases")
 }
 
 // ─── SMS & WhatsApp Marketing ─────────────────────────────────────────────────
