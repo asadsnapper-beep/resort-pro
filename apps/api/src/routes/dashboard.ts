@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { requireAuth } from '../middleware/auth';
 import { ok } from '../utils/response';
+import { tenantTodayRange } from '../utils/tenant-day';
 import dayjs from 'dayjs';
 
 export async function dashboardRoutes(app: FastifyInstance) {
@@ -13,8 +14,11 @@ export async function dashboardRoutes(app: FastifyInstance) {
     preHandler: requireAuth,
     handler: async (request) => {
       const { db } = request;
-      const today = dayjs().startOf('day').toDate();
-      const tomorrow = dayjs().add(1, 'day').startOf('day').toDate();
+      // checkIn/checkOut are `@db.Date`, so the day has to be expressed as a
+      // calendar date rather than a local-midnight timestamp — see
+      // utils/tenant-day.ts. With the old `dayjs().startOf('day')` bounds these
+      // two counts returned 0 every day for any resort east of UTC.
+      const todayRange = tenantTodayRange();
       const monthStart = dayjs().startOf('month').toDate();
       const lastMonthStart = dayjs().subtract(1, 'month').startOf('month').toDate();
       const lastMonthEnd = dayjs().subtract(1, 'month').endOf('month').toDate();
@@ -37,8 +41,8 @@ export async function dashboardRoutes(app: FastifyInstance) {
         db.room.count({ where: { isActive: true } }),
         db.room.count({ where: { status: 'AVAILABLE', isActive: true } }),
         db.room.count({ where: { status: 'OCCUPIED', isActive: true } }),
-        db.booking.count({ where: { checkIn: { gte: today, lt: tomorrow }, status: { in: ['CONFIRMED', 'PENDING'] } } }),
-        db.booking.count({ where: { checkOut: { gte: today, lt: tomorrow }, status: 'CHECKED_IN' } }),
+        db.booking.count({ where: { checkIn: todayRange, status: { in: ['CONFIRMED', 'PENDING'] } } }),
+        db.booking.count({ where: { checkOut: todayRange, status: 'CHECKED_IN' } }),
         db.booking.count({ where: { status: { in: ['CONFIRMED', 'CHECKED_IN'] } } }),
         db.supportTicket.count({ where: { status: { in: ['OPEN', 'IN_PROGRESS'] } } }),
         db.payment.aggregate({ where: { processedAt: { gte: monthStart }, status: 'PAID' }, _sum: { amount: true } }),
@@ -52,7 +56,9 @@ export async function dashboardRoutes(app: FastifyInstance) {
         db.inventoryItem.findMany({
           where: {},
         }),
-        db.housekeepingTask.count({ where: { status: { in: ['PENDING', 'IN_PROGRESS'] }, scheduledDate: { lte: tomorrow } } }),
+        // scheduledDate is `@db.Date` as well, so this compares against the end
+        // of the resort's day rather than a local-midnight timestamp.
+        db.housekeepingTask.count({ where: { status: { in: ['PENDING', 'IN_PROGRESS'] }, scheduledDate: { lt: todayRange.lt } } }),
         db.maintenanceTicket.count({ where: { status: { not: 'RESOLVED' } } }),
       ]);
 
