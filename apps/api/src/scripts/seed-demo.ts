@@ -8,10 +8,111 @@ import {
   BookingStatus, PaymentMethod, HousekeepingStatus, HousekeepingType,
   MaintenanceStatus, MaintenancePriority, MaintenanceIssueType,
   TicketStatus, TicketPriority, TicketCategory,
+  VenueType, VenueBookingStatus, EventType,
+  VehicleType, VehicleAvailability, RentalStatus,
 } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
+
+// ── Demo imagery ──────────────────────────────────────────────────────────────
+// Every image slot in the demo gets filled. A tour where the rooms, the
+// gallery, the menu and the public site are grey placeholder boxes reads as an
+// unfinished product no matter how good the numbers next to them are.
+//
+// Unsplash, with the same photo ids the theme-preview page already uses, so
+// the demo and the theme previews show one coherent resort. Their CDN is
+// built for hotlinking and next.config.js already allows any https host, so
+// no upload pipeline or asset checked into the repo is needed for this.
+// `w=` is sized per slot to keep the demo quick to load.
+const IMG = {
+  hero:  'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1600&q=80',
+  about: 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=1200&q=80',
+  cover: 'https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?w=1600&q=80',
+  gallery: [
+    'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=1000&q=80',
+    'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=1000&q=80',
+    'https://images.unsplash.com/photo-1455587734955-081b22074882?w=1000&q=80',
+    'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=1000&q=80',
+    'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=1000&q=80',
+    'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1000&q=80',
+    'https://images.unsplash.com/photo-1540541338287-41700207dee6?w=1000&q=80',
+    'https://images.unsplash.com/photo-1584132967334-10e028bd69f7?w=1000&q=80',
+  ],
+  // Two photos per room so the gallery/carousel on a room card has something
+  // to page through rather than a single static frame.
+  rooms: {
+    standard: ['https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=1000&q=80', 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1000&q=80'],
+    deluxe:   ['https://images.unsplash.com/photo-1590490360182-c33d57733427?w=1000&q=80', 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=1000&q=80'],
+    suite:    ['https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=1000&q=80', 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=1000&q=80'],
+    villa:    ['https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=1000&q=80', 'https://images.unsplash.com/photo-1615880484746-a134be9a6ecf?w=1000&q=80'],
+    bungalow: ['https://images.unsplash.com/photo-1602002418082-a4443e081dd1?w=1000&q=80', 'https://images.unsplash.com/photo-1444201983204-c43cbd584d93?w=1000&q=80'],
+  },
+  food: {
+    breakfast: 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=600&q=80',
+    lunch:     'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80',
+    dinner:    'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&q=80',
+    seafood:   'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=600&q=80',
+    dessert:   'https://images.unsplash.com/photo-1551024506-0bccd828d307?w=600&q=80',
+    beverage:  'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=600&q=80',
+  },
+  packages: [
+    'https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=1000&q=80',
+    'https://images.unsplash.com/photo-1530549387789-4c1017266635?w=1000&q=80',
+    'https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1000&q=80',
+    'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=1000&q=80',
+  ],
+  venues: {
+    conference: ['https://images.unsplash.com/photo-1517502884422-41eaead166d4?w=1000&q=80', 'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=1000&q=80'],
+    banquet:    ['https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?w=1000&q=80', 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?w=1000&q=80'],
+    lawn:       ['https://images.unsplash.com/photo-1523438885200-e635ba2c371e?w=1000&q=80', 'https://images.unsplash.com/photo-1478146896981-b80fe463b330?w=1000&q=80'],
+  },
+  vehicles: {
+    car:     ['https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=1000&q=80'],
+    microbus:['https://images.unsplash.com/photo-1464219789935-c2d9d9aba644?w=1000&q=80'],
+    bike:    ['https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=1000&q=80'],
+    scooter: ['https://images.unsplash.com/photo-1571068316344-75bc76f77890?w=1000&q=80'],
+    cycle:   ['https://images.unsplash.com/photo-1485965120184-e220f721d03e?w=1000&q=80'],
+  },
+  // Portraits for the team. The Team page, the notification feed and every
+  // "assigned to" chip render an avatar, so eight initial-circles is the most
+  // visible empty state left in the dashboard.
+  staff: {
+    owner:        'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200&q=80',
+    manager:      'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=200&q=80',
+    receptionist: 'https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?w=200&q=80',
+    housekeeper:  'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200&q=80',
+    shareholder:  'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=200&q=80',
+    marketer:     'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=200&q=80',
+    developer:    'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&q=80',
+    chef:         'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=200&q=80',
+  },
+  // Portraits for guest testimonials on the public site.
+  faces: [
+    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80',
+    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80',
+    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&q=80',
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&q=80',
+    'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&q=80',
+  ],
+};
+
+const roomImagesFor = (type: RoomType): string[] => {
+  switch (type) {
+    case RoomType.DELUXE:   return IMG.rooms.deluxe;
+    case RoomType.SUITE:    return IMG.rooms.suite;
+    case RoomType.VILLA:    return IMG.rooms.villa;
+    case RoomType.BUNGALOW: return IMG.rooms.bungalow;
+    default:                return IMG.rooms.standard;
+  }
+};
+
+// The navbar renders the logo as `h-9 w-auto object-contain`, so a cropped
+// photograph would sit there as a stray rectangle. An inline SVG wordmark is a
+// real logo shape, needs no hosting, and cannot fail to load.
+const DEMO_LOGO = 'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20232%2048%22%3E%3Cpath%20d%3D%22M8%2034c6-9%2012-9%2018%200s12%209%2018%200%22%20fill%3D%22none%22%20stroke%3D%22%23d4a853%22%20stroke-width%3D%223%22%20stroke-linecap%3D%22round%22%2F%3E%3Ccircle%20cx%3D%2226%22%20cy%3D%2215%22%20r%3D%226%22%20fill%3D%22%231a6b5e%22%2F%3E%3Ctext%20x%3D%2256%22%20y%3D%2224%22%20font-family%3D%22Georgia%2Cserif%22%20font-size%3D%2219%22%20font-weight%3D%22700%22%20fill%3D%22%231a6b5e%22%20letter-spacing%3D%221.5%22%3ECORAL%20BAY%3C%2Ftext%3E%3Ctext%20x%3D%2257%22%20y%3D%2238%22%20font-family%3D%22Helvetica%2CArial%2Csans-serif%22%20font-size%3D%229%22%20fill%3D%22%238a8375%22%20letter-spacing%3D%224.2%22%3ERESORT%3C%2Ftext%3E%3C%2Fsvg%3E';
+const IMG_COVER = IMG.cover;
+const IMG_GALLERY = IMG.gallery;
 
 const d = (offsetDays: number, h = 12) => {
   const date = new Date();
@@ -108,13 +209,21 @@ async function main() {
   // ── Demo Tenant ─────────────────────────────────────────────────────────────
   const demo = await prisma.tenant.upsert({
     where: { slug: 'demo' },
-    update: { isDemo: true, plan: 'PROFESSIONAL', planStatus: 'active' },
+    update: {
+      isDemo: true, plan: 'PROFESSIONAL', planStatus: 'active',
+      logoUrl: DEMO_LOGO, coverImageUrl: IMG_COVER, galleryImages: IMG_GALLERY,
+    },
     create: {
       name: 'Coral Bay Resort',
       slug: 'demo',
       plan: 'PROFESSIONAL',
       planStatus: 'active',
       isDemo: true,
+      // The discovery page (stay.resortpro.site) renders a card per resort;
+      // without a cover the demo shows up as the one grey tile in the grid.
+      logoUrl: DEMO_LOGO,
+      coverImageUrl: IMG_COVER,
+      galleryImages: IMG_GALLERY,
       phone: '+880-1700-000000',
       email: 'info@coralbay.demo',
       address: "1 Ocean Drive, Cox's Bazar, Bangladesh",
@@ -136,50 +245,50 @@ async function main() {
 
   const demoOwner = await prisma.user.upsert({
     where: { tenantId_email: { tenantId: demo.id, email: 'demo@resortpro.site' } },
-    update: {},
-    create: { tenantId: demo.id, email: 'demo@resortpro.site', passwordHash, firstName: 'Demo', lastName: 'User', role: UserRole.OWNER },
+    update: { avatarUrl: IMG.staff.owner },
+    create: { tenantId: demo.id, email: 'demo@resortpro.site', passwordHash, avatarUrl: IMG.staff.owner, firstName: 'Demo', lastName: 'User', role: UserRole.OWNER },
   });
 
   const demoManager = await prisma.user.upsert({
     where: { tenantId_email: { tenantId: demo.id, email: 'manager@coralbay.demo' } },
-    update: {},
-    create: { tenantId: demo.id, email: 'manager@coralbay.demo', passwordHash, firstName: 'Nasrin', lastName: 'Sultana', role: UserRole.MANAGER },
+    update: { avatarUrl: IMG.staff.manager },
+    create: { tenantId: demo.id, email: 'manager@coralbay.demo', passwordHash, avatarUrl: IMG.staff.manager, firstName: 'Nasrin', lastName: 'Sultana', role: UserRole.MANAGER },
   });
 
   const demoStaff1 = await prisma.user.upsert({
     where: { tenantId_email: { tenantId: demo.id, email: 'reception@coralbay.demo' } },
-    update: {},
-    create: { tenantId: demo.id, email: 'reception@coralbay.demo', passwordHash, firstName: 'Rubel', lastName: 'Mia', role: UserRole.RECEPTIONIST },
+    update: { avatarUrl: IMG.staff.receptionist },
+    create: { tenantId: demo.id, email: 'reception@coralbay.demo', passwordHash, avatarUrl: IMG.staff.receptionist, firstName: 'Rubel', lastName: 'Mia', role: UserRole.RECEPTIONIST },
   });
 
   const demoStaff2 = await prisma.user.upsert({
     where: { tenantId_email: { tenantId: demo.id, email: 'hk@coralbay.demo' } },
-    update: {},
-    create: { tenantId: demo.id, email: 'hk@coralbay.demo', passwordHash, firstName: 'Rina', lastName: 'Akter', role: UserRole.STAFF },
+    update: { avatarUrl: IMG.staff.housekeeper },
+    create: { tenantId: demo.id, email: 'hk@coralbay.demo', passwordHash, avatarUrl: IMG.staff.housekeeper, firstName: 'Rina', lastName: 'Akter', role: UserRole.STAFF },
   });
 
   await prisma.user.upsert({
     where: { tenantId_email: { tenantId: demo.id, email: 'partner@coralbay.demo' } },
-    update: {},
-    create: { tenantId: demo.id, email: 'partner@coralbay.demo', passwordHash, firstName: 'Rafiq', lastName: 'Ahmed', role: UserRole.SHAREHOLDER },
+    update: { avatarUrl: IMG.staff.shareholder },
+    create: { tenantId: demo.id, email: 'partner@coralbay.demo', passwordHash, avatarUrl: IMG.staff.shareholder, firstName: 'Rafiq', lastName: 'Ahmed', role: UserRole.SHAREHOLDER },
   });
 
   await prisma.user.upsert({
     where: { tenantId_email: { tenantId: demo.id, email: 'marketer@coralbay.demo' } },
-    update: {},
-    create: { tenantId: demo.id, email: 'marketer@coralbay.demo', passwordHash, firstName: 'Mitu', lastName: 'Islam', role: UserRole.MARKETER },
+    update: { avatarUrl: IMG.staff.marketer },
+    create: { tenantId: demo.id, email: 'marketer@coralbay.demo', passwordHash, avatarUrl: IMG.staff.marketer, firstName: 'Mitu', lastName: 'Islam', role: UserRole.MARKETER },
   });
 
   await prisma.user.upsert({
     where: { tenantId_email: { tenantId: demo.id, email: 'dev@coralbay.demo' } },
-    update: {},
-    create: { tenantId: demo.id, email: 'dev@coralbay.demo', passwordHash, firstName: 'Shanto', lastName: 'Das', role: UserRole.DEVELOPER },
+    update: { avatarUrl: IMG.staff.developer },
+    create: { tenantId: demo.id, email: 'dev@coralbay.demo', passwordHash, avatarUrl: IMG.staff.developer, firstName: 'Shanto', lastName: 'Das', role: UserRole.DEVELOPER },
   });
 
   await prisma.user.upsert({
     where: { tenantId_email: { tenantId: demo.id, email: 'chef@coralbay.demo' } },
-    update: {},
-    create: { tenantId: demo.id, email: 'chef@coralbay.demo', passwordHash, firstName: 'Karim', lastName: 'Molla', role: UserRole.CHEF },
+    update: { avatarUrl: IMG.staff.chef },
+    create: { tenantId: demo.id, email: 'chef@coralbay.demo', passwordHash, avatarUrl: IMG.staff.chef, firstName: 'Karim', lastName: 'Molla', role: UserRole.CHEF },
   });
 
   console.log('✅ Users (owner, manager, receptionist, staff, partner, marketer, developer, chef)');
@@ -197,6 +306,7 @@ async function main() {
   // worth running. Eight of ten sold, one being turned over, one free reads as a
   // strong week — a fuller board would look staged, an emptier one dead.
   // The eight OCCUPIED rooms match the eight CHECKED_IN bookings below.
+
   const roomsData = [
     { number: '101', name: 'Sea View Standard',   type: RoomType.STANDARD, floor: 1, maxOccupancy: 2, basePrice: 4500,  status: RoomStatus.OCCUPIED  },
     { number: '102', name: 'Sea View Standard',   type: RoomType.STANDARD, floor: 1, maxOccupancy: 2, basePrice: 4500,  status: RoomStatus.OCCUPIED  },
@@ -214,8 +324,10 @@ async function main() {
   for (const room of roomsData) {
     const r = await prisma.room.upsert({
       where: { tenantId_number: { tenantId: demo.id, number: room.number } },
-      update: { status: room.status },
-      create: { tenantId: demo.id, ...room, amenities: ['WiFi', 'AC', 'Smart TV', 'Mini Bar'], images: [] },
+      // Photos are pushed on update too: an already-seeded demo predates this
+      // and would otherwise keep showing empty room cards forever.
+      update: { status: room.status, images: roomImagesFor(room.type) },
+      create: { tenantId: demo.id, ...room, amenities: ['WiFi', 'AC', 'Smart TV', 'Mini Bar'], images: roomImagesFor(room.type) },
     });
     createdRooms.push(r);
   }
@@ -247,10 +359,117 @@ async function main() {
     { name: 'Business Stay', description: 'For the corporate traveler — fast WiFi, meeting room access, and express laundry.', price: 6000, isActive: true, inclusions: ['Meeting Room (2hrs)', 'Express Laundry', 'Airport Transfer', 'Daily Breakfast', 'High-Speed WiFi'] },
     { name: 'Honeymoon Bliss', description: 'Start your new journey in paradise — champagne, spa, and a private beach picnic.', price: 22000, isActive: true, inclusions: ['Champagne on Arrival', 'Private Beach Picnic', 'Couple Spa (90 min)', 'Honeymoon Suite Upgrade', 'Professional Photo Session'] },
   ];
-  for (const pkg of packages) {
-    await prisma.package.create({ data: { tenantId: demo.id, ...pkg } }).catch(softFail);
+  for (const [i, pkg] of packages.entries()) {
+    await prisma.package.create({
+      data: { tenantId: demo.id, ...pkg, imageUrl: IMG.packages[i % IMG.packages.length] },
+    }).catch(softFail);
   }
   console.log('✅ Packages');
+
+  // ── Venues + event bookings ─────────────────────────────────────────────────
+  // Conference room and banquet hall were the two things named as "what a guest
+  // needs to see" for the public site, and until now the module was empty in the
+  // demo — so the Venues page and any theme's venue widget rendered nothing.
+  const venuesData = [
+    {
+      name: 'Coral Conference Hall', type: VenueType.INDOOR, capacity: 120,
+      description: 'Sea-facing hall with projector, PA system and breakout corner — the corporate offsite room.',
+      photos: IMG.venues.conference,
+      amenities: ['Projector + Screen', 'PA System', 'Whiteboard', 'AC', 'High-Speed WiFi', 'Tea/Coffee Station'],
+      halfDayRate: 18000, fullDayRate: 30000, hourlyRate: 4000, overtimeRate: 5000,
+    },
+    {
+      name: 'Pearl Banquet Hall', type: VenueType.INDOOR, capacity: 300,
+      description: 'Chandelier-lit banquet hall for weddings and receptions, with stage and bridal room.',
+      photos: IMG.venues.banquet,
+      amenities: ['Stage', 'Bridal Room', 'In-house Catering', 'Sound System', 'Valet Parking'],
+      halfDayRate: 45000, fullDayRate: 80000, hourlyRate: 12000, overtimeRate: 15000,
+    },
+    {
+      name: 'Sunset Beach Lawn', type: VenueType.OUTDOOR, capacity: 400,
+      description: 'Open lawn on the sand — sunset ceremonies, mehendi nights and corporate barbecues.',
+      photos: IMG.venues.lawn,
+      amenities: ['Open Air', 'Fairy Lighting', 'BBQ Setup', 'Backup Generator', 'Beach Access'],
+      halfDayRate: 35000, fullDayRate: 60000, hourlyRate: 9000, overtimeRate: 12000,
+    },
+  ];
+
+  const createdVenues: { id: string; name: string }[] = [];
+  for (const [i, v] of venuesData.entries()) {
+    const venue = await prisma.venue.create({
+      data: { tenantId: demo.id, ...v, sortOrder: i },
+    }).catch(softFail);
+    if (venue) createdVenues.push({ id: venue.id, name: venue.name });
+  }
+
+  // Events span last month → next month so the calendar has history, today and
+  // pipeline rather than one lonely marker.
+  const venueBookingsData = [
+    { venue: 0, clientName: 'Beximco Pharma — Sales Offsite', clientPhone: '+8801711002200', eventType: EventType.CORPORATE, date: monthDay(1, 12), startTime: '09:00', endTime: '17:00', guestCount: 95,  baseAmount: 30000, addonsAmount: 22000, paidAmount: 52000, addons: { catering: 19000, stationery: 3000 }, status: VenueBookingStatus.CONFIRMED },
+    { venue: 1, clientName: 'Tanjina & Rakib Wedding',        clientPhone: '+8801811334455', eventType: EventType.WEDDING,   date: monthDay(1, 22), startTime: '17:00', endTime: '23:00', guestCount: 280, baseAmount: 80000, addonsAmount: 145000, paidAmount: 225000, addons: { catering: 120000, decoration: 25000 }, status: VenueBookingStatus.CONFIRMED },
+    { venue: 2, clientName: 'Coral Bay Staff Iftar',           clientPhone: '+8801911556677', eventType: EventType.SOCIAL,    date: monthDay(0, 6),  startTime: '17:30', endTime: '20:30', guestCount: 60,  baseAmount: 35000, addonsAmount: 18000, paidAmount: 53000, addons: { catering: 18000 }, status: VenueBookingStatus.CONFIRMED },
+    { venue: 0, clientName: 'Grameenphone Regional Training',  clientPhone: '+8801611778899', eventType: EventType.CORPORATE, date: monthDay(0, 15), startTime: '10:00', endTime: '16:00', guestCount: 70,  baseAmount: 30000, addonsAmount: 12000, paidAmount: 21000, addons: { catering: 12000 }, status: VenueBookingStatus.CONFIRMED },
+    { venue: 1, clientName: 'Sadia 30th Birthday',             clientPhone: '+8801511889900', eventType: EventType.BIRTHDAY,  date: monthDay(0, 24), startTime: '19:00', endTime: '23:00', guestCount: 120, baseAmount: 80000, addonsAmount: 40000, paidAmount: 36000, addons: { catering: 32000, decoration: 8000 }, status: VenueBookingStatus.CONFIRMED },
+    { venue: 2, clientName: 'Ahmed–Nawal Reception',           clientPhone: '+8801311223344', eventType: EventType.WEDDING,   date: monthDay(-1, 8), startTime: '18:00', endTime: '23:30', guestCount: 350, baseAmount: 60000, addonsAmount: 165000, paidAmount: 60000, addons: { catering: 140000, decoration: 25000 }, status: VenueBookingStatus.CONFIRMED },
+    { venue: 0, clientName: 'BRAC Bank Quarterly Review',      clientPhone: '+8801411556600', eventType: EventType.CORPORATE, date: monthDay(-1, 19), startTime: '09:30', endTime: '13:30', guestCount: 45, baseAmount: 18000, addonsAmount: 6000, paidAmount: 0, addons: { catering: 6000 }, status: VenueBookingStatus.TENTATIVE },
+  ];
+
+  for (const vb of venueBookingsData) {
+    const venue = createdVenues[vb.venue];
+    if (!venue) continue;
+    const { venue: _slot, ...rest } = vb;
+    await prisma.venueBooking.create({
+      data: {
+        tenantId: demo.id,
+        venueId: venue.id,
+        ...rest,
+        totalAmount: vb.baseAmount + vb.addonsAmount,
+        createdBy: demoOwner.id,
+      },
+    }).catch(softFail);
+  }
+  console.log(`✅ Venues + ${venueBookingsData.length} event bookings`);
+
+  // ── Vehicles + rentals ──────────────────────────────────────────────────────
+  // The bike rental was the other module called out for the public site. One of
+  // each class, with two out on rent right now so the fleet board is not all
+  // green.
+  const vehiclesData = [
+    { type: VehicleType.CAR,      name: 'Toyota Premio (AC Sedan)',   registrationNumber: 'DHAKA METRO GA 15-2244', capacity: 4, hourlyRate: 700,  dailyRate: 5500, depositAmount: 5000, availability: VehicleAvailability.RENTED,      photos: IMG.vehicles.car,      notes: 'Airport transfer favourite. Driver included.' },
+    { type: VehicleType.VAN,      name: 'Hiace Microbus (11 seat)',   registrationNumber: 'DHAKA METRO CHA 11-8890', capacity: 11, hourlyRate: 1100, dailyRate: 8500, depositAmount: 8000, availability: VehicleAvailability.AVAILABLE,   photos: IMG.vehicles.microbus, notes: 'Group tours and Himchari day trips.' },
+    { type: VehicleType.BIKE,     name: 'Yamaha FZ-S 150',            registrationNumber: "COX'S BAZAR LA 12-3456",  capacity: 2, hourlyRate: 250,  dailyRate: 1500, depositAmount: 3000, availability: VehicleAvailability.RENTED,      photos: IMG.vehicles.bike,     notes: 'Helmet + rain cover provided. Licence required.' },
+    { type: VehicleType.SCOOTY,   name: 'Honda Dio Scooter',          registrationNumber: "COX'S BAZAR LA 14-7789",  capacity: 2, hourlyRate: 180,  dailyRate: 1100, depositAmount: 2500, availability: VehicleAvailability.AVAILABLE,   photos: IMG.vehicles.scooter,  notes: 'Automatic — the easy option for the marine drive.' },
+    { type: VehicleType.BICYCLE,  name: 'Beach Cruiser Bicycle',      registrationNumber: null,                      capacity: 1, hourlyRate: 80,   dailyRate: 400,  depositAmount: 500,  availability: VehicleAvailability.AVAILABLE,   photos: IMG.vehicles.cycle,    notes: 'Free for the first hour with any villa booking.' },
+    { type: VehicleType.CAR,      name: 'Nissan X-Trail (SUV)',       registrationNumber: 'DHAKA METRO GHA 17-5512', capacity: 5, hourlyRate: 950,  dailyRate: 7500, depositAmount: 7000, availability: VehicleAvailability.MAINTENANCE, photos: IMG.vehicles.car,      notes: 'In for a brake service — back on the road Monday.' },
+  ];
+
+  const createdVehicles: { id: string; name: string }[] = [];
+  for (const v of vehiclesData) {
+    const vehicle = await prisma.vehicle.create({ data: { tenantId: demo.id, ...v } }).catch(softFail);
+    if (vehicle) createdVehicles.push({ id: vehicle.id, name: vehicle.name });
+  }
+
+  // The two OUT rentals are the two vehicles marked RENTED above, so the fleet
+  // status and the rental list agree with each other.
+  const rentalsData = [
+    { vehicle: 0, guestName: 'James Miller',   guestPhone: '+8801700111222', startAt: d(-1, 9),  endAt: d(1, 18),  status: RentalStatus.OUT,      rate: 5500, totalAmount: 16500, depositCollected: 5000, odometerOut: 84210, fuelOut: 'Full',      conditionNotesOut: 'Minor scratch on rear bumper, noted at handover.' },
+    { vehicle: 2, guestName: 'Priya Sharma',   guestPhone: '+8801700333444', startAt: d(0, 8),   endAt: d(0, 20),  status: RentalStatus.OUT,      rate: 1500, totalAmount: 1500,  depositCollected: 3000, odometerOut: 12480, fuelOut: 'Half',      conditionNotesOut: 'Helmet and rain cover issued.' },
+    { vehicle: 1, guestName: 'Chen Family',    guestPhone: '+8801700555666', startAt: d(2, 7),   endAt: d(2, 21),  status: RentalStatus.RESERVED,  rate: 8500, totalAmount: 8500,  depositCollected: 0 },
+    { vehicle: 3, guestName: 'Nusrat Jahan',   guestPhone: '+8801700777888', startAt: d(3, 10),  endAt: d(4, 10),  status: RentalStatus.RESERVED,  rate: 1100, totalAmount: 2200,  depositCollected: 0 },
+    { vehicle: 4, guestName: 'Daniel Okafor',  guestPhone: '+8801700999000', startAt: d(-4, 16), endAt: d(-4, 18), status: RentalStatus.RETURNED, rate: 80,   totalAmount: 160,   depositCollected: 500,  depositReturned: 500, odometerOut: 0, odometerIn: 0, actualReturnAt: d(-4, 18), billed: true },
+    { vehicle: 0, guestName: 'Michael Chen',   guestPhone: '+8801700222333', startAt: d(-9, 8),  endAt: d(-7, 19), status: RentalStatus.RETURNED, rate: 5500, totalAmount: 16500, depositCollected: 5000, depositReturned: 5000, odometerOut: 83640, odometerIn: 84210, fuelOut: 'Full', fuelIn: 'Half', actualReturnAt: d(-7, 19), billed: true },
+    { vehicle: 2, guestName: 'Arif Hossain',   guestPhone: '+8801700444555', startAt: d(-14, 9), endAt: d(-12, 9), status: RentalStatus.RETURNED, rate: 1500, totalAmount: 3000,  depositCollected: 3000, depositReturned: 2700, odometerOut: 12100, odometerIn: 12480, actualReturnAt: d(-12, 11), billed: true, conditionNotesIn: 'Returned 2 hrs late — ৳300 held from deposit.' },
+  ];
+
+  for (const r of rentalsData) {
+    const vehicle = createdVehicles[r.vehicle];
+    if (!vehicle) continue;
+    const { vehicle: _slot, ...rest } = r;
+    await prisma.vehicleRental.create({
+      data: { tenantId: demo.id, vehicleId: vehicle.id, ...rest },
+    }).catch(softFail);
+  }
+  console.log(`✅ Vehicles + ${rentalsData.length} rentals`);
 
   // ── Guests ───────────────────────────────────────────────────────────────────
   const guestData = [
@@ -606,17 +825,19 @@ async function main() {
   const menuItemsDB = await prisma.menuItem.findMany({ where: { tenantId: demo.id } });
   if (menuItemsDB.length === 0) {
     // Create menu items first
+    // A menu with photos is the difference between a restaurant module a guest
+    // would order from and a price list.
     const menuItems = [
-      { name: 'Deshi Breakfast Set',    category: 'BREAKFAST', price: 350 },
-      { name: 'Continental Breakfast',  category: 'BREAKFAST', price: 550 },
-      { name: 'Hilsa Fish Curry',       category: 'LUNCH',     price: 680 },
-      { name: 'Grilled Sea Bass',       category: 'DINNER',    price: 950 },
-      { name: 'Lobster Thermidor',      category: 'DINNER',    price: 1800 },
-      { name: 'Prawn Cocktail',         category: 'APPETIZER', price: 580 },
-      { name: 'Mango Pudding',          category: 'DESSERT',   price: 220 },
-      { name: 'Fresh Coconut Water',    category: 'BEVERAGE',  price: 120 },
-      { name: 'Tropical Smoothie',      category: 'BEVERAGE',  price: 280 },
-      { name: "Chef's Special",         category: 'SPECIAL',   price: 1250 },
+      { name: 'Deshi Breakfast Set',    category: 'BREAKFAST', price: 350,  image: IMG.food.breakfast },
+      { name: 'Continental Breakfast',  category: 'BREAKFAST', price: 550,  image: IMG.food.breakfast },
+      { name: 'Hilsa Fish Curry',       category: 'LUNCH',     price: 680,  image: IMG.food.lunch },
+      { name: 'Grilled Sea Bass',       category: 'DINNER',    price: 950,  image: IMG.food.seafood },
+      { name: 'Lobster Thermidor',      category: 'DINNER',    price: 1800, image: IMG.food.seafood },
+      { name: 'Prawn Cocktail',         category: 'APPETIZER', price: 580,  image: IMG.food.seafood },
+      { name: 'Mango Pudding',          category: 'DESSERT',   price: 220,  image: IMG.food.dessert },
+      { name: 'Fresh Coconut Water',    category: 'BEVERAGE',  price: 120,  image: IMG.food.beverage },
+      { name: 'Tropical Smoothie',      category: 'BEVERAGE',  price: 280,  image: IMG.food.beverage },
+      { name: "Chef's Special",         category: 'SPECIAL',   price: 1250, image: IMG.food.dinner },
     ];
     for (const item of menuItems) {
       await prisma.menuItem.create({ data: { tenantId: demo.id, ...(item as any), isAvailable: true } }).catch(softFail);
@@ -802,11 +1023,30 @@ async function main() {
   console.log('✅ Loyalty program + accounts');
 
   // ── Website Content ───────────────────────────────────────────────────────────
+  // The public site is the part a prospective owner is most likely to open in a
+  // second tab, so hero/about/gallery are filled rather than left null. `update`
+  // carries the imagery too — a demo seeded before this would otherwise keep
+  // serving a text-only website.
+  const demoTestimonials = [
+    { name: 'James Miller',  rating: 5, text: 'Absolutely stunning resort. The staff went above and beyond. The beachfront villa was worth every penny!', date: '2026-04-15', avatar: IMG.faces[0] },
+    { name: 'Priya Sharma',  rating: 5, text: 'Perfect honeymoon destination. The spa, the food, the views — everything was magical.',                    date: '2026-03-20', avatar: IMG.faces[1] },
+    { name: 'Michael Chen',  rating: 4, text: 'Great location and beautiful rooms. The Hilsa curry at dinner was the best I have ever had.',              date: '2026-05-01', avatar: IMG.faces[2] },
+    { name: 'Nusrat Jahan',  rating: 5, text: 'We booked the pool villa for a family weekend and nobody wanted to leave. Spotless and so well run.',      date: '2026-05-18', avatar: IMG.faces[3] },
+    { name: 'Daniel Okafor', rating: 5, text: 'Checked in late after a delayed flight and they still had dinner waiting. That is the difference.',         date: '2026-06-02', avatar: IMG.faces[4] },
+  ];
+
   await prisma.websiteContent.upsert({
     where: { tenantId: demo.id },
-    update: {},
+    update: {
+      heroImage: IMG.hero,
+      aboutImage: IMG.about,
+      galleryImages: IMG.gallery,
+      testimonials: demoTestimonials,
+    },
     create: {
       tenantId: demo.id,
+      heroImage: IMG.hero,
+      aboutImage: IMG.about,
       heroTitle: 'Where Ocean Meets Luxury',
       heroSubtitle: "Experience the finest hospitality on the shores of Cox's Bazar",
       aboutTitle: 'About Coral Bay Resort',
@@ -815,12 +1055,8 @@ async function main() {
       seoDescription: "Book your dream beach vacation at Coral Bay Resort. Luxury villas, suites and rooms with stunning sea views on Cox's Bazar beach.",
       primaryColor: '#1a6b5e',
       accentColor: '#d4a853',
-      galleryImages: [],
-      testimonials: [
-        { name: 'James Miller', rating: 5, text: 'Absolutely stunning resort. The staff went above and beyond. The beachfront villa was worth every penny!', date: '2026-04-15' },
-        { name: 'Priya Sharma', rating: 5, text: 'Perfect honeymoon destination. The spa, the food, the views — everything was magical.', date: '2026-03-20' },
-        { name: 'Michael Chen', rating: 4, text: 'Great location and beautiful rooms. The Hilsa curry at dinner was the best I have ever had.', date: '2026-05-01' },
-      ],
+      galleryImages: IMG.gallery,
+      testimonials: demoTestimonials,
     },
   });
   console.log('✅ Website content + testimonials');
