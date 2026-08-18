@@ -192,7 +192,14 @@ export async function buildApp() {
 
   await app.register(jwt, {
     secret: process.env.JWT_SECRET || 'dev-secret-change-in-production',
-    sign: { expiresIn: process.env.JWT_EXPIRES_IN || '15m' },
+    sign: { algorithm: 'HS256', expiresIn: process.env.JWT_EXPIRES_IN || '15m' },
+    // Without this the verifier accepts whichever HS* algorithm the token's own
+    // header names, i.e. the caller picks. Not a bypass today — every HS
+    // variant still needs this same secret, and `alg: none` is already
+    // rejected — but "the attacker chooses" is not a property worth keeping,
+    // and it stops being harmless the moment `secret` becomes a keypair, where
+    // it turns into the classic public-key-as-HMAC-secret forgery.
+    verify: { algorithms: ['HS256'] },
   });
 
   await app.register(websocket);
