@@ -9,6 +9,7 @@ import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import websocket from '@fastify/websocket';
 import staticPlugin from '@fastify/static';
+import { isPrivateUploadKey, verifyUploadSignature } from './utils/signed-upload-url';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
 
@@ -212,10 +213,34 @@ export async function buildApp() {
   // ── Static files — local upload storage ──────────────────────────────────
   const uploadsDir = process.env.STORAGE_LOCAL_DIR ?? join(process.cwd(), 'uploads');
   mkdirSync(uploadsDir, { recursive: true });
-  await app.register(staticPlugin, {
-    root:       uploadsDir,
-    prefix:     '/uploads/',
-    decorateReply: false,
+  await app.register(async (uploads) => {
+    // Room, menu, website and vehicle images are rendered by public resort
+    // sites to visitors with no account, so this prefix stays open. Guest ID
+    // and passport scans live under the same root and must not: they are
+    // released only against a short-lived signature the API issues alongside
+    // the document. See utils/signed-upload-url.ts.
+    uploads.addHook('onRequest', async (request, reply) => {
+      const path = request.url.split('?')[0] ?? '';
+      const marker = '/uploads/';
+      const at = path.indexOf(marker);
+      if (at === -1) return;
+
+      const key = decodeURIComponent(path.slice(at + marker.length));
+      if (!isPrivateUploadKey(key)) return;
+
+      const { exp, sig } = request.query as { exp?: string; sig?: string };
+      if (!verifyUploadSignature(key, exp, sig)) {
+        // 404, not 403: a wrong or expired signature should not confirm that
+        // this particular document exists.
+        return reply.status(404).send({ success: false, error: 'Not found' });
+      }
+    });
+
+    await uploads.register(staticPlugin, {
+      root:       uploadsDir,
+      prefix:     '/uploads/',
+      decorateReply: false,
+    });
   });
 
   // ── Swagger / OpenAPI ─────────────────────────────────────────────────────

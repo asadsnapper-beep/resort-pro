@@ -9,6 +9,7 @@
 import type { FastifyInstance } from 'fastify';
 import { requireRole } from '../middleware/auth';
 import { uploadToStorage, deleteFromStorage } from '../services/storage';
+import { signUploadUrl } from '../utils/signed-upload-url';
 import type { JwtPayload } from '@resort-pro/types';
 
 const ALLOWED_DOC_TYPES = new Set([
@@ -101,7 +102,9 @@ export async function guestDocumentRoutes(app: FastifyInstance) {
         success: true,
         data: {
           id:         doc.id,
-          imageUrl:   doc.imageUrl,
+          // Signed on the way out. The stored URL is not usable on its own —
+          // the static route refuses guest-docs without a live signature.
+          imageUrl:   signUploadUrl(doc.imageUrl),
           docType:    doc.docType,
           bookingId:  doc.bookingId,
           uploadedAt: doc.uploadedAt,
@@ -138,7 +141,10 @@ export async function guestDocumentRoutes(app: FastifyInstance) {
         },
       });
 
-      return reply.send({ success: true, data: docs });
+      return reply.send({
+        success: true,
+        data: docs.map((d) => ({ ...d, imageUrl: signUploadUrl(d.imageUrl) })),
+      });
     },
   });
 
