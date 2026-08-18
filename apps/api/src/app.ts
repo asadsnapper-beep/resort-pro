@@ -45,6 +45,7 @@ import { notificationRoutes } from './routes/notifications';
 import { chatRoutes } from './routes/chat';
 import { crmRoutes, crmPublicRoutes } from './routes/crm';
 import { billingRoutes, stripeWebhookRoute } from './routes/billing';
+import { themePurchaseRoutes } from './routes/themePurchases';
 import { adminRoutes } from './routes/admin';
 import { frontDeskRoutes } from './routes/frontDesk';
 import { ratePlanRoutes } from './routes/ratePlans';
@@ -327,6 +328,7 @@ export async function buildApp() {
   await registerFeatureRoutes('/api/crm', 'crm_v2', crmRoutes);
   await app.register(crmPublicRoutes, { prefix: '/crm' });
   await app.register(billingRoutes, { prefix: '/api/billing' });
+  await app.register(themePurchaseRoutes, { prefix: '/api/theme-purchases' });
   await app.register(stripeWebhookRoute, { prefix: '/api/stripe' });
   await app.register(adminRoutes, { prefix: '/api/admin' });
   await app.register(frontDeskRoutes, { prefix: '/api/front-desk' });

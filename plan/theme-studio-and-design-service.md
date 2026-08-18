@@ -338,4 +338,156 @@ model DesignRequest {
 
 ## Status
 
-📋 **Plan only — কোনো code লেখা হয়নি।** অনুমোদনের অপেক্ষায়।
+✅ **Phase 1–4 বানানো হয়ে গেছে ও live।** (শেষ verify: ২০২৬-০৮-১৩, কোড থেকে সরাসরি)
+
+| Phase | কী | অবস্থা |
+|---|---|---|
+| 1+2 | `DesignRequest` + owner modal + admin pipeline + `Theme.exclusiveToTenantId` | ✅ Done |
+| 3 | `plan/theme-contract.md` | ✅ Done |
+| 4 | Tier 2 engine — upload → Handlebars compile → sanitize → widget hydration | ✅ Done, `/demo` public site-এ end-to-end verify করা |
+| 5 | `/theme` skill → Tier 2 HTML বানাবে | ❌ বাকি (skill এখনো পুরনো Tier 1 JSON বানায়) |
+| 6 | Config theme-এ আরও block/variant | ❌ বাকি (optional) |
+
+---
+
+# ২০২৬-০৮-১৩ — Tenant customization + theme বিক্রি (নতুন ধাপ)
+
+## লক্ষ্য (owner-এর ভাষায়)
+
+> সুপার অ্যাডমিন থেকে **সপ্তাহে ১টা** HTML template upload হবে। কোনটা free / কোনটা কেনা লাগবে / কোনটা offer-এ — সেটা অ্যাডমিন ঠিক করবে। Resort owner সেই template customize করবে: logo, লেখা, ছবি, section-এর background (রঙ/ছবি/ভিডিও), gallery, video section। আর dashboard-এর যেসব data গেস্টের দেখা দরকার — room, খাবার, conference room, bike — সেগুলো site-এ দেখাবে।
+
+## যা ইতিমধ্যেই কাজ করে (নতুন কিছু লাগবে না)
+
+| চাহিদা | কীভাবে |
+|---|---|
+| Logo | `{{tenant.logoUrl}}` |
+| লেখা | `{{website.heroTitle}}`, `heroSubtitle`, `aboutTitle`, `aboutText` |
+| ছবি | `{{website.heroImage}}`, `aboutImage` |
+| Gallery | `{{website.galleryImages}}` (array) |
+| Room | `{{#each rooms}}` — নাম, দাম, ছবি, amenities, videos |
+| খাবার | `data-rp-widget="menu"` |
+| Conference room | `data-rp-widget="venues"` |
+| Bike / গাড়ি | `data-rp-widget="vehicles"` |
+| Section on/off + order | `WebsiteContent.hiddenSections`, `sectionOrder` |
+| free/premium চিহ্ন | `Theme.isPremium`, `Theme.requiredPlan` (schema-তে আছে) |
+
+## যা নেই
+
+1. **Section-ভিত্তিক background** (রঙ/ছবি/ভিডিও) — এখন শুধু global `primaryColor`/`accentColor`
+2. **Video section** — room-এ `videos[]` আছে, আলাদা video section নেই
+3. **Theme বিক্রির ব্যবস্থা** — দাম, কেনার record, offer, ownership check
+4. **🔴 Premium enforce হয় না** — `website.ts:78`-এ শুধু bespoke-lock চেক হয়, `requiredPlan` চেক হয় **না**। আজ Solo tenant যেকোনো premium theme নিয়ে নিতে পারে।
+
+## সিদ্ধান্ত ১ — Section vocabulary: **Fixed list** (manifest নয়)
+
+Template-এর section id গুলো contract-এ fixed থাকবে (`SITE_SECTIONS`-এর ১১টা: about, amenities, rooms, menu, venues, vehicles, gallery, testimonials, availability, booking, contact)। Shopify-র মতো per-template JSON manifest **করা হবে না**।
+
+**কারণ:** সপ্তাহে ১টা template = বছরে ~৫০টা।
+- Fixed list → customization UI **১ বার** বানালেই template #1 আর #50 দুটোতেই চলে। প্রতি সপ্তাহে বাড়তি কাজ **শূন্য**।
+- Manifest → প্রতিটা template-এর সাথে manifest লিখতে + validate করতে হবে। **প্রতি সপ্তাহের একটা কর।**
+
+Designer-এর স্বাধীনতা কমে না — fixed শুধু *কোন ধরনের content আছে*, কিন্তু *দেখতে কেমন* (layout, grid, animation, রঙ, typography, order) সম্পূর্ণ মুক্ত। একটা resort site-এ content type ওই ১১টাই।
+
+পরে দরকার হলে manifest **optional** হিসেবে যোগ করা যাবে (manifest না থাকলে fixed list) — তাই এটা dead-end নয়।
+
+## সিদ্ধান্ত ২ — Monetization: **এককালীন কেনা** (one-time purchase)
+
+Subscription plan-এর সাথে বাঁধা নয় — theme আলাদা করে কিনতে হবে।
+
+আগে ভেবেছিলাম এটা "কয়েক সপ্তাহের নতুন subsystem" — **সেটা ভুল ছিল**, কারণ:
+- bKash/SSLCommerz/Stripe payment rails **আগে থেকেই আছে** (`billing.ts`-এর subscription checkout)
+- Ownership enforce করার **জায়গাটাও আছে** — `website.ts:78`, যেখানে bespoke-lock চেক হয়; ওখানেই "কেনা আছে কিনা" বসবে
+
+তাই এটা ৩-৪টা focused step।
+
+## দুটো design সতর্কতা (ভুলবেন না)
+
+1. **White-on-white** — tenant ইচ্ছেমতো bg রঙ দিলে designer-এর সাদা লেখা অদৃশ্য হয়ে যাবে। সমাধান: auto-contrast — bg-এর brightness হিসাব করে লেখার রঙ নিজে থেকে উল্টানো (~২০ লাইন)। এটা প্রতিটা theme system-এর #১ support ticket।
+2. **Video background** — auto-play ৫-১৫MB, বাংলাদেশে mobile data-তে site ভাঙা মনে হবে + Core Web Vitals/SEO-তে মার। তাই: video **section** = YouTube/Vimeo embed (storage খরচ শূন্য, quality auto)। Video **background** চাইলে দেওয়া যাবে কিন্তু poster ছবি বাধ্যতামূলক + muted + playsinline + size cap।
+
+## ঝুঁকি — ৫০টা theme = চিরকালের maintenance
+
+বিক্রি একবারের, দায়িত্ব চিরকালের। **সমাধান schema-তে আগে থেকেই আছে:** `Theme.contractVersion` — পুরনো theme পুরনো contract-এ চলবে, নতুন contract আসলেও ভাঙবে না। শুধু এটা ব্যবহার করা শুরু করতে হবে।
+
+## ধাপ (প্রতিটা আলাদাভাবে shippable)
+
+| # | কাজ | আকার | কেন এই order |
+|---|---|---|---|
+| ১ | ✅ **শেষ** — Theme-এর দাম + `ThemePurchase` + ownership enforce + offer + bKash checkout + admin grant + owner picker UI | ছোট-মাঝারি | আয়ের তালা খোলে — এরপর প্রতি সপ্তাহের কাজ বিক্রিযোগ্য |
+| ৪ | ✅ **শেষ** — `/theme` skill → Tier 2 HTML | ছোট | সাপ্তাহিক template বানানো দ্রুত হবে |
+| ২ | Section-ভিত্তিক bg (রঙ/ছবি) + auto-contrast — `WebsiteContent.sectionStyles Json` | ছোট | Tenant-এর আসল value, চোখে দেখা যায় |
+| ৩ | Video section widget (YouTube/Vimeo embed) | ছোট | |
+| ৫ | Live preview (customize করার সময় সাথে সাথে দেখা) | বড় | সবচেয়ে বড়, সবার শেষে |
+
+**ধাপ ৪ কেন ২-এর আগে করা হলো:** owner সপ্তাহে ১টা template বানাবেন, অথচ
+`/theme` skill তখনো পুরনো Tier 1 JSON বানাত — মানে সাপ্তাহিক কাজটাই আটকে ছিল।
+ধাপ ২/৩ একবারের ফিচার, ধাপ ৪ প্রতি সপ্তাহে সময় বাঁচায়। তাছাড়া template না
+থাকলে customize করার মতো কিছুই থাকে না।
+
+**ধাপ ৪-এ যা হলো (২০২৬-০৮-১৩):** `.claude/commands/theme.md` এখন contract-মাফিক
+এক-ফাইল `.html` বানায় — data token, required section id (`rooms`/`booking`),
+`data-rp-widget` mount point, নিষিদ্ধ তালিকা (JS নেই, motion শুধু CSS), আর
+filename→key নিয়ম সব skill-এ লেখা। ডিজাইন-মানের অংশ (৯টা প্রশ্ন, color theory,
+typography, CSS signature) অপরিবর্তিত। নতুন `themes-out/` ফোল্ডার — generated
+theme git-এ রাখা হয়, কারণ ওগুলোই বিক্রির পণ্য; DB-র কপি deployed state, backup নয়।
+আসল uploader দিয়ে যাচাই করা: নিয়ম-মানা template 201 (key/CSS extraction/দাম ঠিক),
+`<script>` ও required-id ছাড়া template 400।
+
+## সিদ্ধান্ত ৩ — দাম: **$30 (৳3000)**, তবে সবসময় বদলানো যাবে
+
+Owner-এর শর্ত: *"এখন $30, কিন্তু চাইলে যাতে আমি পরিবর্তন করতে পারি এই ব্যবস্থা রাইখো।"* তাই দাম **কোডে বসবে না**।
+
+### কোথায় থাকবে
+
+দাম প্রতিটা theme-এর **DB row-তে** থাকবে, `packages/types/src/plans.ts`-এ নয়।
+
+**কেন plans.ts-এ নয়:** plan মাত্র ৩টা, বছরে একবার বদলায় — তাই কোডে থাকা ঠিক আছে। কিন্তু theme **সপ্তাহে ১টা করে বাড়বে (বছরে ~৫০টা)**, প্রতিটার দাম আলাদা হতে পারে। ৫০টা দাম কোডে রাখলে প্রতিবার দাম বদলাতে deploy লাগবে — যা owner-এর শর্তের সরাসরি বিপরীত।
+
+```prisma
+// Theme model-এ যোগ হবে
+priceUsd      Decimal   @default(30)   @db.Decimal(10, 2)
+priceBdt      Decimal   @default(3000) @db.Decimal(10, 2)
+offerPriceUsd Decimal?  @db.Decimal(10, 2)   // null = কোনো offer নেই
+offerPriceBdt Decimal?  @db.Decimal(10, 2)
+offerEndsAt   DateTime?                       // null = অনির্দিষ্টকাল
+```
+
+- **Free theme** = `priceUsd 0` (অথবা `isPremium false`)
+- **Offer** = `offerPrice*` সেট করা থাকলে সেটাই কার্যকর, `offerEndsAt` পার হলে আবার আসল দাম
+- নতুন theme upload করলে default $30/৳3000 বসবে, কিন্তু admin UI থেকে প্রতিটা theme-এর দাম আলাদা করে বদলানো যাবে
+
+### দাম কেন USD আর BDT **দুটোই** আলাদা করে রাখব
+
+এটা এই project-এর নিজের প্রতিষ্ঠিত নিয়ম — `PLAN_PRICING`-এ `monthlyUsd: 10` আর `monthlyBdt: 1000` দুটোই আলাদা করে লেখা, live exchange rate ব্যবহার হয় না। ধরা হার **৳১০০ = $১**।
+
+**কেন live FX নয়:** (ক) ডলারের হার ওঠানামা করলে বাংলাদেশি owner-এর দেখা দাম হঠাৎ বদলে যাবে — বিশ্বাস নষ্ট হয়; (খ) ৳3000-এর মতো গোল সংখ্যা রাখা যায়, ৳3247 নয়; (গ) টাকা ঠিক থাকে, FX API-এর উপর নির্ভরতা থাকে না।
+
+### deploy ছাড়াই বদলানোর ব্যবস্থা
+
+`billing.ts:64`-এর প্রমাণিত pattern অনুসরণ করা হবে — নতুন theme upload-এর **default** দামটা env দিয়ে override করা যাবে:
+
+```ts
+// env না থাকলে canonical default, কোনো স্বাধীন সংখ্যা নয়
+const DEFAULT_THEME_PRICE_USD = Number(process.env.THEME_DEFAULT_PRICE_USD) || 30;
+```
+
+অর্থাৎ দাম বদলানোর **তিনটা** রাস্তা থাকবে: (১) admin UI থেকে প্রতিটা theme আলাদা করে, (২) env দিয়ে নতুন theme-এর default, (৩) offer দিয়ে সাময়িক ছাড়।
+
+### টাকার Prisma type
+
+`Decimal @db.Decimal(10, 2)` — `Float` নয়। Schema-তে দুটোই আছে (পুরনো কিছু field `Float`), কিন্তু নতুন/গুরুত্বপূর্ণ সবগুলো (`basePrice`, `totalAmount`, `paidAmount`, `Payment.amount`) Decimal ব্যবহার করে। টাকার হিসাবে Float কখনো নয় — rounding error হয়।
+
+## সিদ্ধান্ত ৪ — মালিকানার নিয়ম (owner ২০২৬-০৮-১৩-এ নিশ্চিত করেছেন)
+
+- **এককালীন, per-resort, চিরস্থায়ী** — একবার $30 দিলে ওই resort ওই theme চিরকাল ব্যবহার করবে। কোনো নবায়ন নেই।
+- **Subscription শেষ হলেও কেনা theme থেকে যাবে** — তারা কিনেছে, কেড়ে নেওয়া হবে না। (subscription বন্ধ থাকলে সাইট এমনিতেই বন্ধ, তাই বাস্তবে প্রশ্নটা কম ওঠে — কিন্তু ফিরে এলে theme-টা ওখানেই পাবে।)
+
+**কোডে এর মানে:** `ThemePurchase` row একবার তৈরি হলে কখনো মুছবে না, কোনো expiry থাকবে না। Ownership check = "এই tenant-এর জন্য এই theme-এর একটা purchase row আছে কি?" — তারিখ বা plan দেখা হবে না।
+
+## ⚠️ Enforcement চালু করার আগে — পুরনো ব্যবহারকারীদের রক্ষা করতে হবে
+
+আজ কোনো enforcement নেই, তাই কেউ যদি ইতিমধ্যেই একটা premium theme ব্যবহার করে থাকে, হঠাৎ তালা লাগালে **তার live সাইট ভেঙে যাবে**।
+
+**তাই migration-এ grandfather করতে হবে:** enforcement চালু হওয়ার মুহূর্তে যে tenant যে premium theme ব্যবহার করছে, তাকে ওই theme-এর একটা **বিনামূল্যের `ThemePurchase` row** দিয়ে দিতে হবে (`amountPaid = 0`, `note = 'grandfathered'`)। আগে থেকে ব্যবহার করা জিনিস কেড়ে নেওয়া যায় না।
+
+*(এখনকার অবস্থা: `seed-themes.ts`-এর সব theme `isPremium: false` — তাই সম্ভবত কেউ ক্ষতিগ্রস্ত হবে না। তবু migration-এ grandfather রাখতে হবে, কারণ admin UI থেকে কেউ কোনো theme premium করে থাকতে পারে।)*

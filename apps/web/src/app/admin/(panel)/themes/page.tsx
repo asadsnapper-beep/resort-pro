@@ -29,6 +29,12 @@ interface Theme {
   sortOrder:    number;
   usageCount:   number;
   createdAt:    string;
+  // One-time sale price — 0 means the theme is free.
+  priceUsd?:      string | number;
+  priceBdt?:      string | number;
+  offerPriceUsd?: string | number | null;
+  offerPriceBdt?: string | number | null;
+  offerEndsAt?:   string | null;
   // Dynamic theme fields
   themeType?:   'HARDCODED' | 'UPLOADED' | 'AI_GENERATED';
   themeStatus?: 'DRAFT' | 'PREVIEW' | 'PUBLISHED';
@@ -79,7 +85,17 @@ const THEME_THUMBNAIL: Record<string, {
 const EMPTY_FORM = {
   name: '', description: '', previewImage: '', screenshots: [] as string[], author: 'ResortPro Team',
   version: '1.0.0', tags: '', isPremium: false, requiredPlan: 'STARTER', sortOrder: 99,
+  // Kept as strings so the inputs can be cleared while typing; converted on save.
+  priceUsd: '30', priceBdt: '3000', offerPriceUsd: '', offerPriceBdt: '', offerEndsAt: '',
 };
+
+/**
+ * Prices are stored in USD and BDT separately rather than converted at runtime,
+ * so an owner's BDT price never moves with the exchange rate. This is the fixed
+ * rate the rest of the app already prices at (PLAN_PRICING: $10 → ৳1000), used
+ * only to pre-fill the BDT box — the admin can always type a different number.
+ */
+const USD_TO_BDT = 100;
 
 const SECTIONS_LIST = [
   'hero', 'about', 'rooms', 'gallery', 'testimonials',
@@ -230,6 +246,155 @@ function PremiumToggle({ value, onChange }: { value: boolean; onChange: (v: bool
   );
 }
 
+/**
+ * One-time sale price for a theme, plus an optional running offer.
+ *
+ * Typing a USD price pre-fills BDT at the app's fixed ৳100 = $1 rate, but the
+ * BDT box stays independently editable: the two are stored separately on
+ * purpose so a Bangladeshi owner's price never drifts with the exchange rate,
+ * and so it can be a round ৳3000 rather than whatever a live rate produced.
+ * Set the price to 0 to give a theme away free.
+ */
+function PricingEditor({
+  form, setForm,
+}: {
+  form: typeof EMPTY_FORM;
+  setForm: React.Dispatch<React.SetStateAction<typeof EMPTY_FORM>>;
+}) {
+  const priceNum = Number(form.priceUsd) || 0;
+  const offerNum = form.offerPriceUsd === '' ? null : Number(form.offerPriceUsd);
+  const offerTooHigh = offerNum !== null && Number.isFinite(offerNum) && offerNum > priceNum;
+
+  const money = (v: string) => v.replace(/[^\d.]/g, '');
+
+  return (
+    <div className="mt-5 rounded-xl border border-gray-800 bg-gray-950/40 p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">One-time price</span>
+        {priceNum === 0 && (
+          <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">Free theme</span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-gray-400">Price (USD)</label>
+          <input
+            inputMode="decimal"
+            value={form.priceUsd}
+            onChange={e => {
+              const usd = money(e.target.value);
+              setForm(p => ({
+                ...p,
+                priceUsd: usd,
+                // Keep BDT in step while the admin types, but never overwrite a
+                // BDT figure they set by hand to something off the fixed rate.
+                priceBdt: (p.priceBdt === '' || Number(p.priceBdt) === Number(p.priceUsd) * USD_TO_BDT)
+                  ? String((Number(usd) || 0) * USD_TO_BDT)
+                  : p.priceBdt,
+              }));
+            }}
+            placeholder="30"
+            className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-gray-400">Price (BDT)</label>
+          <input
+            inputMode="decimal"
+            value={form.priceBdt}
+            onChange={e => setForm(p => ({ ...p, priceBdt: money(e.target.value) }))}
+            placeholder="3000"
+            className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+      </div>
+
+      <div className="mt-4 mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
+        Offer <span className="font-normal normal-case tracking-normal text-gray-600">— leave blank for no offer</span>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-gray-400">Offer (USD)</label>
+          <input
+            inputMode="decimal"
+            value={form.offerPriceUsd}
+            onChange={e => {
+              const usd = money(e.target.value);
+              setForm(p => ({
+                ...p,
+                offerPriceUsd: usd,
+                offerPriceBdt: usd === '' ? '' : String((Number(usd) || 0) * USD_TO_BDT),
+              }));
+            }}
+            placeholder="—"
+            className={`w-full rounded-lg border bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-1 ${offerTooHigh ? 'border-red-500 focus:ring-red-500' : 'border-gray-700 focus:ring-indigo-500'}`}
+          />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-gray-400">Offer (BDT)</label>
+          <input
+            inputMode="decimal"
+            value={form.offerPriceBdt}
+            onChange={e => setForm(p => ({ ...p, offerPriceBdt: money(e.target.value) }))}
+            placeholder="—"
+            className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-gray-400">Offer ends</label>
+          <input
+            type="date"
+            value={form.offerEndsAt}
+            onChange={e => setForm(p => ({ ...p, offerEndsAt: e.target.value }))}
+            className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+      </div>
+
+      {offerTooHigh && (
+        <p className="mt-2 text-xs font-semibold text-red-400">
+          Offer price is higher than the normal price — the server will reject this.
+        </p>
+      )}
+      {!offerTooHigh && form.offerPriceUsd !== '' && !form.offerEndsAt && (
+        <p className="mt-2 text-xs text-gray-500">No end date — this offer runs until you clear it.</p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Price at a glance on the theme card. An offer that has passed its end date is
+ * shown as expired rather than as the live price — the same thing the server
+ * will conclude at checkout, so the catalogue never advertises a discount that
+ * would no longer be honoured.
+ */
+function ThemePriceBadge({ theme }: { theme: Theme }) {
+  const price = Number(theme.priceUsd ?? 0);
+  if (!price) {
+    return <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-semibold text-emerald-400">Free</span>;
+  }
+
+  const offer = theme.offerPriceUsd != null ? Number(theme.offerPriceUsd) : null;
+  const expired = !!theme.offerEndsAt && new Date(theme.offerEndsAt).getTime() < Date.now();
+  const offerLive = offer !== null && !expired;
+
+  return (
+    <span className="flex items-center gap-1.5 rounded-full border border-gray-700 bg-gray-800 px-2 py-0.5 text-xs">
+      {offerLive ? (
+        <>
+          <span className="text-gray-500 line-through">${price}</span>
+          <span className="font-semibold text-amber-400">${offer}</span>
+        </>
+      ) : (
+        <span className="font-semibold text-gray-200">${price}</span>
+      )}
+      {offer !== null && expired && <span className="text-[10px] text-gray-500">offer ended</span>}
+    </span>
+  );
+}
+
 /* ── Theme Card ────────────────────────────────────────────────────────────── */
 function ThemeCard({
   theme, onEdit, onToggle, onSetDefault, onDelete, togglePending,
@@ -343,11 +508,12 @@ function ThemeCard({
           </div>
         )}
 
-        {/* Plan + installs */}
+        {/* Plan + price + installs */}
         <div className="flex items-center gap-2 flex-wrap mt-auto">
           <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 border ${PLAN_COLOR[theme.requiredPlan] ?? 'text-gray-400 bg-gray-700 border-gray-600'}`}>
             {PLAN_ICON[theme.requiredPlan]} {getPlanDisplayName(theme.requiredPlan)}
           </span>
+          <ThemePriceBadge theme={theme} />
           <span className="text-xs text-gray-500 flex items-center gap-1 ml-auto">
             <Users className="h-3 w-3" />
             {theme.usageCount} {theme.usageCount === 1 ? 'resort' : 'resorts'}
@@ -479,6 +645,12 @@ function EditModal({
     isPremium: theme.isPremium,
     requiredPlan: theme.requiredPlan,
     sortOrder: theme.sortOrder,
+    priceUsd: theme.priceUsd != null ? String(Number(theme.priceUsd)) : '30',
+    priceBdt: theme.priceBdt != null ? String(Number(theme.priceBdt)) : '3000',
+    offerPriceUsd: theme.offerPriceUsd != null ? String(Number(theme.offerPriceUsd)) : '',
+    offerPriceBdt: theme.offerPriceBdt != null ? String(Number(theme.offerPriceBdt)) : '',
+    // <input type="date"> needs a bare YYYY-MM-DD, not a full ISO timestamp.
+    offerEndsAt: theme.offerEndsAt ? theme.offerEndsAt.slice(0, 10) : '',
   });
 
   return (
@@ -523,6 +695,8 @@ function EditModal({
               <PlanSelector value={form.requiredPlan} onChange={v => setForm(p => ({ ...p, requiredPlan: v }))} />
               <PremiumToggle value={form.isPremium} onChange={v => setForm(p => ({ ...p, isPremium: v }))} />
             </div>
+
+            <PricingEditor form={form} setForm={setForm} />
           </div>
 
           <div className="flex gap-3 px-6 py-4 border-t border-gray-800 sticky bottom-0 bg-gray-900">
@@ -1302,6 +1476,13 @@ export default function AdminThemesPage() {
         author: form.author, version: form.version,
         tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
         isPremium: form.isPremium, requiredPlan: form.requiredPlan, sortOrder: Number(form.sortOrder),
+        priceUsd: Number(form.priceUsd) || 0,
+        priceBdt: Number(form.priceBdt) || 0,
+        // Empty box means "no offer" — send null so a running offer is cleared
+        // rather than left in place because the field was simply omitted.
+        offerPriceUsd: form.offerPriceUsd === '' ? null : Number(form.offerPriceUsd),
+        offerPriceBdt: form.offerPriceBdt === '' ? null : Number(form.offerPriceBdt),
+        offerEndsAt: form.offerEndsAt === '' ? null : form.offerEndsAt,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-themes'] });

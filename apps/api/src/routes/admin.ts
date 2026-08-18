@@ -1180,17 +1180,95 @@ export async function adminRoutes(app: FastifyInstance) {
     return reply.send(ok(data));
   });
 
+  /**
+   * A theme's price is the only admin-editable value here that becomes a real
+   * charge, so it is checked rather than trusted. A negative price, or an
+   * "offer" that costs more than the theme itself, would otherwise be stored
+   * happily and only surface later at checkout in front of a paying customer.
+   *
+   * `existing` is the stored theme when updating, so an offer sent on its own
+   * is compared against the price it will actually sit next to.
+   * Returns an error message, or null when the input is fine.
+   */
+  function validateThemeMoney(
+    body: {
+      priceUsd?: number; priceBdt?: number;
+      offerPriceUsd?: number | null; offerPriceBdt?: number | null; offerEndsAt?: string | null;
+    },
+    existing?: { priceUsd: unknown; priceBdt: unknown } | null,
+  ): string | null {
+    const bad = (v: unknown) => { const n = Number(v); return !Number.isFinite(n) || n < 0; };
+
+    if (body.priceUsd !== undefined && bad(body.priceUsd)) return 'priceUsd must be a number and cannot be negative';
+    if (body.priceBdt !== undefined && bad(body.priceBdt)) return 'priceBdt must be a number and cannot be negative';
+
+    const effUsd = body.priceUsd !== undefined ? Number(body.priceUsd) : existing ? Number(existing.priceUsd) : Infinity;
+    const effBdt = body.priceBdt !== undefined ? Number(body.priceBdt) : existing ? Number(existing.priceBdt) : Infinity;
+
+    if (body.offerPriceUsd !== undefined && body.offerPriceUsd !== null) {
+      if (bad(body.offerPriceUsd)) return 'offerPriceUsd must be a number and cannot be negative';
+      if (Number(body.offerPriceUsd) > effUsd) return 'offerPriceUsd cannot be higher than priceUsd';
+    }
+    if (body.offerPriceBdt !== undefined && body.offerPriceBdt !== null) {
+      if (bad(body.offerPriceBdt)) return 'offerPriceBdt must be a number and cannot be negative';
+      if (Number(body.offerPriceBdt) > effBdt) return 'offerPriceBdt cannot be higher than priceBdt';
+    }
+    if (body.offerEndsAt && Number.isNaN(new Date(body.offerEndsAt).getTime())) {
+      return 'offerEndsAt is not a valid date';
+    }
+    return null;
+  }
+
   // ── PUT /api/admin/themes/:key ─────────────────────────────────────────────
-  app.put<{ Params: { key: string }; Body: { name: string; description?: string; previewImage?: string; screenshots?: string[]; isActive?: boolean; isPremium?: boolean; sortOrder?: number } }>(
+  // Upsert — the admin UI uses this for both "edit theme" and "register theme".
+  app.put<{ Params: { key: string }; Body: {
+    name: string; description?: string; previewImage?: string; screenshots?: string[];
+    isActive?: boolean; isPremium?: boolean; sortOrder?: number;
+    author?: string; version?: string; tags?: string[]; requiredPlan?: string;
+    priceUsd?: number; priceBdt?: number;
+    offerPriceUsd?: number | null; offerPriceBdt?: number | null; offerEndsAt?: string | null;
+  } }>(
     '/themes/:key',
     { preHandler: requireSuperAdmin },
     async (request, reply) => {
       const { key } = request.params;
-      const { name, description, previewImage, screenshots, isActive, isPremium, sortOrder } = request.body;
+      const {
+        name, description, previewImage, screenshots, isActive, isPremium, sortOrder,
+        author, version, tags, requiredPlan,
+        priceUsd, priceBdt, offerPriceUsd, offerPriceBdt, offerEndsAt,
+      } = request.body;
+
+      const existing = await prisma.theme.findUnique({ where: { key }, select: { priceUsd: true, priceBdt: true } });
+      const moneyError = validateThemeMoney(request.body, existing);
+      if (moneyError) return reply.status(400).send({ success: false, error: moneyError });
+
+      // author/version/tags/requiredPlan were previously accepted by the admin
+      // UI but never destructured here, so every save silently dropped them —
+      // an admin could set "Required Plan: PROFESSIONAL", see a success toast,
+      // and find the value unchanged. They are written now.
+      const shared = {
+        name, description, previewImage, screenshots, isActive, isPremium, sortOrder,
+        author, version, tags, requiredPlan,
+        priceUsd, priceBdt, offerPriceUsd, offerPriceBdt,
+        // Only touch offerEndsAt when it was actually sent, so an unrelated
+        // edit (a rename, say) cannot silently end a running offer.
+        ...(offerEndsAt !== undefined ? { offerEndsAt: offerEndsAt ? new Date(offerEndsAt) : null } : {}),
+      };
+
       const theme = await prisma.theme.upsert({
         where: { key },
-        update: { name, description, previewImage, screenshots, isActive, isPremium, sortOrder },
-        create: { key, name, description, previewImage, screenshots: screenshots ?? [], isActive: isActive ?? true, isPremium: isPremium ?? false, sortOrder: sortOrder ?? 99 },
+        update: shared,
+        create: {
+          key,
+          ...shared,
+          name,
+          screenshots: screenshots ?? [],
+          isActive: isActive ?? true,
+          isPremium: isPremium ?? false,
+          sortOrder: sortOrder ?? 99,
+          // priceUsd/priceBdt left undefined here fall back to the schema
+          // defaults ($30 / ৳3000), which is the intended price for a new theme.
+        },
       });
       const adminUser = request.user as any;
       await logAdminAction({
@@ -1199,7 +1277,7 @@ export async function adminRoutes(app: FastifyInstance) {
         targetType: 'theme',
         targetId: key,
         targetName: name,
-        metadata: { name, isPremium, isActive, sortOrder },
+        metadata: { name, isPremium, isActive, sortOrder, requiredPlan, priceUsd, priceBdt },
         ipAddress: request.ip,
       });
       return reply.send(ok(theme, 'Theme saved'));
@@ -3175,7 +3253,11 @@ Rules:
     Params: { key: string };
     Body: { isDefault?: boolean; requiredPlan?: string; sortOrder?: number; name?: string; description?: string; previewImage?: string; screenshots?: string[]; author?: string; version?: string; tags?: string[]; isPremium?: boolean; isActive?: boolean;
       /** Scope a bespoke theme to the tenant that commissioned it. null = shared catalogue. */
-      exclusiveToTenantId?: string | null; };
+      exclusiveToTenantId?: string | null;
+      /** One-time sale price. 0 = free theme. See plan/theme-studio-and-design-service.md. */
+      priceUsd?: number; priceBdt?: number;
+      /** Temporary discount. Send null to clear a running offer. */
+      offerPriceUsd?: number | null; offerPriceBdt?: number | null; offerEndsAt?: string | null; };
   }>('/themes/:key', { preHandler: requireAdminRole(['SUPER_ADMIN']) }, async (request, reply) => {
     const { key } = request.params;
     const body = request.body ?? {};
@@ -3183,13 +3265,79 @@ Rules:
     const theme = await prisma.theme.findUnique({ where: { key } });
     if (!theme) return reply.status(404).send({ success: false, error: 'Theme not found' });
 
+    const moneyError = validateThemeMoney(body, theme);
+    if (moneyError) return reply.status(400).send({ success: false, error: moneyError });
+
     if (body.isDefault === true) {
       await prisma.theme.updateMany({ where: { isDefault: true }, data: { isDefault: false } });
     }
 
-    const updated = await prisma.theme.update({ where: { key }, data: body });
+    const { offerEndsAt, ...rest } = body;
+    const updated = await prisma.theme.update({
+      where: { key },
+      data: {
+        ...rest,
+        // Only touch offerEndsAt when the caller actually sent it, so a PATCH
+        // that just renames a theme doesn't silently end a running offer.
+        ...(offerEndsAt !== undefined ? { offerEndsAt: offerEndsAt ? new Date(offerEndsAt) : null } : {}),
+      },
+    });
     return reply.send(ok(updated, 'Theme updated'));
   });
+
+  // ── POST /api/admin/theme-grants ───────────────────────────────────────────
+  // Give a resort a theme without a card ever being involved. Sales genuinely
+  // happen face to face here — an owner sends money by personal bKash, or pays
+  // cash — and that has to be recordable. It also makes the whole ownership
+  // path usable before any payment credentials exist. `amountPaid` is stored
+  // as given (0 for a genuine gift) so the books stay honest either way.
+  app.post<{ Body: { tenantId?: string; themeKey?: string; amountPaid?: number; currency?: string; note?: string } }>(
+    '/theme-grants',
+    { preHandler: requireAdminRole(['SUPER_ADMIN']) },
+    async (request, reply) => {
+      const { tenantId, themeKey, amountPaid = 0, currency = 'BDT', note } = request.body ?? {};
+      if (!tenantId || !themeKey) {
+        return reply.status(400).send({ success: false, error: 'tenantId and themeKey required' });
+      }
+      const amount = Number(amountPaid);
+      if (!Number.isFinite(amount) || amount < 0) {
+        return reply.status(400).send({ success: false, error: 'amountPaid cannot be negative' });
+      }
+
+      const [tenant, theme] = await Promise.all([
+        prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true, name: true } }),
+        prisma.theme.findUnique({ where: { key: themeKey }, select: { key: true, name: true } }),
+      ]);
+      if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
+      if (!theme) return reply.status(404).send({ success: false, error: 'Theme not found' });
+
+      // Re-granting an owned theme is a no-op rather than an error: the admin's
+      // intent ("this resort should have it") is already satisfied.
+      const purchase = await prisma.themePurchase.upsert({
+        where: { tenantId_themeKey: { tenantId, themeKey } },
+        update: {},
+        create: {
+          tenantId, themeKey,
+          amountPaid: amount, currency,
+          paymentMethod: 'manual',
+          note: note || 'granted by admin',
+        },
+      });
+
+      const adminUser = request.user as any;
+      await logAdminAction({
+        adminEmail: adminUser.email,
+        action: 'theme_grant',
+        targetType: 'theme',
+        targetId: themeKey,
+        targetName: theme.name,
+        metadata: { tenantId, tenantName: tenant.name, amountPaid: amount, currency, note },
+        ipAddress: request.ip,
+      });
+
+      return reply.send(ok(purchase, `"${theme.name}" granted to ${tenant.name}`));
+    },
+  );
 
   // ── Demo leads (marketing — who viewed /try) ────────────────────────────────
   // See plan/demo-gate-and-click-tracking.md. Not an auth record — just a

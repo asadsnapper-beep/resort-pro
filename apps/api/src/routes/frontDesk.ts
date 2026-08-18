@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { requireRole } from '../middleware/auth';
 import { ok } from '../utils/response';
+import { tenantTodayRange } from '../utils/tenant-day';
 
 export async function frontDeskRoutes(app: FastifyInstance) {
 
@@ -11,11 +12,12 @@ export async function frontDeskRoutes(app: FastifyInstance) {
     handler: async (request, reply) => {
       const { db } = request;
 
-      const today     = new Date();
-      const todayDate = today.toISOString().split('T')[0];
-      const tomorrow  = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowDate = tomorrow.toISOString().split('T')[0];
+      // checkIn/checkOut are `@db.Date`. Deriving the day from
+      // `toISOString()` took the UTC calendar date, which in Asia/Dhaka is
+      // still yesterday between midnight and 6am — handing the night shift
+      // yesterday's arrival list at exactly the hours they rely on it.
+      // utils/tenant-day.ts resolves the day in the resort's own timezone.
+      const todayRange = tenantTodayRange();
 
       const guestSelect = {
         id: true, firstName: true, lastName: true, phone: true, email: true,
@@ -34,7 +36,7 @@ export async function frontDeskRoutes(app: FastifyInstance) {
         // Today's arrivals: checkIn = today, status CONFIRMED or PENDING
         db.booking.findMany({
           where: {
-            checkIn: { gte: new Date(todayDate), lt: new Date(tomorrowDate) },
+            checkIn: todayRange,
             status: { in: ['CONFIRMED', 'PENDING'] },
           },
           select: { ...bookingBase, guest: { select: guestSelect }, room: { select: roomSelect } },
@@ -44,7 +46,7 @@ export async function frontDeskRoutes(app: FastifyInstance) {
         // Today's departures: checkOut = today, status CHECKED_IN
         db.booking.findMany({
           where: {
-            checkOut: { gte: new Date(todayDate), lt: new Date(tomorrowDate) },
+            checkOut: todayRange,
             status: 'CHECKED_IN',
           },
           select: { ...bookingBase, guest: { select: guestSelect }, room: { select: roomSelect } },
@@ -77,7 +79,7 @@ export async function frontDeskRoutes(app: FastifyInstance) {
       const totalGuests = inHouse.reduce((s, b) => s + b.adults + b.children, 0);
 
       return ok({
-        date:     todayDate,
+        date:     todayRange.gte.toISOString().split('T')[0],
         roomStats,
         totalGuests,
         arrivals: {

@@ -90,7 +90,9 @@ function isSelfServeUpgrade(currentPlan: PlanKey, status: string, requestedPlan:
 
 // Platform bKash merchant account (money comes to YOU). Returns null if unset,
 // so the endpoint can degrade gracefully instead of crashing.
-function getPlatformBkash(): BkashConfig | null {
+/** Exported so theme purchases read the same platform bKash credentials
+ *  rather than keeping a second copy that could drift out of sync. */
+export function getPlatformBkash(): BkashConfig | null {
   const { BKASH_APP_KEY, BKASH_APP_SECRET, BKASH_USERNAME, BKASH_PASSWORD } = process.env;
   if (!BKASH_APP_KEY || !BKASH_APP_SECRET || !BKASH_USERNAME || !BKASH_PASSWORD) return null;
   return { appKey: BKASH_APP_KEY, appSecret: BKASH_APP_SECRET, username: BKASH_USERNAME, password: BKASH_PASSWORD };
