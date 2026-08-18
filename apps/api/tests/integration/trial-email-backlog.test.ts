@@ -108,3 +108,23 @@ describe('First-run trial email backlog', () => {
     expect(suppressed.map((r) => r.stage).sort()).toEqual(['expired', 'winback3', 'winback30', 'winback7']);
   });
 });
+
+describe('Win-back copy makes no claim we do not honour', () => {
+  it('the 30-day email does not threaten deletion — nothing deletes dormant data', async () => {
+    const src = await import('node:fs').then((fs) =>
+      fs.readFileSync(new URL('../../src/services/trial-emails.ts', import.meta.url), 'utf8'));
+    // Strip comments so the note explaining the removal is not mistaken for the claim.
+    const code = src.replace(/^\s*(\/\/|\*|\/\*).*$/gm, '');
+    expect(code).not.toMatch(/permanently deleted/i);
+    expect(code).not.toMatch(/deletion scheduled/i);
+    expect(code).not.toMatch(/data deletion/i);
+  });
+
+  it('the 30-day window is reachable at all', async () => {
+    // around(30) wants 29.5–30.5 days past expiry; the query bound must not
+    // cut that in half, which a 30-day bound did.
+    const src = await import('node:fs').then((fs) =>
+      fs.readFileSync(new URL('../../src/services/trial-emails.ts', import.meta.url), 'utf8'));
+    expect(src).toMatch(/now\.getTime\(\) - 31 \* 24 \* 60 \* 60 \* 1000/);
+  });
+});

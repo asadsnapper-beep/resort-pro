@@ -186,21 +186,27 @@ function winBack7(ownerName: string, resortName: string): string {
 
 // ── Win-back #3 (30 days after expiry) ────────────────────────────────────
 
+// The deletion warning this used to carry — "we'll retain your data for 60
+// more days, after which it will be permanently deleted", under a scheduled-
+// deletion banner — was not true. Nothing in this codebase deletes a dormant
+// tenant's data; there is no such job. Telling a customer their records are on
+// a countdown, to pressure a reactivation, is not a claim to make loosely and
+// certainly not one to make falsely. Reinstate it if and when a retention
+// policy exists and something actually enforces it.
 function winBack30(ownerName: string, resortName: string): string {
   return brandedEmail(`
-    <h2 style="margin:0 0 16px;color:#111827">Final notice for ${resortName}</h2>
+    <h2 style="margin:0 0 16px;color:#111827">Still here whenever you are, ${resortName}</h2>
     <p style="color:#6b7280;line-height:1.7">Hi ${ownerName},</p>
     <p style="color:#6b7280;line-height:1.7">
-      Your ResortPro account has been inactive for 30 days.
-      <strong>We'll retain your data for 60 more days</strong>, after which it will be permanently deleted.
+      It has been a month since your ResortPro trial ended. Your rooms, bookings
+      and guest records are exactly where you left them — nothing has been
+      removed.
     </p>
     <p style="color:#6b7280;line-height:1.7">
-      If you'd like to export your data or reactivate your account, please do so before then.
+      Pick a plan whenever you are ready and you will be back where you were. If
+      you would rather take your data elsewhere, we will export it for you.
     </p>
-    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:20px;margin:24px 0;text-align:center">
-      <p style="margin:0;color:#c2410c;font-weight:700">Data deletion scheduled in 60 days</p>
-    </div>
-    ${ctaButton('Reactivate & keep my data →', `${APP_URL}/dashboard/upgrade`)}
+    ${ctaButton('Reactivate my account →', `${APP_URL}/dashboard/upgrade`)}
     <p style="margin-top:16px;text-align:center;color:#9ca3af;font-size:13px">
       To request a data export, email <a href="mailto:${SUPPORT_EMAIL}" style="color:#1a6b5e">${SUPPORT_EMAIL}</a>
     </p>
@@ -228,7 +234,10 @@ export async function runTrialEmailCron(): Promise<void> {
   });
 
   // Fetch recently expired tenants (0–30 days ago)
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  // 31 days, not 30. around(30) matches 29.5–30.5 days past expiry, so a 30-day
+  // lower bound cut the window in half and the 30-day mail could only ever fire
+  // in the 29.5–30.0 sliver.
+  const thirtyDaysAgo = new Date(now.getTime() - 31 * 24 * 60 * 60 * 1000);
   const expiredTenants = await prisma.tenant.findMany({
     where: {
       planStatus: 'trialing',
@@ -334,7 +343,7 @@ export async function runTrialEmailCron(): Promise<void> {
         `win-back-7 ({tenant.name})`.replace('{tenant.name}', tenant.name));
     } else if (around(30)) {
       await sendOnce(tenant.id, 'winback30', owner.email,
-        `Final notice: data deletion scheduled for ${tenant.name}`,
+        `Your ${tenant.name} data is still here whenever you are`,
         winBack30(owner.firstName, tenant.name),
         `win-back-30 ({tenant.name})`.replace('{tenant.name}', tenant.name));
     }
