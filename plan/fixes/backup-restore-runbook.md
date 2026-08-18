@@ -82,3 +82,48 @@ Run against a scratch Postgres 16 seeded with 2 tenants and 370 bookings:
 Take a dump first and confirm it verified. The API container runs
 `prisma migrate deploy` on start with no gate in front of it, so the backup is
 the only thing standing between a bad migration and the data.
+
+
+---
+
+# Before the worker runs for the first time
+
+`worker.ts` has never been deployed. Its first run acts on a backlog that has
+been accumulating the whole time, so do these two things on the target database
+*before* starting it.
+
+## 1. Silence the stale trial-email backlog
+
+The job mails every tenant currently inside a lifecycle window. Left alone, day
+one sends win-backs about trials that ended weeks ago, and a 30-day notice that
+tells people their data is scheduled for deletion — which nothing in this
+codebase actually does.
+
+```bash
+docker compose exec api npx tsx src/scripts/suppress-trial-email-backlog.ts
+```
+
+Dry run first: it prints exactly who would be mailed, split into what it will
+suppress and what it will let through. Then:
+
+```bash
+docker compose exec api npx tsx src/scripts/suppress-trial-email-backlog.ts --apply
+```
+
+It suppresses only the backward-looking stages. Forward warnings still go out —
+a trial ending in three days should be warned today. `--all` silences those too.
+
+## 2. Count what the pending-booking sweep will cancel
+
+`expire-pending-bookings` cancels every unpaid PENDING booking older than 30
+minutes, and has a backlog to work through.
+
+```bash
+docker compose exec postgres psql -U resortpro -d resortpro -c \
+  "SELECT count(*) FROM bookings WHERE status='PENDING' AND \"paidAmount\" <= 0 AND \"createdAt\" < now() - interval '30 minutes';"
+```
+
+Dashboard-created bookings are `CONFIRMED` and walk-ins are `CHECKED_IN`, so
+this only reaches abandoned public-website holds — rooms that have been falsely
+blocked all along. Still worth knowing the number before it happens, rather than
+explaining it afterwards.
