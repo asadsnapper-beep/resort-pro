@@ -52,6 +52,9 @@ services:
     pull_policy: always
     restart: unless-stopped
     environment: &api-env-coolify
+      # Pinned rather than left to derive from cwd, so the path the app writes to
+      # and the path the volume is mounted at cannot drift apart.
+      STORAGE_LOCAL_DIR: /app/uploads
       NODE_ENV: production
       PORT: 4000
       HOST: 0.0.0.0
@@ -82,6 +85,11 @@ services:
       NEXT_PUBLIC_APP_URL: ${WEB_URL}
     networks:
       - coolify
+    # Guest ID/passport scans, room and website images are written here by the
+    # local storage driver. Without this volume the container filesystem — and
+    # every uploaded document with it — is discarded on redeploy.
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -136,6 +144,7 @@ services:
 
 volumes:
   postgres_data:
+  uploads_data:
   redis_data:
 
 networks:

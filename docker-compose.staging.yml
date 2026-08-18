@@ -47,6 +47,9 @@ services:
     ports:
       - '4001:4000'
     environment: &api-env-staging
+      # Pinned rather than left to derive from cwd, so the path the app writes to
+      # and the path the volume is mounted at cannot drift apart.
+      STORAGE_LOCAL_DIR: /app/uploads
       NODE_ENV: staging
       PORT: 4000
       HOST: 0.0.0.0
@@ -69,6 +72,11 @@ services:
       # nightly (jobs/refresh-demo.ts) to stop its dates going stale. Never set
       # this on production — a refresh deletes the demo tenant first.
       SEED_DEMO_REFRESH: ${SEED_DEMO_REFRESH:-}
+    # Guest ID/passport scans, room and website images are written here by the
+    # local storage driver. Without this volume the container filesystem — and
+    # every uploaded document with it — is discarded on redeploy.
+    volumes:
+      - uploads_staging_data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -124,4 +132,5 @@ services:
 
 volumes:
   postgres_staging_data:
+  uploads_staging_data:
   redis_staging_data:
