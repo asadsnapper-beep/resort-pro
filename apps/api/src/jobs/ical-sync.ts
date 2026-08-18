@@ -19,6 +19,7 @@
  */
 
 import cron from 'node-cron'
+import { assertSafeExternalUrl } from '../utils/safe-url'
 import { prisma } from '@resort-pro/database'
 import { parseIcal, ICalEvent } from '../utils/ical-parser'
 
@@ -41,7 +42,11 @@ async function syncOneCalendar(cal: CalendarRow): Promise<void> {
   try {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 10_000)
-    const res = await fetch(cal.icalUrl, { signal: controller.signal })
+    // Re-checked here, not just at save time: a stored URL can have been
+    // written before this guard existed, and DNS behind a stored hostname can
+    // change after it was approved.
+    const safe = await assertSafeExternalUrl(cal.icalUrl)
+    const res = await fetch(safe, { signal: controller.signal })
     clearTimeout(timer)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     icalText = await res.text()

@@ -18,6 +18,7 @@ import { requireAuth, requireRole } from '../middleware/auth'
 import { ok } from '../utils/response'
 import { parseIcal } from '../utils/ical-parser'
 import { syncCalendarsForRoom } from '../jobs/ical-sync'
+import { assertSafeExternalUrl, UnsafeUrlError } from '../utils/safe-url'
 
 const createSchema = z.object({
   roomId: z.string().min(1),
@@ -36,9 +37,12 @@ const updateSchema = z.object({
 
 async function fetchAndValidateUrl(url: string): Promise<{ ok: boolean; eventCount: number; error?: string }> {
   try {
+    // The URL is tenant-supplied and fetched by the server, so it has to clear
+    // the SSRF guard before any request goes out — see utils/safe-url.ts.
+    const safe = await assertSafeExternalUrl(url)
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 10_000)
-    const res = await fetch(url, { signal: controller.signal })
+    const res = await fetch(safe, { signal: controller.signal })
     clearTimeout(timer)
     if (!res.ok) return { ok: false, eventCount: 0, error: `HTTP ${res.status}` }
     const text = await res.text()
@@ -48,6 +52,7 @@ async function fetchAndValidateUrl(url: string): Promise<{ ok: boolean; eventCou
     const events = parseIcal(text)
     return { ok: true, eventCount: events.length }
   } catch (err: any) {
+    if (err instanceof UnsafeUrlError) return { ok: false, eventCount: 0, error: err.message }
     return { ok: false, eventCount: 0, error: err?.message ?? 'Request failed' }
   }
 }
