@@ -71,7 +71,12 @@ services:
       # Staging's demo tenant is disposable, so it is rebuilt on every start and
       # nightly (jobs/refresh-demo.ts) to stop its dates going stale. Never set
       # this on production — a refresh deletes the demo tenant first.
-      SEED_DEMO_REFRESH: ${SEED_DEMO_REFRESH:-}
+      #
+      # Defaulted to 1 here rather than left to a Portainer stack variable: the
+      # deploy workflow PUTs `"env": []` on every update, so anything set in
+      # that UI is wiped by the next push to dev. It would work, then quietly
+      # stop working, with nothing to point at.
+      SEED_DEMO_REFRESH: ${SEED_DEMO_REFRESH:-1}
     # Guest ID/passport scans, room and website images are written here by the
     # local storage driver. Without this volume the container filesystem — and
     # every uploaded document with it — is discarded on redeploy.
