@@ -548,6 +548,12 @@ async function handleStripeEvent(event: Stripe.Event) {
         where: { stripeSubscriptionId: sub.id },
         select: { id: true, name: true, slug: true, plan: true },
       });
+      // Every upgrade path syncs the feature flags; this downgrade did not, so
+      // a tenant who stopped paying kept every paid module switched on —
+      // per-tenant flag rows beat plan defaults, and nothing rewrote them.
+      if (canceledTenant) {
+        await applyPlanFlagsToTenant(canceledTenant.id, 'FREE');
+      }
       await createAdminNotification({
         type: 'subscription_canceled',
         title: 'Subscription canceled',
