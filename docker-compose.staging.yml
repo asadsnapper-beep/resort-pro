@@ -90,6 +90,36 @@ services:
       retries: 5
 
 
+
+  # ── Database backup ──────────────────────────────────────────────────────────
+  # A daily pg_dump, verified with `pg_restore --list` before it is kept. Uses
+  # the postgres image purely for its client tools, so nothing has to be
+  # installed on the host and this works the same under Portainer and Coolify.
+  #
+  # Scope, stated plainly: this protects against the failures that actually
+  # happen — a bad migration, a mistaken delete, operator error. It does NOT
+  # protect against losing the host, because the dumps sit on the same machine.
+  # Copying backups_staging_data off-box is the remaining step, and it is a
+  # deliberate follow-up rather than something quietly assumed to be done.
+  backup:
+    image: ghcr.io/asadsnapper-beep/resort-pro-api:dev
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-resortpro}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-resortpro}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - backups_staging_data:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # One run at start (so a fresh deploy has a backup immediately rather than
+    # 24 hours later), then once a day.
+    entrypoint: ['sh', '-c', 'while true; do sh /app/scripts/backup-db.sh || echo "[backup] run failed"; sleep 86400; done']
+
   # ── Background worker (cron jobs) ────────────────────────────────────────────
   # worker.ts is the only process that schedules pre-arrival reminders, iCal
   # sync, daily reports, automation sequences, trial emails and expiry of
@@ -132,5 +162,6 @@ services:
 
 volumes:
   postgres_staging_data:
+  backups_staging_data:
   uploads_staging_data:
   redis_staging_data:

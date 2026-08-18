@@ -29,7 +29,12 @@ RUN pnpm --filter @resort-pro/api build
 
 # ── Stage 3: runtime ──────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
-RUN apk add --no-cache openssl wget
+# postgresql-client supplies pg_dump/pg_restore for the backup sidecar, which
+# runs this same image. Baking them in rather than bind-mounting scripts from
+# the host: the staging deploy hands Portainer the compose file as a *string*,
+# so the repo is not on that host and a bind mount would silently resolve to
+# nothing.
+RUN apk add --no-cache openssl wget postgresql16-client
 WORKDIR /app
 ENV NODE_ENV=production
 
@@ -42,6 +47,10 @@ COPY --from=builder /app/packages/database/prisma   ./prisma
 # Bundled API output
 COPY --from=builder /app/apps/api/dist   ./dist
 COPY --from=builder /app/apps/api/package.json   ./package.json
+
+# Backup/restore scripts — versioned with the code that they protect.
+COPY scripts/backup-db.sh scripts/restore-db.sh   ./scripts/
+RUN chmod +x ./scripts/*.sh
 
 EXPOSE 4000
 
