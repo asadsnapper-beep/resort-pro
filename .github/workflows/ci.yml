@@ -375,17 +375,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # No pnpm setup and no `cache: 'pnpm'` here, deliberately. This job runs a
-      # plain node script and never installs anything, so the pnpm store it was
-      # asking setup-node to cache did not exist. That stayed invisible while
-      # the lockfile hash kept hitting an existing cache entry — on a hit there
-      # is nothing to save. The moment the lockfile changed, the post-job save
-      # ran, found no such path, and failed the job, with every actual check
-      # green.
+      # This job runs a plain node script and installs nothing, so it must not
+      # touch the package-manager cache at all. Dropping `cache: 'pnpm'` is not
+      # enough — setup-node@v5 defaults package-manager-cache to true and
+      # detects pnpm from pnpm-lock.yaml on its own, so it has to be switched
+      # off explicitly.
+      #
+      # Caching here was always broken, just invisibly: nothing ever created a
+      # pnpm store to save. While the lockfile hash kept hitting an existing
+      # cache entry the post-job step had nothing to save and said nothing.
+      # Changing the lockfile in 8e1ce7e turned that into a hard failure, with
+      # the job's own check and all six other CI jobs green.
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: '20'
+          package-manager-cache: false
 
       - name: Check for design system regressions
         run: node scripts/design-system-ratchet.mjs
