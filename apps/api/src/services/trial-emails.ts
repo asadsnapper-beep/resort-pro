@@ -244,6 +244,36 @@ export async function runTrialEmailCron(): Promise<void> {
   });
 
   let sent = 0;
+  let skipped = 0;
+
+  /**
+   * Send `stage` to this tenant at most once, ever.
+   *
+   * The row is written BEFORE the email goes out, and the unique constraint on
+   * (tenantId, stage) is what does the work: a duplicate attempt fails the
+   * insert instead of racing through a read-then-check that two workers could
+   * both pass. Claiming first also means a send that throws is not retried on
+   * the next tick — for lifecycle mail, silently missing one is much cheaper
+   * than mailing an owner the same thing twice.
+   */
+  const sendOnce = async (
+    tenantId: string,
+    stage: string,
+    to: string,
+    subject: string,
+    html: string,
+    label: string,
+  ) => {
+    try {
+      await prisma.trialEmailLog.create({ data: { tenantId, stage, sentTo: to } });
+    } catch (e: any) {
+      if (e?.code === 'P2002') { skipped++; return; } // already sent
+      throw e;
+    }
+    await sendEmail({ to, subject, html });
+    log(`Sent ${label} to ${to}`);
+    sent++;
+  };
 
   // ── Trialing — warning emails ──────────────────────────────────────────
   for (const tenant of trialingTenants) {
@@ -258,29 +288,20 @@ export async function runTrialEmailCron(): Promise<void> {
       daysUntilExpiry > target - 0.5 && daysUntilExpiry <= target + 0.5;
 
     if (around(7)) {
-      await sendEmail({
-        to: owner.email,
-        subject: `Your ResortPro trial ends in 7 days — ${tenant.name}`,
-        html: trialWarning7(owner.firstName, tenant.name, tenant.trialEndsAt),
-      });
-      log(`Sent 7-day warning to ${owner.email} (${tenant.name})`);
-      sent++;
+      await sendOnce(tenant.id, 'warn7', owner.email,
+        `Your ResortPro trial ends in 7 days — ${tenant.name}`,
+        trialWarning7(owner.firstName, tenant.name, tenant.trialEndsAt),
+        `7-day warning ({tenant.name})`.replace('{tenant.name}', tenant.name));
     } else if (around(3)) {
-      await sendEmail({
-        to: owner.email,
-        subject: `⚠️ 3 days left in your ResortPro trial`,
-        html: trialWarning3(owner.firstName, tenant.name, tenant.trialEndsAt),
-      });
-      log(`Sent 3-day warning to ${owner.email} (${tenant.name})`);
-      sent++;
+      await sendOnce(tenant.id, 'warn3', owner.email,
+        `⚠️ 3 days left in your ResortPro trial`,
+        trialWarning3(owner.firstName, tenant.name, tenant.trialEndsAt),
+        `3-day warning ({tenant.name})`.replace('{tenant.name}', tenant.name));
     } else if (around(1)) {
-      await sendEmail({
-        to: owner.email,
-        subject: `🚨 Last chance — trial ends tomorrow`,
-        html: trialWarning1(owner.firstName, tenant.name),
-      });
-      log(`Sent 1-day warning to ${owner.email} (${tenant.name})`);
-      sent++;
+      await sendOnce(tenant.id, 'warn1', owner.email,
+        `🚨 Last chance — trial ends tomorrow`,
+        trialWarning1(owner.firstName, tenant.name),
+        `1-day warning ({tenant.name})`.replace('{tenant.name}', tenant.name));
     }
   }
 
@@ -297,39 +318,27 @@ export async function runTrialEmailCron(): Promise<void> {
 
     if (daysSinceExpiry < 0.5) {
       // Just expired
-      await sendEmail({
-        to: owner.email,
-        subject: `Your ResortPro trial has ended — ${tenant.name}`,
-        html: trialExpired(owner.firstName, tenant.name),
-      });
-      log(`Sent trial-expired email to ${owner.email} (${tenant.name})`);
-      sent++;
+      await sendOnce(tenant.id, 'expired', owner.email,
+        `Your ResortPro trial has ended — ${tenant.name}`,
+        trialExpired(owner.firstName, tenant.name),
+        `trial-expired email ({tenant.name})`.replace('{tenant.name}', tenant.name));
     } else if (around(3)) {
-      await sendEmail({
-        to: owner.email,
-        subject: `Still thinking it over? Your data is waiting`,
-        html: winBack3(owner.firstName, tenant.name),
-      });
-      log(`Sent win-back-3 to ${owner.email} (${tenant.name})`);
-      sent++;
+      await sendOnce(tenant.id, 'winback3', owner.email,
+        `Still thinking it over? Your data is waiting`,
+        winBack3(owner.firstName, tenant.name),
+        `win-back-3 ({tenant.name})`.replace('{tenant.name}', tenant.name));
     } else if (around(7)) {
-      await sendEmail({
-        to: owner.email,
-        subject: `We saved your resort data 🔒`,
-        html: winBack7(owner.firstName, tenant.name),
-      });
-      log(`Sent win-back-7 to ${owner.email} (${tenant.name})`);
-      sent++;
+      await sendOnce(tenant.id, 'winback7', owner.email,
+        `We saved your resort data 🔒`,
+        winBack7(owner.firstName, tenant.name),
+        `win-back-7 ({tenant.name})`.replace('{tenant.name}', tenant.name));
     } else if (around(30)) {
-      await sendEmail({
-        to: owner.email,
-        subject: `Final notice: data deletion scheduled for ${tenant.name}`,
-        html: winBack30(owner.firstName, tenant.name),
-      });
-      log(`Sent win-back-30 to ${owner.email} (${tenant.name})`);
-      sent++;
+      await sendOnce(tenant.id, 'winback30', owner.email,
+        `Final notice: data deletion scheduled for ${tenant.name}`,
+        winBack30(owner.firstName, tenant.name),
+        `win-back-30 ({tenant.name})`.replace('{tenant.name}', tenant.name));
     }
   }
 
-  log(`Done — ${sent} email(s) sent`);
+  log(`Done — ${sent} email(s) sent, ${skipped} already sent earlier`);
 }
