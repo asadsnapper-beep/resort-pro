@@ -55,7 +55,7 @@ services:
     restart: unless-stopped
     ports:
       - '4000:4000'
-    environment:
+    environment: &api-env
       NODE_ENV: production
       PORT: 4000
       HOST: 0.0.0.0
@@ -95,6 +95,34 @@ services:
       timeout: 10s
       start_period: 40s
       retries: 5
+
+
+  # ── Background worker (cron jobs) ────────────────────────────────────────────
+  # worker.ts is the only process that schedules pre-arrival reminders, iCal
+  # sync, daily reports, automation sequences, trial emails and expiry of
+  # abandoned public booking holds. Without this service none of them run —
+  # they fail silently, which is why it went unnoticed.
+  #
+  # Same image as the api, different command: the api's CMD also runs
+  # `prisma migrate deploy` and the seeds, and two containers doing that at
+  # once would race. This waits for the api to be healthy, by which time
+  # migrations have already been applied.
+  #
+  # Exactly one replica. These are cron schedules, not queue consumers — a
+  # second instance would send every reminder twice.
+  worker:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    command: ['node', 'dist/worker.js']
+    environment:
+      <<: *api-env
+    depends_on:
+      api:
+        condition: service_healthy
+    deploy:
+      replicas: 1
 
   # ── Web (Next.js) ────────────────────────────────────────────────────────────
   web:
