@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams } from '../utils/response';
-import type { TenantScopedPrisma } from '@resort-pro/database';
+import { prisma, type TenantScopedPrisma } from '@resort-pro/database';
 
 const itemSchema = z.object({
   name: z.string().min(1),
@@ -268,25 +268,71 @@ export async function inventoryRoutes(app: FastifyInstance) {
       const { id } = request.params as { id: string };
       const body = movementSchema.parse(request.body);
 
-      const item = await db.inventoryItem.findFirst({ where: { id } });
-      if (!item) return reply.status(404).send({ success: false, error: 'Item not found' });
+      const { tenantId } = request.user as { tenantId: string };
 
-      const newStock = body.type === 'IN'
-        ? Number(item.currentStock) + body.quantity
-        : body.type === 'OUT'
-          ? Number(item.currentStock) - body.quantity
-          : body.quantity;
+      // Stock used to be read, decremented in JS, and written back as an
+      // absolute value alongside the movement in a Promise.all. Two concurrent
+      // OUTs both read the same starting figure, both passed the check, and
+      // the second write silently discarded the first — the stock ended up one
+      // movement short of reality, with both movements on record.
+      //
+      // The decrement now happens in the database as a conditional update, so
+      // the `>= quantity` test and the subtraction are the same operation and
+      // no other transaction can slip between them. `count === 0` means
+      // another request took the stock first.
+      //
+      // Raw `prisma` inside the transaction because Prisma's interactive
+      // transactions hand back an unextended client — the tenant scoping does
+      // not survive, so every `where` names tenantId explicitly. Same pattern
+      // as the booking-conflict transaction.
+      let result: { movement: unknown; item: { id: string; name: string; minimumStock: unknown; unit: string }; before: number; after: number };
+      try {
+        result = await prisma.$transaction(async (tx) => {
+          const item = await tx.inventoryItem.findFirst({ where: { id, tenantId } });
+          if (!item) throw Object.assign(new Error('Item not found'), { statusCode: 404 });
 
-      if (newStock < 0) return reply.status(400).send({ success: false, error: 'Insufficient stock' });
+          const before = Number(item.currentStock);
 
-      const [movement] = await Promise.all([
-        db.inventoryMovement.create({ data: { inventoryItemId: id, ...body } }),
-        db.inventoryItem.update({ where: { id }, data: { currentStock: newStock } }),
-      ]);
+          if (body.type === 'OUT') {
+            const dec = await tx.inventoryItem.updateMany({
+              where: { id, tenantId, currentStock: { gte: body.quantity } },
+              data:  { currentStock: { decrement: body.quantity } },
+            });
+            if (dec.count === 0) {
+              throw Object.assign(new Error('Insufficient stock'), { statusCode: 400 });
+            }
+          } else if (body.type === 'IN') {
+            await tx.inventoryItem.updateMany({
+              where: { id, tenantId },
+              data:  { currentStock: { increment: body.quantity } },
+            });
+          } else {
+            // ADJUSTMENT sets an absolute figure — a stock count, where the
+            // operator's number is meant to replace whatever was there.
+            if (body.quantity < 0) {
+              throw Object.assign(new Error('Insufficient stock'), { statusCode: 400 });
+            }
+            await tx.inventoryItem.updateMany({
+              where: { id, tenantId },
+              data:  { currentStock: body.quantity },
+            });
+          }
 
-      await notifyIfCrossedLowStock(db, item, Number(item.currentStock), newStock);
+          const updated = await tx.inventoryItem.findFirstOrThrow({ where: { id, tenantId } });
+          const movement = await tx.inventoryMovement.create({ data: { tenantId, inventoryItemId: id, ...body } });
 
-      return reply.status(201).send(ok(movement, 'Movement recorded'));
+          return { movement, item: updated, before, after: Number(updated.currentStock) };
+        });
+      } catch (e: any) {
+        if (e?.statusCode) return reply.status(e.statusCode).send({ success: false, error: e.message });
+        throw e;
+      }
+
+      // Outside the transaction: a notification failure must not roll back a
+      // recorded stock movement.
+      await notifyIfCrossedLowStock(db, result.item, result.before, result.after);
+
+      return reply.status(201).send(ok(result.movement, 'Movement recorded'));
     },
   });
 }
