@@ -161,7 +161,14 @@ const softFail = (err: unknown) => {
   seedFailures.push(msg);
 };
 
-async function main() {
+/**
+ * Seeds (or refreshes) the demo tenant.
+ *
+ * Exported so the daily refresh job can call it in-process — see
+ * jobs/refresh-demo.ts. `refresh` forces a rebuild; left undefined it falls
+ * back to the CLI flag / env var, which is how the deploy invokes it.
+ */
+export async function seedDemo(opts: { refresh?: boolean } = {}) {
   console.log('🎭 Seeding full demo tenant...\n');
 
   // ── Idempotency guard / refresh ───────────────────────────────────────────────
@@ -174,7 +181,7 @@ async function main() {
   // decays: arrivals drift into the past, "today" empties out, and within a
   // month a prospective customer is shown a dead resort. A daily refresh keeps
   // the tour looking like the business it is meant to be selling.
-  const REFRESH = process.argv.includes('--refresh') || process.env.SEED_DEMO_REFRESH === '1';
+  const REFRESH = opts.refresh ?? (process.argv.includes('--refresh') || process.env.SEED_DEMO_REFRESH === '1');
 
   const existing = await prisma.tenant.findUnique({
     where: { slug: 'demo' },
@@ -187,9 +194,9 @@ async function main() {
     // isDemo. A real resort must never reach this line, however the script is
     // invoked or whatever a future env var is set to.
     if (!existing.isDemo) {
-      console.error(`❌ Refusing to refresh: tenant "${existing.name}" (slug 'demo') is not flagged isDemo.`);
-      await prisma.$disconnect();
-      process.exit(1);
+      // Throws rather than exits: this now also runs inside the long-lived API
+      // process, where process.exit() would take the whole server down.
+      throw new Error(`Refusing to refresh: tenant "${existing.name}" (slug 'demo') is not flagged isDemo.`);
     }
     // Relations cascade from Tenant (migration 20260809000000_tenant_delete_cascade_relations),
     // so this clears operational data, config rows and users in one step —
@@ -201,7 +208,6 @@ async function main() {
     if (bookingCount > 0) {
       console.log(`✅ Demo tenant already seeded (${bookingCount} bookings). Skipping to avoid duplicates.`);
       console.log('   Run with --refresh to rebuild it with current dates.');
-      await prisma.$disconnect();
       return;
     }
   }
@@ -1185,6 +1191,11 @@ async function main() {
   console.log('   Refresh daily so "today" stays today: pnpm seed:demo --refresh');
 }
 
-main()
-  .catch((e) => { console.error(e); process.exit(1); })
-  .finally(() => prisma.$disconnect());
+// Only self-executes when run as a script (`node dist/scripts/seed-demo.js`,
+// which is what the container CMD does). Importing it — as the refresh job
+// does — must not kick off a seed as a side effect of the import.
+if (require.main === module) {
+  seedDemo()
+    .catch((e) => { console.error(e); process.exit(1); })
+    .finally(() => prisma.$disconnect());
+}

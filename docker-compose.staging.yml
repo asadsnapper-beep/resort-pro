@@ -65,6 +65,10 @@ services:
       STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
       STRIPE_PRICE_ENTERPRISE: ${STRIPE_PRICE_ENTERPRISE:-}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://resortpro.webcoronet.com}
+      # Staging's demo tenant is disposable, so it is rebuilt on every start and
+      # nightly (jobs/refresh-demo.ts) to stop its dates going stale. Never set
+      # this on production — a refresh deletes the demo tenant first.
+      SEED_DEMO_REFRESH: ${SEED_DEMO_REFRESH:-}
     depends_on:
       postgres:
         condition: service_healthy

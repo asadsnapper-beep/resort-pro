@@ -46,6 +46,7 @@ import { chatRoutes } from './routes/chat';
 import { crmRoutes, crmPublicRoutes } from './routes/crm';
 import { billingRoutes, stripeWebhookRoute } from './routes/billing';
 import { themePurchaseRoutes } from './routes/themePurchases';
+import { startDemoRefreshCron } from './jobs/refresh-demo';
 import { adminRoutes } from './routes/admin';
 import { frontDeskRoutes } from './routes/frontDesk';
 import { ratePlanRoutes } from './routes/ratePlans';
@@ -352,6 +353,9 @@ export async function buildApp() {
   await registerFeatureRoutes('/api/restaurant/tables', 'restaurant_module', restaurantTableRoutes);
   await app.register(publicTableRoutes,     { prefix: '/table' });
   await app.register(aiRoutes,              { prefix: '/api/ai' });
+
+  // No-op unless SEED_DEMO_REFRESH=1 — staging only, never production.
+  startDemoRefreshCron();
 
   return app;
 }
