@@ -514,6 +514,7 @@ model Tenant {
   designRequests         DesignRequest[]
   exclusiveThemes        Theme[]
   themePurchases         ThemePurchase[]
+  trialEmailLogs         TrialEmailLog[]
   deletionRequests       TenantDeletionRequest[]
 
   @@map("tenants")
@@ -2280,6 +2281,31 @@ model EmailSend {
   @@index([guestId])
   @@index([campaignId])
   @@map("email_sends")
+}
+
+/// One row per tenant per trial-lifecycle stage, written *before* the email is
+/// sent so it doubles as the lock that stops a repeat.
+///
+/// The job had no memory at all: it decided what to send purely from how far
+/// `trialEndsAt` was from now, inside a window a day wide, while running every
+/// 12 hours and once more at worker startup. Two runs therefore landed in every
+/// window — three if a container restarted — and each one sent again.
+///
+/// The unique constraint is what actually enforces this: a second attempt loses
+/// on insert rather than on a read-then-check that two workers could both pass.
+model TrialEmailLog {
+  id       String   @id @default(uuid())
+  tenantId String
+  /// warn7 | warn3 | warn1 | expired | winback3 | winback7 | winback30
+  stage    String
+  sentTo   String
+  sentAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, stage])
+  @@index([tenantId])
+  @@map("trial_email_logs")
 }
 
 // Link click tracking

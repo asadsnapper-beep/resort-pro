@@ -1814,6 +1814,11 @@ Rules:
         where: { id: referral.referrerId },
         data: { plan: plan as any, planStatus: 'active', freeUntil },
       });
+      // Without this the referral reward was cosmetic: the plan name changed
+      // on the tenant row while the modules it is supposed to include stayed
+      // locked, because the per-tenant flag rows still held the old plan's
+      // answer. Same sync the paid and admin upgrade paths already run.
+      await applyPlanFlagsToTenant(referral.referrerId, plan as string);
     }
 
     // Update referral record

@@ -9,6 +9,7 @@ import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import websocket from '@fastify/websocket';
 import staticPlugin from '@fastify/static';
+import { isPrivateUploadKey, verifyUploadSignature } from './utils/signed-upload-url';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
 
@@ -46,6 +47,7 @@ import { chatRoutes } from './routes/chat';
 import { crmRoutes, crmPublicRoutes } from './routes/crm';
 import { billingRoutes, stripeWebhookRoute } from './routes/billing';
 import { themePurchaseRoutes } from './routes/themePurchases';
+import { startDemoRefreshCron } from './jobs/refresh-demo';
 import { adminRoutes } from './routes/admin';
 import { frontDeskRoutes } from './routes/frontDesk';
 import { ratePlanRoutes } from './routes/ratePlans';
@@ -191,7 +193,14 @@ export async function buildApp() {
 
   await app.register(jwt, {
     secret: process.env.JWT_SECRET || 'dev-secret-change-in-production',
-    sign: { expiresIn: process.env.JWT_EXPIRES_IN || '15m' },
+    sign: { algorithm: 'HS256', expiresIn: process.env.JWT_EXPIRES_IN || '15m' },
+    // Without this the verifier accepts whichever HS* algorithm the token's own
+    // header names, i.e. the caller picks. Not a bypass today — every HS
+    // variant still needs this same secret, and `alg: none` is already
+    // rejected — but "the attacker chooses" is not a property worth keeping,
+    // and it stops being harmless the moment `secret` becomes a keypair, where
+    // it turns into the classic public-key-as-HMAC-secret forgery.
+    verify: { algorithms: ['HS256'] },
   });
 
   await app.register(websocket);
@@ -204,10 +213,34 @@ export async function buildApp() {
   // ── Static files — local upload storage ──────────────────────────────────
   const uploadsDir = process.env.STORAGE_LOCAL_DIR ?? join(process.cwd(), 'uploads');
   mkdirSync(uploadsDir, { recursive: true });
-  await app.register(staticPlugin, {
-    root:       uploadsDir,
-    prefix:     '/uploads/',
-    decorateReply: false,
+  await app.register(async (uploads) => {
+    // Room, menu, website and vehicle images are rendered by public resort
+    // sites to visitors with no account, so this prefix stays open. Guest ID
+    // and passport scans live under the same root and must not: they are
+    // released only against a short-lived signature the API issues alongside
+    // the document. See utils/signed-upload-url.ts.
+    uploads.addHook('onRequest', async (request, reply) => {
+      const path = request.url.split('?')[0] ?? '';
+      const marker = '/uploads/';
+      const at = path.indexOf(marker);
+      if (at === -1) return;
+
+      const key = decodeURIComponent(path.slice(at + marker.length));
+      if (!isPrivateUploadKey(key)) return;
+
+      const { exp, sig } = request.query as { exp?: string; sig?: string };
+      if (!verifyUploadSignature(key, exp, sig)) {
+        // 404, not 403: a wrong or expired signature should not confirm that
+        // this particular document exists.
+        return reply.status(404).send({ success: false, error: 'Not found' });
+      }
+    });
+
+    await uploads.register(staticPlugin, {
+      root:       uploadsDir,
+      prefix:     '/uploads/',
+      decorateReply: false,
+    });
   });
 
   // ── Swagger / OpenAPI ─────────────────────────────────────────────────────
@@ -352,6 +385,9 @@ export async function buildApp() {
   await registerFeatureRoutes('/api/restaurant/tables', 'restaurant_module', restaurantTableRoutes);
   await app.register(publicTableRoutes,     { prefix: '/table' });
   await app.register(aiRoutes,              { prefix: '/api/ai' });
+
+  // No-op unless SEED_DEMO_REFRESH=1 — staging only, never production.
+  startDemoRefreshCron();
 
   return app;
 }

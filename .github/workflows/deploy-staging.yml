@@ -141,11 +141,20 @@ jobs:
           STACK_ID=${{ steps.stack.outputs.id }}
           COMPOSE_CONTENT=$(cat /tmp/docker-compose.staging.deploy.yml)
 
-          # Get endpoint ID
-          ENDPOINT_ID=$(curl -s \
+          # Read the stack once: the endpoint id and the environment come from
+          # the same response.
+          STACK_JSON=$(curl -s \
             -H "X-API-Key: ${{ secrets.PORTAINER_TOKEN }}" \
-            "https://docker.webcoronet.com/api/stacks/${STACK_ID}" \
-            | jq -r '.EndpointId')
+            "https://docker.webcoronet.com/api/stacks/${STACK_ID}")
+
+          ENDPOINT_ID=$(echo "$STACK_JSON" | jq -r '.EndpointId')
+
+          # Carry the existing environment forward. This PUT used to send
+          # `"env": []`, which is not "leave it alone" — it is "delete
+          # everything". Any variable set through Portainer's stack UI survived
+          # exactly until the next push, then vanished with nothing to point at.
+          EXISTING_ENV=$(echo "$STACK_JSON" | jq -c '.Env // []')
+          echo "Preserving $(echo "$EXISTING_ENV" | jq 'length') stack environment variable(s)"
 
           curl -s -X PUT \
             -H "X-API-Key: ${{ secrets.PORTAINER_TOKEN }}" \
@@ -155,7 +164,7 @@ jobs:
               \"stackFileContent\": $(echo "$COMPOSE_CONTENT" | jq -Rs .),
               \"pullImage\": true,
               \"prune\": false,
-              \"env\": []
+              \"env\": ${EXISTING_ENV}
             }"
 
       - name: Summary
