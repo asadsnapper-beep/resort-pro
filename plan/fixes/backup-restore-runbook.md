@@ -92,26 +92,32 @@ the only thing standing between a bad migration and the data.
 been accumulating the whole time, so do these two things on the target database
 *before* starting it.
 
-## 1. Silence the stale trial-email backlog
+## 1. Stale trial-email backlog — handled automatically
 
-The job mails every tenant currently inside a lifecycle window. Left alone, day
-one sends win-backs about trials that ended weeks ago, and a 30-day notice that
-tells people their data is scheduled for deletion — which nothing in this
-codebase actually does.
+**No action required.** This used to be a manual step here, and it was not a
+workable one: the worker container starts seconds after the deploy, so there is
+no window in which to run a script that is supposed to protect against what the
+worker does on startup. A safeguard that has to win a race against the thing it
+guards is not a safeguard.
+
+The job now suppresses its own backlog on the first run in an environment,
+detected by trial_email_logs being empty. Backward-looking stages (expired and
+the win-backs) are marked as already sent; forward warnings still go out,
+because a trial ending in three days should be warned today.
+
+The script is still there for when you want to see the list or make the call
+yourself, and it dry-runs by default:
 
 ```bash
 docker compose exec api npx tsx src/scripts/suppress-trial-email-backlog.ts
-```
-
-Dry run first: it prints exactly who would be mailed, split into what it will
-suppress and what it will let through. Then:
-
-```bash
 docker compose exec api npx tsx src/scripts/suppress-trial-email-backlog.ts --apply
 ```
 
-It suppresses only the backward-looking stages. Forward warnings still go out —
-a trial ending in three days should be warned today. `--all` silences those too.
+After the first deploy, check what it decided:
+
+```bash
+docker compose logs worker | grep "First run"
+```
 
 ## 2. Count what the pending-booking sweep will cancel
 

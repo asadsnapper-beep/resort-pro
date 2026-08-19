@@ -215,11 +215,70 @@ function winBack30(ownerName: string, resortName: string): string {
 
 // ── Main cron function ─────────────────────────────────────────────────────
 
+/**
+ * On the very first run in an environment, treat the backward-looking backlog
+ * as already sent.
+ *
+ * The worker was never deployed, so on its first start the job would mail every
+ * tenant sitting in a window right now — win-backs about trials that ended
+ * weeks ago, arriving as a burst from a system that has been silent.
+ *
+ * scripts/suppress-trial-email-backlog.ts exists to be run beforehand, but that
+ * is not a procedure anyone can actually follow: the worker container starts
+ * seconds after the deploy, so there is no window in which to run it. A step
+ * that has to win a race against the thing it protects is not a safeguard.
+ *
+ * An empty trial_email_logs table is a precise signal — this environment has
+ * never sent one of these. Forward warnings are deliberately left alone: a
+ * trial ending in three days should still be warned today.
+ */
+async function suppressBacklogOnFirstRun(log: (msg: string) => void): Promise<void> {
+  if ((await prisma.trialEmailLog.count()) > 0) return;
+
+  const now = Date.now();
+  const expired = await prisma.tenant.findMany({
+    where: {
+      planStatus: 'trialing',
+      trialEndsAt: { gte: new Date(now - 31 * 86_400_000), lt: new Date(now) },
+    },
+    include: { users: { where: { role: 'OWNER', isActive: true }, take: 1, select: { email: true } } },
+  });
+
+  let suppressed = 0;
+  for (const tenant of expired) {
+    const email = tenant.users[0]?.email;
+    if (!email || !tenant.trialEndsAt) continue;
+
+    const days = (now - tenant.trialEndsAt.getTime()) / 86_400_000;
+    const near = (target: number) => days > target - 0.5 && days <= target + 0.5;
+    const stage = days < 0.5 ? 'expired'
+      : near(3) ? 'winback3'
+      : near(7) ? 'winback7'
+      : near(30) ? 'winback30'
+      : null;
+    if (!stage) continue;
+
+    try {
+      await prisma.trialEmailLog.create({
+        data: { tenantId: tenant.id, stage, sentTo: `suppressed-backlog:${email}` },
+      });
+      suppressed++;
+    } catch (e: any) {
+      if (e?.code !== 'P2002') throw e;
+    }
+  }
+
+  log(`First run in this environment — suppressed ${suppressed} stale win-back(s). Live trials are still warned.`);
+}
+
 export async function runTrialEmailCron(): Promise<void> {
   const now = new Date();
   const log = (msg: string) => console.log(`[trial-cron] ${msg}`);
 
   log('Starting trial email cron...');
+
+  await suppressBacklogOnFirstRun(log);
+
 
   // Fetch all trialing tenants
   const trialingTenants = await prisma.tenant.findMany({
