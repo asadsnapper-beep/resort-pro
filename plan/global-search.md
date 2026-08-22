@@ -288,7 +288,26 @@ No indexes added, per "do not add indexes blindly".
 
 Exit criteria: API returns only permitted, tenant-scoped, minimal result cards.
 
-### Phase B — desktop search experience
+### Phase B — desktop search experience — DONE (18 Aug 2026)
+
+`GlobalSearch.tsx` (palette) and the `top-nav.tsx` trigger, with `searchApi` in
+`lib/api.ts`. Three things this plan did not foresee:
+
+- **ModalShell does not handle Escape.** It registers no keydown listener at
+  all, so §3's "Escape closes the palette" had to be implemented in the palette
+  itself. Every other modal in the app is therefore also not Escape-closable —
+  worth deciding separately whether that belongs in ModalShell.
+- **A result href is not enough on its own.** Guests and Rooms have no detail
+  route, so results link to the list with `?search=`, and those pages ignored
+  the parameter — the palette navigated correctly and showed an unfiltered
+  list. Both pages now seed their search state from the URL.
+- **Which then exposed the real blocker:** the per-page search could not match
+  the full name the palette hands it, so a correct hand-off landed on an empty
+  list. `utils/search-terms.ts` now backs guests and rooms with the same
+  per-term AND used by `/api/search`. The other twelve modules still use the old
+  single-`contains`.
+
+
 
 1. Replace the static header input with a truthful trigger.
 2. Build GlobalSearch using ModalShell and ResortPro design tokens.

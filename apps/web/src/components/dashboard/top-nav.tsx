@@ -8,7 +8,8 @@ import { useQuery } from '@tanstack/react-query';
 import { billingApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { GlobalSearch, useGlobalSearchShortcut } from './GlobalSearch';
 import { useAuthStore } from '@/store/auth';
 import { useUiStore } from '@/store/ui';
 
@@ -60,6 +61,26 @@ function TrialBanner() {
 }
 
 export function TopNav() {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchTriggerRef = useRef<HTMLButtonElement>(null);
+
+  // ⌘ on Mac, Ctrl everywhere else — showing the wrong one is a small lie that
+  // makes the shortcut look broken. Resolved after mount because navigator is
+  // not available during server rendering.
+  const [shortcutLabel, setShortcutLabel] = useState('Ctrl K');
+  useEffect(() => {
+    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+    setShortcutLabel(isMac ? '⌘K' : 'Ctrl K');
+  }, []);
+
+  useGlobalSearchShortcut(useCallback(() => setSearchOpen(true), []));
+
+  // Escape closes the palette from inside ModalShell; returning focus here is
+  // what lets a keyboard user carry on from where they were.
+  const handleSearchOpenChange = useCallback((next: boolean) => {
+    setSearchOpen(next);
+    if (!next) searchTriggerRef.current?.focus();
+  }, []);
   const { theme, setTheme } = useTheme();
   const { sidebarCollapsed, toggleSidebar } = useUiStore();
 
@@ -76,16 +97,22 @@ export function TopNav() {
           >
             {sidebarCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </button>
-          <div className="relative flex-1">
+          {/* A button, not an input. It used to look editable and accept
+              text that went nowhere, with a ⌘K badge that had nothing behind
+              it — the search opens a palette, so the trigger should say so. */}
+          <button
+            ref={searchTriggerRef}
+            onClick={() => setSearchOpen(true)}
+            aria-label="Search guests, bookings, rooms"
+            aria-haspopup="dialog"
+            className="relative flex-1 flex items-center rounded-[8px] border border-black/5 bg-[#f4f1eb] py-1.5 pl-8 pr-16 text-left text-[13px] text-[#64748b] transition-colors hover:border-black/10 focus:outline-none focus:ring-1 focus:ring-resort-600/20 dark:border-white/10 dark:bg-white/5"
+          >
             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#64748b]" />
-            <input
-              placeholder="Search rooms, bookings, guests..."
-              className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] py-1.5 pl-8 pr-16 text-[13px] text-[#183153] placeholder:text-[#64748b] focus:outline-none focus:ring-1 focus:ring-resort-600/20 dark:border-white/10 dark:bg-white/5 dark:text-white"
-            />
+            <span className="truncate">Search guests, bookings, rooms…</span>
             <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-0.5 rounded bg-white border border-black/8 px-1.5 py-0.5 text-[10px] text-[#64748b] font-medium">
-              ⌘K
+              {shortcutLabel}
             </kbd>
-          </div>
+          </button>
         </div>
 
         <div className="flex items-center gap-1">
@@ -103,6 +130,8 @@ export function TopNav() {
           <NotificationBell />
         </div>
       </div>
+
+      <GlobalSearch open={searchOpen} onOpenChange={handleSearchOpenChange} />
     </header>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { roomsApi } from '@/lib/api';
@@ -65,7 +66,13 @@ export default function RoomsPage() {
   const isDark = resolvedTheme === 'dark';
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter,   setTypeFilter]   = useState('');
-  const [searchInput,  setSearchInput]  = useState('');
+  const searchParams = useSearchParams();
+  /**
+   * Seeded from `?search=` so a global-search result lands on this page with the
+   * record already isolated. Without it the palette navigates here and shows an
+   * unfiltered list, which is not "opening" the record the user picked.
+   */
+  const [searchInput,  setSearchInput]  = useState(searchParams.get('search') ?? '');
   const [page,         setPage]         = useState(1);
   const search = useDebounce(searchInput, 350);
 

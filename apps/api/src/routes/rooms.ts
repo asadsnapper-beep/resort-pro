@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams } from '../utils/response';
 import { checkRoomLimit } from '../utils/entitlement';
+import { matchAllTerms } from '../utils/search-terms';
 
 const roomSchema = z.object({
   number:       z.string().min(1).max(10),
@@ -64,12 +65,9 @@ export async function roomRoutes(app: FastifyInstance) {
         isActive: true,
         ...(q.status && { status: q.status }),
         ...(q.type   && { type:   q.type   }),
-        ...(q.search && {
-          OR: [
-            { name:   { contains: q.search, mode: 'insensitive' } },
-            { number: { contains: q.search, mode: 'insensitive' } },
-          ],
-        }),
+        // Per-term, so "Sea View Standard" matches rather than requiring the
+        // whole phrase to sit in one column.
+        ...(matchAllTerms(q.search, ['name', 'number']) ?? {}),
       };
 
       const [rooms, total] = await Promise.all([
