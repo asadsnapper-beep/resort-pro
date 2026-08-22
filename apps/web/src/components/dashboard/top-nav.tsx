@@ -105,7 +105,7 @@ export function TopNav() {
             onClick={() => setSearchOpen(true)}
             aria-label="Search guests, bookings, rooms"
             aria-haspopup="dialog"
-            className="relative flex-1 flex items-center rounded-[8px] border border-black/5 bg-[#f4f1eb] py-1.5 pl-8 pr-16 text-left text-[13px] text-[#64748b] transition-colors hover:border-black/10 focus:outline-none focus:ring-1 focus:ring-resort-600/20 dark:border-white/10 dark:bg-white/5"
+            className="relative flex-1 flex items-center rounded-[8px] border border-black/5 bg-[#f4f1eb] min-h-[44px] sm:min-h-0 py-1.5 pl-8 pr-16 text-left text-[13px] text-[#64748b] transition-colors hover:border-black/10 focus:outline-none focus:ring-1 focus:ring-resort-600/20 dark:border-white/10 dark:bg-white/5"
           >
             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#64748b]" />
             <span className="truncate">Search guests, bookings, rooms…</span>

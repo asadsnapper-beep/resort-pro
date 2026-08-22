@@ -204,7 +204,7 @@ export function GlobalSearch({
 
         <p aria-live="polite" className="sr-only">{announcement}</p>
 
-        <div id="global-search-results" role="listbox" aria-label="Search results" ref={listRef} className="max-h-[52vh] overflow-y-auto">
+        <div id="global-search-results" role="listbox" aria-label="Search results" ref={listRef} className="max-h-[62vh] sm:max-h-[52vh] overflow-y-auto">
           {tooShort && (
             <>
               <p className="px-1 pb-2 text-[12px] text-[#64748b]">
@@ -288,7 +288,7 @@ export function GlobalSearch({
                         <span className="block truncate text-[13px] text-[#183153] dark:text-white">
                           {highlight(r.title, trimmed)}
                         </span>
-                        <span className="block truncate text-[12px] text-[#64748b]">{r.subtitle}</span>
+                        <span className="text-[12px] text-[#64748b] line-clamp-2 sm:block sm:truncate">{r.subtitle}</span>
                       </span>
                       {r.status && (
                         <span className="shrink-0 rounded-full bg-black/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#64748b] dark:bg-white/10">

@@ -319,7 +319,36 @@ Exit criteria: API returns only permitted, tenant-scoped, minimal result cards.
 Exit criteria: a receptionist can find and open a booking, guest, and room by
 keyboard without a mouse.
 
-### Phase C — mobile and visual polish
+### Phase C — mobile and visual polish — DONE (18 Aug 2026)
+
+Verified by driving the browser at 375 and 320 px, in both themes.
+
+What actually needed fixing:
+
+- **Trigger was a 34 px tap target.** Now `min-h-[44px] sm:min-h-0`, so phones
+  get the 44 px §3 asks for while the desktop header keeps its compact bar.
+- **Subtitles truncated to uselessness at 320 px** — "CBR-2026-014 · Roo…",
+  losing the room and both dates. Two lines on phones, one on wider screens.
+  The first attempt did not work: a `block` class in the same string overrode
+  the `display: -webkit-box` that `line-clamp` needs, so the clamp was set and
+  had no effect.
+- **List raised to 62vh on phones** (52vh above `sm`), since a 52vh box on a
+  720 px screen wastes most of it.
+
+What did **not** need fixing, contrary to a first measurement: dark mode. An
+early probe showed near-black text on a near-white active row, but that was an
+artifact of toggling `.dark` from the console after mount. Through the app's own
+theme switch the palette is correct — active row `rgba(255,255,255,0.1)`, white
+title, tinted highlight. The §3 rule about no dark full-row hover holds.
+
+Bangla renders correctly, including highlight inside Bangla text and a long
+mixed name at 320 px with no overflow.
+
+Not done from this phase: the plan's separate mobile *sheet* layout. The
+centred ModalShell dialog is legible and fully usable at 320 px, and a bespoke
+sheet is a bigger change than the problem justifies right now.
+
+
 
 1. Add the mobile sheet layout and 44-pixel controls.
 2. Verify long guest names, Bangla/English mixed text, phone searches, and
