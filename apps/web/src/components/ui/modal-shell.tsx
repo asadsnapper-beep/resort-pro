@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
@@ -39,6 +39,10 @@ export function ModalShell({
   variant = 'resort',
 }: ModalShellProps) {
   const [mounted, setMounted] = useState(false);
+  // Stable per-instance ids so aria-labelledby/-describedby can name the real
+  // header text rather than duplicating it into an aria-label that then drifts.
+  const titleId = useId();
+  const descriptionId = useId();
   const [isDark, setIsDark] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -78,7 +82,15 @@ export function ModalShell({
       }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
+      {/* The panel is the dialog, not the backdrop. Without this a screen
+          reader announced nothing: it saw plain divs, so a modal that visually
+          takes over the screen was invisible as a modal. Every ModalShell
+          consumer gets this, not just the one that surfaced it. */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
         style={{
           position: 'relative',
           width: '100%',
@@ -103,11 +115,11 @@ export function ModalShell({
           flexShrink: 0,
         }}>
           <div>
-            <h2 style={{ fontFamily: isAdmin ? 'Archivo, system-ui, sans-serif' : 'var(--font-display, serif)', fontSize: isAdmin ? '20px' : '17px', fontWeight: isAdmin ? 800 : 500, color: isAdmin ? 'var(--rp-text)' : 'var(--rp-btn-accent-text)', margin: 0 }}>
+            <h2 id={titleId} style={{ fontFamily: isAdmin ? 'Archivo, system-ui, sans-serif' : 'var(--font-display, serif)', fontSize: isAdmin ? '20px' : '17px', fontWeight: isAdmin ? 800 : 500, color: isAdmin ? 'var(--rp-text)' : 'var(--rp-btn-accent-text)', margin: 0 }}>
               {title}
             </h2>
             {description && (
-              <p style={{ fontSize: '12px', color: isAdmin ? 'var(--rp-text-muted)' : 'rgba(255,255,255,0.4)', marginTop: '2px', margin: '2px 0 0' }}>
+              <p id={descriptionId} style={{ fontSize: '12px', color: isAdmin ? 'var(--rp-text-muted)' : 'rgba(255,255,255,0.4)', marginTop: '2px', margin: '2px 0 0' }}>
                 {description}
               </p>
             )}

@@ -145,16 +145,6 @@ export function GlobalSearch({
   }, [onOpenChange, router]);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
-    // ModalShell has no Escape handling of its own — verified, it registers no
-    // keydown listener — so the palette closes itself. Focus goes back to the
-    // header trigger via onOpenChange, which is what lets a keyboard user
-    // resume where they were.
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      onOpenChange(false);
-      return;
-    }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setActive((i) => (flat.length ? (i + 1) % flat.length : 0));
@@ -169,6 +159,27 @@ export function GlobalSearch({
          item.kind === 'action' ? 'action' : item.result.type);
     }
   };
+
+  /**
+   * Escape closes the palette, from wherever focus happens to be.
+   *
+   * ModalShell registers no keydown listener of its own, so the palette has to
+   * handle this. It was bound to the palette's own wrapper, which works only
+   * while focus is inside it — if focus ever slipped out, Escape stopped
+   * working and a keyboard user was stuck in a modal they could not dismiss.
+   * A document listener has no such dependency.
+   */
+  useEffect(() => {
+    if (!open) return;
+    const onEscape = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      onOpenChange(false);
+    };
+    document.addEventListener('keydown', onEscape, true);
+    return () => document.removeEventListener('keydown', onEscape, true);
+  }, [open, onOpenChange]);
 
   // Keep the active row in view when arrowing past the fold.
   useEffect(() => {
