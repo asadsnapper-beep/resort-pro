@@ -5,6 +5,7 @@ import { requireRole } from '../middleware/auth';
 import { ok, validate } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
 import { sendEmail, wrapEmail, renderTemplate, SEQUENCE_TEMPLATES } from '../services/email';
+import { matchAllTerms } from '../utils/search-terms';
 
 // ─── Default email templates (auto-created for every new tenant) ──────────────
 const DEFAULT_EMAIL_TEMPLATES = [
@@ -278,11 +279,7 @@ export async function crmRoutes(app: FastifyInstance) {
     const limit = Math.min(100, parseInt(q.limit ?? '20'));
 
     const where = {
-      ...(q.search ? { OR: [
-        { firstName: { contains: q.search, mode: 'insensitive' as const } },
-        { lastName:  { contains: q.search, mode: 'insensitive' as const } },
-        { email:     { contains: q.search, mode: 'insensitive' as const } },
-      ]} : {}),
+      ...(matchAllTerms(q.search, ['firstName', 'lastName', 'email', 'phone']) ?? {}),
       ...(q.tier ? { score: { tier: q.tier as any } } : {}),
       ...(q.tag  ? { tags: { some: { tag: { name: q.tag } } } } : {}),
     };

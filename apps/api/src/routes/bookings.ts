@@ -18,6 +18,7 @@ import { resolveRate } from './ratePlans';
 import { createAdminNotification } from '../utils/notifications';
 import { nextDocumentNumber } from '../utils/sequence';
 import type { JwtPayload } from '@resort-pro/types';
+import { matchAllTerms } from '../utils/search-terms';
 
 /* ── Auto-create invoice when a booking is confirmed ────────────────────── */
 async function autoCreateInvoice(bookingId: string, tenantId: string) {
@@ -140,15 +141,11 @@ export async function bookingRoutes(app: FastifyInstance) {
             ...(query.dateTo   ? [{ checkIn:  { lte: new Date(query.dateTo + 'T23:59:59Z') } }] : []),
           ],
         } : {}),
-        // Search across guest name, email, confirmation number
-        ...(query.search ? {
-          OR: [
-            { confirmationNo: { contains: query.search, mode: 'insensitive' } },
-            { guest: { firstName: { contains: query.search, mode: 'insensitive' } } },
-            { guest: { lastName:  { contains: query.search, mode: 'insensitive' } } },
-            { guest: { email:     { contains: query.search, mode: 'insensitive' } } },
-          ],
-        } : {}),
+        // Every word must match some field, so a full guest name works —
+        // with one `contains` per field, "Karim Hossain" matched nothing.
+        ...(matchAllTerms(query.search, [
+          'confirmationNo', 'guest.firstName', 'guest.lastName', 'guest.email', 'guest.phone',
+        ]) ?? {}),
       };
 
       const [bookings, total] = await Promise.all([

@@ -8,6 +8,7 @@ import { requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams } from '../utils/response';
 import { sendEmail } from '../services/email';
 import type { JwtPayload } from '@resort-pro/types';
+import { matchAllTerms } from '../utils/search-terms';
 
 const DEPARTMENTS = ['FRONT_DESK', 'HOUSEKEEPING', 'RESTAURANT', 'MAINTENANCE', 'SECURITY', 'MANAGEMENT'] as const;
 const INVITE_ROLES = ['MANAGER', 'STAFF', 'RECEPTIONIST', 'MARKETER', 'DEVELOPER', 'SHAREHOLDER'] as const;
@@ -38,14 +39,9 @@ export async function staffRoutes(app: FastifyInstance) {
 
       const where: Record<string, unknown> = {
         ...(query.department && { department: query.department }),
-        ...(query.search && {
-          OR: [
-            { user: { firstName: { contains: query.search, mode: 'insensitive' } } },
-            { user: { lastName:  { contains: query.search, mode: 'insensitive' } } },
-            { user: { email:     { contains: query.search, mode: 'insensitive' } } },
-            { position:          { contains: query.search, mode: 'insensitive' } },
-          ],
-        }),
+        ...(matchAllTerms(query.search, [
+          'user.firstName', 'user.lastName', 'user.email', 'position',
+        ]) ?? {}),
       };
 
       const [staff, total] = await Promise.all([

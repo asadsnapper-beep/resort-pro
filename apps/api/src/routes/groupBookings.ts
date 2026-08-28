@@ -4,6 +4,7 @@ import { prisma, Prisma } from '@resort-pro/database';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { ok } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
+import { matchAllTerms } from '../utils/search-terms';
 
 const groupSchema = z.object({
   name: z.string().min(1),
@@ -39,12 +40,7 @@ export async function groupBookingRoutes(app: FastifyInstance) {
           ...(status ? { status: status as any } : {}),
           ...(search
             ? {
-                OR: [
-                  { name: { contains: search, mode: 'insensitive' } },
-                  { organization: { contains: search, mode: 'insensitive' } },
-                  { contactName: { contains: search, mode: 'insensitive' } },
-                  { contactEmail: { contains: search, mode: 'insensitive' } },
-                ],
+                ...(matchAllTerms(search, ['name', 'organization', 'contactName', 'contactEmail']) ?? {}),
               }
             : {}),
         },

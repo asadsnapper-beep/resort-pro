@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams } from '../utils/response';
 import { prisma, type TenantScopedPrisma } from '@resort-pro/database';
+import { matchAllTerms } from '../utils/search-terms';
 
 const itemSchema = z.object({
   name: z.string().min(1),
@@ -107,12 +108,7 @@ export async function inventoryRoutes(app: FastifyInstance) {
       // Base where: optional category + optional search
       const baseWhere = {
         ...(query.category && { category: query.category as never }),
-        ...(query.search && {
-          OR: [
-            { name: { contains: query.search, mode: 'insensitive' as const } },
-            { supplier: { contains: query.search, mode: 'insensitive' as const } },
-          ],
-        }),
+        ...(matchAllTerms(query.search, ['name', 'supplier']) ?? {}),
       };
 
       // lowStock filter requires column-to-column comparison (currentStock <= minimumStock)

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams } from '../utils/response';
+import { matchAllTerms } from '../utils/search-terms';
 
 const createSchema = z.object({
   roomId: z.string().uuid().optional().nullable(),
@@ -27,7 +28,7 @@ export async function lostFoundRoutes(app: FastifyInstance) {
       const { page, limit, skip } = parsePageParams(query);
       const where = {
         ...(query.status && { status: query.status as never }),
-        ...(query.search && { description: { contains: query.search, mode: 'insensitive' as const } }),
+        ...(matchAllTerms(query.search, ['description', 'storageLocation', 'notes']) ?? {}),
       };
       const [items, total] = await Promise.all([
         db.lostFoundItem.findMany({

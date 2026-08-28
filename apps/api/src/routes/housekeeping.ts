@@ -1,7 +1,9 @@
 import type { FastifyInstance } from 'fastify';
+import type { JwtPayload } from '@resort-pro/types';
 import { z } from 'zod';
 import { requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams } from '../utils/response';
+import { matchAllTerms } from '../utils/search-terms';
 
 const taskSchema = z.object({
   roomId: z.string().uuid(),
@@ -14,6 +16,15 @@ const taskSchema = z.object({
 // Task types that involve cleaning between stays (room should be CLEANING while in progress, AVAILABLE when done)
 const BETWEEN_STAY_TYPES = ['CHECKOUT', 'DEEP_CLEAN', 'CHECKIN'] as const;
 
+type HousekeepingActor = Pick<JwtPayload, 'role' | 'sub'>;
+
+/** STAFF may read and mutate only tasks assigned to their linked Staff record. */
+export function housekeepingAssignmentScope(actor: HousekeepingActor) {
+  return actor.role === 'STAFF'
+    ? { assignedTo: { is: { userId: actor.sub } } }
+    : {};
+}
+
 export async function housekeepingRoutes(app: FastifyInstance) {
   // GET /stats — total counts by status (for accurate dashboard cards)
   app.get('/stats', {
@@ -21,15 +32,17 @@ export async function housekeepingRoutes(app: FastifyInstance) {
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST', 'STAFF'),
     handler: async (request) => {
       const { db } = request;
+      const actor = request.user as JwtPayload;
       const query = request.query as { date?: string };
       const dateWhere = query.date ? { scheduledDate: { equals: new Date(query.date) } } : {};
+      const assignmentScope = housekeepingAssignmentScope(actor);
 
       const [pending, inProgress, completed, skipped, total] = await Promise.all([
-        db.housekeepingTask.count({ where: { status: 'PENDING', ...dateWhere } }),
-        db.housekeepingTask.count({ where: { status: 'IN_PROGRESS', ...dateWhere } }),
-        db.housekeepingTask.count({ where: { status: 'COMPLETED', ...dateWhere } }),
-        db.housekeepingTask.count({ where: { status: 'SKIPPED', ...dateWhere } }),
-        db.housekeepingTask.count({ where: { ...dateWhere } }),
+        db.housekeepingTask.count({ where: { status: 'PENDING', ...dateWhere, ...assignmentScope } }),
+        db.housekeepingTask.count({ where: { status: 'IN_PROGRESS', ...dateWhere, ...assignmentScope } }),
+        db.housekeepingTask.count({ where: { status: 'COMPLETED', ...dateWhere, ...assignmentScope } }),
+        db.housekeepingTask.count({ where: { status: 'SKIPPED', ...dateWhere, ...assignmentScope } }),
+        db.housekeepingTask.count({ where: { ...dateWhere, ...assignmentScope } }),
       ]);
 
       return ok({ total, pending, inProgress, completed, skipped });
@@ -41,20 +54,18 @@ export async function housekeepingRoutes(app: FastifyInstance) {
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST', 'STAFF'),
     handler: async (request) => {
       const { db } = request;
+      const actor = request.user as JwtPayload;
       const query = request.query as { page?: number; limit?: number; status?: string; date?: string; search?: string };
       const { page, limit, skip } = parsePageParams(query);
 
       const where = {
+        ...housekeepingAssignmentScope(actor),
         ...(query.status && { status: query.status as never }),
         ...(query.date && { scheduledDate: { equals: new Date(query.date) } }),
-        ...(query.search && {
-          OR: [
-            { room: { number: { contains: query.search, mode: 'insensitive' as const } } },
-            { room: { name:   { contains: query.search, mode: 'insensitive' as const } } },
-            { assignedTo: { user: { firstName: { contains: query.search, mode: 'insensitive' as const } } } },
-            { assignedTo: { user: { lastName:  { contains: query.search, mode: 'insensitive' as const } } } },
-          ],
-        }),
+        ...(matchAllTerms(query.search, [
+          'room.number', 'room.name',
+          'assignedTo.user.firstName', 'assignedTo.user.lastName',
+        ]) ?? {}),
       };
 
       const [tasks, total] = await Promise.all([
@@ -101,10 +112,13 @@ export async function housekeepingRoutes(app: FastifyInstance) {
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST', 'STAFF'),
     handler: async (request, reply) => {
       const { db } = request;
+      const actor = request.user as JwtPayload;
       const { id } = request.params as { id: string };
       const { status } = request.body as { status: string };
 
-      const task = await db.housekeepingTask.findFirst({ where: { id } });
+      const task = await db.housekeepingTask.findFirst({
+        where: { id, ...housekeepingAssignmentScope(actor) },
+      });
       if (!task) return reply.status(404).send({ success: false, error: 'Task not found' });
 
       const updated = await db.housekeepingTask.update({

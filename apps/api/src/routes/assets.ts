@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams } from '../utils/response';
 import type { TenantScopedPrisma } from '@resort-pro/database';
+import { matchAllTerms } from '../utils/search-terms';
 
 const ASSET_CATEGORIES = ['FURNITURE', 'ELECTRONICS', 'APPLIANCE', 'KITCHEN_EQUIPMENT', 'VEHICLE', 'IT_EQUIPMENT', 'OTHER'] as const;
 const ASSET_STATUSES = ['IN_USE', 'IN_REPAIR', 'IN_STORAGE', 'RETIRED'] as const;
@@ -62,10 +63,7 @@ export async function assetRoutes(app: FastifyInstance) {
         ...(query.category && { category: query.category as never }),
         ...(query.status && { status: query.status as never }),
         ...(query.search && {
-          OR: [
-            { name: { contains: query.search, mode: 'insensitive' as const } },
-            { assetTag: { contains: query.search, mode: 'insensitive' as const } },
-          ],
+          ...(matchAllTerms(query.search, ['name', 'assetTag']) ?? {}),
         }),
       };
 

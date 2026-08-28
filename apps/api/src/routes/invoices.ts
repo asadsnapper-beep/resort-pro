@@ -8,6 +8,7 @@ import { sendEmail } from '../services/email';
 import { nextDocumentNumber } from '../utils/sequence';
 import type { JwtPayload } from '@resort-pro/types';
 import PDFDocument from 'pdfkit';
+import { matchAllTerms } from '../utils/search-terms';
 
 /* ── helpers ─────────────────────────────────────────────────────────────── */
 
@@ -257,10 +258,8 @@ export async function invoicesRoutes(app: FastifyInstance) {
       // withBookingPaymentTruth), so the status filter has to apply after
       // that override, not before it. Search stays DB-side; it's unrelated.
       const where: Record<string, unknown> = {};
-      if (q.search) where.OR = [
-        { invoiceNumber: { contains: q.search, mode: 'insensitive' } },
-        { guestName:     { contains: q.search, mode: 'insensitive' } },
-      ];
+      // Per-term, so a full guest name matches the snapshot on the invoice.
+      Object.assign(where, matchAllTerms(q.search, ['invoiceNumber', 'guestName']) ?? {});
 
       const all = await db.invoice.findMany({
         where,

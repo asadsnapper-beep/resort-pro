@@ -4,6 +4,7 @@ import { requireAuth, requireRole } from '../middleware/auth';
 import { ok } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
 import { awardPoints, redeemPoints, getOrCreateAccount, calcTier } from '../services/loyalty';
+import { matchAllTerms } from '../utils/search-terms';
 
 export async function loyaltyRoutes(app: FastifyInstance) {
   // ── GET /api/loyalty/program ───────────────────────────────────────────────
@@ -63,11 +64,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
         ...(search
           ? {
               guest: {
-                OR: [
-                  { firstName: { contains: search, mode: 'insensitive' as const } },
-                  { lastName: { contains: search, mode: 'insensitive' as const } },
-                  { email: { contains: search, mode: 'insensitive' as const } },
-                ],
+                ...(matchAllTerms(search, ['firstName', 'lastName', 'email']) ?? {}),
               },
             }
           : {}),
