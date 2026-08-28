@@ -43,6 +43,12 @@ beforeAll(async () => {
   await prisma.guest.create({
     data: { tenantId, firstName: 'Rumana', lastName: 'Khatun', email: `rk-${slug}@test.com` },
   });
+
+  // A fresh signup has no active subscription, and POSTs from such a tenant are
+  // held read-only with a 402. The beacon has to work anyway — it is telemetry,
+  // not a business write — so the state is pinned here instead of inherited.
+  // CI hit this and the first local run did not.
+  await prisma.tenant.update({ where: { id: tenantId }, data: { planStatus: 'incomplete' } });
 }, 40000);
 
 afterAll(async () => {

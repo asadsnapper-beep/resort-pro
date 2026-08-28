@@ -14,7 +14,12 @@ function isInactiveSubscriptionWriteAllowed(request: FastifyRequest) {
   const pathname = request.url.split('?')[0].replace(/\/$/, '');
   return (request.method === 'PATCH' && pathname === '/api/tenant')
     || (request.method === 'PATCH' && pathname === '/api/tenant/onboarding')
-    || (request.method === 'POST' && pathname === '/api/rooms');
+    || (request.method === 'POST' && pathname === '/api/rooms')
+    // Telemetry, not a business write. It records that a search result was
+    // opened and changes nothing a lapsed subscription should protect. Blocking
+    // it would also bias the numbers exactly where they matter most: the
+    // tenants having trouble would be the ones that stop reporting.
+    || (request.method === 'POST' && pathname === '/api/search/selected');
 }
 
 /** Authenticate a tenant-scoped request and enforce subscription read-only mode. */
