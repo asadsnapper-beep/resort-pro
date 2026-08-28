@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { locales, localeNames, type Locale } from '@/i18n/config';
 
 interface LanguageSwitcherProps {
@@ -48,9 +48,65 @@ export function LanguageSwitcher({
   }
 
   // Dropdown variant
+  //
+  // Opened by click, not by CSS :hover. Hover-only meant this could not be
+  // opened on a phone — where there is no hover — or by keyboard, so the
+  // dashboard had a language switcher that a Bangladeshi resort's staff could
+  // not actually reach on the device they use it on.
+  return <LocaleDropdown
+    currentLocale={currentLocale}
+    isLight={isLight}
+    className={className}
+    onSelect={switchLocale}
+  />;
+}
+
+function LocaleDropdown({
+  currentLocale,
+  isLight,
+  className,
+  onSelect,
+}: {
+  currentLocale: Locale;
+  isLight: boolean;
+  className: string;
+  onSelect: (locale: Locale) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
+
+  // Close on Escape and on a click outside. Without the outside-click the menu
+  // would sit open behind whatever the user tapped next.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
+    const onPointer = (e: PointerEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onPointer);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onPointer);
+    };
+  }, [open]);
+
   return (
-    <div className={`relative group ${className}`}>
-      <button className={`flex w-full items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all
+    <div ref={containerRef} className={`relative ${className}`}>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={menuId}
+        className={`flex w-full items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all
         ${isLight
           ? 'text-gray-500 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-800'
           : 'text-white/70 hover:text-white hover:bg-white/10'
@@ -62,8 +118,12 @@ export function LanguageSwitcher({
         </svg>
       </button>
 
-      <div className={`absolute bottom-full left-0 mb-1 w-40 rounded-xl border shadow-xl
-        opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50
+      <div
+        id={menuId}
+        role="menu"
+        hidden={!open}
+        className={`absolute bottom-full left-0 mb-1 w-40 rounded-xl border shadow-xl transition-all z-50
+        ${open ? 'opacity-100 visible' : 'pointer-events-none opacity-0 invisible'}
         ${isLight
           ? 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900'
           : 'border-white/10 bg-resort-900'
@@ -71,7 +131,9 @@ export function LanguageSwitcher({
         {locales.map((loc) => (
           <button
             key={loc}
-            onClick={() => switchLocale(loc)}
+            type="button"
+            role="menuitem"
+            onClick={() => { onSelect(loc); setOpen(false); }}
             className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm transition-colors
               first:rounded-t-xl last:rounded-b-xl
               ${currentLocale === loc

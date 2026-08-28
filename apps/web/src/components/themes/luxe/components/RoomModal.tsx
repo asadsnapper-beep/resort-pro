@@ -25,6 +25,11 @@ export function RoomModal({ room, currency, primaryColor, accentColor, onClose, 
 
   const allPhotos  = room.images ?? []
   const allVideos  = room.videos ?? []
+
+  // Clamped rather than indexed directly: activeMedia is shared with the photo
+  // strip, so a room with more photos than videos could otherwise leave this
+  // undefined and render an empty player.
+  const activeVideo = allVideos[Math.min(activeMedia, allVideos.length - 1)]
   const totalPhotos = allPhotos.length
   const hasMedia   = totalPhotos > 0 || allVideos.length > 0
 
@@ -71,12 +76,12 @@ export function RoomModal({ room, currency, primaryColor, accentColor, onClose, 
               {allVideos.length > 0 && (
                 <div className="flex gap-1 p-3 bg-black/30">
                   <button
-                    onClick={() => setMediaType('photo')}
+                    onClick={() => { setMediaType('photo'); setActiveMedia(0); }}
                     className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${mediaType === 'photo' ? 'bg-white text-gray-900' : 'text-white/70 hover:text-white'}`}>
                     📷 Photos {totalPhotos > 0 && `(${totalPhotos})`}
                   </button>
                   <button
-                    onClick={() => setMediaType('video')}
+                    onClick={() => { setMediaType('video'); setActiveMedia(0); }}
                     className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${mediaType === 'video' ? 'bg-white text-gray-900' : 'text-white/70 hover:text-white'}`}>
                     🎬 Videos ({allVideos.length})
                   </button>
@@ -120,16 +125,17 @@ export function RoomModal({ room, currency, primaryColor, accentColor, onClose, 
                   </>
                 ) : mediaType === 'video' && allVideos.length > 0 ? (
                   <div className="w-full h-full">
-                    {isYouTube(allVideos[0]) ? (
+                    {isYouTube(activeVideo) ? (
                       <iframe
-                        src={`https://www.youtube.com/embed/${getYTId(allVideos[0])}?autoplay=0&rel=0`}
+                        key={activeVideo}
+                        src={`https://www.youtube.com/embed/${getYTId(activeVideo)}?autoplay=0&rel=0`}
                         className="w-full h-full"
                         frameBorder="0"
                         allowFullScreen
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                       />
                     ) : (
-                      <video src={allVideos[0]} controls className="w-full h-full object-contain bg-black">
+                      <video key={activeVideo} src={activeVideo} controls className="w-full h-full object-contain bg-black">
                         Your browser does not support the video tag.
                       </video>
                     )}
@@ -156,7 +162,10 @@ export function RoomModal({ room, currency, primaryColor, accentColor, onClose, 
                 <div className="flex gap-2 p-3 bg-black/60 overflow-x-auto">
                   {allVideos.map((_, i) => (
                     <button key={i}
-                      className="flex-shrink-0 h-14 w-20 rounded-lg bg-gray-700 flex items-center justify-center text-white/60 border-2 border-white/30">
+                      onClick={() => setActiveMedia(i)}
+                      aria-label={`Play video ${i + 1}`}
+                      aria-current={activeMedia === i}
+                      className={`flex-shrink-0 h-14 w-20 rounded-lg bg-gray-700 flex items-center justify-center text-white/60 border-2 transition-all ${activeMedia === i ? 'border-white text-white scale-105' : 'border-white/30 hover:border-white/60'}`}>
                       ▶
                     </button>
                   ))}
