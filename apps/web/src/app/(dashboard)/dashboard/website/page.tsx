@@ -94,7 +94,7 @@ function SaveBtn({ loading, dirty, onClick }: { loading: boolean; dirty?: boolea
     <div className="flex items-center gap-2.5">
       {dirty && !loading && (
         <span className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
-          style={{ background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.25)', color: '#b89040' }}>
+          style={{ background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.25)', color: 'var(--rp-gold)' }}>
           <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#b89040' }} />
           Unsaved changes
         </span>
@@ -278,7 +278,7 @@ export default function WebsitePage() {
   if (isLoading) {
     return (
       <div className="space-y-5">
-        <div className="h-7 w-48 rounded-[8px] animate-pulse" style={{ background: '#e8e5e0' }} />
+        <div className="h-7 w-48 rounded-[8px] animate-pulse" style={{ background: 'var(--rp-surface-4)' }} />
         <div className="h-64 rounded-[14px] animate-pulse" style={{ background: 'var(--rp-surface-4)' }} />
       </div>
     );
@@ -297,7 +297,7 @@ export default function WebsitePage() {
           </div>
           {publicUrl && (
             <span className="hidden sm:flex items-center gap-1.5 rounded-full border px-[9px] py-[3px] text-[11px] font-semibold"
-              style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }}>
+              style={{ background: 'var(--rp-teal-bg)', borderColor: 'var(--rp-border)', color: 'var(--rp-text)' }}>
               <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: '#4ade80' }} /> Live
             </span>
           )}
@@ -307,7 +307,7 @@ export default function WebsitePage() {
           <button onClick={() => setShowPreview(v => !v)} title={showPreview ? 'Hide preview' : 'Show preview'}
             className="hidden lg:flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12px] font-medium transition-colors"
             style={showPreview
-              ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)', color: '#183153' }
+              ? { background: 'var(--rp-teal-bg)', borderColor: 'var(--rp-border)', color: 'var(--rp-text)' }
               : { background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
             {showPreview ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRight className="h-3.5 w-3.5" />}
             {showPreview ? 'Hide Preview' : 'Show Preview'}
@@ -338,7 +338,7 @@ export default function WebsitePage() {
               <button key={id} onClick={() => setTab(id)}
                 className="flex items-center gap-1.5 px-3 py-2.5 text-[12px] font-medium border-b-2 -mb-px transition-colors whitespace-nowrap"
                 style={tab === id
-                  ? { borderColor: '#183153', color: '#183153' }
+                  ? { borderColor: '#183153', color: 'var(--rp-text)' }
                   : { borderColor: 'transparent', color: 'var(--rp-text-muted)' }}>
                 <Icon className="h-3.5 w-3.5" /> {label}
               </button>
@@ -346,15 +346,15 @@ export default function WebsitePage() {
           </div>
 
           {/* Scrollable content */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-5" style={{ background: '#f7f5f0' }}>
+          <div className="flex-1 overflow-y-auto p-4 space-y-5" style={{ background: 'var(--rp-surface-3)' }}>
 
             {/* Live URL banner — canonical public address + copy */}
             {publicUrl && tenant?.slug && (
               <div className="flex items-center gap-2 rounded-[10px] border px-3 py-2"
-                style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)' }}>
-                <Globe className="h-3.5 w-3.5 shrink-0" style={{ color: '#183153' }} />
+                style={{ background: 'var(--rp-teal-bg)', borderColor: 'var(--rp-border)' }}>
+                <Globe className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--rp-text)' }} />
                 <a href={publicUrl} target="_blank" rel="noopener noreferrer"
-                  className="text-[12px] font-semibold truncate hover:underline" style={{ color: '#183153' }}>
+                  className="text-[12px] font-semibold truncate hover:underline" style={{ color: 'var(--rp-text)' }}>
                   {tenant.slug}.resortpro.site
                 </a>
                 <button
@@ -365,7 +365,7 @@ export default function WebsitePage() {
                   }}
                   title="Copy site address"
                   className="ml-auto flex shrink-0 items-center gap-1 rounded-[7px] border px-2 py-1 text-[11px] font-semibold transition-colors hover:bg-white/60"
-                  style={{ borderColor: 'rgba(24,49,83,0.25)', color: '#183153' }}>
+                  style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text)' }}>
                   {urlCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                   {urlCopied ? 'Copied' : 'Copy'}
                 </button>
@@ -373,7 +373,7 @@ export default function WebsitePage() {
                   onClick={() => window.open(publicUrl, '_blank')}
                   title="Open site"
                   className="flex shrink-0 items-center gap-1 rounded-[7px] border px-2 py-1 text-[11px] font-semibold transition-colors hover:bg-white/60"
-                  style={{ borderColor: 'rgba(24,49,83,0.25)', color: '#183153' }}>
+                  style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text)' }}>
                   <ExternalLink className="h-3 w-3" /> Open
                 </button>
               </div>
@@ -387,7 +387,7 @@ export default function WebsitePage() {
                     <h3 className="text-[13.5px] font-bold text-[#183153]">Your site is {checklistPct}% ready</h3>
                     <p className="text-[11.5px] text-[#64748b]">Finish these to make a great first impression</p>
                   </div>
-                  <span className="text-[12px] font-bold" style={{ color: '#183153' }}>{checklistDone}/{checklist.length}</span>
+                  <span className="text-[12px] font-bold" style={{ color: 'var(--rp-text)' }}>{checklistDone}/{checklist.length}</span>
                 </div>
                 <div className="h-1.5 w-full overflow-hidden rounded-full" style={{ background: 'var(--rp-surface-3)' }}>
                   <div className="h-full rounded-full transition-all duration-500"
@@ -401,12 +401,12 @@ export default function WebsitePage() {
                         disabled={item.done}
                         className="flex w-full items-center gap-2 rounded-[8px] px-2 py-1.5 text-left text-[12.5px] transition-colors disabled:cursor-default enabled:hover:bg-black/[0.03]">
                         {item.done
-                          ? <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: '#183153' }} />
+                          ? <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: 'var(--rp-text)' }} />
                           : <span className="h-4 w-4 shrink-0 rounded-full border-2" style={{ borderColor: 'rgba(0,0,0,0.15)' }} />}
-                        <span style={item.done ? { color: '#64748b', textDecoration: 'line-through' } : { color: '#183153' }}>
+                        <span style={item.done ? { color: 'var(--rp-text-muted)', textDecoration: 'line-through' } : { color: 'var(--rp-text)' }}>
                           {item.label}
                         </span>
-                        {!item.done && <span className="ml-auto text-[11px] font-semibold" style={{ color: '#183153' }}>Fix →</span>}
+                        {!item.done && <span className="ml-auto text-[11px] font-semibold" style={{ color: 'var(--rp-text)' }}>Fix →</span>}
                       </button>
                     </li>
                   ))}
@@ -433,7 +433,7 @@ export default function WebsitePage() {
                 <div className={cardCls} style={cardStyle}>
                   <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                     <div className="flex h-7 w-7 items-center justify-center rounded-[7px]" style={{ background: 'var(--rp-teal-bg)' }}>
-                      <Globe className="h-3.5 w-3.5" style={{ color: '#183153' }} />
+                      <Globe className="h-3.5 w-3.5" style={{ color: 'var(--rp-text)' }} />
                     </div>
                     Hero Section
                   </h3>
@@ -460,7 +460,7 @@ export default function WebsitePage() {
                 <div className={cardCls} style={cardStyle}>
                   <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                     <div className="flex h-7 w-7 items-center justify-center rounded-[7px]" style={{ background: 'var(--rp-amber-bg)' }}>
-                      <FileText className="h-3.5 w-3.5" style={{ color: '#b89040' }} />
+                      <FileText className="h-3.5 w-3.5" style={{ color: 'var(--rp-gold)' }} />
                     </div>
                     About Section
                   </h3>
@@ -493,7 +493,7 @@ export default function WebsitePage() {
                 <div className="flex items-center justify-between">
                   <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                     <div className="flex h-7 w-7 items-center justify-center rounded-[7px]" style={{ background: 'var(--rp-coral-bg)' }}>
-                      <Image className="h-3.5 w-3.5" style={{ color: '#b8724a' }} />
+                      <Image className="h-3.5 w-3.5" style={{ color: 'var(--rp-coral)' }} />
                     </div>
                     Gallery Images
                   </h3>
@@ -531,7 +531,7 @@ export default function WebsitePage() {
                 <div className="flex items-center justify-between">
                   <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                     <div className="flex h-7 w-7 items-center justify-center rounded-[7px]" style={{ background: 'var(--rp-amber-bg)' }}>
-                      <Star className="h-3.5 w-3.5" style={{ color: '#b89040' }} />
+                      <Star className="h-3.5 w-3.5" style={{ color: 'var(--rp-gold)' }} />
                     </div>
                     Guest Testimonials
                   </h3>
@@ -598,7 +598,7 @@ export default function WebsitePage() {
                 <div className={cardCls} style={cardStyle}>
                   <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                     <div className="flex h-7 w-7 items-center justify-center rounded-[7px]" style={{ background: 'var(--rp-teal-bg)' }}>
-                      <FileText className="h-3.5 w-3.5" style={{ color: '#183153' }} />
+                      <FileText className="h-3.5 w-3.5" style={{ color: 'var(--rp-text)' }} />
                     </div>
                     SEO Settings
                   </h3>
@@ -622,7 +622,7 @@ export default function WebsitePage() {
                     <p className="mt-1 text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">
                       Your GA4 Measurement ID — find it in{' '}
                       <a href="https://analytics.google.com" target="_blank" rel="noopener noreferrer"
-                        className="underline" style={{ color: '#183153' }}>Google Analytics</a>
+                        className="underline" style={{ color: 'var(--rp-text)' }}>Google Analytics</a>
                       {' '}→ Admin → Data Streams.
                     </p>
                   </div>
@@ -631,7 +631,7 @@ export default function WebsitePage() {
                 <div className={cardCls} style={cardStyle}>
                   <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                     <div className="flex h-7 w-7 items-center justify-center rounded-[7px]" style={{ background: 'var(--rp-amber-bg)' }}>
-                      <Palette className="h-3.5 w-3.5" style={{ color: '#b89040' }} />
+                      <Palette className="h-3.5 w-3.5" style={{ color: 'var(--rp-gold)' }} />
                     </div>
                     Brand Colors
                   </h3>
@@ -684,7 +684,7 @@ export default function WebsitePage() {
                 <div className={cardCls} style={cardStyle}>
                   <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                     <div className="flex h-7 w-7 items-center justify-center rounded-[7px]" style={{ background: 'var(--rp-teal-bg)' }}>
-                      <LayoutGrid className="h-3.5 w-3.5" style={{ color: '#183153' }} />
+                      <LayoutGrid className="h-3.5 w-3.5" style={{ color: 'var(--rp-text)' }} />
                     </div>
                     Page Sections
                   </h3>
@@ -712,12 +712,12 @@ export default function WebsitePage() {
                             <button type="button" onClick={() => move(sec.id, -1)} disabled={idx === 0}
                               title="Move up"
                               className="flex h-5 w-6 items-center justify-center rounded-[5px] transition-colors disabled:opacity-25 enabled:hover:bg-black/[0.06]">
-                              <ChevronUp className="h-3.5 w-3.5" style={{ color: '#183153' }} />
+                              <ChevronUp className="h-3.5 w-3.5" style={{ color: 'var(--rp-text)' }} />
                             </button>
                             <button type="button" onClick={() => move(sec.id, 1)} disabled={idx === order.length - 1}
                               title="Move down"
                               className="flex h-5 w-6 items-center justify-center rounded-[5px] transition-colors disabled:opacity-25 enabled:hover:bg-black/[0.06]">
-                              <ChevronDown className="h-3.5 w-3.5" style={{ color: '#183153' }} />
+                              <ChevronDown className="h-3.5 w-3.5" style={{ color: 'var(--rp-text)' }} />
                             </button>
                           </div>
                           <div className="flex-1">
@@ -728,7 +728,7 @@ export default function WebsitePage() {
                           </div>
                           {sec.fixed ? (
                             <span className="shrink-0 rounded-full border px-2 py-0.5 text-[10.5px] font-semibold"
-                              style={{ borderColor: 'rgba(24,49,83,0.25)', color: '#183153' }}>
+                              style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text)' }}>
                               Always shown
                             </span>
                           ) : (
@@ -744,7 +744,7 @@ export default function WebsitePage() {
                     })}
                   </div>
                   <button type="button" onClick={() => set('sectionOrder', [])}
-                    className="text-[12px] font-medium underline-offset-2 hover:underline" style={{ color: '#64748b' }}>
+                    className="text-[12px] font-medium underline-offset-2 hover:underline" style={{ color: 'var(--rp-text-muted)' }}>
                     Reset to default order
                   </button>
                 </div>
@@ -757,7 +757,7 @@ export default function WebsitePage() {
                 <div className={cardCls} style={cardStyle}>
                   <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                     <div className="flex h-7 w-7 items-center justify-center rounded-[7px]" style={{ background: 'var(--rp-teal-bg)' }}>
-                      <Share2 className="h-3.5 w-3.5" style={{ color: '#183153' }} />
+                      <Share2 className="h-3.5 w-3.5" style={{ color: 'var(--rp-text)' }} />
                     </div>
                     Social Profiles
                   </h3>
@@ -793,8 +793,8 @@ export default function WebsitePage() {
                     <p className="mt-1 text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">Include country code. E.g. +8801712345678</p>
                   </div>
                   {form.whatsappNumber && (
-                    <div className="rounded-[10px] border p-4" style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)' }}>
-                      <p className="text-[12px] font-medium mb-2" style={{ color: '#183153' }}>Preview</p>
+                    <div className="rounded-[10px] border p-4" style={{ background: 'var(--rp-teal-bg)', borderColor: 'var(--rp-border)' }}>
+                      <p className="text-[12px] font-medium mb-2" style={{ color: 'var(--rp-text)' }}>Preview</p>
                       <a href={`https://wa.me/${form.whatsappNumber.replace(/\D/g, '')}`}
                         target="_blank" rel="noopener noreferrer"
                         className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-medium text-white hover:opacity-90 transition-colors"
@@ -804,7 +804,7 @@ export default function WebsitePage() {
                     </div>
                   )}
                   <div className="rounded-[10px] border p-3" style={{ background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.2)' }}>
-                    <p className="text-[12px]" style={{ color: '#b89040' }}>
+                    <p className="text-[12px]" style={{ color: 'var(--rp-gold)' }}>
                       <strong>Tip:</strong> Social links and WhatsApp button are only shown to guests on your public website — not in the dashboard.
                     </p>
                   </div>
@@ -818,12 +818,12 @@ export default function WebsitePage() {
 
                 {tenant?.slug && (
                   <div className="flex items-start gap-3 rounded-[12px] border p-4"
-                    style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)' }}>
-                    <Globe className="h-5 w-5 mt-0.5 shrink-0" style={{ color: '#183153' }} />
+                    style={{ background: 'var(--rp-teal-bg)', borderColor: 'var(--rp-border)' }}>
+                    <Globe className="h-5 w-5 mt-0.5 shrink-0" style={{ color: 'var(--rp-text)' }} />
                     <div>
-                      <p className="text-[13px] font-semibold mb-0.5" style={{ color: '#183153' }}>Your free subdomain</p>
+                      <p className="text-[13px] font-semibold mb-0.5" style={{ color: 'var(--rp-text)' }}>Your free subdomain</p>
                       <a href={`https://${tenant.slug}.resortpro.site`} target="_blank" rel="noopener noreferrer"
-                        className="text-[12.5px] font-mono flex items-center gap-1 hover:underline" style={{ color: '#183153' }}>
+                        className="text-[12.5px] font-mono flex items-center gap-1 hover:underline" style={{ color: 'var(--rp-text)' }}>
                         {tenant.slug}.resortpro.site <ExternalLink className="h-3 w-3" />
                       </a>
                       <p className="mt-1 text-[11.5px] text-[#475569] dark:text-[#9db4c4]">This always works — no setup required.</p>
@@ -848,11 +848,11 @@ export default function WebsitePage() {
                   {domainInfo?.customDomain && (
                     <div className="flex items-center gap-3 rounded-[10px] border p-3"
                       style={domainInfo.domainVerified
-                        ? { background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)' }
+                        ? { background: 'var(--rp-teal-bg)', borderColor: 'var(--rp-border)' }
                         : { background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.25)' }}>
                       {domainInfo.domainVerified
-                        ? <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: '#183153' }} />
-                        : <AlertTriangle className="h-5 w-5 shrink-0" style={{ color: '#b89040' }} />}
+                        ? <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: 'var(--rp-text)' }} />
+                        : <AlertTriangle className="h-5 w-5 shrink-0" style={{ color: 'var(--rp-gold)' }} />}
                       <div className="flex-1 min-w-0">
                         <p className="text-[13px] font-semibold font-mono truncate text-[#183153] dark:text-[#f8fafc]">{domainInfo.customDomain}</p>
                         <p className="text-[11.5px]" style={{ color: domainInfo.domainVerified ? '#183153' : '#b89040' }}>
@@ -861,7 +861,7 @@ export default function WebsitePage() {
                       </div>
                       {domainInfo.domainVerified && (
                         <a href={`https://${domainInfo.customDomain}`} target="_blank" rel="noopener noreferrer"
-                          style={{ color: '#183153' }}>
+                          style={{ color: 'var(--rp-text)' }}>
                           <ExternalLink className="h-4 w-4" />
                         </a>
                       )}
@@ -888,7 +888,7 @@ export default function WebsitePage() {
                   {domainInfo?.customDomain && !domainInfo.domainVerified && (
                     <button onClick={() => verifyMut.mutate()} disabled={verifyMut.isPending}
                       className="flex w-full items-center justify-center gap-2 rounded-[9px] border py-2 text-[13px] font-medium transition-colors disabled:opacity-60 hover:bg-[#f4ecda]"
-                      style={{ borderColor: 'rgba(184,144,64,0.35)', color: '#b89040' }}>
+                      style={{ borderColor: 'rgba(184,144,64,0.35)', color: 'var(--rp-gold)' }}>
                       {verifyMut.isPending
                         ? <><Loader2 className="h-4 w-4 animate-spin" /> Checking DNS…</>
                         : <><CheckCircle2 className="h-4 w-4" /> Verify Domain</>}
@@ -897,7 +897,7 @@ export default function WebsitePage() {
 
                   {domainInfo?.customDomain && (
                     <button onClick={() => { setDomainInput(''); setDomainMut.mutate(null); }}
-                      className="text-[12px] hover:underline" style={{ color: '#c43c3c' }}>
+                      className="text-[12px] hover:underline" style={{ color: 'var(--rp-danger)' }}>
                       Remove custom domain
                     </button>
                   )}
@@ -922,7 +922,7 @@ export default function WebsitePage() {
                         ].map(({ label, value }) => (
                           <div key={label}>
                             <p className="text-[10.5px] mb-1 text-[#64748b] dark:text-[#a9c1d0]">{label}</p>
-                            <code className="block rounded-[6px] border px-2 py-1 text-[11px] font-mono break-all bg-white dark:bg-white/5" style={{ borderColor: 'var(--rp-border)', color: '#183153' }}>{value}</code>
+                            <code className="block rounded-[6px] border px-2 py-1 text-[11px] font-mono break-all bg-white dark:bg-white/5" style={{ borderColor: 'var(--rp-border)', color: 'var(--rp-text)' }}>{value}</code>
                           </div>
                         ))}
                       </div>
@@ -931,7 +931,7 @@ export default function WebsitePage() {
                       DNS changes can take up to <strong>48 hours</strong> to propagate. Once set, click <strong>Verify Domain</strong> above.
                     </p>
                     <div className="rounded-[10px] border p-3" style={{ background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.2)' }}>
-                      <p className="text-[12px]" style={{ color: '#b89040' }}>
+                      <p className="text-[12px]" style={{ color: 'var(--rp-gold)' }}>
                         <strong>Cloudflare users:</strong> Make sure the CNAME proxy is <strong>DNS only</strong> (grey cloud ☁️), not Proxied (orange cloud 🟠) during initial verification.
                       </p>
                     </div>
@@ -940,14 +940,14 @@ export default function WebsitePage() {
 
                 {domainInfo?.domainVerified && (
                   <div className="flex items-start gap-3 rounded-[12px] border p-5"
-                    style={{ background: 'var(--rp-teal-bg)', borderColor: 'rgba(24,49,83,0.2)' }}>
-                    <CheckCircle2 className="h-6 w-6 mt-0.5 shrink-0" style={{ color: '#183153' }} />
+                    style={{ background: 'var(--rp-teal-bg)', borderColor: 'var(--rp-border)' }}>
+                    <CheckCircle2 className="h-6 w-6 mt-0.5 shrink-0" style={{ color: 'var(--rp-text)' }} />
                     <div>
-                      <p className="text-[14px] font-semibold" style={{ color: '#183153' }}>Domain is live!</p>
+                      <p className="text-[14px] font-semibold" style={{ color: 'var(--rp-text)' }}>Domain is live!</p>
                       <p className="text-[12.5px] mt-0.5 text-[#475569] dark:text-[#9db4c4]">
                         Your website is accessible at{' '}
                         <a href={`https://${domainInfo.customDomain}`} target="_blank" rel="noopener noreferrer"
-                          className="font-semibold underline" style={{ color: '#183153' }}>
+                          className="font-semibold underline" style={{ color: 'var(--rp-text)' }}>
                           {domainInfo.customDomain}
                         </a>
                       </p>
@@ -974,7 +974,7 @@ export default function WebsitePage() {
 
         {/* ── RIGHT: Live preview ────────────────────────────────────────────── */}
         {showPreview && previewUrl && (
-          <div className="hidden lg:flex flex-col min-h-0" style={{ background: '#e8e5e0' }}>
+          <div className="hidden lg:flex flex-col min-h-0" style={{ background: 'var(--rp-surface-4)' }}>
 
             {/* Preview toolbar */}
             <div className="flex items-center gap-2 px-4 py-2 flex-shrink-0"
@@ -991,14 +991,14 @@ export default function WebsitePage() {
                 <button onClick={() => setMobileView(false)} title="Desktop view"
                   className="flex h-[26px] w-[26px] items-center justify-center rounded-[6px] transition-colors"
                   style={!mobileView
-                    ? { background: 'var(--rp-teal-bg)', color: '#183153' }
+                    ? { background: 'var(--rp-teal-bg)', color: 'var(--rp-text)' }
                     : { color: 'var(--rp-text-faint)' }}>
                   <Monitor className="h-3.5 w-3.5" />
                 </button>
                 <button onClick={() => setMobileView(true)} title="Mobile view"
                   className="flex h-[26px] w-[26px] items-center justify-center rounded-[6px] transition-colors"
                   style={mobileView
-                    ? { background: 'var(--rp-teal-bg)', color: '#183153' }
+                    ? { background: 'var(--rp-teal-bg)', color: 'var(--rp-text)' }
                     : { color: 'var(--rp-text-faint)' }}>
                   <Smartphone className="h-3.5 w-3.5" />
                 </button>
@@ -1059,13 +1059,13 @@ export default function WebsitePage() {
         <div className="space-y-3">
           <p className="text-[13px] leading-relaxed" style={{ color: 'var(--rp-text-muted)' }}>
             Guests will see the updated site at{' '}
-            <span className="font-semibold" style={{ color: '#183153' }}>{tenant?.slug}.resortpro.site</span>{' '}
+            <span className="font-semibold" style={{ color: 'var(--rp-text)' }}>{tenant?.slug}.resortpro.site</span>{' '}
             as soon as you publish.
           </p>
           {checklistPct < 100 && (
             <div className="flex items-start gap-2 rounded-[10px] border px-3 py-2.5"
               style={{ background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.25)' }}>
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: '#b89040' }} />
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: 'var(--rp-gold)' }} />
               <p className="text-[12.5px] leading-relaxed" style={{ color: '#8a6d30' }}>
                 Your site is {checklistPct}% complete — you can publish now and finish the remaining{' '}
                 {checklist.length - checklistDone} checklist item{checklist.length - checklistDone !== 1 ? 's' : ''} later.

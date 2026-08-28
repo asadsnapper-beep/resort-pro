@@ -189,25 +189,22 @@ export function ThemePicker({ currentTheme, slug, onSelect }: ThemePickerProps) 
           return (
             <div key={theme.key}
               onClick={() => !locked && onSelect(theme.key)}
-              // A white surface and dark text in both themes, deliberately.
-              // The editor panel this sits in hardcodes `background: #f7f5f0`
-              // inline, so it stays cream even in dark mode and no `dark:` class
-              // can override an inline style — which is why the old
-              // `dark:text-white` title was white-on-cream and unreadable.
-              // Making the panel dark instead fixed this row and broke the
-              // readiness checklist and domain banner beside it, which are built
-              // for a light surface. So the row owns its colours and reads
-              // correctly whatever the panel does; the panel is a separate bug.
-              className={`group relative flex gap-3 rounded-2xl border-2 bg-white p-3 transition-all duration-200 ${
+              // Surface from the theme tokens rather than a literal, so the row
+              // follows the panel. It could not before: the panel hardcoded its
+              // background as an inline style, which no `dark:` class can beat,
+              // so it stayed cream in dark mode and any `dark:text-white` here
+              // was white-on-cream. That is fixed at the source now — the panel
+              // uses --rp-surface-3, which flips.
+              className={`group relative flex gap-3 rounded-2xl border-2 bg-[var(--rp-surface)] p-3 transition-all duration-200 ${
                 locked
-                  ? 'opacity-70 cursor-not-allowed border-gray-200 dark:border-gray-800'
+                  ? 'opacity-70 cursor-not-allowed border-[var(--rp-border)]'
                   : isSelected
                   ? 'border-resort-600 shadow-lg shadow-resort-100/50 cursor-pointer'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-resort-300 hover:shadow-md cursor-pointer'
+                  : 'border-[var(--rp-border-md)] hover:border-resort-300 hover:shadow-md cursor-pointer'
               }`}>
 
               {/* Thumbnail — fixed width so the text column gets the rest */}
-              <div className="relative h-24 w-32 shrink-0 overflow-hidden rounded-xl bg-gray-100">
+              <div className="relative h-24 w-32 shrink-0 overflow-hidden rounded-xl bg-[var(--rp-surface-3)]">
                 {theme.previewImage
                   ? <img src={theme.previewImage} alt={theme.name}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
@@ -250,7 +247,7 @@ export function ThemePicker({ currentTheme, slug, onSelect }: ThemePickerProps) 
                   how the buttons escaped the card before. */}
               <div className="flex min-w-0 flex-1 flex-col">
                 <div className="flex items-start justify-between gap-2">
-                  <h4 className="truncate text-sm font-bold text-gray-900">{theme.name}</h4>
+                  <h4 className="truncate text-sm font-bold text-[var(--rp-text)]">{theme.name}</h4>
                   {isSelected && !locked ? (
                     <span className="shrink-0 flex items-center gap-1 rounded-full bg-resort-600 px-2 py-0.5 text-xs font-semibold text-white">
                       <CheckCircle2 className="h-3 w-3" /> Active
@@ -270,14 +267,14 @@ export function ThemePicker({ currentTheme, slug, onSelect }: ThemePickerProps) 
                   )}
                 </div>
 
-                <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-gray-500">{theme.description}</p>
+                <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-[var(--rp-text-muted)]">{theme.description}</p>
 
                 {/* Actions pinned to the bottom of the row */}
                 <div className="mt-auto flex justify-end gap-2 pt-2">
                   <button
                     onClick={e => { e.stopPropagation(); setPreview(theme); }}
-                    className="flex min-w-0 max-w-[180px] flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-200 py-1.5 text-xs font-medium
-                               text-gray-600 transition-colors hover:bg-gray-50 hover:text-resort-600">
+                    className="flex min-w-0 max-w-[180px] flex-1 items-center justify-center gap-1.5 rounded-lg border border-[var(--rp-border-md)] py-1.5 text-xs font-medium
+                               text-[var(--rp-text-muted)] transition-colors hover:bg-[var(--rp-surface-2)] hover:text-[var(--rp-text)]">
                     <Eye className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Preview</span>
                   </button>
 
@@ -285,8 +282,12 @@ export function ThemePicker({ currentTheme, slug, onSelect }: ThemePickerProps) 
                     <button
                       onClick={e => { e.stopPropagation(); buyTheme(theme); }}
                       disabled={buying === theme.key}
-                      className="flex min-w-0 flex-1 max-w-[180px] items-center justify-center gap-1.5 rounded-lg bg-amber-500 py-1.5 text-xs font-semibold text-white
-                                 transition-colors hover:bg-amber-600 disabled:opacity-60">
+                      // Near-black on amber, not white. White on amber-500 is
+                      // 2.1:1 — it looks fine at a glance and fails AA badly,
+                      // which is a poor property for the one button that takes
+                      // someone's money.
+                      className="flex min-w-0 max-w-[180px] flex-1 items-center justify-center gap-1.5 rounded-lg bg-amber-500 py-1.5 text-xs font-semibold text-gray-900
+                                 transition-colors hover:bg-amber-400 disabled:opacity-60">
                       {buying === theme.key
                         ? <><Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> <span className="truncate">Starting…</span></>
                         : <><ShoppingCart className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Buy {priceLabel(theme)}</span></>}
@@ -298,8 +299,8 @@ export function ThemePicker({ currentTheme, slug, onSelect }: ThemePickerProps) 
                   ) : (
                     <button
                       onClick={e => { e.stopPropagation(); onSelect(theme.key); }}
-                      className="min-w-0 max-w-[180px] flex-1 truncate rounded-lg bg-gray-900 py-1.5 text-xs font-semibold text-white
-                                 transition-colors hover:bg-gray-700">
+                      className="min-w-0 max-w-[180px] flex-1 truncate rounded-lg bg-[var(--rp-btn-accent)] py-1.5 text-xs font-semibold text-[var(--rp-btn-accent-text)]
+                                 transition-colors hover:opacity-90">
                       Select
                     </button>
                   )}
