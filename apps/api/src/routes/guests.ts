@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams } from '../utils/response';
+import { matchAllTerms } from '../utils/search-terms';
 
 const guestSchema = z.object({
   firstName: z.string().min(1).max(50),
@@ -25,15 +26,10 @@ export async function guestRoutes(app: FastifyInstance) {
       const query = request.query as { page?: number; limit?: number; search?: string };
       const { page, limit, skip } = parsePageParams(query);
 
-      const where = {
-        ...(query.search && {
-          OR: [
-            { firstName: { contains: query.search, mode: 'insensitive' as never } },
-            { lastName: { contains: query.search, mode: 'insensitive' as never } },
-            { email: { contains: query.search, mode: 'insensitive' as never } },
-          ],
-        }),
-      };
+      // Every word must match some field, rather than one word matching one
+      // field — otherwise a full name like "Karim Hossain" matches nothing,
+      // which is exactly what a global-search result hands this page.
+      const where = { ...(matchAllTerms(query.search, ['firstName', 'lastName', 'email', 'phone']) ?? {}) };
 
       const [guests, total] = await Promise.all([
         db.guest.findMany({ where, skip, take: limit, orderBy: { createdAt: 'desc' } }),

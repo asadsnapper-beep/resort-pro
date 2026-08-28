@@ -658,3 +658,25 @@ export const offersApi = {
   apply: (bookingId: string, offerId: string) => api.post('/offers/apply', { bookingId, offerId }),
   remove: (bookingId: string, offerId: string) => api.delete('/offers/remove', { data: { bookingId, offerId } }),
 };
+
+// ── Global search (⌘K palette) ───────────────────────────────────────────────
+export type SearchResultType = 'booking' | 'guest' | 'room' | 'invoice';
+
+export interface SearchResult {
+  id: string;
+  type: SearchResultType;
+  title: string;
+  subtitle: string;
+  status?: string;
+  href: string;
+}
+
+export const searchApi = {
+  /**
+   * `signal` lets the palette drop a stale request when the query moves on —
+   * without it, a slow response for "Kar" can land after "Karim" and replace
+   * the right results with the wrong ones.
+   */
+  query: (q: string, signal?: AbortSignal) =>
+    api.get<{ data: { results: SearchResult[]; query: string } }>('/search', { params: { q }, signal }),
+};

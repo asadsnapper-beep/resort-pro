@@ -47,6 +47,7 @@ import { chatRoutes } from './routes/chat';
 import { crmRoutes, crmPublicRoutes } from './routes/crm';
 import { billingRoutes, stripeWebhookRoute } from './routes/billing';
 import { themePurchaseRoutes } from './routes/themePurchases';
+import { searchRoutes } from './routes/search';
 import { startDemoRefreshCron } from './jobs/refresh-demo';
 import { adminRoutes } from './routes/admin';
 import { frontDeskRoutes } from './routes/frontDesk';
@@ -326,6 +327,7 @@ export async function buildApp() {
   // ── Routes ────────────────────────────────────────────────────────────────
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(dashboardRoutes, { prefix: '/api/dashboard' });
+  await app.register(searchRoutes,    { prefix: '/api/search' });
   await app.register(tenantRoutes, { prefix: '/api/tenant' });
   await app.register(roomRoutes, { prefix: '/api/rooms' });
   await app.register(propertyRoutes, { prefix: '/api/properties' });

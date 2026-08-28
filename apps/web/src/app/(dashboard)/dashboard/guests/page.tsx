@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { guestsApi } from '@/lib/api';
 import { ConfirmModal } from '@/components/ui/modal';
@@ -19,8 +20,14 @@ interface Guest {
 
 export default function GuestsPage() {
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const searchParams = useSearchParams();
+  /**
+   * Seeded from `?search=` so a global-search result lands on this page with the
+   * record already isolated. Without it the palette navigates here and shows an
+   * unfiltered list, which is not "opening" the record the user picked.
+   */
+  const [search, setSearch] = useState(searchParams.get('search') ?? '');
+  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') ?? '');
   const [page, setPage] = useState(1);
   const [addOpen, setAddOpen] = useState(false);
   const [editGuest, setEditGuest] = useState<Guest | null>(null);
