@@ -173,8 +173,15 @@ export function ThemePicker({ currentTheme, slug, onSelect }: ThemePickerProps) 
         </p>
       )}
 
-      {/* Theme grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      {/* Theme list — one row per theme.
+          Not a multi-column grid: this panel lives inside the website editor's
+          fixed 440px column (`lg:grid-cols-[440px_1fr]`), so it has ~407px to
+          work with no matter how wide the window gets. The old
+          `lg:grid-cols-3` keyed off the *viewport*, which the panel does not
+          follow, and squeezed three cards into 122px each — names wrapped and
+          the Select and Buy buttons overflowed the card by up to 37px.
+          A horizontal row fits the real width and cannot collapse that way. */}
+      <div className="flex flex-col gap-3">
         {filtered.map(theme => {
           const isSelected = currentTheme === theme.key;
           const locked     = isLocked(theme);
@@ -182,7 +189,16 @@ export function ThemePicker({ currentTheme, slug, onSelect }: ThemePickerProps) 
           return (
             <div key={theme.key}
               onClick={() => !locked && onSelect(theme.key)}
-              className={`group relative rounded-2xl border-2 overflow-hidden transition-all duration-200 ${
+              // A white surface and dark text in both themes, deliberately.
+              // The editor panel this sits in hardcodes `background: #f7f5f0`
+              // inline, so it stays cream even in dark mode and no `dark:` class
+              // can override an inline style — which is why the old
+              // `dark:text-white` title was white-on-cream and unreadable.
+              // Making the panel dark instead fixed this row and broke the
+              // readiness checklist and domain banner beside it, which are built
+              // for a light surface. So the row owns its colours and reads
+              // correctly whatever the panel does; the panel is a separate bug.
+              className={`group relative flex gap-3 rounded-2xl border-2 bg-white p-3 transition-all duration-200 ${
                 locked
                   ? 'opacity-70 cursor-not-allowed border-gray-200 dark:border-gray-800'
                   : isSelected
@@ -190,8 +206,8 @@ export function ThemePicker({ currentTheme, slug, onSelect }: ThemePickerProps) 
                   : 'border-gray-200 dark:border-gray-700 hover:border-resort-300 hover:shadow-md cursor-pointer'
               }`}>
 
-              {/* Preview image — falls back to a live scaled render of the actual theme */}
-              <div className="relative h-44 overflow-hidden bg-gray-100 dark:bg-gray-800">
+              {/* Thumbnail — fixed width so the text column gets the rest */}
+              <div className="relative h-24 w-32 shrink-0 overflow-hidden rounded-xl bg-gray-100">
                 {theme.previewImage
                   ? <img src={theme.previewImage} alt={theme.name}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
@@ -205,9 +221,9 @@ export function ThemePicker({ currentTheme, slug, onSelect }: ThemePickerProps) 
                         aria-hidden="true"
                         className="pointer-events-none select-none border-0"
                         style={{
-                          width: '400%',
-                          height: '400%',
-                          transform: 'scale(0.25)',
+                          width: '500%',
+                          height: '500%',
+                          transform: 'scale(0.2)',
                           transformOrigin: 'top left',
                         }}
                       />
@@ -215,106 +231,75 @@ export function ThemePicker({ currentTheme, slug, onSelect }: ThemePickerProps) 
                   )
                 }
 
-                {/* Hover overlay with Preview button — offered for locked themes
-                    too: nobody buys a design they were not allowed to look at. */}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-200 flex items-center justify-center">
-                  <button
-                    onClick={e => { e.stopPropagation(); setPreview(theme); }}
-                    className="flex items-center gap-2 bg-white/90 dark:bg-gray-900/90 text-gray-900 dark:text-white text-xs font-semibold px-4 py-2 rounded-full shadow-lg
-                               opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-2 group-hover:translate-y-0 hover:bg-white dark:hover:bg-gray-800">
-                    <Eye className="h-3.5 w-3.5" /> Preview
-                  </button>
-                </div>
-
-                {/* Price tag on themes this resort has not bought */}
-                {locked && (
-                  <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
-                    <Lock className="h-3 w-3" />
-                    {theme.onOffer && theme.listPriceUsd ? (
-                      <>
-                        <span className="text-white/60 line-through">${theme.listPriceUsd}</span>
-                        <span className="text-amber-300">{priceLabel(theme)}</span>
-                      </>
-                    ) : (
-                      priceLabel(theme)
-                    )}
-                  </div>
-                )}
-
-                {/* Active badge */}
-                {isSelected && !locked && (
-                  <div className="absolute top-3 right-3 flex items-center gap-1 bg-resort-600 text-white text-xs font-semibold px-2.5 py-1 rounded-full shadow-sm">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Active
-                  </div>
-                )}
-
-                {/* Premium badge */}
+                {/* Premium marker. The row has a real Preview button now, so the
+                    thumbnail no longer hides one behind a hover state. */}
                 {theme.isPremium && (
-                  <div className="absolute top-3 left-3 flex items-center gap-1 bg-amber-500 text-white text-xs font-semibold px-2.5 py-1 rounded-full shadow-sm">
-                    <Sparkles className="h-3 w-3" /> Premium
+                  <div className="absolute top-1.5 left-1.5 flex items-center gap-1 rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+                    <Sparkles className="h-2.5 w-2.5" /> Premium
+                  </div>
+                )}
+                {locked && (
+                  <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded-full bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+                    <Lock className="h-2.5 w-2.5" />
                   </div>
                 )}
               </div>
 
-              {/* Card body */}
-              <div className="p-4">
-                <div className="flex items-start justify-between mb-1">
-                  <h4 className="font-bold text-gray-900 dark:text-white text-sm">{theme.name}</h4>
-                  {theme.isFree ?? !theme.isPremium ? (
-                    <span className="text-xs font-medium text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-400 px-2 py-0.5 rounded-full">Free</span>
+              {/* Text column. min-w-0 is what actually lets this shrink — without
+                  it a flex child refuses to go below its content width, which is
+                  how the buttons escaped the card before. */}
+              <div className="flex min-w-0 flex-1 flex-col">
+                <div className="flex items-start justify-between gap-2">
+                  <h4 className="truncate text-sm font-bold text-gray-900">{theme.name}</h4>
+                  {isSelected && !locked ? (
+                    <span className="shrink-0 flex items-center gap-1 rounded-full bg-resort-600 px-2 py-0.5 text-xs font-semibold text-white">
+                      <CheckCircle2 className="h-3 w-3" /> Active
+                    </span>
+                  ) : theme.isFree ?? !theme.isPremium ? (
+                    <span className="shrink-0 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-600">Free</span>
                   ) : locked ? (
-                    <span className="text-xs font-medium text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400 px-2 py-0.5 rounded-full flex items-center gap-1">
-                      {priceLabel(theme)}
+                    <span className="shrink-0 whitespace-nowrap rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-600">
+                      {theme.onOffer && theme.listPriceUsd
+                        ? <><span className="text-amber-400 line-through">${theme.listPriceUsd}</span> {priceLabel(theme)}</>
+                        : priceLabel(theme)}
                     </span>
                   ) : (
-                    // Paid, and already theirs — say so plainly, so nobody
-                    // wonders whether they are about to be charged again.
-                    <span className="text-xs font-medium text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-400 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="shrink-0 flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-600">
                       <CheckCircle2 className="h-3 w-3" /> Owned
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed mb-3">{theme.description}</p>
 
-                {/* Tags */}
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {(theme.tags ?? []).map(tag => (
-                    <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
+                <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-gray-500">{theme.description}</p>
 
-                {/* Actions row */}
-                <div className="flex gap-2">
-                  {/* Preview button */}
+                {/* Actions pinned to the bottom of the row */}
+                <div className="mt-auto flex justify-end gap-2 pt-2">
                   <button
                     onClick={e => { e.stopPropagation(); setPreview(theme); }}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium border border-gray-200 dark:border-gray-700 rounded-lg py-1.5
-                               text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-resort-600 transition-colors">
-                    <Eye className="h-3.5 w-3.5" /> Preview
+                    className="flex min-w-0 max-w-[180px] flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-200 py-1.5 text-xs font-medium
+                               text-gray-600 transition-colors hover:bg-gray-50 hover:text-resort-600">
+                    <Eye className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Preview</span>
                   </button>
 
-                  {/* Buy / Select / Selected */}
                   {locked ? (
                     <button
                       onClick={e => { e.stopPropagation(); buyTheme(theme); }}
                       disabled={buying === theme.key}
-                      className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-1.5 bg-amber-500 text-white
-                                 hover:bg-amber-600 disabled:opacity-60 transition-colors">
+                      className="flex min-w-0 flex-1 max-w-[180px] items-center justify-center gap-1.5 rounded-lg bg-amber-500 py-1.5 text-xs font-semibold text-white
+                                 transition-colors hover:bg-amber-600 disabled:opacity-60">
                       {buying === theme.key
-                        ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Starting…</>
-                        : <><ShoppingCart className="h-3.5 w-3.5" /> Buy {priceLabel(theme)}</>}
+                        ? <><Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> <span className="truncate">Starting…</span></>
+                        : <><ShoppingCart className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Buy {priceLabel(theme)}</span></>}
                     </button>
                   ) : isSelected ? (
-                    <div className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg py-1.5 bg-resort-600 text-white">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Selected
+                    <div className="flex min-w-0 flex-1 max-w-[180px] items-center justify-center gap-1.5 rounded-lg bg-resort-600 py-1.5 text-xs font-semibold text-white">
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Selected</span>
                     </div>
                   ) : (
                     <button
                       onClick={e => { e.stopPropagation(); onSelect(theme.key); }}
-                      className="flex-1 text-xs font-semibold rounded-lg py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900
-                                 hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors">
+                      className="min-w-0 max-w-[180px] flex-1 truncate rounded-lg bg-gray-900 py-1.5 text-xs font-semibold text-white
+                                 transition-colors hover:bg-gray-700">
                       Select
                     </button>
                   )}
