@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { bookingsApi, roomsApi, guestsApi } from '@/lib/api';
+import { bookingsApi, roomsApi, guestsApi, ratePlansApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -95,7 +95,20 @@ export function WalkInModal({ onClose }: Props) {
   const nights = form.checkIn && form.checkOut
     ? Math.max(1, Math.ceil((new Date(form.checkOut).getTime() - new Date(form.checkIn).getTime()) / 86_400_000))
     : 1;
-  const totalAmount = selectedRoom ? Number(selectedRoom.basePrice) * nights : 0;
+  // Rate-plan-aware, matching the Front Desk walk-in. This used to quote
+  // basePrice × nights, which is not what the server charges: POST /bookings
+  // resolves the rate plan itself, so a room with a 9,500 base under a 6,375
+  // promo was quoted at 19,000 and booked at 12,750 — the receptionist told
+  // the guest one number and the system recorded another.
+  const { data: rateResolved } = useQuery({
+    queryKey: ['walkin-rate-resolve', form.roomId, form.checkIn, form.checkOut],
+    queryFn: () => ratePlansApi.resolve(form.roomId, form.checkIn, form.checkOut).then(r => r.data.data),
+    enabled: !!form.roomId && !!form.checkIn && !!form.checkOut && form.checkOut > form.checkIn,
+  });
+  const effectiveNightlyRate = (rateResolved as { effectivePrice?: number } | undefined)?.effectivePrice
+    ?? (selectedRoom ? Number(selectedRoom.basePrice) : 0);
+  const activePlanName = (rateResolved as { resolved?: { planName?: string } | null } | undefined)?.resolved?.planName ?? null;
+  const totalAmount = selectedRoom ? effectiveNightlyRate * Math.max(nights, 1) : 0;
 
   const { mutate, isPending } = useMutation({
     mutationFn: async () => {
@@ -301,6 +314,11 @@ export function WalkInModal({ onClose }: Props) {
                 <span style={{ fontWeight: 600, color: 'var(--rp-text)' }}>{selectedRoom.name}</span>
                 {' · '}{nights} night{nights !== 1 ? 's' : ''}
                 {' · '}{form.paymentMethod === 'PENDING' ? 'Pay later' : form.paymentMethod.charAt(0) + form.paymentMethod.slice(1).toLowerCase()}
+                {activePlanName && (
+                  <span style={{ display: 'block', fontSize: '11.5px', color: 'var(--rp-text-muted)', marginTop: '2px' }}>
+                    {activePlanName} · {formatCurrency(effectiveNightlyRate)}/night
+                  </span>
+                )}
               </div>
               <div style={{ textAlign: 'right' }}>
                 <p style={{ fontSize: '17px', fontWeight: 700, color: '#183153', margin: 0 }}>{formatCurrency(totalAmount)}</p>
