@@ -50,7 +50,9 @@ export const DEFAULT_PLAN_CONFIGS: PlanConfig[] = [
     roomLimit: PLAN_PRICING.FREE.roomLimit,
     staffLimit: PLAN_PRICING.FREE.staffLimit,
     aiMonthlyTokenCap: 0,
-    flags: [],
+    // Search is not a paid feature. It shipped to every tenant before this flag
+    // existed, and a FREE resort finding its own booking is not an upsell.
+    flags: ['global_search'],
     features: [
       `Up to ${PLAN_PRICING.FREE.roomLimit} rooms`,
       `${PLAN_PRICING.FREE.staffLimit} staff seats`,
@@ -72,7 +74,7 @@ export const DEFAULT_PLAN_CONFIGS: PlanConfig[] = [
       'custom_domain', 'payment_gateway', 'crm_v2', 'restaurant_module',
       'housekeeping_module', 'inventory_module', 'maintenance_module',
       'marketing_module', 'loyalty_module', 'offers_module', 'rate_plans_module',
-      'group_bookings_module', 'vehicles_module', 'venues_module', 'export_pdf',
+      'group_bookings_module', 'vehicles_module', 'venues_module', 'export_pdf', 'global_search',
       'ai_content',
     ],
     features: [
@@ -97,7 +99,7 @@ export const DEFAULT_PLAN_CONFIGS: PlanConfig[] = [
       'custom_domain', 'payment_gateway', 'crm_v2', 'restaurant_module',
       'housekeeping_module', 'inventory_module', 'maintenance_module',
       'marketing_module', 'loyalty_module', 'offers_module', 'rate_plans_module',
-      'group_bookings_module', 'vehicles_module', 'venues_module', 'export_pdf',
+      'group_bookings_module', 'vehicles_module', 'venues_module', 'export_pdf', 'global_search',
       'ai_content', 'channel_sync', 'corporate_accounts_module',
       'advanced_reports', 'beta_analytics', 'ai_chatbot', 'multi_property',
     ],
@@ -122,7 +124,7 @@ export const DEFAULT_PLAN_CONFIGS: PlanConfig[] = [
     staffLimit: PLAN_PRICING.ENTERPRISE.staffLimit,
     aiMonthlyTokenCap: 1500000,
     flags: [
-      'export_pdf',
+      'export_pdf', 'global_search',
       'ai_content',
       'ai_chatbot',
       'ai_business_insights',

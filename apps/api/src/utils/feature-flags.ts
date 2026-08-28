@@ -79,6 +79,16 @@ export const FLAG_REGISTRY: FlagDefinition[] = [
 
   // ── UX ────────────────────────────────────────────────────────────────────
   {
+    flag: 'global_search',
+    label: 'Global Search (⌘K)',
+    description: 'Header search palette across bookings, guests, rooms and invoices.',
+    category: 'UX',
+    // On by default because this shipped before the flag existed — the switch
+    // is here to turn it OFF for one resort if it misbehaves, not to stage a
+    // rollout that already happened.
+    defaultOn: true,
+  },
+  {
     flag: 'new_booking_flow',
     label: 'New Booking Flow (Beta)',
     description: 'Opt into the redesigned multi-step booking creation wizard.',

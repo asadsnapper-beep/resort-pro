@@ -135,7 +135,11 @@ export function GlobalSearch({
     return () => { controller.abort(); clearTimeout(timer); };
   }, [open, trimmed, tooShort]);
 
-  const go = useCallback((href: string) => {
+  const go = useCallback((href: string, type: string) => {
+    // Reported before navigating, and never awaited — selection rate is the
+    // only signal that says search found the right thing, but it is not worth
+    // a millisecond of the user's time.
+    searchApi.recordSelection(type);
     onOpenChange(false);
     router.push(href);
   }, [onOpenChange, router]);
@@ -161,7 +165,8 @@ export function GlobalSearch({
       e.preventDefault();
       const item = flat[active];
       if (!item) return;
-      go(item.kind === 'action' ? item.href : item.result.href);
+      go(item.kind === 'action' ? item.href : item.result.href,
+         item.kind === 'action' ? 'action' : item.result.type);
     }
   };
 
@@ -227,7 +232,7 @@ export function GlobalSearch({
                         role="option"
                         aria-selected={active === i}
                         onMouseEnter={() => setActive(i)}
-                        onClick={() => go(a.href)}
+                        onClick={() => go(a.href, 'action')}
                         className={`flex w-full items-center gap-2.5 rounded-[8px] px-3 py-2 text-left text-[13px] transition-colors ${
                           active === i ? 'bg-resort-50 text-resort-900 dark:bg-white/10 dark:text-white' : 'text-[#183153] dark:text-[#cbd5e1]'
                         }`}
@@ -279,7 +284,7 @@ export function GlobalSearch({
                       role="option"
                       aria-selected={active === i}
                       onMouseEnter={() => setActive(i)}
-                      onClick={() => go(r.href)}
+                      onClick={() => go(r.href, r.type)}
                       className={`flex w-full items-start justify-between gap-3 rounded-[8px] px-3 py-2 text-left transition-colors ${
                         active === i ? 'bg-resort-50 dark:bg-white/10' : ''
                       }`}

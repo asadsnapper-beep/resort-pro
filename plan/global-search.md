@@ -360,7 +360,35 @@ sheet is a bigger change than the problem justifies right now.
 Exit criteria: the experience is clear and usable at 320-pixel width and has
 no dark hover treatment inconsistent with the product.
 
-### Phase D — rollout and scale
+### Phase D — rollout and scale — flag + signals DONE (29 Aug 2026)
+
+One judgement call worth recording: this plan says "release behind a tenant or
+internal feature flag", but search had already shipped to production unflagged
+by the time Phase D started. Gating it off would have taken away something
+every tenant already has. So `global_search` is granted on all four plans and
+exists as a **kill switch** — the value now is being able to turn it off for one
+resort without a deploy, not staging a rollout that already happened.
+
+Signals, in `utils/search-metrics.ts` and surfaced on the admin metrics
+endpoint alongside the existing request metrics:
+
+- **API p95 came free** — every request already goes through the metrics ring
+  buffer, so `/api/search` latency was being measured before Phase D began.
+- **No-result rate and results-per-query** are server-side only; the route
+  knows both. Queries below the 2-character threshold are deliberately *not*
+  counted, or search would look worse the more someone types.
+- **Selection rate** needed a beacon: a query returning three bookings and a
+  query returning the *right* booking are indistinguishable from the server.
+  `POST /api/search/selected` takes the result type and nothing else — no query
+  text, no record id. Knowing guests get opened more than invoices is enough to
+  act on; storing who searched for whom is not.
+
+Still open from this phase: no pilot has run, so none of these numbers exist
+yet, and "fix weak matches before general release" has nothing to act on. The
+counters are in-process and reset on restart, which is fine for a pilot read and
+useless as history.
+
+
 
 1. Release behind a tenant or internal feature flag.
 2. Pilot with internal/demo resorts and track anonymous operational metrics:

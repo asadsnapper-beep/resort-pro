@@ -19,6 +19,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '@resort-pro/database';
 import { requireAuth } from '../middleware/auth';
+import { searchMetrics } from '../utils/search-metrics';
 import { ok } from '../utils/response';
 import type { JwtPayload, UserRole } from '@resort-pro/types';
 
@@ -122,6 +123,8 @@ export async function searchRoutes(app: FastifyInstance) {
       // Below the threshold, return empty rather than matching broadly — a
       // one-character `contains` is a table scan that returns noise.
       if (query.replace(/\s+/g, '').length < MIN_QUERY_LENGTH) {
+        // Not counted: nothing was searched, so folding this into the
+        // no-result rate would make search look worse the more people type.
         return reply.send(ok({ results: [], query }, 'Search'));
       }
 
@@ -314,7 +317,33 @@ export async function searchRoutes(app: FastifyInstance) {
         if (capped.length >= TOTAL_CAP) break;
       }
 
+      searchMetrics.recordQuery(capped.length);
       return reply.send(ok({ results: capped, query }, 'Search'));
+    },
+  });
+
+  /**
+   * Fire-and-forget: the palette calls this when someone opens a result.
+   *
+   * Selection rate is the one quality signal the server cannot infer — a query
+   * that returns three bookings and a query that returns the *right* booking
+   * look identical from here. Deliberately takes only the result type, never
+   * the query or the record id: knowing that guests get opened more than
+   * invoices is enough to act on, and storing who searched for whom is not.
+   */
+  app.post('/selected', {
+    schema: {
+      tags: ['search'],
+      summary: 'Record that a search result was opened',
+      security: [{ bearerAuth: [] }],
+    },
+    config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
+    preHandler: requireAuth,
+    handler: async (request, reply) => {
+      const { type } = (request.body ?? {}) as { type?: string };
+      const known = ['booking', 'guest', 'room', 'invoice', 'action'];
+      searchMetrics.recordSelection(known.includes(type ?? '') ? type! : 'other');
+      return reply.status(204).send();
     },
   });
 }

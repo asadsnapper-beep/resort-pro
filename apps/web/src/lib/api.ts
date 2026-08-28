@@ -673,6 +673,12 @@ export interface SearchResult {
 
 export const searchApi = {
   /**
+   * Fire-and-forget selection beacon. Failure is ignored on purpose: a metric
+   * that cannot be recorded must never stop the user opening the record.
+   */
+  recordSelection: (type: string) => api.post('/search/selected', { type }).catch(() => {}),
+
+  /**
    * `signal` lets the palette drop a stale request when the query moves on —
    * without it, a slow response for "Kar" can land after "Karim" and replace
    * the right results with the wrong ones.

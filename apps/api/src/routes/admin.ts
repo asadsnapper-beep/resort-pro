@@ -26,6 +26,7 @@ import { FLAG_REGISTRY, FLAG_MAP } from '../utils/feature-flags';
 import { applyPlanFlagsToTenant, DEFAULT_PLAN_CONFIGS, getPlanConfigs } from '../utils/entitlement';
 import { anonymizeTenant, collectTenantExport, getPendingErasures } from '../utils/gdpr';
 import { metrics } from '../utils/metrics';
+import { searchMetrics } from '../utils/search-metrics';
 import { getStorageConfig, invalidateStorageCache, uploadToStorage, deleteFromStorage, type StorageConfig } from '../services/storage';
 import { generateReferralCode, referralRegistrationUrl } from '../utils/referral';
 
@@ -2650,6 +2651,10 @@ Rules:
     const reqMetrics = metrics.snapshot(60 * 60_000);
 
     return reply.send(ok({
+      // Global search pilot signals — plan/global-search.md §Phase D. Latency
+      // and p95 for /api/search are already inside reqMetrics; these are the
+      // things only search knows about itself.
+      search: searchMetrics.snapshot(),
       process: {
         nodeVersion: process.version,
         platform: process.platform,

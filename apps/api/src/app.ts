@@ -327,7 +327,9 @@ export async function buildApp() {
   // ── Routes ────────────────────────────────────────────────────────────────
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(dashboardRoutes, { prefix: '/api/dashboard' });
-  await app.register(searchRoutes,    { prefix: '/api/search' });
+  // Gated so one resort can be switched off without a deploy. Granted on every
+  // plan — see entitlement.ts — because search shipped before the flag existed.
+  await registerFeatureRoutes('/api/search', 'global_search', searchRoutes);
   await app.register(tenantRoutes, { prefix: '/api/tenant' });
   await app.register(roomRoutes, { prefix: '/api/rooms' });
   await app.register(propertyRoutes, { prefix: '/api/properties' });
