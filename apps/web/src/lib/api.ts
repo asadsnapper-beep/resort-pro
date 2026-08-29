@@ -151,6 +151,9 @@ export const frontDeskApi = {
 export const guestsApi = {
   list: (params?: Record<string, unknown>) => api.get('/guests', { params }),
   get: (id: string) => api.get(`/guests/${id}`),
+  // Has this person stayed with us before? Answered from the phone number
+  // alone, so the walk-in desk can ask it while the guest is still talking.
+  lookup: (phone: string) => api.get('/guests/lookup', { params: { phone } }),
   create: (data: unknown) => api.post('/guests', data),
   update: (id: string, data: unknown) => api.patch(`/guests/${id}`, data),
   delete: (id: string) => api.delete(`/guests/${id}`),

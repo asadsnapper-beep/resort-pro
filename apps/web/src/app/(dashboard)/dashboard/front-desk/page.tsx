@@ -1,7 +1,7 @@
 'use client';
 
 import { ModalShell } from '@/components/ui/modal-shell';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { frontDeskApi, bookingsApi, roomsApi, ratePlansApi, guestsApi } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
@@ -184,6 +184,16 @@ function CheckOutModal({ booking, onClose, onSuccess }: { booking: Booking; onCl
   );
 }
 
+/** A previous guest the phone number turned up, as returned by /guests/lookup. */
+type GuestMatch = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  stayCount: number;
+  lastStay: string | null;
+};
+
 // ── Walk-In Modal ──────────────────────────────────────────────────────────────
 function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const { tenant } = useAuthStore();
@@ -200,6 +210,47 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
   });
   const [pendingDoc, setPendingDoc] = useState<PendingDocument | null>(null);
   const [showDocPicker, setShowDocPicker] = useState(false);
+
+  // ── Returning-guest lookup ────────────────────────────────────────────────
+  // Most walk-ins are people who have stayed before. Surfacing that here,
+  // before the booking exists, is what lets the desk put the stay on their
+  // real record instead of a fourth copy of the same person — which is what
+  // used to happen silently on every visit.
+  const [linkedGuest, setLinkedGuest] = useState<GuestMatch | null>(null);
+  const [dismissedPhone, setDismissedPhone] = useState<string | null>(null);
+  const [debouncedPhone, setDebouncedPhone] = useState('');
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedPhone(form.guestPhone), 350);
+    return () => clearTimeout(t);
+  }, [form.guestPhone]);
+
+  const phoneDigits = debouncedPhone.replace(/\D/g, '');
+  const { data: guestMatches } = useQuery({
+    queryKey: ['guest-lookup', phoneDigits],
+    // Seven digits is the server's floor too: below that a "phone number" is
+    // a room number or a half-typed field, and matching on it finds strangers.
+    enabled: phoneDigits.length >= 7 && !linkedGuest,
+    queryFn: () => guestsApi.lookup(debouncedPhone).then(r => (r.data.data as { matches: GuestMatch[] }).matches),
+  });
+  const suggestedGuest = !linkedGuest && dismissedPhone !== phoneDigits ? guestMatches?.[0] ?? null : null;
+
+  // A walk-in stored with a one-word name has "-" as its last name; that is a
+  // placeholder, not something to show a guest or write back into the field.
+  const displayName = (g: GuestMatch) => `${g.firstName} ${g.lastName}`.replace(/ -$/, '').trim();
+
+  const linkGuest = (g: GuestMatch) => {
+    setLinkedGuest(g);
+    // Adopt the stored spelling: the record is the name of account, and the
+    // desk has just confirmed this is the same person.
+    setForm(f => ({ ...f, guestName: displayName(g) }));
+  };
+
+  const unlinkGuest = () => {
+    setLinkedGuest(null);
+    // Remember the refusal, or the suggestion reappears on the next keystroke.
+    setDismissedPhone(phoneDigits);
+  };
 
   const { data: roomData } = useQuery({
     queryKey: ['rooms-available', form.checkIn, form.checkOut],
@@ -229,7 +280,7 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const res = await bookingsApi.walkIn({ ...form, advanceAmount: advanceNum || undefined });
+      const res = await bookingsApi.walkIn({ ...form, advanceAmount: advanceNum || undefined, guestId: linkedGuest?.id });
       const booking = res.data.data as { id: string; guestId: string };
       // Document is attached after the guest/booking actually exist —
       // best-effort: a failed upload shouldn't undo an otherwise-successful
@@ -310,6 +361,52 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
             <ModalInput label="Phone">
               <input value={form.guestPhone} onChange={e => set('guestPhone', e.target.value)} placeholder="01712-345678" className={inputCls} />
             </ModalInput>
+            {(suggestedGuest || linkedGuest) && (
+              <div className="col-span-2 order-last rounded-rp-btn border border-rp-border-md bg-rp-teal-bg p-3 text-rp-body">
+                {linkedGuest ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-rp-text">
+                        Returning guest — {displayName(linkedGuest)}
+                      </p>
+                      <p className="text-rp-micro text-rp-muted">
+                        This stay will be added to their existing record.
+                      </p>
+                    </div>
+                    <button type="button" onClick={unlinkGuest}
+                      className="shrink-0 rounded-rp-ctrl border border-rp-border-md px-3 py-[6px] text-rp-micro font-semibold text-rp-text">
+                      Not them
+                    </button>
+                  </div>
+                ) : suggestedGuest && (
+                  <div className="space-y-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-rp-text">
+                        {displayName(suggestedGuest)} has this number
+                      </p>
+                      <p className="text-rp-micro text-rp-muted">
+                        {suggestedGuest.stayCount > 0
+                          ? `${suggestedGuest.stayCount} previous stay${suggestedGuest.stayCount === 1 ? '' : 's'}`
+                          : 'On file, no completed stays yet'}
+                        {suggestedGuest.lastStay
+                          ? ` · last ${new Date(suggestedGuest.lastStay).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}`
+                          : ''}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => linkGuest(suggestedGuest)}
+                        className="rounded-rp-ctrl bg-rp-btn-accent px-3 py-[6px] text-rp-micro font-semibold text-rp-btn-accent-text">
+                        Same guest
+                      </button>
+                      <button type="button" onClick={() => setDismissedPhone(phoneDigits)}
+                        className="rounded-rp-ctrl border border-rp-border-md px-3 py-[6px] text-rp-micro font-semibold text-rp-text">
+                        Someone new
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex gap-2">
               <ModalInput label="Adults">
                 <input type="number" min={1} value={form.adults} onChange={e => set('adults', Number(e.target.value))} className={inputCls} />
