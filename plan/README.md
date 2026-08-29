@@ -18,14 +18,35 @@ plan/
 
 > **🎯 Active execution roadmap:** [core-workflow-execution-plan.md](./core-workflow-execution-plan.md) — sequenced, small-step plan for booking/payment core gaps found by hand-testing (modify, cancel/refund, rate-plan pricing, double-booking concurrency). Read this before picking the next task; it also says what to explicitly skip/defer from [core-workflow-completion-plan.md](./core-workflow-completion-plan.md)'s bigger 13-initiative audit.
 
+> **💰 Billing contract:** [billing-contract.md](./billing-contract.md) — the
+> normative rules every charge source must follow (one authoritative
+> `bill(bookingId)`, line-item provenance, idempotent charges, immutable final
+> invoice, adjustments instead of edits). Read it before touching anything that
+> puts money on a guest's bill.
+
+### Recommended implementation order
+
+| Priority | Plan | Why this order |
+|---|---|---|
+| **P0** | [checkout-billing-completeness.md](./checkout-billing-completeness.md) | Four totals disagree today and money is collected against the smallest. Everything below adds charges this must be able to carry. |
+| **P1** | [restaurant-room-billing.md](./restaurant-room-billing.md) | Largest unbilled charge volume, and the backend is already shaped for it. |
+| **P1** | [early-checkin-late-checkout.md](./early-checkin-late-checkout.md) | New revenue, self-contained, adds no new charge plumbing. |
+| **P2** | [airport-transfers.md](./airport-transfers.md) — Phase A | Operational only. **Not blocked by billing**: a stranded guest is worse than an unbilled trip. |
+| **P3** | [airport-transfers.md](./airport-transfers.md) — Phase B | Transfer billing; needs P0 finished. |
+
+Six charge sources already funnel through `InvoiceExtra` (minibar, laundry,
+vehicle rental, damages, and soon early/late and transfers) and none of them
+reach the checkout total. P0 is what unblocks all of them.
+
 ---
 
 ## 🏗️ Core PMS (Property Management)
 
 | File | কী আছে | Status |
 |------|---------|--------|
+| [billing-contract.md](./billing-contract.md) | **Normative.** The rules every charge source obeys — one `bill()`, `sourceType`/`sourceId` provenance, idempotent charge creation, immutable final invoice, adjustments not edits, conformance checklist for new modules | 📋 Contract — implemented by P0 |
 | [front-desk.md](./front-desk.md) | Check-in/out, walk-in booking, room map, daily arrivals/departures | ✅ Built |
-| [checkout-billing-completeness.md](./checkout-billing-completeness.md) | এক থাকার একটাই বিল — এখন চার জায়গায় চার অঙ্ক (ঘরের দাম basePrice থেকে নেওয়া হয়, চার্জ করা totalAmount থেকে নয়; খাবার/extras আসল Invoice-এ কখনো ঢোকে না; checkout ইনভয়েস finalize করে না, DRAFT-ই থেকে যায়)। একটাই `bill()`, checkout-এ Invoice → PAID + PDF, ভাঙা হিসাব ও charge যোগের বোতাম | ❌ Not built — **টাকা হারাচ্ছে, আগে করা দরকার** |
+| [checkout-billing-completeness.md](./checkout-billing-completeness.md) | **P0.** One authoritative `bill(bookingId)`; room priced from `booking.totalAmount` not `basePrice`; food/extras/packages/tax in one place; checkout finalises the Invoice (immutable) with idempotent, provenance-tagged line items | ❌ Not built — **loses money today** |
 | [housekeeping.md](./housekeeping.md) | Room status tracking, cleaning tasks, staff assignment, floor map | ✅ Built |
 | [housekeeping-extras.md](./housekeeping-extras.md) | Lost & Found, Minibar (catalog + consumption), Laundry orders — new tabs on the Housekeeping page, with "Bill to Room" wired into the existing InvoiceExtra mechanism | ✅ Built |
 | [maintenance.md](./maintenance.md) | Issue reporting, assignment, OOO room management | ✅ Built |
@@ -42,7 +63,7 @@ plan/
 |------|---------|--------|
 | [offers-promotions.md](./offers-promotions.md) | Offer creation, promo codes, website display, booking form integration | ✅ Built |
 | [launch-pricing-and-trial-abuse-prevention.md](./launch-pricing-and-trial-abuse-prevention.md) | **Active pricing decision:** Free Forever + $19 Independent Resort + $59 Resort Group, customer rights, migration, billing and launch steps | 📋 Approved direction — implementation pending |
-| [early-checkin-late-checkout.md](./early-checkin-late-checkout.md) | Early check-in / late check-out নীতি ও চার্জ (ফ্রি / ৫০% / পুরো রাত), ঘর তৈরি কিনা দেখে সিদ্ধান্ত, Settings-এ সময়-হার | ❌ Not built — checkout-billing-completeness আগে লাগবে |
+| [early-checkin-late-checkout.md](./early-checkin-late-checkout.md) | **P1.** Availability and room readiness gate before price; per-tenant free/half/full policy in tenant timezone; fee from the booking's own effective rate; grants audited with quoted vs waived | ❌ Not built — needs P0 |
 | [dynamic-pricing.md](./dynamic-pricing.md) | Seasonal rules, occupancy-based, day-of-week, advance/last-minute pricing | ❌ Not built — কোনো PricingRule model/seasonal logic নাই |
 | [online-payment.md](./online-payment.md) | Stripe + bKash payment integration | ✅ Built — Stripe + bKash + SSLCommerz সব real |
 | [corporate-accounts.md](./corporate-accounts.md) | Company/B2B client accounts — consolidated billing, credit terms, corporate rates (separate from one-off Group Bookings) | ✅ Built |
@@ -70,7 +91,7 @@ plan/
 | File | কী আছে | Status |
 |------|---------|--------|
 | [guest-crm.md](./guest-crm.md) | Guest profiles, booking history, loyalty program, points system, tiers | ✅ Built |
-| [restaurant-room-billing.md](./restaurant-room-billing.md) | রেস্টুরেন্টের খাবার ঘরের বিলে — `FoodOrder.bookingId` আর checkout-এর যোগ দুটোই আছে, কিন্তু অর্ডার ফর্ম কখনো `bookingId` পাঠায় না (ঘর যায় খোলা লেখা হিসেবে), তাই in-house অতিথির খাবারের টাকা কোনোদিন বিলে ওঠে না | ❌ Not built — backend তৈরি, শুধু জোড়াটা নেই |
+| [restaurant-room-billing.md](./restaurant-room-billing.md) | **P1.** Explicit settlement (pay now / charge to room / comp / corporate), server-side validation that the stay is `CHECKED_IN`, only `DELIVERED` orders bill, signed tokens for QR room-charging, idempotent orders | ❌ Not built — needs P0 |
 | [in-room-dining.md](./in-room-dining.md) | QR-based room food ordering, F&B billing | 🟡 Partial — table-QR ordering আছে, room-QR ordering নাই |
 
 ---
@@ -91,7 +112,7 @@ plan/
 | File | কী আছে | Status |
 |------|---------|--------|
 | [event-venue.md](./event-venue.md) | Conference/banquet/lawn booking, event management, pricing | ✅ Built — venue CRUD, booking with double-booking conflict check, half/full-day/hourly pricing. Public website section + enquiry form now live too (see [public-venues-vehicles.md](./public-venues-vehicles.md)). |
-| [airport-transfers.md](./airport-transfers.md) | এয়ারপোর্ট/স্টেশন পিকআপ ও ড্রপ — ফ্লাইট নম্বর ও নামার সময় ধরে ট্রিপ, ড্রাইভার/গাড়ি বরাদ্দ, Front Desk-এ আজকের যাতায়াত, অতিথিকে ড্রাইভারের নাম-ফোন আগেই পাঠানো, রুট-ভিত্তিক দাম (ফ্রি দেওয়ার সুযোগ সহ) | ❌ Not built — গাড়ি ভাড়া থেকে আলাদা জিনিস, `Vehicle` ভাগ করে নেবে |
+| [airport-transfers.md](./airport-transfers.md) | **P2 ops / P3 billing.** Phase A: transfers board, driver+vehicle assignment, unassigned/late alerts, guest confirmation, fleet conflicts shared with vehicle rental. Phase B: route pricing, comp, charge-to-room, driver-collected cash | ❌ Not built — Phase A not blocked by billing |
 | [vehicle-rental.md](./vehicle-rental.md) | Car/bike/scooty/cycle fleet, guest rentals with pickup/return (odometer, fuel, deposit, condition notes), conflict-checked time-slot booking, bill-to-room | ✅ Built |
 | [public-venues-vehicles.md](./public-venues-vehicles.md) | Venues & Vehicle Rental sections on the public resort website — self-fetching widgets on all 5 themes, "Enquire" modal → SupportTicket, owner-toggleable in website editor | ✅ Built |
 
