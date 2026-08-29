@@ -41,6 +41,15 @@ interface Props {
   onClose: () => void;
 }
 
+/** A previous guest the phone number turned up, from /guests/lookup. */
+type GuestMatch = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  stayCount: number;
+  lastStay: string | null;
+};
+
 const inp = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
 const lbl = 'block text-[11px] font-semibold uppercase tracking-[0.06em] mb-1.5 text-[#64748b]';
 
@@ -75,6 +84,45 @@ export function WalkInModal({ onClose }: Props) {
 
   const [pendingDoc, setPendingDoc] = useState<PendingDocument | null>(null);
   const [showDocPicker, setShowDocPicker] = useState(false);
+
+  // Returning-guest lookup, same as the Front Desk walk-in. Without it this
+  // form only recognised a repeat guest when the receptionist happened to
+  // type the same email — and walk-ins hand over a phone number, not an
+  // address, so in practice every visit created another duplicate.
+  const [linkedGuest, setLinkedGuest] = useState<GuestMatch | null>(null);
+  const [dismissedPhone, setDismissedPhone] = useState<string | null>(null);
+  const [debouncedPhone, setDebouncedPhone] = useState('');
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedPhone(form.phone), 350);
+    return () => clearTimeout(t);
+  }, [form.phone]);
+
+  const phoneDigits = debouncedPhone.replace(/\D/g, '');
+  const { data: guestMatches } = useQuery({
+    queryKey: ['guest-lookup', phoneDigits],
+    // Seven digits is the server's floor too: below it a "phone number" is a
+    // room number or a half-typed field, and matching finds strangers.
+    enabled: phoneDigits.length >= 7 && !linkedGuest,
+    queryFn: () => guestsApi.lookup(debouncedPhone).then(r => (r.data.data as { matches: GuestMatch[] }).matches),
+  });
+  const suggestedGuest = !linkedGuest && dismissedPhone !== phoneDigits ? guestMatches?.[0] ?? null : null;
+
+  // "-" is the placeholder a one-word walk-in name leaves behind, not a name.
+  const displayName = (g: GuestMatch) => `${g.firstName} ${g.lastName}`.replace(/ -$/, '').trim();
+
+  const linkGuest = (g: GuestMatch) => {
+    setLinkedGuest(g);
+    // Adopt the stored spelling — the record is the name of account, and the
+    // desk has just confirmed this is the same person.
+    setForm(f => ({ ...f, firstName: g.firstName, lastName: g.lastName === '-' ? '' : g.lastName }));
+  };
+
+  const unlinkGuest = () => {
+    setLinkedGuest(null);
+    // Remember the refusal, or it reappears on the next keystroke.
+    setDismissedPhone(phoneDigits);
+  };
 
   const { data: roomsRes, isLoading: roomsLoading } = useQuery({
     queryKey: ['walkin-rooms', form.checkIn, form.checkOut],
@@ -118,6 +166,7 @@ export function WalkInModal({ onClose }: Props) {
         notes: form.notes || undefined, source: 'WALK_IN',
         skipEmail: form.skipEmail, autoCheckIn: form.autoCheckIn,
         paymentMethod: form.paymentMethod === 'PENDING' ? undefined : form.paymentMethod,
+        guestId: linkedGuest?.id,
         guestFirstName: form.firstName, guestLastName: form.lastName,
         guestEmail: form.email || undefined, guestPhone: form.phone || undefined,
       });
@@ -248,6 +297,52 @@ export function WalkInModal({ onClose }: Props) {
               <input type="tel" placeholder="Phone (optional)" value={form.phone} onChange={e => set('phone', e.target.value)} className={inp} />
               <input type="email" placeholder="Email (optional)" value={form.email} onChange={e => set('email', e.target.value)} className={inp} />
             </div>
+            {(suggestedGuest || linkedGuest) && (
+              <div style={{ marginTop: '10px', borderRadius: '10px', border: '1px solid var(--rp-border-md)', background: 'var(--rp-teal-bg)', padding: '10px 12px' }}>
+                {linkedGuest ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--rp-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        Returning guest — {displayName(linkedGuest)}
+                      </p>
+                      <p style={{ fontSize: '11px', color: 'var(--rp-text-muted)' }}>
+                        This stay will be added to their existing record.
+                      </p>
+                    </div>
+                    <button type="button" onClick={unlinkGuest}
+                      style={{ flexShrink: 0, borderRadius: '8px', border: '1px solid var(--rp-border-md)', background: 'transparent', color: 'var(--rp-text)', fontSize: '11px', fontWeight: 600, padding: '5px 10px', cursor: 'pointer' }}>
+                      Not them
+                    </button>
+                  </div>
+                ) : suggestedGuest && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--rp-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {displayName(suggestedGuest)} has this number
+                      </p>
+                      <p style={{ fontSize: '11px', color: 'var(--rp-text-muted)' }}>
+                        {suggestedGuest.stayCount > 0
+                          ? `${suggestedGuest.stayCount} previous stay${suggestedGuest.stayCount === 1 ? '' : 's'}`
+                          : 'On file, no completed stays yet'}
+                        {suggestedGuest.lastStay
+                          ? ` · last ${new Date(suggestedGuest.lastStay).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}`
+                          : ''}
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button type="button" onClick={() => linkGuest(suggestedGuest)}
+                        style={{ borderRadius: '8px', border: 'none', background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', fontSize: '11px', fontWeight: 600, padding: '5px 10px', cursor: 'pointer' }}>
+                        Same guest
+                      </button>
+                      <button type="button" onClick={() => setDismissedPhone(phoneDigits)}
+                        style={{ borderRadius: '8px', border: '1px solid var(--rp-border-md)', background: 'transparent', color: 'var(--rp-text)', fontSize: '11px', fontWeight: 600, padding: '5px 10px', cursor: 'pointer' }}>
+                        Someone new
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             {showDocPicker && (
               <div style={{ marginTop: '10px' }}>
                 <AddDocumentInline value={pendingDoc} onChange={setPendingDoc} />

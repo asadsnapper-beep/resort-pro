@@ -55,7 +55,7 @@ beforeAll(async () => {
   ownerToken = await verifyOwnerAndLogin(app, { tenantId, email: `owner-${slug}@test.com`, password, slug });
   await prisma.tenant.update({ where: { id: tenantId }, data: { planStatus: 'active', plan: 'ENTERPRISE' } });
 
-  for (const n of ['201', '202', '203', '204', '205', '206']) await makeRoom(n);
+  for (const n of ['201', '202', '203', '204', '205', '206', '207', '208', '209']) await makeRoom(n);
 }, 30000);
 
 afterAll(async () => {
@@ -161,5 +161,46 @@ describe('GET /api/guests/lookup', () => {
       method: 'GET', url: '/api/guests/lookup?phone=0171', headers: auth(),
     });
     expect(JSON.parse(res.body).data.matches).toEqual([]);
+  });
+});
+
+// The bookings page has its own walk-in form, which posts to the general
+// booking route rather than /walk-in. It reached the same dead end: a
+// returning guest with no email on file became a new record every time.
+describe('Walk-in through POST /api/bookings', () => {
+  function booking(payload: Record<string, unknown>) {
+    return app.inject({
+      method: 'POST', url: '/api/bookings', headers: auth(),
+      payload: { source: 'WALK_IN', autoCheckIn: true, ...payload },
+    });
+  }
+
+  it('reuses the guest the front desk already knows', async () => {
+    const res = await booking({
+      guestFirstName: 'Karim', guestLastName: 'Hossain', guestPhone: '+880 1711-002200',
+      roomId: rooms[6], checkIn: '2027-01-05', checkOut: '2027-01-06',
+    });
+    expect(res.statusCode).toBe(201);
+    expect(JSON.parse(res.body).data.guestId).toBe(karimGuestId);
+  });
+
+  it('still refuses a different name on the same phone', async () => {
+    const res = await booking({
+      guestFirstName: 'Shirin', guestLastName: 'Hossain', guestPhone: '01711002200',
+      roomId: rooms[7], checkIn: '2027-01-08', checkOut: '2027-01-09',
+    });
+    expect(res.statusCode).toBe(201);
+    expect(JSON.parse(res.body).data.guestId).not.toBe(karimGuestId);
+  });
+
+  it('lets an explicit email keep deciding, as it always did', async () => {
+    const res = await booking({
+      guestFirstName: 'Karim', guestLastName: 'Hossain',
+      guestEmail: 'karim.separate@example.com', guestPhone: '01711002200',
+      roomId: rooms[8], checkIn: '2027-01-11', checkOut: '2027-01-12',
+    });
+    expect(res.statusCode).toBe(201);
+    // An address that matches no one is a new guest, phone match or not.
+    expect(JSON.parse(res.body).data.guestId).not.toBe(karimGuestId);
   });
 });

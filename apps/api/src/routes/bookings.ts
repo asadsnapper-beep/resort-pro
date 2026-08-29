@@ -351,6 +351,21 @@ export async function bookingRoutes(app: FastifyInstance) {
         return reply.status(400).send({ success: false, error: 'Guest name is required for walk-in bookings' });
       }
 
+      // A walk-in booked from this route gets the same returning-guest
+      // matching as the front desk's own route. Email is the stronger signal
+      // and still wins, but walk-ins rarely give one — the phone number is
+      // what they actually hand over, so without this the regular is filed as
+      // a stranger here even though the front desk would have recognised them.
+      // Read outside the transaction deliberately: it is a lookup, not an
+      // invariant, and losing the race only recreates today's duplicate.
+      const matchedGuestId = body.guestId || body.guestEmail
+        ? undefined
+        : await findReturningGuestId(
+            tenantId,
+            body.guestPhone,
+            `${body.guestFirstName} ${body.guestLastName}`,
+          );
+
       try {
         booking = await prisma.$transaction(async (tx) => {
           // 1. Conflict check (inside transaction — reads are now serialized)
@@ -376,7 +391,9 @@ export async function bookingRoutes(app: FastifyInstance) {
             const email = body.guestEmail ?? `walkin-${Date.now()}@resortpro.local`;
             const existing = body.guestEmail
               ? await tx.guest.findFirst({ where: { tenantId, email } })
-              : null;
+              : matchedGuestId
+                ? await tx.guest.findFirst({ where: { id: matchedGuestId, tenantId } })
+                : null;
             const guest = existing ?? await tx.guest.create({
               data: {
                 tenantId,
