@@ -25,6 +25,7 @@ plan/
 | File | কী আছে | Status |
 |------|---------|--------|
 | [front-desk.md](./front-desk.md) | Check-in/out, walk-in booking, room map, daily arrivals/departures | ✅ Built |
+| [checkout-billing-completeness.md](./checkout-billing-completeness.md) | Checkout-এ পুরো বিল — মিনিবার/লন্ড্রি/গাড়ি/ক্ষতিপূরণ এখন invoice-এ জমে কিন্তু "Balance due"-তে আসে না; তিন জায়গার তিন হিসাব এক করা + checkout থেকেই charge যোগ | ❌ Not built — **টাকা হারাচ্ছে, আগে করা দরকার** |
 | [housekeeping.md](./housekeeping.md) | Room status tracking, cleaning tasks, staff assignment, floor map | ✅ Built |
 | [housekeeping-extras.md](./housekeeping-extras.md) | Lost & Found, Minibar (catalog + consumption), Laundry orders — new tabs on the Housekeeping page, with "Bill to Room" wired into the existing InvoiceExtra mechanism | ✅ Built |
 | [maintenance.md](./maintenance.md) | Issue reporting, assignment, OOO room management | ✅ Built |
@@ -41,6 +42,7 @@ plan/
 |------|---------|--------|
 | [offers-promotions.md](./offers-promotions.md) | Offer creation, promo codes, website display, booking form integration | ✅ Built |
 | [launch-pricing-and-trial-abuse-prevention.md](./launch-pricing-and-trial-abuse-prevention.md) | **Active pricing decision:** Free Forever + $19 Independent Resort + $59 Resort Group, customer rights, migration, billing and launch steps | 📋 Approved direction — implementation pending |
+| [early-checkin-late-checkout.md](./early-checkin-late-checkout.md) | Early check-in / late check-out নীতি ও চার্জ (ফ্রি / ৫০% / পুরো রাত), ঘর তৈরি কিনা দেখে সিদ্ধান্ত, Settings-এ সময়-হার | ❌ Not built — checkout-billing-completeness আগে লাগবে |
 | [dynamic-pricing.md](./dynamic-pricing.md) | Seasonal rules, occupancy-based, day-of-week, advance/last-minute pricing | ❌ Not built — কোনো PricingRule model/seasonal logic নাই |
 | [online-payment.md](./online-payment.md) | Stripe + bKash payment integration | ✅ Built — Stripe + bKash + SSLCommerz সব real |
 | [corporate-accounts.md](./corporate-accounts.md) | Company/B2B client accounts — consolidated billing, credit terms, corporate rates (separate from one-off Group Bookings) | ✅ Built |
