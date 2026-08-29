@@ -91,6 +91,7 @@ plan/
 | File | কী আছে | Status |
 |------|---------|--------|
 | [event-venue.md](./event-venue.md) | Conference/banquet/lawn booking, event management, pricing | ✅ Built — venue CRUD, booking with double-booking conflict check, half/full-day/hourly pricing. Public website section + enquiry form now live too (see [public-venues-vehicles.md](./public-venues-vehicles.md)). |
+| [airport-transfers.md](./airport-transfers.md) | এয়ারপোর্ট/স্টেশন পিকআপ ও ড্রপ — ফ্লাইট নম্বর ও নামার সময় ধরে ট্রিপ, ড্রাইভার/গাড়ি বরাদ্দ, Front Desk-এ আজকের যাতায়াত, অতিথিকে ড্রাইভারের নাম-ফোন আগেই পাঠানো, রুট-ভিত্তিক দাম (ফ্রি দেওয়ার সুযোগ সহ) | ❌ Not built — গাড়ি ভাড়া থেকে আলাদা জিনিস, `Vehicle` ভাগ করে নেবে |
 | [vehicle-rental.md](./vehicle-rental.md) | Car/bike/scooty/cycle fleet, guest rentals with pickup/return (odometer, fuel, deposit, condition notes), conflict-checked time-slot booking, bill-to-room | ✅ Built |
 | [public-venues-vehicles.md](./public-venues-vehicles.md) | Venues & Vehicle Rental sections on the public resort website — self-fetching widgets on all 5 themes, "Enquire" modal → SupportTicket, owner-toggleable in website editor | ✅ Built |
 
