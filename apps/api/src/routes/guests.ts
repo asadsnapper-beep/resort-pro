@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams } from '../utils/response';
 import { matchAllTerms } from '../utils/search-terms';
+import { findGuestIdsByPhone } from '../utils/guest-lookup';
+import type { JwtPayload } from '@resort-pro/types';
 
 const guestSchema = z.object({
   firstName: z.string().min(1).max(50),
@@ -37,6 +39,56 @@ export async function guestRoutes(app: FastifyInstance) {
       ]);
 
       return paginated(guests, total, page, limit);
+    },
+  });
+
+  // GET /api/guests/lookup?phone=… — "have we met this person before?"
+  //
+  // Exists for the walk-in desk: the guest is standing there, they give a
+  // phone number, and the receptionist needs to know *before* creating a
+  // booking whether this is a returning guest. Without it every walk-in
+  // silently minted a new guest record, and repeat visitors lost their
+  // history, preferences and loyalty balance on every stay.
+  app.get('/lookup', {
+    schema: { tags: ['guests'], summary: 'Find existing guests by phone number', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
+    handler: async (request) => {
+      const { db } = request;
+      const { tenantId } = request.user as JwtPayload;
+      const { phone } = request.query as { phone?: string };
+
+      const ids = await findGuestIdsByPhone(tenantId, phone);
+      if (ids.length === 0) return ok({ matches: [] }, 'No previous guest with that number');
+
+      const [guests, stays] = await Promise.all([
+        db.guest.findMany({
+          where: { id: { in: ids } },
+          select: {
+            id: true, firstName: true, lastName: true, email: true, phone: true,
+            nationality: true, idType: true, idNumber: true, notes: true,
+          },
+        }),
+        // Only stays that actually happened count as visits — a cancelled or
+        // still-pending booking would overstate how well we know them.
+        db.booking.groupBy({
+          by: ['guestId'],
+          where: { guestId: { in: ids }, status: { in: ['CHECKED_IN', 'CHECKED_OUT'] } },
+          _count: { _all: true },
+          _max: { checkIn: true },
+        }),
+      ]);
+
+      const statsFor = new Map(stays.map((s) => [s.guestId, s]));
+      const matches = guests.map((g) => ({
+        ...g,
+        // A walk-in guest has no real address, so the generated
+        // walkin-…@resortpro.local placeholder must never be shown as one.
+        email: g.email.endsWith('@resortpro.local') ? null : g.email,
+        stayCount: statsFor.get(g.id)?._count._all ?? 0,
+        lastStay: statsFor.get(g.id)?._max.checkIn ?? null,
+      }));
+
+      return ok({ matches }, 'Previous guests found');
     },
   });
 

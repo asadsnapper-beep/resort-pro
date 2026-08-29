@@ -15,6 +15,7 @@ import { awardCheckoutPoints } from '../services/loyalty';
 import { syncCalendarsForRoom } from '../jobs/ical-sync';
 import { createGuestPaymentLink } from './billing';
 import { resolveRate } from './ratePlans';
+import { findReturningGuestId } from '../utils/guest-lookup';
 import { createAdminNotification } from '../utils/notifications';
 import { nextDocumentNumber } from '../utils/sequence';
 import type { JwtPayload } from '@resort-pro/types';
@@ -1117,6 +1118,9 @@ export async function bookingRoutes(app: FastifyInstance) {
       const body = z.object({
         guestName:     z.string().min(1),
         guestPhone:    z.string().optional(),
+        // Set when the desk confirmed a returning-guest match, so the stay
+        // lands on the existing record instead of minting another duplicate.
+        guestId:       z.string().optional(),
         adults:        z.number().int().min(1).default(1),
         children:      z.number().int().min(0).default(0),
         roomId:        z.string(),
@@ -1165,6 +1169,19 @@ export async function bookingRoutes(app: FastifyInstance) {
       const totalAmount = baseTotal * (1 - body.discount / 100);
       const now         = new Date();
 
+      // Returning guests are the normal case at a resort, and this route could
+      // not express one: it created a fresh guest — with a throwaway
+      // walkin-<timestamp>@ email — on every single visit, so the same person
+      // accumulated a new record each time and lost their history,
+      // preferences and loyalty balance along with it.
+      //
+      // Read outside the transaction on purpose. It is a lookup, not an
+      // invariant: the worst a race can do is create the duplicate we would
+      // have created anyway, which is not worth widening the serializable
+      // window that the conflict check needs.
+      const existingGuestId = body.guestId
+        ?? await findReturningGuestId(tenantId, body.guestPhone, body.guestName);
+
       let booking: Awaited<ReturnType<typeof prisma.booking.findFirst>> & object;
       try {
         booking = await prisma.$transaction(async (tx) => {
@@ -1186,14 +1203,36 @@ export async function bookingRoutes(app: FastifyInstance) {
           // must never abort the whole check-in transaction — drop it instead.
           const parsedDob = body.dateOfBirth ? new Date(body.dateOfBirth) : undefined;
           const dateOfBirth = parsedDob && !isNaN(parsedDob.getTime()) ? parsedDob : undefined;
-          const guest = await tx.guest.create({
-            data: {
-              tenantId, firstName, lastName, phone: body.guestPhone,
-              email: `walkin-${Date.now()}@resortpro.local`,
-              idType: body.idType, idNumber: body.idNumber, nationality: body.nationality,
-              dateOfBirth,
-            },
-          });
+          const returning = existingGuestId
+            ? await tx.guest.findFirst({ where: { id: existingGuestId, tenantId } })
+            : null;
+          if (body.guestId && !returning) {
+            throw Object.assign(new Error('Guest not found'), { statusCode: 404 });
+          }
+
+          // Backfill only. A returning guest's stored details are the record of
+          // account; an ID scan at this check-in may add a passport number we
+          // never had, but it must not overwrite one already on file — that is
+          // how a typo at the desk quietly replaces a verified document.
+          const guest = returning
+            ? await tx.guest.update({
+                where: { id: returning.id },
+                data: {
+                  phone:       returning.phone       ?? body.guestPhone,
+                  idType:      returning.idType      ?? body.idType,
+                  idNumber:    returning.idNumber    ?? body.idNumber,
+                  nationality: returning.nationality ?? body.nationality,
+                  dateOfBirth: returning.dateOfBirth ?? dateOfBirth,
+                },
+              })
+            : await tx.guest.create({
+                data: {
+                  tenantId, firstName, lastName, phone: body.guestPhone,
+                  email: `walkin-${Date.now()}@resortpro.local`,
+                  idType: body.idType, idNumber: body.idNumber, nationality: body.nationality,
+                  dateOfBirth,
+                },
+              });
 
           const newBooking = await tx.booking.create({
             data: {
