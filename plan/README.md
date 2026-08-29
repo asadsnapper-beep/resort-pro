@@ -25,7 +25,7 @@ plan/
 | File | কী আছে | Status |
 |------|---------|--------|
 | [front-desk.md](./front-desk.md) | Check-in/out, walk-in booking, room map, daily arrivals/departures | ✅ Built |
-| [checkout-billing-completeness.md](./checkout-billing-completeness.md) | Checkout-এ পুরো বিল — মিনিবার/লন্ড্রি/গাড়ি/ক্ষতিপূরণ এখন invoice-এ জমে কিন্তু "Balance due"-তে আসে না; তিন জায়গার তিন হিসাব এক করা + checkout থেকেই charge যোগ | ❌ Not built — **টাকা হারাচ্ছে, আগে করা দরকার** |
+| [checkout-billing-completeness.md](./checkout-billing-completeness.md) | এক থাকার একটাই বিল — এখন চার জায়গায় চার অঙ্ক (ঘরের দাম basePrice থেকে নেওয়া হয়, চার্জ করা totalAmount থেকে নয়; খাবার/extras আসল Invoice-এ কখনো ঢোকে না; checkout ইনভয়েস finalize করে না, DRAFT-ই থেকে যায়)। একটাই `bill()`, checkout-এ Invoice → PAID + PDF, ভাঙা হিসাব ও charge যোগের বোতাম | ❌ Not built — **টাকা হারাচ্ছে, আগে করা দরকার** |
 | [housekeeping.md](./housekeeping.md) | Room status tracking, cleaning tasks, staff assignment, floor map | ✅ Built |
 | [housekeeping-extras.md](./housekeeping-extras.md) | Lost & Found, Minibar (catalog + consumption), Laundry orders — new tabs on the Housekeeping page, with "Bill to Room" wired into the existing InvoiceExtra mechanism | ✅ Built |
 | [maintenance.md](./maintenance.md) | Issue reporting, assignment, OOO room management | ✅ Built |
