@@ -70,6 +70,7 @@ plan/
 | File | কী আছে | Status |
 |------|---------|--------|
 | [guest-crm.md](./guest-crm.md) | Guest profiles, booking history, loyalty program, points system, tiers | ✅ Built |
+| [restaurant-room-billing.md](./restaurant-room-billing.md) | রেস্টুরেন্টের খাবার ঘরের বিলে — `FoodOrder.bookingId` আর checkout-এর যোগ দুটোই আছে, কিন্তু অর্ডার ফর্ম কখনো `bookingId` পাঠায় না (ঘর যায় খোলা লেখা হিসেবে), তাই in-house অতিথির খাবারের টাকা কোনোদিন বিলে ওঠে না | ❌ Not built — backend তৈরি, শুধু জোড়াটা নেই |
 | [in-room-dining.md](./in-room-dining.md) | QR-based room food ordering, F&B billing | 🟡 Partial — table-QR ordering আছে, room-QR ordering নাই |
 
 ---
