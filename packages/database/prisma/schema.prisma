@@ -297,51 +297,51 @@ enum LoyaltyTxType {
 // ─── Core Models ──────────────────────────────────────────────────────────────
 
 model Tenant {
-  id                      String     @id @default(uuid())
+  id                      String                @id @default(uuid())
   name                    String
-  slug                    String     @unique
-  plan                    TenantPlan @default(FREE)
-  isActive                Boolean    @default(true)
-  isDemo                  Boolean    @default(false) // demo tenant — read-only, auto-login
+  slug                    String                @unique
+  plan                    TenantPlan            @default(FREE)
+  isActive                Boolean               @default(true)
+  isDemo                  Boolean               @default(false) // demo tenant — read-only, auto-login
   logoUrl                 String?
   address                 String?
   phone                   String?
   email                   String?
   website                 String?
-  customDomain            String?    @unique // e.g. www.sunsetresort.com
-  domainVerified          Boolean    @default(false)
+  customDomain            String?               @unique // e.g. www.sunsetresort.com
+  domainVerified          Boolean               @default(false)
   domainVerifiedAt        DateTime?
   domainVerificationToken String? // TXT token for ownership proof
-  sslStatus               String?    @default("none") // none | pending | provisioning | active | error
+  sslStatus               String?               @default("none") // none | pending | provisioning | active | error
   sslProvisionedAt        DateTime?
   sslExpiresAt            DateTime?
   sslError                String? // last error message from cert provisioner
-  country                 String     @default("BD") // ISO 3166-1 alpha-2: BD, IN, LK, NP, TH, ID, MY, KE...
-  currency                String     @default("BDT")
-  taxRate                 Float      @default(0) // invoice tax percentage e.g. 10 = 10%
-  timezone                String     @default("Asia/Dhaka")
-  checkInTime             String     @default("14:00")
-  checkOutTime            String     @default("11:00")
-  attendanceDeviceKey     String?    @unique // secret for the fingerprint device webhook
+  country                 String                @default("BD") // ISO 3166-1 alpha-2: BD, IN, LK, NP, TH, ID, MY, KE...
+  currency                String                @default("BDT")
+  taxRate                 Float                 @default(0) // invoice tax percentage e.g. 10 = 10%
+  timezone                String                @default("Asia/Dhaka")
+  checkInTime             String                @default("14:00")
+  checkOutTime            String                @default("11:00")
+  attendanceDeviceKey     String?               @unique // secret for the fingerprint device webhook
   roomTypeLabels          Json? // { "STANDARD": "Garden Room", ... } — display-layer override
   // Stripe billing
-  stripeCustomerId        String?    @unique
-  stripeSubscriptionId    String?    @unique
-  planStatus              String     @default("trialing") // trialing | active | past_due | canceled | incomplete
+  stripeCustomerId        String?               @unique
+  stripeSubscriptionId    String?               @unique
+  planStatus              String                @default("trialing") // trialing | active | past_due | canceled | incomplete
   trialEndsAt             DateTime?
   currentPeriodEnd        DateTime?
   priceProtectedUntil     DateTime? // current plan price remains valid through this date
   billingEmail            String?
   // Referral & marketing attribution
-  referralCode            String?    @unique // this tenant's shareable code e.g. "SUNSET-A3K9"
+  referralCode            String?               @unique // this tenant's shareable code e.g. "SUNSET-A3K9"
   referredById            String? // which tenant referred this one
   campaignSource          String? // campaign link code used during signup (e.g. "RAKIB2024")
-  referrer                Tenant?    @relation("TenantReferrals", fields: [referredById], references: [id], onDelete: SetNull)
-  referrals               Tenant[]   @relation("TenantReferrals")
-  accountCredit           Float      @default(0) // ৳ credit balance — deducted from next invoice
+  referrer                Tenant?               @relation("TenantReferrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals               Tenant[]              @relation("TenantReferrals")
+  accountCredit           Float                 @default(0) // ৳ credit balance — deducted from next invoice
   freeUntil               DateTime? // free plan expiry (set when reward = FREE_PLAN)
-  referralsMade           Referral[] @relation("ReferrerReferrals")
-  referralEntry           Referral?  @relation("ReferredReferrals")
+  referralsMade           Referral[]            @relation("ReferrerReferrals")
+  referralEntry           Referral?             @relation("ReferredReferrals")
   promotionRedemptions    PromotionRedemption[]
   // GDPR
   gdprErasureRequestedAt  DateTime? // when tenant/admin requested erasure
@@ -349,25 +349,25 @@ model Tenant {
   gdprAnonymizedAt        DateTime? // when anonymization was completed
   deletedAt               DateTime? // soft-delete timestamp (hard purge after 30d)
   // Payment gateways (owner configures in dashboard)
-  bkashEnabled            Boolean    @default(false)
+  bkashEnabled            Boolean               @default(false)
   bkashAppKey             String?
   bkashAppSecret          String?
   bkashUsername           String?
   bkashPassword           String?
-  sslEnabled              Boolean    @default(false)
+  sslEnabled              Boolean               @default(false)
   sslStoreId              String?
   sslStorePassword        String?
-  sslIsLive               Boolean    @default(false)
-  stripeGuestEnabled      Boolean    @default(false)
+  sslIsLive               Boolean               @default(false)
+  stripeGuestEnabled      Boolean               @default(false)
   // SMS & WhatsApp notifications
-  smsEnabled              Boolean    @default(false)
-  smsMode                 String     @default("platform") // "platform" | "own"
+  smsEnabled              Boolean               @default(false)
+  smsMode                 String                @default("platform") // "platform" | "own"
   smsProvider             String? // "ssl_wireless" | "twilio" | "alpha_net"
   smsApiKey               String?
   smsApiSecret            String?
   smsSenderId             String?
-  waEnabled               Boolean    @default(false)
-  waMode                  String     @default("platform") // "platform" | "own"
+  waEnabled               Boolean               @default(false)
+  waMode                  String                @default("platform") // "platform" | "own"
   waApiToken              String?
   waPhoneNumberId         String?
   waBusinessAccId         String?
@@ -375,38 +375,38 @@ model Tenant {
   telegramBotToken        String? // bot token from BotFather
   telegramNotifChatId     String? // staff group/channel chat_id for new ticket alerts
   // Notification triggers
-  notifBookingConfirm     Boolean    @default(true)
-  notifPaymentReceived    Boolean    @default(true)
-  notifCheckinReminder    Boolean    @default(true)
-  notifCheckoutRemind     Boolean    @default(false)
-  notifCancellation       Boolean    @default(true)
-  notifInvoiceSent        Boolean    @default(false)
-  notifLanguage           String     @default("en") // "en" | "bn"
+  notifBookingConfirm     Boolean               @default(true)
+  notifPaymentReceived    Boolean               @default(true)
+  notifCheckinReminder    Boolean               @default(true)
+  notifCheckoutRemind     Boolean               @default(false)
+  notifCancellation       Boolean               @default(true)
+  notifInvoiceSent        Boolean               @default(false)
+  notifLanguage           String                @default("en") // "en" | "bn"
   // SMS quota & credits
-  smsQuotaMonthly         Int        @default(100)
-  smsUsedThisMonth        Int        @default(0)
-  smsCredits              Int        @default(0)
-  waQuotaMonthly          Int        @default(50)
-  waUsedThisMonth         Int        @default(0)
-  waCredits               Int        @default(0)
+  smsQuotaMonthly         Int                   @default(100)
+  smsUsedThisMonth        Int                   @default(0)
+  smsCredits              Int                   @default(0)
+  waQuotaMonthly          Int                   @default(50)
+  waUsedThisMonth         Int                   @default(0)
+  waCredits               Int                   @default(0)
   // White-label branding
-  whitelabelEnabled       Boolean    @default(false)
+  whitelabelEnabled       Boolean               @default(false)
   brandLogoUrl            String? // overrides logoUrl in tenant dashboard header
   brandPrimaryColor       String? // hex e.g. "#1a6b5e"
   brandAccentColor        String? // hex e.g. "#d4a853"
   companyDisplayName      String? // replaces "ResortPro" in UI
   // SSO
-  ssoEnabled              Boolean    @default(false)
+  ssoEnabled              Boolean               @default(false)
   ssoProvider             String? // "google" | "microsoft" | "okta" | "saml"
   ssoClientId             String?
   ssoClientSecret         String? // stored encrypted in production; plain for dev
   ssoConfig               Json? // provider-specific extras (tenant_id, domain, etc.)
   // Enterprise onboarding
-  onboardingStep          Int        @default(0) // 0-6; 6 = complete
+  onboardingStep          Int                   @default(0) // 0-6; 6 = complete
   onboardingCompletedAt   DateTime?
   enterpriseNotes         String?
   // stay.resortpro.site — Public discovery map
-  mapVisible              Boolean    @default(false) // show on public map
+  mapVisible              Boolean               @default(false) // show on public map
   latitude                Float? // e.g. 22.3569
   longitude               Float? // e.g. 91.7832
   resortCategory          String? // "eco" | "agro" | "beach" | "hill" | "city" | "heritage"
@@ -414,20 +414,20 @@ model Tenant {
   shortDescription        String? // 1-2 line blurb for map popup & list card
   coverImageUrl           String? // hero image for resort card on discovery page
   // stay.resortpro.site — Revenue features
-  isFeatured              Boolean    @default(false) // sponsored / featured listing
+  isFeatured              Boolean               @default(false) // sponsored / featured listing
   featuredUntil           DateTime? // expiry of featured status
   featuredBadge           String? // "Sponsored" | "Top Pick" | "Editor's Choice"
   affiliateUrl            String? // booking.com / agoda / direct affiliate link
   affiliateSource         String? // "booking.com" | "agoda" | "direct" | "custom"
-  discoveryTier           String     @default("free") // "free" | "basic" | "premium"
+  discoveryTier           String                @default("free") // "free" | "basic" | "premium"
   // Gallery (premium feature — up to 6 extra images)
-  galleryImages           String[]   @default([])
+  galleryImages           String[]              @default([])
   // Profile extras (premium)
-  amenitiesHighlights     String[]   @default([]) // e.g. ["Pool", "WiFi", "Restaurant"]
+  amenitiesHighlights     String[]              @default([]) // e.g. ["Pool", "WiFi", "Restaurant"]
   bookingPhone            String? // WhatsApp / call button on discovery page
   instagramHandle         String? // @handle
-  createdAt               DateTime   @default(now())
-  updatedAt               DateTime   @updatedAt
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
 
   // Relations
   users                  User[]
@@ -475,6 +475,7 @@ model Tenant {
   slaAgreement           SlaAgreement?
   invoiceExtras          InvoiceExtra[]
   invoices               Invoice[]
+  billingAudits          BillingAudit[]
   invoicePayments        InvoicePayment[]
   ratePlans              RatePlan[]
   numberCounters         NumberCounter[]
@@ -521,34 +522,34 @@ model Tenant {
 }
 
 model User {
-  id           String    @id @default(uuid())
-  tenantId     String
-  email        String
-  passwordHash String
-  firstName    String
-  lastName     String
-  role         UserRole  @default(STAFF)
-  phone        String?
-  avatarUrl    String?
-  isActive     Boolean   @default(true)
-  lastLoginAt  DateTime?
+  id              String    @id @default(uuid())
+  tenantId        String
+  email           String
+  passwordHash    String
+  firstName       String
+  lastName        String
+  role            UserRole  @default(STAFF)
+  phone           String?
+  avatarUrl       String?
+  isActive        Boolean   @default(true)
+  lastLoginAt     DateTime?
   // Existing/invited staff are trusted by default. Public resort signup
   // explicitly writes null until the owner clicks the verification link.
   emailVerifiedAt DateTime? @default(now())
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   // Relations
-  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  staff               Staff?
-  assignedTickets     SupportTicket[]      @relation("AssignedTickets")
-  chatMessages        ChatMessage[]
-  notifications       Notification[]
-  refreshTokens       RefreshToken[]
-  passwordResetTokens PasswordResetToken[]
+  tenant                  Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staff                   Staff?
+  assignedTickets         SupportTicket[]          @relation("AssignedTickets")
+  chatMessages            ChatMessage[]
+  notifications           Notification[]
+  refreshTokens           RefreshToken[]
+  passwordResetTokens     PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
-  shareholderProfile  ShareholderProfile?
-  tenantDeletionRequests TenantDeletionRequest[] @relation("TenantDeletionRequests")
+  shareholderProfile      ShareholderProfile?
+  tenantDeletionRequests  TenantDeletionRequest[]  @relation("TenantDeletionRequests")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -556,12 +557,12 @@ model User {
 }
 
 model EmailVerificationToken {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  tokenHash String   @unique
+  tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -664,14 +665,14 @@ model Room {
   updatedAt    DateTime   @updatedAt
 
   // Relations
-  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  property           Property?           @relation(fields: [propertyId], references: [id], onDelete: SetNull)
-  bookings           Booking[]
-  housekeepingTasks  HousekeepingTask[]
-  ratePlans          RatePlan[]
-  maintenanceTickets MaintenanceTicket[]
-  externalCalendars  ExternalCalendar[]
-  assets             Asset[]
+  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  property            Property?            @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  bookings            Booking[]
+  housekeepingTasks   HousekeepingTask[]
+  ratePlans           RatePlan[]
+  maintenanceTickets  MaintenanceTicket[]
+  externalCalendars   ExternalCalendar[]
+  assets              Asset[]
   lostFoundItems      LostFoundItem[]
   minibarConsumptions MinibarConsumption[]
   laundryOrders       LaundryOrder[]
@@ -817,19 +818,19 @@ model Booking {
   updatedAt             DateTime      @updatedAt
 
   // Relations
-  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  room             Room              @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  guest            Guest             @relation(fields: [guestId], references: [id], onDelete: Cascade)
-  group            GroupBooking?     @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  corporateAccount CorporateAccount? @relation(fields: [corporateAccountId], references: [id], onDelete: SetNull)
-  corporateInvoice CorporateInvoice? @relation(fields: [corporateInvoiceId], references: [id], onDelete: SetNull)
-  payments         Payment[]
-  foodOrders       FoodOrder[]
-  supportTickets   SupportTicket[]
-  invoiceExtras    InvoiceExtra[]
-  bookingPackages  BookingPackage[]
-  bookingOffers    BookingOffer[]
-  invoice          Invoice?
+  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  room                Room                 @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  guest               Guest                @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  group               GroupBooking?        @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  corporateAccount    CorporateAccount?    @relation(fields: [corporateAccountId], references: [id], onDelete: SetNull)
+  corporateInvoice    CorporateInvoice?    @relation(fields: [corporateInvoiceId], references: [id], onDelete: SetNull)
+  payments            Payment[]
+  foodOrders          FoodOrder[]
+  supportTickets      SupportTicket[]
+  invoiceExtras       InvoiceExtra[]
+  bookingPackages     BookingPackage[]
+  bookingOffers       BookingOffer[]
+  invoice             Invoice?
   minibarConsumptions MinibarConsumption[]
   laundryOrders       LaundryOrder[]
   vehicleRentals      VehicleRental[]
@@ -1002,6 +1003,7 @@ enum InvoiceItemCategory {
   SERVICE
   LAUNDRY
   MINIBAR
+  TRANSFER
   TAX
   DISCOUNT
   OTHER
@@ -1053,6 +1055,11 @@ model Invoice {
   dueDate    DateTime?
   notes      String?
 
+  // Frozen at check-out. Once set, line items and totals are a historical
+  // record — corrections are appended as ADJUSTMENT lines, never edits.
+  finalizedAt DateTime?
+  finalizedBy String? // User.id who checked the guest out
+
   // Relations
   tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   booking  Booking?         @relation(fields: [bookingId], references: [id], onDelete: SetNull)
@@ -1076,8 +1083,18 @@ model InvoiceItem {
   unitPrice   Float
   total       Float // quantity × unitPrice (pre-computed)
 
+  // Where this charge came from — see plan/billing-contract.md R2.
+  // ROOM | PACKAGE | FOOD_ORDER | EXTRA | TRANSFER | ADJUSTMENT
+  sourceType String?
+  sourceId   String? // the originating row's id (bookingId for ROOM)
+
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
+  // What makes writing charges idempotent: a retried finalisation writes the
+  // same (sourceType, sourceId) and Postgres rejects it, rather than quietly
+  // doubling the guest's bill. ADJUSTMENT rows carry a null sourceId, and
+  // Postgres treats nulls as distinct, so corrections are not blocked.
+  @@unique([invoiceId, sourceType, sourceId])
   @@index([invoiceId])
   @@map("invoice_items")
 }
@@ -1302,8 +1319,8 @@ model Staff {
   updatedAt      DateTime        @updatedAt
 
   // Relations
-  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   housekeepingTasks  HousekeepingTask[]
   attendance         StaffAttendance[]
   salaryAdjustments  SalaryAdjustment[]
@@ -1315,18 +1332,18 @@ model Staff {
 }
 
 model StaffAttendance {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   tenantId    String
   staffId     String
-  date        DateTime @db.Date
+  date        DateTime  @db.Date
   clockIn     DateTime?
   clockOut    DateTime?
-  status      String   @default("PRESENT") // PRESENT | LATE | ABSENT | ON_LEAVE
+  status      String    @default("PRESENT") // PRESENT | LATE | ABSENT | ON_LEAVE
   hoursWorked Float?
-  source      String   @default("MANUAL") // MANUAL | DEVICE_IMPORT | DEVICE_WEBHOOK
+  source      String    @default("MANUAL") // MANUAL | DEVICE_IMPORT | DEVICE_WEBHOOK
   notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
@@ -1768,9 +1785,9 @@ model InventoryItem {
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
-  tenant           Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  vendor           Vendor?              @relation(fields: [vendorId], references: [id], onDelete: SetNull)
-  movements        InventoryMovement[]
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vendor             Vendor?             @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  movements          InventoryMovement[]
   purchaseOrderItems PurchaseOrderItem[]
 
   @@index([tenantId])
@@ -2710,9 +2727,9 @@ model TenantDeletionRequest {
   reason        String
 
   status               TenantDeletionRequestStatus @default(PENDING)
-  resolvedAt            DateTime?
-  resolvedByAdminEmail  String?
-  adminNotes            String?
+  resolvedAt           DateTime?
+  resolvedByAdminEmail String?
+  adminNotes           String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
@@ -3047,7 +3064,7 @@ model Venue {
   capacity    Int
   description String?
   photos      String[]
-  videos      String[] @default([])
+  videos      String[]  @default([])
   amenities   String[]
 
   halfDayRate  Float?
@@ -3246,4 +3263,28 @@ model CorporateInvoice {
 
   @@index([tenantId])
   @@map("corporate_invoices")
+}
+
+/// Who changed a guest's money, and why.
+///
+/// AuditLog is super-admin scoped (adminEmail, targetType tenant/user/theme)
+/// and cannot record tenant staff actions. Without this table there is no
+/// answer to "who waived this charge" — see plan/billing-contract.md §7.
+model BillingAudit {
+  id        String   @id @default(cuid())
+  tenantId  String
+  bookingId String?
+  invoiceId String?
+  action    String // FINALISE | ADJUST | DISCOUNT | COMP | WAIVE | REFUND | VOID
+  amount    Float?
+  reason    String?
+  actorId   String // User.id — never null; an unattributable change is the thing this exists to prevent
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, bookingId])
+  @@index([tenantId, createdAt])
+  @@map("billing_audits")
 }

@@ -251,3 +251,86 @@ describe('GET /api/bookings/:id/bill', () => {
     expect(res.statusCode).toBe(401);
   });
 });
+
+/**
+ * The unique constraint is the whole idempotency mechanism (contract R2): a
+ * retried finalisation must be rejected by the database, not silently double
+ * the guest's bill. These tests pin that, and pin the one case that must NOT
+ * be blocked — corrections after the fact.
+ */
+describe('InvoiceItem provenance constraint', () => {
+  async function makeInvoice() {
+    const b = await makeBooking({ total: 10000, checkIn: '2028-01-01', checkOut: '2028-01-02' });
+    const inv = await prisma.invoice.create({
+      data: {
+        tenantId, bookingId: b.id,
+        invoiceNumber: `INV-TEST-${Math.random().toString(36).slice(2, 10)}`,
+        guestName: 'Bill Payer', status: 'DRAFT',
+      },
+    });
+    return { booking: b, invoice: inv };
+  }
+
+  it('rejects the same charge written twice', async () => {
+    const { booking, invoice } = await makeInvoice();
+    const line = {
+      invoiceId: invoice.id, description: 'Room', category: 'ROOM' as const,
+      quantity: 1, unitPrice: 10000, total: 10000,
+      sourceType: 'ROOM', sourceId: booking.id,
+    };
+    await prisma.invoiceItem.create({ data: line });
+    await expect(prisma.invoiceItem.create({ data: line })).rejects.toThrow();
+    expect(await prisma.invoiceItem.count({ where: { invoiceId: invoice.id } })).toBe(1);
+  });
+
+  it('absorbs a retry with skipDuplicates instead of failing', async () => {
+    const { booking, invoice } = await makeInvoice();
+    const lines = [{
+      invoiceId: invoice.id, description: 'Room', category: 'ROOM' as const,
+      quantity: 1, unitPrice: 10000, total: 10000,
+      sourceType: 'ROOM', sourceId: booking.id,
+    }];
+    await prisma.invoiceItem.createMany({ data: lines, skipDuplicates: true });
+    await prisma.invoiceItem.createMany({ data: lines, skipDuplicates: true });
+    expect(await prisma.invoiceItem.count({ where: { invoiceId: invoice.id } })).toBe(1);
+  });
+
+  it('allows the same source on a different invoice', async () => {
+    const { booking, invoice } = await makeInvoice();
+    const other = await makeInvoice();
+    const line = (invoiceId: string) => ({
+      invoiceId, description: 'Room', category: 'ROOM' as const,
+      quantity: 1, unitPrice: 10000, total: 10000,
+      sourceType: 'ROOM', sourceId: booking.id,
+    });
+    await prisma.invoiceItem.create({ data: line(invoice.id) });
+    await prisma.invoiceItem.create({ data: line(other.invoice.id) });
+    expect(await prisma.invoiceItem.count({ where: { sourceId: booking.id } })).toBe(2);
+  });
+
+  it('does not block repeated adjustments, which carry no source id', async () => {
+    const { invoice } = await makeInvoice();
+    const adjustment = (amount: number) => ({
+      invoiceId: invoice.id, description: 'Correction', category: 'OTHER' as const,
+      quantity: 1, unitPrice: amount, total: amount,
+      sourceType: 'ADJUSTMENT', sourceId: null,
+    });
+    await prisma.invoiceItem.create({ data: adjustment(-500) });
+    await prisma.invoiceItem.create({ data: adjustment(-300) });
+    // Postgres treats nulls as distinct, so corrections are never refused.
+    expect(await prisma.invoiceItem.count({ where: { invoiceId: invoice.id } })).toBe(2);
+  });
+
+  it('records a billing audit row', async () => {
+    const { booking, invoice } = await makeInvoice();
+    await prisma.billingAudit.create({
+      data: {
+        tenantId, bookingId: booking.id, invoiceId: invoice.id,
+        action: 'ADJUST', amount: -500, reason: 'Charged in error', actorId: 'staff-1',
+      },
+    });
+    const rows = await prisma.billingAudit.findMany({ where: { tenantId, bookingId: booking.id } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.actorId).toBe('staff-1');
+  });
+});
