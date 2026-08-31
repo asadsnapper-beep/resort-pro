@@ -1,4 +1,4 @@
-import { prisma } from '@resort-pro/database';
+import { prisma, type Prisma } from '@resort-pro/database';
 
 /**
  * The one place a stay's payable total is calculated.
@@ -81,9 +81,17 @@ function nightsBetween(checkIn: Date, checkOut: Date): number {
  * `tenantId` is passed explicitly: this is called from transactions and jobs
  * where the tenant-scoped Prisma client is not in play, and a billing query
  * that silently crosses tenants is not a bug anyone would catch in review.
+ *
+ * `client` accepts a transaction client so check-out can price the stay inside
+ * the same transaction that freezes it. Reading beforehand would let a charge
+ * added in between be silently dropped from the guest's final bill.
  */
-export async function bill(tenantId: string, bookingId: string): Promise<Bill> {
-  const booking = await prisma.booking.findFirstOrThrow({
+export async function bill(
+  tenantId: string,
+  bookingId: string,
+  client: Prisma.TransactionClient | typeof prisma = prisma,
+): Promise<Bill> {
+  const booking = await client.booking.findFirstOrThrow({
     where: { id: bookingId, tenantId },
     include: {
       room: { select: { name: true, number: true } },

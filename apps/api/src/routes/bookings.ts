@@ -569,83 +569,166 @@ export async function bookingRoutes(app: FastifyInstance) {
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { db } = request;
-      const { sub: checkedOutByStaff } = request.user as JwtPayload;
+      const { tenantId, sub: checkedOutByStaff } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
       const body = z.object({
         additionalPayment: z.number().optional(), // extra amount collected at checkout
         paymentMethod:     z.enum(['CASH', 'CARD', 'BANK_TRANSFER']).optional(),
       }).parse(request.body ?? {});
 
-      const booking = await db.booking.findFirst({ where: { id } });
-      if (!booking) return reply.status(404).send({ success: false, error: 'Booking not found' });
-      if (booking.status !== 'CHECKED_IN') {
-        return reply.status(400).send({ success: false, error: 'Guest must be checked in to check out' });
+      const existing = await db.booking.findFirst({
+        where: { id },
+        include: { guest: { select: { firstName: true, lastName: true, email: true, phone: true } } },
+      });
+      if (!existing) return reply.status(404).send({ success: false, error: 'Booking not found' });
+      if (existing.status !== 'CHECKED_IN') {
+        return reply.status(409).send({ success: false, error: 'Guest must be checked in to check out' });
       }
+
+      // An invoice number is minted outside the transaction because the counter
+      // is its own sequence: a rolled-back checkout leaving a gap in the
+      // numbering is harmless, two checkouts sharing a number is not.
+      const priorInvoice = await db.invoice.findFirst({ where: { bookingId: id }, select: { id: true } });
+      const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { slug: true } });
+      const reservedNumber = priorInvoice ? null : await nextDocumentNumber(tenantId, tenant.slug, 'INV');
 
       const now = new Date();
+      const paid = body.additionalPayment && body.additionalPayment > 0 ? body.additionalPayment : 0;
+      const method = (body.paymentMethod ?? 'CASH') as 'CASH' | 'CARD' | 'BANK_TRANSFER';
 
-      const [foodAgg] = await Promise.all([
-        db.foodOrder.aggregate({
-          where: { bookingId: id, status: { notIn: ['CANCELLED'] } },
-          _sum: { totalAmount: true },
-        }),
-      ]);
-      const foodTotal = Number(foodAgg._sum.totalAmount ?? 0);
+      let result: { billed: Awaited<ReturnType<typeof bill>>; booking: unknown };
+      try {
+        result = await prisma.$transaction(async (tx) => {
+          // Compare-and-set: the status change is the lock. A second request —
+          // a double-clicked button, a retry after a timeout — matches zero
+          // rows and is rejected, so a guest can never be checked out twice or
+          // charged twice for the same stay.
+          const claimed = await tx.booking.updateMany({
+            where: { id, tenantId, status: 'CHECKED_IN' },
+            data: { status: 'CHECKED_OUT', actualCheckOut: now, checkedOutBy: checkedOutByStaff },
+          });
+          if (claimed.count === 0) {
+            throw Object.assign(new Error('Guest must be checked in to check out'), { statusCode: 409 });
+          }
 
-      const ops: Promise<unknown>[] = [
-        db.booking.update({
-          where: { id },
-          data: { status: 'CHECKED_OUT', actualCheckOut: now, checkedOutBy: checkedOutByStaff },
-          include: {
-            guest: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
-            room:  { select: { number: true, name: true, type: true } },
-            payments: { select: { amount: true, method: true, status: true, processedAt: true } },
-          },
-        }),
-        db.room.update({ where: { id: booking.roomId }, data: { status: 'CLEANING' } }),
-        db.housekeepingTask.create({
-          data: { roomId: booking.roomId, type: 'CHECKOUT', status: 'PENDING', scheduledDate: now },
-        }),
-      ];
+          if (paid > 0) {
+            await tx.payment.create({
+              data: { tenantId, bookingId: id, amount: paid, method, status: 'PAID', processedAt: now },
+            });
+            await tx.booking.update({ where: { id }, data: { paidAmount: { increment: paid } } });
+          }
 
-      // Record additional checkout payment if provided
-      if (body.additionalPayment && body.additionalPayment > 0) {
-        const method = (body.paymentMethod ?? 'CASH') as 'CASH' | 'CARD' | 'BANK_TRANSFER';
-        ops.push(
-          db.payment.create({
-            data: { bookingId: id, amount: body.additionalPayment, method, status: 'PAID', processedAt: now },
-          }),
-          db.booking.update({
+          // Priced inside the transaction, after the payment is recorded, so
+          // the frozen invoice matches the money that actually changed hands.
+          const billed = await bill(tenantId, id, tx);
+
+          const status = (billed.balanceDue <= 0 ? 'PAID' : billed.paidAmount > 0 ? 'PARTIAL' : 'SENT') as 'PAID' | 'PARTIAL' | 'SENT';
+          const totals = {
+            status, finalizedAt: now, finalizedBy: checkedOutByStaff,
+            subtotal: billed.subtotal, taxRate: billed.taxRate, taxAmount: billed.taxAmount,
+            total: billed.grandTotal, paidAmount: billed.paidAmount,
+          };
+
+          // Not an upsert: Prisma validates the `create` branch even when it
+          // takes `update`, so the null invoice number reserved only for the
+          // create path would reject every checkout that already has a draft —
+          // which, because autoCreateInvoice runs at booking time, is nearly
+          // all of them.
+          const invoice = priorInvoice
+            ? await tx.invoice.update({ where: { id: priorInvoice.id }, data: totals })
+            : await tx.invoice.create({
+                data: {
+                  ...totals,
+                  tenantId, bookingId: id,
+                  invoiceNumber: reservedNumber!,
+                  guestName:  `${existing.guest.firstName} ${existing.guest.lastName}`,
+                  guestEmail: existing.guest.email ?? undefined,
+                  guestPhone: existing.guest.phone ?? undefined,
+                  discountAmt: billed.discountAmount,
+                },
+              });
+
+          // The draft was a snapshot from booking-confirmation day; the stay has
+          // happened since. Rewrite the priced lines, but never touch
+          // ADJUSTMENT rows — those are corrections someone made deliberately.
+          //
+          // `NOT: { sourceType: 'ADJUSTMENT' }` alone would miss every legacy
+          // row, because in SQL `NULL <> 'ADJUSTMENT'` is NULL, not true — the
+          // stale lines would survive and double the guest's bill.
+          await tx.invoiceItem.deleteMany({
+            where: {
+              invoiceId: invoice.id,
+              OR: [{ sourceType: null }, { sourceType: { not: 'ADJUSTMENT' } }],
+            },
+          });
+          await tx.invoiceItem.createMany({
+            data: billed.lines.map((l) => ({
+              invoiceId: invoice.id,
+              description: l.description,
+              category: l.category as 'ROOM' | 'FOOD' | 'SERVICE' | 'OTHER',
+              quantity: l.quantity,
+              unitPrice: l.unitPrice,
+              total: l.total,
+              sourceType: l.sourceType,
+              sourceId: l.sourceId,
+            })),
+            skipDuplicates: true,
+          });
+
+          await tx.room.update({ where: { id: existing.roomId }, data: { status: 'CLEANING' } });
+          await tx.housekeepingTask.create({
+            data: { tenantId, roomId: existing.roomId, type: 'CHECKOUT', status: 'PENDING', scheduledDate: now },
+          });
+
+          await tx.billingAudit.create({
+            data: {
+              tenantId, bookingId: id, invoiceId: invoice.id,
+              action: 'FINALISE', amount: billed.grandTotal, actorId: checkedOutByStaff,
+              metadata: { invoiceNumber: invoice.invoiceNumber, balanceDue: billed.balanceDue },
+            },
+          });
+
+          const booking = await tx.booking.findUniqueOrThrow({
             where: { id },
-            data: { paidAmount: { increment: body.additionalPayment } },
-          }),
-        );
+            include: {
+              guest: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
+              room:  { select: { number: true, name: true, type: true } },
+              payments: { select: { amount: true, method: true, status: true, processedAt: true } },
+            },
+          });
+          return { billed, booking };
+        });
+      } catch (err) {
+        const status = (err as { statusCode?: number }).statusCode;
+        if (status === 409) return reply.status(409).send({ success: false, error: (err as Error).message });
+        throw err;
       }
 
-      const [updated] = await Promise.all(ops) as Awaited<typeof ops>;
-
-      const nights = Math.ceil((booking.checkOut.getTime() - booking.checkIn.getTime()) / 86_400_000);
-      const grandTotal = Number(booking.totalAmount) + foodTotal;
-      const paidAfter  = Number(booking.paidAmount) + (body.additionalPayment ?? 0);
-
-      trackGuestEmail('checkout', id, booking.tenantId, sendCheckoutEmail(id));
+      // Side effects run only once the bill is safely committed. A failed email
+      // or a failed loyalty award must never undo a completed checkout, and a
+      // guest must never be emailed an invoice that was rolled back.
+      trackGuestEmail('checkout', id, existing.tenantId, sendCheckoutEmail(id));
       awardCheckoutPoints(id).catch(() => {});
 
       return ok({
-        ...(updated as object),
+        ...(result.booking as object),
         checkoutSummary: {
-          nights,
-          roomTotal:  Number(booking.totalAmount),
-          foodTotal,
-          grandTotal,
-          paidAmount: paidAfter,
-          balanceDue: Math.max(0, grandTotal - paidAfter),
+          nights:     result.billed.nights,
+          roomTotal:  result.billed.roomTotal,
+          foodTotal:  result.billed.foodTotal,
+          extrasTotal: result.billed.extrasTotal,
+          taxAmount:  result.billed.taxAmount,
+          grandTotal: result.billed.grandTotal,
+          paidAmount: result.billed.paidAmount,
+          balanceDue: result.billed.balanceDue,
+          // Orders that never reached the guest, so the desk can see what was
+          // deliberately left off the bill it just froze.
+          unbilled:   result.billed.warnings,
         },
       }, 'Guest checked out');
     },
   });
 
-  // PATCH /api/bookings/:id/cancel
   app.patch('/:id/cancel', {
     schema: { tags: ['bookings'], summary: 'Cancel a booking', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
