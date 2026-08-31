@@ -6,6 +6,9 @@ export default defineConfig({
     'src/worker.ts',
     'src/scripts/seed-demo.ts',
     'src/scripts/seed-admin.ts',
+    // Run manually, not at startup — but it has to exist in the image to be
+    // runnable at all. The container ships only dist/, with no tsx.
+    'src/scripts/backfill-finalized-invoices.ts',
   ],
   format: ['cjs'],
   outDir: 'dist',
