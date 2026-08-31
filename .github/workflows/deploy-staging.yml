@@ -125,7 +125,7 @@ jobs:
           # Create new stack from compose file
           COMPOSE_CONTENT=$(cat /tmp/docker-compose.staging.deploy.yml)
 
-          curl -s -X POST \
+          HTTP_STATUS=$(curl -s -o /tmp/portainer-create.txt -w "%{http_code}" -X POST \
             -H "X-API-Key: ${{ secrets.PORTAINER_TOKEN }}" \
             -H "Content-Type: application/json" \
             "https://docker.webcoronet.com/api/stacks/create/standalone/string?endpointId=${ENDPOINT_ID}" \
@@ -133,7 +133,13 @@ jobs:
               \"name\": \"resortpro-staging\",
               \"stackFileContent\": $(echo "$COMPOSE_CONTENT" | jq -Rs .),
               \"env\": []
-            }"
+            }")
+
+          cat /tmp/portainer-create.txt
+          if [ "$HTTP_STATUS" -lt 200 ] || [ "$HTTP_STATUS" -ge 300 ]; then
+            echo "::error::Portainer stack creation failed with HTTP $HTTP_STATUS"
+            exit 1
+          fi
 
       - name: Update existing stack
         if: steps.stack.outputs.id != ''
@@ -156,7 +162,14 @@ jobs:
           EXISTING_ENV=$(echo "$STACK_JSON" | jq -c '.Env // []')
           echo "Preserving $(echo "$EXISTING_ENV" | jq 'length') stack environment variable(s)"
 
-          curl -s -X PUT \
+          # This used to be a bare `curl -s` whose response was thrown away, so
+          # any Portainer error — most often a name conflict with a container
+          # someone once created by hand outside compose — left the step
+          # exiting 0 and the whole workflow green while nothing was deployed.
+          # Staging then served an arbitrarily old image with every run
+          # reporting success. Production already checks its status; this is
+          # the same treatment.
+          HTTP_STATUS=$(curl -s -o /tmp/portainer-resp.txt -w "%{http_code}" -X PUT \
             -H "X-API-Key: ${{ secrets.PORTAINER_TOKEN }}" \
             -H "Content-Type: application/json" \
             "https://docker.webcoronet.com/api/stacks/${STACK_ID}?endpointId=${ENDPOINT_ID}" \
@@ -165,7 +178,32 @@ jobs:
               \"pullImage\": true,
               \"prune\": false,
               \"env\": ${EXISTING_ENV}
-            }"
+            }")
+
+          cat /tmp/portainer-resp.txt
+          if [ "$HTTP_STATUS" -lt 200 ] || [ "$HTTP_STATUS" -ge 300 ]; then
+            echo "::error::Portainer stack update failed with HTTP $HTTP_STATUS — staging is still running the previous image."
+            exit 1
+          fi
+
+      # A 2xx means Portainer accepted the request, not that it kept it. Read
+      # the stack back and confirm this commit's SHA is really in the stored
+      # compose — the difference between "deployed" and "reported deployed".
+      - name: Verify Portainer stored this commit
+        run: |
+          STORED=$(curl -s \
+            -H "X-API-Key: ${{ secrets.PORTAINER_TOKEN }}" \
+            "https://docker.webcoronet.com/api/stacks/${{ steps.stack.outputs.id }}/file" \
+            | jq -r '.StackFileContent // ""')
+
+          if echo "$STORED" | grep -q "resort-pro-api:dev-${GITHUB_SHA}"; then
+            echo "Portainer stack pins dev-${GITHUB_SHA}"
+          else
+            echo "::error::Portainer's stored compose does not reference dev-${GITHUB_SHA}."
+            echo "It still pins:"
+            echo "$STORED" | grep -o 'resort-pro-\(api\|web\):[^ ]*' | sort -u
+            exit 1
+          fi
 
       - name: Summary
         run: |
