@@ -48,8 +48,10 @@ async function autoCreateInvoice(bookingId: string, tenantId: string) {
         description: `${booking.room.name} — ${nights} night${nights > 1 ? 's' : ''} (${new Date(booking.checkIn).toLocaleDateString()} → ${new Date(booking.checkOut).toLocaleDateString()})`,
         category: 'ROOM',
         quantity: nights,
-        unitPrice: Number(booking.room.basePrice),
-        total: Number(booking.room.basePrice) * nights,
+        // What the booking was actually priced at, after any rate plan, staff
+        // override or discount — not the room's rate card.
+        unitPrice: Number(booking.totalAmount) / nights,
+        total: Number(booking.totalAmount),
       },
     ];
 
@@ -675,6 +677,16 @@ export async function bookingRoutes(app: FastifyInstance) {
             skipDuplicates: true,
           });
 
+          // Link the booking to its invoice number here rather than leaving it
+          // to sendCheckoutEmail. That stamped it only after an email actually
+          // sent, so a resort with checkout emails switched off never got the
+          // link at all and kept falling back to the second, incompatible
+          // `INV-{confirmationNo}` scheme.
+          await tx.booking.update({
+            where: { id },
+            data: { invoiceNumber: invoice.invoiceNumber },
+          });
+
           await tx.room.update({ where: { id: existing.roomId }, data: { status: 'CLEANING' } });
           await tx.housekeepingTask.create({
             data: { tenantId, roomId: existing.roomId, type: 'CHECKOUT', status: 'PENDING', scheduledDate: now },
@@ -1025,6 +1037,7 @@ export async function bookingRoutes(app: FastifyInstance) {
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { db } = request;
+      const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
 
       const booking = await db.booking.findFirst({
@@ -1041,19 +1054,20 @@ export async function bookingRoutes(app: FastifyInstance) {
       });
       if (!booking) return reply.status(404).send({ error: 'Booking not found' });
 
-      const nights = calculateNights(booking.checkIn, booking.checkOut);
-      const roomTotal = Number(booking.room.basePrice) * nights;
-      const foodTotal = booking.foodOrders.reduce((sum, o) => sum + Number(o.totalAmount), 0);
-      const extrasTotal = booking.invoiceExtras.reduce((sum, e) => sum + e.amount * e.quantity, 0);
-      const subtotal = roomTotal + foodTotal + extrasTotal;
-      const taxAmount = subtotal * ((booking.tenant.taxRate ?? 0) / 100);
-      const grandTotal = subtotal + taxAmount;
-      const paidAmount = booking.payments.reduce((sum, p) => sum + Number(p.amount), 0);
-      const balanceDue = grandTotal - paidAmount;
+      // Totals come from the one calculation, never re-derived here. Pricing
+      // the room from room.basePrice — which this did — is wrong the moment a
+      // rate plan, a staff override or a discount applies.
+      const billed = await bill(tenantId, id);
+      const nights = billed.nights;
+      const { roomTotal, foodTotal, extrasTotal, subtotal, taxAmount, grandTotal, paidAmount, balanceDue } = billed;
+      const finalizedAt = await db.invoice.findFirst({ where: { bookingId: id }, select: { finalizedAt: true } });
 
       return reply.send({
         success: true,
         data: {
+          // Once settled, this is a historical record: the client hides the
+          // controls that would edit it (see plan/billing-contract.md R4).
+          finalizedAt: finalizedAt?.finalizedAt ?? null,
           booking: {
             id: booking.id,
             confirmationNo: booking.confirmationNo,
@@ -1072,7 +1086,7 @@ export async function bookingRoutes(app: FastifyInstance) {
           room: { id: booking.room.id, name: booking.room.name, number: booking.room.number, basePrice: booking.room.basePrice },
           tenant: booking.tenant,
           lineItems: {
-            room: { description: `Room ${booking.room.name} (${nights} nights × ${booking.tenant.currency} ${Number(booking.room.basePrice).toFixed(2)})`, amount: roomTotal, nights },
+            room: { description: `Room ${booking.room.name} (${nights} nights × ${booking.tenant.currency} ${(roomTotal / nights).toFixed(2)})`, amount: roomTotal, nights },
             food: booking.foodOrders.flatMap(o => o.items.map(i => ({
               description: i.menuItem.name,
               quantity: i.quantity,
@@ -1141,6 +1155,7 @@ export async function bookingRoutes(app: FastifyInstance) {
     preHandler: [requireAuth, requireRole('OWNER', 'MANAGER', 'RECEPTIONIST')],
     handler: async (request, reply) => {
       const { db } = request;
+      const { tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
 
       const booking = await db.booking.findFirst({
@@ -1156,15 +1171,11 @@ export async function bookingRoutes(app: FastifyInstance) {
       });
       if (!booking) return reply.status(404).send({ error: 'Booking not found' });
 
-      const nights = calculateNights(booking.checkIn, booking.checkOut);
-      const roomTotal = Number(booking.room.basePrice) * nights;
-      const foodTotal = booking.foodOrders.reduce((sum, o) => sum + Number(o.totalAmount), 0);
-      const extrasTotal = booking.invoiceExtras.reduce((sum, e) => sum + e.amount * e.quantity, 0);
-      const subtotal = roomTotal + foodTotal + extrasTotal;
-      const taxAmount = subtotal * ((booking.tenant.taxRate ?? 0) / 100);
-      const grandTotal = subtotal + taxAmount;
-      const paidAmount = booking.payments.reduce((sum, p) => sum + Number(p.amount), 0);
-      const balanceDue = grandTotal - paidAmount;
+      // Same figures as everywhere else. This is a guest-facing document; it
+      // must not re-derive the room from room.basePrice, which is the rate
+      // card rather than what the guest was charged.
+      const billed = await bill(tenantId, id);
+      const { nights, roomTotal, foodTotal, extrasTotal, subtotal, taxAmount, grandTotal, paidAmount, balanceDue } = billed;
       const cur = booking.tenant.currency;
       const fmt = (n: number) => `${cur} ${n.toFixed(2)}`;
 
@@ -1205,7 +1216,7 @@ export async function bookingRoutes(app: FastifyInstance) {
               </tr>
             </thead>
             <tbody>
-              <tr><td style="padding:4px 8px">Room: ${booking.room.name} (${nights}n × ${fmt(Number(booking.room.basePrice))})</td><td style="padding:4px 8px;text-align:right">${fmt(roomTotal)}</td></tr>
+              <tr><td style="padding:4px 8px">Room: ${booking.room.name} (${nights}n × ${fmt(roomTotal / nights)})</td><td style="padding:4px 8px;text-align:right">${fmt(roomTotal)}</td></tr>
               ${foodRows}
               ${extraRows}
               ${booking.tenant.taxRate ? `<tr style="border-top:1px solid #eee"><td style="padding:4px 8px;color:#888">Tax (${booking.tenant.taxRate}%)</td><td style="padding:4px 8px;text-align:right;color:#888">${fmt(taxAmount)}</td></tr>` : ''}

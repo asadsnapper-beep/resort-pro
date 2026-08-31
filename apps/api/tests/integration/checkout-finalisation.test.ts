@@ -58,7 +58,7 @@ beforeAll(async () => {
   ownerToken = await verifyOwnerAndLogin(app, { tenantId, email: `owner-${slug}@test.com`, password, slug });
   await prisma.tenant.update({ where: { id: tenantId }, data: { planStatus: 'active', plan: 'ENTERPRISE', taxRate: 0 } });
 
-  for (const n of ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']) {
+  for (const n of ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16']) {
     const r = await app.inject({
       method: 'POST', url: '/api/rooms', headers: auth(),
       payload: { number: `F${n}`, name: `Fin Room ${n}`, type: 'DELUXE', basePrice: 4000, maxOccupancy: 2 },
@@ -204,5 +204,67 @@ describe('check-out finalises the invoice', () => {
     expect(JSON.parse(res.body).data.checkoutSummary.balanceDue).toBe(7000);
     const inv = await prisma.invoice.findFirstOrThrow({ where: { bookingId: b.id } });
     expect(inv.status).toBe('PARTIAL');
+  });
+});
+
+/**
+ * The acceptance criterion for the whole P0 plan: one stay, one number,
+ * everywhere. Before this work the front desk, the check-out response, the
+ * invoice page and the guest email each computed their own total and all four
+ * disagreed.
+ */
+describe('every surface reports the same total', () => {
+  it('bill, check-out summary, invoice page and stored invoice agree', async () => {
+    const b = await stay({ total: 12000, paid: 5000, day: 19 });
+    await prisma.foodOrder.create({
+      data: {
+        tenantId, bookingId: b.id, totalAmount: 900, status: 'DELIVERED', paymentStatus: 'PENDING',
+        items: { create: [{ menuItemId, quantity: 1, unitPrice: 900 }] },
+      },
+    });
+    await prisma.invoiceExtra.create({
+      data: { tenantId, bookingId: b.id, description: 'Laundry', amount: 300, quantity: 1 },
+    });
+
+    const preview = JSON.parse((await app.inject({
+      method: 'GET', url: `/api/bookings/${b.id}/bill`, headers: auth(),
+    })).body).data;
+
+    const summary = JSON.parse((await app.inject({
+      method: 'PATCH', url: `/api/bookings/${b.id}/check-out`, headers: auth(),
+      payload: { additionalPayment: 8200, paymentMethod: 'CASH' },
+    })).body).data.checkoutSummary;
+
+    const invoicePage = JSON.parse((await app.inject({
+      method: 'GET', url: `/api/bookings/${b.id}/invoice`, headers: auth(),
+    })).body).data;
+
+    const stored = await prisma.invoice.findFirstOrThrow({ where: { bookingId: b.id } });
+
+    expect(preview.grandTotal).toBe(13200);
+    expect(summary.grandTotal).toBe(13200);
+    expect(invoicePage.summary.grandTotal).toBe(13200);
+    expect(stored.total).toBe(13200);
+    expect(summary.balanceDue).toBe(0);
+    expect(invoicePage.finalizedAt).not.toBeNull();
+  });
+
+  it('prices the invoice page from what was charged, not the room rate card', async () => {
+    // basePrice is 4000/night; this stay was booked at 9000 for one night.
+    const b = await stay({ total: 9000, paid: 9000, day: 21 });
+    const page = JSON.parse((await app.inject({
+      method: 'GET', url: `/api/bookings/${b.id}/invoice`, headers: auth(),
+    })).body).data;
+    expect(page.lineItems.room.amount).toBe(9000);
+    expect(page.summary.grandTotal).toBe(9000);
+  });
+
+  it('stamps the booking with the invoice’s own number, not a second scheme', async () => {
+    const b = await stay({ total: 4000, paid: 4000, day: 23 });
+    await checkOut(b.id);
+    const inv = await prisma.invoice.findFirstOrThrow({ where: { bookingId: b.id } });
+    const fresh = await prisma.booking.findUniqueOrThrow({ where: { id: b.id } });
+    expect(fresh.invoiceNumber).toBe(inv.invoiceNumber);
+    expect(fresh.invoiceNumber).not.toMatch(/^INV-FIN-/); // not the confirmation-number fallback
   });
 });

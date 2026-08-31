@@ -3,6 +3,7 @@
  * Each function checks the tenant's EmailSettings toggles before sending.
  */
 import { prisma } from '@resort-pro/database';
+import { bill } from '../services/billing';
 import { sendEmail } from '../services/email';
 import { calculateNights } from './booking';
 import { createAdminNotification } from './notifications';
@@ -250,8 +251,7 @@ export async function sendCheckoutEmail(bookingId: string) {
       guest: true,
       room: true,
       payments: { where: { status: 'PAID' } },
-      foodOrders: true,
-      invoiceExtras: true,
+      invoice: { include: { items: true } },
       tenant: { select: { name: true, email: true, currency: true, logoUrl: true, brandPrimaryColor: true, taxRate: true } },
     },
   });
@@ -264,17 +264,46 @@ export async function sendCheckoutEmail(bookingId: string) {
   const primary = booking.tenant.brandPrimaryColor ?? '#1a6b5e';
   const cur = booking.tenant.currency;
 
-  const roomTotal = Number(booking.room.basePrice) * nights;
-  const foodTotal = booking.foodOrders.reduce((s, o) => s + Number(o.totalAmount), 0);
-  const extrasTotal = booking.invoiceExtras.reduce((s, e) => s + e.amount * e.quantity, 0);
-  const subtotal = roomTotal + foodTotal + extrasTotal;
-  const taxRate = booking.tenant.taxRate ?? 0;
-  const taxAmount = subtotal * (taxRate / 100);
-  const grandTotal = subtotal + taxAmount;
-  const paidAmount = booking.payments.reduce((s, p) => s + Number(p.amount), 0);
+  // The guest is sent the document of record, not a fresh calculation.
+  //
+  // Check-out freezes an invoice; re-deriving the numbers here is how this
+  // email came to disagree with everything else — it priced the room from
+  // room.basePrice, so a stay charged 13,500 under a rate plan was invoiced
+  // to the guest at 9,000. Falling back to bill() covers a stay that has no
+  // finalised invoice yet (a manual send before check-out).
+  const finalised = booking.invoice?.finalizedAt ? booking.invoice : null;
+  let roomTotal: number, foodTotal: number, extrasTotal: number;
+  let subtotal: number, taxRate: number, taxAmount: number, grandTotal: number, paidAmount: number;
+
+  if (finalised) {
+    // Grouped by category rather than sourceType, so invoices written before
+    // provenance existed still split into the right rows.
+    const sumOf = (pred: (c: string) => boolean) =>
+      finalised.items.filter((i) => pred(i.category)).reduce((s, i) => s + i.total, 0);
+    roomTotal   = sumOf((c) => c === 'ROOM');
+    foodTotal   = sumOf((c) => c === 'FOOD');
+    extrasTotal = sumOf((c) => c !== 'ROOM' && c !== 'FOOD');
+    subtotal    = finalised.subtotal;
+    taxRate     = finalised.taxRate;
+    taxAmount   = finalised.taxAmount;
+    grandTotal  = finalised.total;
+    paidAmount  = finalised.paidAmount;
+  } else {
+    const b = await bill(booking.tenantId, booking.id);
+    roomTotal   = b.roomTotal;
+    foodTotal   = b.foodTotal;
+    extrasTotal = b.extrasTotal + b.packagesTotal;
+    subtotal    = b.subtotal;
+    taxRate     = b.taxRate;
+    taxAmount   = b.taxAmount;
+    grandTotal  = b.grandTotal;
+    paidAmount  = b.paidAmount;
+  }
   const balanceDue = grandTotal - paidAmount;
 
-  const invoiceNumber = booking.invoiceNumber ?? `INV-${booking.confirmationNo}`;
+  // Prefer the invoice's own number: `INV-${confirmationNo}` was a second,
+  // incompatible numbering scheme, so one stay could carry two invoice numbers.
+  const invoiceNumber = booking.invoice?.invoiceNumber ?? booking.invoiceNumber ?? `INV-${booking.confirmationNo}`;
 
   const invoiceRows = [
     `<tr style="background:#f8fafa"><td style="padding:8px 16px;font-size:13px">Room: ${booking.room.name} (${nights}n)</td><td style="padding:8px 16px;text-align:right;font-size:13px">${fmt(roomTotal, cur)}</td></tr>`,
