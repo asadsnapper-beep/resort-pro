@@ -128,6 +128,10 @@
 .dark {
   /* Text */
   --rp-text: #f8fafc;
+  /* --rp-danger had no dark value, so it stayed the light-mode #c43c3c and
+     measured 3.02:1 on a dark surface — below AA, on the one number a
+     receptionist has to read correctly: the balance due. */
+  --rp-danger: #ff8a7a;
   --rp-text-muted: #a9c1d0;
   --rp-text-muted-2: #a9c1d0;
   --rp-text-subtle: #a9c1d0;

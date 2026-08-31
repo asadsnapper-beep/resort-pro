@@ -16,6 +16,7 @@ import { syncCalendarsForRoom } from '../jobs/ical-sync';
 import { createGuestPaymentLink } from './billing';
 import { resolveRate } from './ratePlans';
 import { findReturningGuestId } from '../utils/guest-lookup';
+import { bill } from '../services/billing';
 import { createAdminNotification } from '../utils/notifications';
 import { nextDocumentNumber } from '../utils/sequence';
 import type { JwtPayload } from '@resort-pro/types';
@@ -477,6 +478,28 @@ export async function bookingRoutes(app: FastifyInstance) {
       autoCreateInvoice(booking.id, tenantId).catch(() => {});
 
       return reply.status(201).send(ok(booking, 'Booking created'));
+    },
+  });
+
+  // GET /api/bookings/:id/bill — what this stay currently owes
+  //
+  // The single billing calculation (see plan/billing-contract.md). Read-only:
+  // it changes nothing, it is safe to poll, and it is what the front desk,
+  // the invoice page and the guest email will all read so they stop
+  // disagreeing about the same stay.
+  app.get('/:id/bill', {
+    schema: { tags: ['bookings'], summary: 'Current bill for a booking', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
+    handler: async (request, reply) => {
+      const { tenantId } = request.user as JwtPayload;
+      const { id } = request.params as { id: string };
+      try {
+        return reply.send(ok(await bill(tenantId, id), 'Bill'));
+      } catch {
+        // bill() uses findFirstOrThrow scoped to the tenant, so a miss is
+        // either a bad id or another tenant's booking — same answer either way.
+        return reply.status(404).send({ success: false, error: 'Booking not found' });
+      }
     },
   });
 

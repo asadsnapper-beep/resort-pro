@@ -134,6 +134,8 @@ export const bookingsApi = {
   calendar: (month: number, year: number) => api.get('/bookings/calendar', { params: { month, year } }),
   gantt: (from: string, to: string) => api.get('/bookings/gantt', { params: { from, to } }),
   getInvoice: (id: string) => api.get(`/bookings/${id}/invoice`),
+  // The one billing calculation — room, packages, food, extras, tax, paid.
+  bill: (id: string) => api.get(`/bookings/${id}/bill`),
   addInvoiceExtra: (id: string, data: { description: string; amount: number; quantity?: number }) =>
     api.post(`/bookings/${id}/invoice/extras`, data),
   deleteInvoiceExtra: (id: string, extraId: string) =>

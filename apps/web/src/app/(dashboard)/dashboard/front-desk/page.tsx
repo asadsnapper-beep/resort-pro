@@ -124,14 +124,68 @@ function CheckInModal({ booking, onClose, onSuccess }: { booking: Booking; onClo
   );
 }
 
+/** One line of the server's bill calculation (GET /bookings/:id/bill). */
+type BillLine = { sourceType: string; sourceId: string; description: string; quantity: number; total: number };
+type Bill = {
+  currency: string; nights: number; lines: BillLine[];
+  roomTotal: number; packagesTotal: number; foodTotal: number; extrasTotal: number;
+  subtotal: number; discountAmount: number; taxRate: number; taxAmount: number;
+  grandTotal: number; paidAmount: number; balanceDue: number;
+  warnings: { kind: string; sourceId: string; description: string; amount: number }[];
+};
+
+/** A bill line, expandable to the individual charges behind it — a guest who
+ *  asks "what is this for?" should be answered at the desk, not by opening
+ *  the invoice page. */
+function BillRow({ label, amount, currency, detail }: { label: string; amount: number; currency?: string; detail?: BillLine[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <div className="flex justify-between">
+        <span className="text-rp-muted">
+          {label}
+          {detail && detail.length > 0 && (
+            <button type="button" onClick={() => setOpen(v => !v)} className="ml-1.5 text-rp-micro underline">
+              {open ? 'hide' : `${detail.length} item${detail.length !== 1 ? 's' : ''}`}
+            </button>
+          )}
+        </span>
+        <span className="text-rp-text">{fmt(amount, currency)}</span>
+      </div>
+      {open && detail?.map(d => (
+        <div key={d.sourceId} className="flex justify-between pl-3 text-rp-micro text-rp-muted">
+          <span className="truncate pr-2">{d.description}</span><span>{fmt(d.total, currency)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Check-Out Modal ────────────────────────────────────────────────────────────
 function CheckOutModal({ booking, onClose, onSuccess }: { booking: Booking; onClose: () => void; onSuccess: () => void }) {
   const { tenant } = useAuthStore();
   const qc = useQueryClient();
-  const balance = Math.max(0, Number(booking.totalAmount) - Number(booking.paidAmount));
-  const [extraPayment, setExtraPayment] = useState(balance > 0 ? String(balance) : '');
+
+  // The bill comes from the server's single calculation rather than being
+  // re-derived here. This box used to show room-minus-paid: a guest who had
+  // eaten, used the minibar or broken something settled the room and walked
+  // out, and the rest sat unpaid on an invoice nobody opened.
+  const { data: billData, isLoading: billLoading } = useQuery({
+    queryKey: ['booking-bill', booking.id],
+    queryFn: () => bookingsApi.bill(booking.id).then(r => r.data.data as Bill),
+  });
+
+  const balance = billData ? billData.balanceDue : Math.max(0, Number(booking.totalAmount) - Number(booking.paidAmount));
+  const [extraPayment, setExtraPayment] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD' | 'BANK_TRANSFER'>('CASH');
-  const n = nights(booking.checkIn, booking.checkOut);
+  const n = billData?.nights ?? nights(booking.checkIn, booking.checkOut);
+
+  // Prefill the collection box once the real balance is known, without
+  // overwriting an amount the receptionist has already typed.
+  const [touchedAmount, setTouchedAmount] = useState(false);
+  useEffect(() => {
+    if (!touchedAmount && billData) setExtraPayment(billData.balanceDue > 0 ? String(billData.balanceDue) : '');
+  }, [billData, touchedAmount]);
 
   const mutation = useMutation({
     mutationFn: () => bookingsApi.checkOut(booking.id, { additionalPayment: extraPayment ? Number(extraPayment) : undefined, paymentMethod }),
@@ -157,16 +211,49 @@ function CheckOutModal({ booking, onClose, onSuccess }: { booking: Booking; onCl
       </>
     }>
       <div className="rounded-[12px] border p-4 space-y-2 text-[13px]" style={{ background: 'var(--rp-surface-3)', borderColor: 'var(--rp-border)' }}>
-        <div className="flex justify-between"><span className="text-[#64748b]">Room ({n} nights)</span><span className="text-[#183153]">{fmt(Number(booking.totalAmount), tenant?.currency)}</span></div>
-        <div className="flex justify-between border-t pt-2 font-semibold" style={{ borderColor: 'var(--rp-border)' }}><span className="text-[#183153]">Total</span><span className="text-[#183153]">{fmt(Number(booking.totalAmount), tenant?.currency)}</span></div>
-        <div className="flex justify-between text-[#183153]"><span>Already paid</span><span>-{fmt(Number(booking.paidAmount), tenant?.currency)}</span></div>
-        <div className={`flex justify-between border-t pt-2 text-[14px] font-bold ${balance > 0 ? 'text-[#c43c3c]' : 'text-[#183153]'}`} style={{ borderColor: 'var(--rp-border)' }}>
-          <span>Balance due</span><span>{fmt(balance, tenant?.currency)}</span>
-        </div>
+        {billLoading && <p className="text-rp-muted">Loading bill…</p>}
+        {billData && (
+          <>
+            <BillRow label={`Room (${n} night${n !== 1 ? 's' : ''})`} amount={billData.roomTotal} currency={billData.currency} />
+            {billData.packagesTotal > 0 && <BillRow label="Packages" amount={billData.packagesTotal} currency={billData.currency} />}
+            {billData.foodTotal > 0 && (
+              <BillRow label="Food &amp; beverage" amount={billData.foodTotal} currency={billData.currency}
+                detail={billData.lines.filter(l => l.sourceType === 'FOOD_ORDER')} />
+            )}
+            {billData.extrasTotal > 0 && (
+              <BillRow label="Other charges" amount={billData.extrasTotal} currency={billData.currency}
+                detail={billData.lines.filter(l => l.sourceType === 'EXTRA')} />
+            )}
+            {billData.discountAmount > 0 && <BillRow label="Discount" amount={-billData.discountAmount} currency={billData.currency} />}
+            {billData.taxAmount > 0 && <BillRow label={`Tax (${billData.taxRate}%)`} amount={billData.taxAmount} currency={billData.currency} />}
+            <div className="flex justify-between border-t pt-2 font-semibold" style={{ borderColor: 'var(--rp-border)' }}>
+              <span className="text-rp-text">Total</span><span className="text-rp-text">{fmt(billData.grandTotal, billData.currency)}</span>
+            </div>
+            <div className="flex justify-between text-rp-text"><span>Already paid</span><span>-{fmt(billData.paidAmount, billData.currency)}</span></div>
+            <div className={`flex justify-between border-t pt-2 text-[14px] font-bold ${balance > 0 ? 'text-rp-danger' : 'text-rp-text'}`} style={{ borderColor: 'var(--rp-border)' }}>
+              <span>Balance due</span><span>{fmt(balance, billData.currency)}</span>
+            </div>
+          </>
+        )}
       </div>
+
+      {/* Food that has not reached the guest yet. Deliberately not decided for
+          the desk: billing it charges for a meal nobody ate, dropping it
+          silently loses real money. */}
+      {billData && billData.warnings.length > 0 && (
+        <div className="mt-3 rounded-rp-btn border border-rp-border-md bg-rp-amber-bg p-3 text-rp-body">
+          <p className="font-semibold text-rp-text">
+            {billData.warnings.length} food order{billData.warnings.length !== 1 ? 's' : ''} not delivered yet
+          </p>
+          <p className="text-rp-micro text-rp-muted">
+            Not included in this bill ({fmt(billData.warnings.reduce((s, w) => s + w.amount, 0), billData.currency)}).
+            Deliver or cancel them before checking out, or they go unpaid.
+          </p>
+        </div>
+      )}
       {balance > 0 && (
         <ModalInput label="Collect payment">
-          <input type="number" value={extraPayment} onChange={e => setExtraPayment(e.target.value)} placeholder={String(balance)} className={`${inputCls} mb-2`} />
+          <input type="number" value={extraPayment} onChange={e => { setTouchedAmount(true); setExtraPayment(e.target.value); }} placeholder={String(balance)} className={`${inputCls} mb-2`} />
           <div className="flex gap-2">
             {(['CASH', 'CARD', 'BANK_TRANSFER'] as const).map(m => (
               <button key={m} onClick={() => setPaymentMethod(m)}

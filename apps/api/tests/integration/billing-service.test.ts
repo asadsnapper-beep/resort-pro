@@ -209,3 +209,45 @@ describe('bill() — provenance and isolation', () => {
     await expect(bill('00000000-0000-0000-0000-000000000000', b.id)).rejects.toThrow();
   });
 });
+
+describe('GET /api/bookings/:id/bill', () => {
+  it('returns the same numbers bill() computes', async () => {
+    const b = await makeBooking({ total: 12000, checkIn: '2027-11-01', checkOut: '2027-11-03', paid: 5000 });
+    await makeFoodOrder(b.id, 800, 'DELIVERED');
+    await prisma.invoiceExtra.create({
+      data: { tenantId, bookingId: b.id, description: 'Minibar', amount: 200, quantity: 1 },
+    });
+
+    const res = await app.inject({ method: 'GET', url: `/api/bookings/${b.id}/bill`, headers: auth() });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body).data;
+
+    const direct = await bill(tenantId, b.id);
+    expect(body.grandTotal).toBe(direct.grandTotal);
+    expect(body.grandTotal).toBe(13000);
+    expect(body.balanceDue).toBe(8000);
+    expect(body.lines).toHaveLength(3);
+  });
+
+  it('surfaces undelivered food as a warning', async () => {
+    const b = await makeBooking({ total: 9000, checkIn: '2027-11-05', checkOut: '2027-11-06' });
+    await makeFoodOrder(b.id, 450, 'READY');
+    const res = await app.inject({ method: 'GET', url: `/api/bookings/${b.id}/bill`, headers: auth() });
+    const body = JSON.parse(res.body).data;
+    expect(body.foodTotal).toBe(0);
+    expect(body.warnings).toHaveLength(1);
+  });
+
+  it('404s for an unknown booking', async () => {
+    const res = await app.inject({
+      method: 'GET', url: '/api/bookings/00000000-0000-0000-0000-000000000000/bill', headers: auth(),
+    });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('requires authentication', async () => {
+    const b = await makeBooking({ total: 5000, checkIn: '2027-11-08', checkOut: '2027-11-09' });
+    const res = await app.inject({ method: 'GET', url: `/api/bookings/${b.id}/bill` });
+    expect(res.statusCode).toBe(401);
+  });
+});
