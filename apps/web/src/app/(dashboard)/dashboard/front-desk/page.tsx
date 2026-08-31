@@ -183,6 +183,30 @@ function CheckOutModal({ booking, onClose, onSuccess }: { booking: Booking; onCl
   // Prefill the collection box once the real balance is known, without
   // overwriting an amount the receptionist has already typed.
   const [touchedAmount, setTouchedAmount] = useState(false);
+
+  // Adding a charge at check-out, rather than only from the invoice page.
+  // "The guest broke a glass" is learned at this counter, at this moment —
+  // making staff leave check-out, find the invoice page and come back means
+  // on a busy desk the charge simply never gets added.
+  const [showCharge, setShowCharge] = useState(false);
+  const [chargeDesc, setChargeDesc] = useState('');
+  const [chargeAmount, setChargeAmount] = useState('');
+
+  const addCharge = useMutation({
+    mutationFn: () => bookingsApi.addInvoiceExtra(booking.id, {
+      description: chargeDesc.trim(), amount: Number(chargeAmount),
+    }),
+    onSuccess: () => {
+      // The balance must move with the charge, so re-read rather than patch
+      // it locally — the server's calculation stays the only one.
+      qc.invalidateQueries({ queryKey: ['booking-bill', booking.id] });
+      setTouchedAmount(false);
+      setChargeDesc(''); setChargeAmount(''); setShowCharge(false);
+      toast({ title: 'Charge added' });
+    },
+    onError: (e: { response?: { data?: { error?: string } } }) =>
+      toast({ title: 'Error', description: e.response?.data?.error || 'Could not add the charge', variant: 'destructive' }),
+  });
   useEffect(() => {
     if (!touchedAmount && billData) setExtraPayment(billData.balanceDue > 0 ? String(billData.balanceDue) : '');
   }, [billData, touchedAmount]);
@@ -249,6 +273,41 @@ function CheckOutModal({ booking, onClose, onSuccess }: { booking: Booking; onCl
             Not included in this bill ({fmt(billData.warnings.reduce((s, w) => s + w.amount, 0), billData.currency)}).
             Deliver or cancel them before checking out, or they go unpaid.
           </p>
+        </div>
+      )}
+
+      {!showCharge ? (
+        <button type="button" onClick={() => setShowCharge(true)}
+          className="mt-3 w-full rounded-rp-ctrl border border-dashed border-rp-border-md py-[9px] text-rp-body font-medium text-rp-muted hover:text-rp-text">
+          + Add charge
+        </button>
+      ) : (
+        <div className="mt-3 rounded-rp-btn border border-rp-border-md p-3">
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {['Damage', 'Extra bed', 'Lost key', 'Laundry'].map(preset => (
+              <button key={preset} type="button" onClick={() => setChargeDesc(preset)}
+                className="rounded-rp-ctrl border border-rp-border-md px-2 py-[3px] text-rp-micro text-rp-muted hover:text-rp-text">
+                {preset}
+              </button>
+            ))}
+          </div>
+          <input value={chargeDesc} onChange={e => setChargeDesc(e.target.value)}
+            placeholder="What is this for?" className={`${inputCls} mb-2`} />
+          {/* No preset amounts: a broken glass and a broken table are not the
+              same money, and a wrong default is worse than an empty box. */}
+          <input type="number" min="0" value={chargeAmount} onChange={e => setChargeAmount(e.target.value)}
+            placeholder="Amount" className={`${inputCls} mb-2`} />
+          <div className="flex gap-2">
+            <button type="button" onClick={() => { setShowCharge(false); setChargeDesc(''); setChargeAmount(''); }}
+              className="flex-1 rounded-rp-ctrl border border-rp-border-md py-[7px] text-rp-meta font-medium text-rp-text">
+              Cancel
+            </button>
+            <button type="button" onClick={() => addCharge.mutate()}
+              disabled={addCharge.isPending || !chargeDesc.trim() || !(Number(chargeAmount) > 0)}
+              className="flex-1 rounded-rp-ctrl bg-rp-btn-accent py-[7px] text-rp-meta font-medium text-rp-btn-accent-text disabled:opacity-50">
+              {addCharge.isPending ? 'Adding…' : 'Add to bill'}
+            </button>
+          </div>
         </div>
       )}
       {balance > 0 && (
