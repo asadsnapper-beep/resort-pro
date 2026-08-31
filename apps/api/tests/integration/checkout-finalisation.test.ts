@@ -7,7 +7,7 @@
  * wrong: it must not charge twice, must not half-complete, and must not let a
  * failing email undo a settled stay.
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { buildApp } from '../../src/app';
 import { prisma } from '@resort-pro/database';
 import { verifyOwnerAndLogin } from '../helpers/auth';
@@ -58,7 +58,7 @@ beforeAll(async () => {
   ownerToken = await verifyOwnerAndLogin(app, { tenantId, email: `owner-${slug}@test.com`, password, slug });
   await prisma.tenant.update({ where: { id: tenantId }, data: { planStatus: 'active', plan: 'ENTERPRISE', taxRate: 0 } });
 
-  for (const n of ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16']) {
+  for (const n of ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20']) {
     const r = await app.inject({
       method: 'POST', url: '/api/rooms', headers: auth(),
       payload: { number: `F${n}`, name: `Fin Room ${n}`, type: 'DELUXE', basePrice: 4000, maxOccupancy: 2 },
@@ -266,5 +266,79 @@ describe('every surface reports the same total', () => {
     const fresh = await prisma.booking.findUniqueOrThrow({ where: { id: b.id } });
     expect(fresh.invoiceNumber).toBe(inv.invoiceNumber);
     expect(fresh.invoiceNumber).not.toMatch(/^INV-FIN-/); // not the confirmation-number fallback
+  });
+});
+
+/**
+ * Side effects run after the bill is committed, so each needs its own guard.
+ * Without them a retry emails the guest their invoice twice and awards the
+ * loyalty points twice — points given away twice are money given away twice.
+ */
+describe('side effects are claimed, not repeated', () => {
+  it('sends the checkout invoice once', async () => {
+    await prisma.emailSettings.upsert({
+      where: { tenantId }, create: { tenantId, sendCheckoutInvoice: true }, update: { sendCheckoutInvoice: true },
+    });
+    // Its own guest, so the count cannot pick up the fire-and-forget emails
+    // other tests in this file leave in flight.
+    const soloEmail = `solo-${Date.now()}@test.com`;
+    const solo = await prisma.guest.create({
+      data: { tenantId, firstName: 'Solo', lastName: 'Guest', email: soloEmail },
+    });
+    const b = await prisma.booking.create({
+      data: {
+        tenantId, roomId: nextRoom(), guestId: solo.id,
+        checkIn: new Date('2029-01-25'), checkOut: new Date('2029-01-26'),
+        totalAmount: 5000, paidAmount: 5000, status: 'CHECKED_IN',
+        confirmationNo: `SOLO-${Math.random().toString(36).slice(2, 10).toUpperCase()}`,
+      },
+    });
+
+    // Count the actual sends. Asserting on invoiceSentAt would pass with the
+    // guard removed, because the stamp does not move on a second send — it
+    // has to be the email itself that is counted.
+    const emailService = await import('../../src/services/email');
+    const spy = vi.spyOn(emailService, 'sendEmail');
+    const { sendCheckoutEmail } = await import('../../src/utils/guest-emails');
+
+    await sendCheckoutEmail(b.id);
+    await sendCheckoutEmail(b.id);
+
+    expect(spy.mock.calls.filter(([arg]) => arg.to === soloEmail)).toHaveLength(1);
+    expect((await prisma.booking.findUniqueOrThrow({ where: { id: b.id } })).invoiceSentAt).not.toBeNull();
+    spy.mockRestore();
+  });
+
+  it('awards loyalty points once', async () => {
+    await prisma.loyaltyProgram.upsert({
+      where: { tenantId },
+      create: { tenantId, isEnabled: true, pointsPerDollar: 1 },
+      update: { isEnabled: true, pointsPerDollar: 1 },
+    });
+    const b = await stay({ total: 5000, paid: 5000, day: 27 });
+
+    const { awardCheckoutPoints } = await import('../../src/services/loyalty');
+    // Concurrently on purpose. Run one after the other, the flag read at the
+    // top of the function already stops the second — it is only two callers
+    // reading `false` at the same moment that the atomic claim exists for.
+    await Promise.all([awardCheckoutPoints(b.id), awardCheckoutPoints(b.id)]);
+
+    const txns = await prisma.loyaltyTransaction.count({ where: { bookingId: b.id } });
+    expect(txns).toBe(1);
+  });
+
+  it('does not mark a stay awarded when the programme is off', async () => {
+    await prisma.loyaltyProgram.upsert({
+      where: { tenantId },
+      create: { tenantId, isEnabled: false, pointsPerDollar: 1 },
+      update: { isEnabled: false },
+    });
+    const b = await stay({ total: 5000, paid: 5000, day: 29 });
+    const { awardCheckoutPoints } = await import('../../src/services/loyalty');
+    await awardCheckoutPoints(b.id);
+    const fresh = await prisma.booking.findUniqueOrThrow({ where: { id: b.id } });
+    // Claiming the flag here would deny the stay its points forever once the
+    // resort switches loyalty on.
+    expect(fresh.loyaltyPointsAwarded).toBe(false);
   });
 });

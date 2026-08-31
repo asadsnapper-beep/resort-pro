@@ -260,6 +260,17 @@ export async function sendCheckoutEmail(bookingId: string) {
   const settings = await getEmailSettings(booking.tenantId);
   if (!settings.sendCheckoutInvoice) return;
 
+  // Claim the send before doing it, not after. Stamping invoiceSentAt only on
+  // success left nothing to stop a second call — a retry, or a future queue —
+  // from emailing the guest their invoice twice. updateMany filtered on
+  // invoiceSentAt = null makes the claim atomic: a concurrent caller matches
+  // zero rows and stops here.
+  const claimed = await prisma.booking.updateMany({
+    where: { id: bookingId, invoiceSentAt: null },
+    data: { invoiceSentAt: new Date() },
+  });
+  if (claimed.count === 0) return; // already sent, or being sent right now
+
   const nights = calculateNights(booking.checkIn, booking.checkOut);
   const primary = booking.tenant.brandPrimaryColor ?? '#1a6b5e';
   const cur = booking.tenant.currency;
@@ -336,28 +347,33 @@ export async function sendCheckoutEmail(bookingId: string) {
     <p style="color:#555;font-size:14px">We'd love to have you back! We hope to welcome you again at ${booking.tenant.name}.</p>
   `;
 
-  await sendEmail({
-    to: booking.guest.email,
-    subject: `Thank you for your stay — Invoice ${invoiceNumber}`,
-    html: wrapGuest({
-      tenantName: booking.tenant.name,
-      logoUrl: booking.tenant.logoUrl,
-      primaryColor: primary,
-      replyToEmail: settings.replyToEmail ?? booking.tenant.email,
-      footerText: settings.footerText,
-      body,
-    }),
-  });
+  try {
+    await sendEmail({
+      to: booking.guest.email,
+      subject: `Thank you for your stay — Invoice ${invoiceNumber}`,
+      html: wrapGuest({
+        tenantName: booking.tenant.name,
+        logoUrl: booking.tenant.logoUrl,
+        primaryColor: primary,
+        replyToEmail: settings.replyToEmail ?? booking.tenant.email,
+        footerText: settings.footerText,
+        body,
+      }),
+    });
+  } catch (err) {
+    // Release the claim so the invoice can be sent later. This deliberately
+    // re-opens the small duplicate-send window: a guest receiving their
+    // invoice twice is an annoyance, never receiving it is a guest who does
+    // not know what they owe.
+    await prisma.booking.updateMany({ where: { id: bookingId }, data: { invoiceSentAt: null } }).catch(() => {});
+    throw err;
+  }
 
-  // Mark invoice as sent. updateMany (not update) so a booking that no
-  // longer exists by the time this fire-and-forget job gets here is a
-  // silent 0-row no-op instead of a thrown P2025 "record not found" — this
-  // function is always called as `sendCheckoutEmail(id).catch(() => {})`,
-  // so it can only run to completion after the email itself already sent;
-  // there's nothing to roll back or retry, just nothing left to stamp.
+  // updateMany (not update) so a booking deleted while this fire-and-forget
+  // job was running is a silent 0-row no-op rather than a thrown P2025.
   await prisma.booking.updateMany({
     where: { id: bookingId },
-    data: { invoiceNumber, invoiceSentAt: new Date() },
+    data: { invoiceNumber },
   });
 }
 

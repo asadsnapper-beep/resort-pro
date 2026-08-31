@@ -98,16 +98,32 @@ export async function awardCheckoutPoints(bookingId: string) {
   const points = Math.floor(Number(booking.totalAmount) * prog.pointsPerDollar);
   if (points <= 0) return;
 
-  await awardPoints(
-    booking.tenantId,
-    booking.guestId,
-    points,
-    `Stay: ${nights} night${nights !== 1 ? 's' : ''} · Booking ${booking.confirmationNo}`,
-    bookingId,
-  );
-
-  await prisma.booking.update({
-    where: { id: bookingId },
+  // Claim the award before granting it, and only once everything above has
+  // decided points are actually due. Reading the flag and writing it after
+  // lets two calls both see `false` and both award — points handed out twice
+  // are money given away twice. Claiming any earlier would be worse: a
+  // booking marked awarded while the programme was disabled could never
+  // earn its points once the resort turned loyalty on.
+  const claimed = await prisma.booking.updateMany({
+    where: { id: bookingId, loyaltyPointsAwarded: false },
     data: { loyaltyPointsAwarded: true },
   });
+  if (claimed.count === 0) return;
+
+  try {
+    await awardPoints(
+      booking.tenantId,
+      booking.guestId,
+      points,
+      `Stay: ${nights} night${nights !== 1 ? 's' : ''} · Booking ${booking.confirmationNo}`,
+      bookingId,
+    );
+  } catch (err) {
+    // Release the claim so the stay can still earn its points on a retry.
+    await prisma.booking.updateMany({
+      where: { id: bookingId },
+      data: { loyaltyPointsAwarded: false },
+    }).catch(() => {});
+    throw err;
+  }
 }
