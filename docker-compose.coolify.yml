@@ -114,6 +114,12 @@ services:
   # Copying backups_data off-box is the remaining step, and it is a
   # deliberate follow-up rather than something quietly assumed to be done.
   backup:
+    # This image is the API's, and its Dockerfile HEALTHCHECK probes
+    # localhost:4000. This container only runs a backup loop and never
+    # opens that port, so it reported unhealthy forever — a permanent red
+    # that would equally hide a backup that had genuinely stopped working.
+    healthcheck:
+      disable: true
     image: ghcr.io/asadsnapper-beep/resort-pro-api:latest
     pull_policy: always
     restart: unless-stopped
@@ -146,6 +152,11 @@ services:
   # Exactly one replica. These are cron schedules, not queue consumers — a
   # second instance would send every reminder twice.
   worker:
+    # Same as backup: the API image's HEALTHCHECK probes localhost:4000,
+    # which the worker never listens on. No health signal is more honest
+    # than a permanently false one; docker still restarts it if it exits.
+    healthcheck:
+      disable: true
     image: ghcr.io/asadsnapper-beep/resort-pro-api:latest
     pull_policy: always
     restart: unless-stopped
