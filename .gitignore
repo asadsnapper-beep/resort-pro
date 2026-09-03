@@ -19,3 +19,6 @@ apps/api/uploads/
 
 # Tesseract.js language models (auto-downloaded cache, not source)
 *.traineddata
+
+# TypeScript incremental build cache — regenerated on every build
+*.tsbuildinfo
