@@ -114,12 +114,30 @@ export async function housekeepingRoutes(app: FastifyInstance) {
       const { db } = request;
       const actor = request.user as JwtPayload;
       const { id } = request.params as { id: string };
-      const { status } = request.body as { status: string };
+      const { status, expectedStatus } = z.object({
+        status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'SKIPPED']),
+        expectedStatus: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'SKIPPED']).optional(),
+      }).parse(request.body);
 
       const task = await db.housekeepingTask.findFirst({
         where: { id, ...housekeepingAssignmentScope(actor) },
       });
       if (!task) return reply.status(404).send({ success: false, error: 'Task not found' });
+
+      // Idempotent retry: the first request may have committed while its response
+      // was lost. Returning the current task prevents duplicate side effects.
+      if (task.status === status) return ok(task, 'Task already updated');
+
+      // Offline clients send the status they originally observed. Never let a
+      // stale queued change overwrite a newer server decision.
+      if (expectedStatus && task.status !== expectedStatus) {
+        return reply.status(409).send({
+          success: false,
+          error: 'Task changed since it was last synced',
+          code: 'HOUSEKEEPING_STATUS_CONFLICT',
+          data: { currentStatus: task.status },
+        });
+      }
 
       const updated = await db.housekeepingTask.update({
         where: { id },

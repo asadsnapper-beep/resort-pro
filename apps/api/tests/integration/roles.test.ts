@@ -15,6 +15,7 @@ const password = 'TestPass123!';
 
 // Tokens per role
 const tokens: Record<string, string> = {};
+const userIds: Record<string, string> = {};
 let tenantId: string;
 
 // ── Setup: register a tenant + create users for each role ──────────────────
@@ -45,11 +46,12 @@ beforeAll(async () => {
 
   const roles = ['MANAGER', 'SHAREHOLDER', 'RECEPTIONIST', 'STAFF', 'CHEF'] as const;
   for (const role of roles) {
-    await prisma.user.upsert({
+    const user = await prisma.user.upsert({
       where: { tenantId_email: { tenantId, email: `${role.toLowerCase()}-${slug}@test.com` } },
       update: {},
       create: { tenantId, email: `${role.toLowerCase()}-${slug}@test.com`, passwordHash: hash, firstName: role, lastName: 'Test', role },
     });
+    userIds[role] = user.id;
 
     const login = await app.inject({
       method: 'POST', url: '/api/auth/login',
@@ -118,6 +120,84 @@ describe('Housekeeping — role permissions', () => {
   it('STAFF can GET /api/housekeeping', async () => {
     const res = await req('GET', '/api/housekeeping', 'STAFF');
     expect(res.statusCode).toBe(200);
+  });
+
+  it('STAFF can read and update only its own assigned housekeeping tasks', async () => {
+    const ownStaff = await prisma.staff.create({
+      data: {
+        tenantId,
+        userId: userIds.STAFF,
+        department: 'HOUSEKEEPING',
+        position: 'Room Attendant',
+        hireDate: new Date('2026-01-01'),
+      },
+    });
+    const otherStaff = await prisma.staff.create({
+      data: {
+        tenantId,
+        userId: userIds.MANAGER,
+        department: 'HOUSEKEEPING',
+        position: 'Housekeeping Manager',
+        hireDate: new Date('2026-01-01'),
+      },
+    });
+    const room = await prisma.room.create({
+      data: {
+        tenantId,
+        number: 'HK-1',
+        name: 'Housekeeping Scope Room',
+        type: 'STANDARD',
+        maxOccupancy: 2,
+        basePrice: 1000,
+        amenities: [],
+        images: [],
+        videos: [],
+      },
+    });
+    const scheduledDate = new Date('2026-08-29');
+    const ownTask = await prisma.housekeepingTask.create({
+      data: { tenantId, roomId: room.id, assignedToId: ownStaff.id, type: 'DAILY', scheduledDate },
+    });
+    const otherTask = await prisma.housekeepingTask.create({
+      data: { tenantId, roomId: room.id, assignedToId: otherStaff.id, type: 'DAILY', scheduledDate },
+    });
+    const unassignedTask = await prisma.housekeepingTask.create({
+      data: { tenantId, roomId: room.id, type: 'DAILY', scheduledDate },
+    });
+
+    const list = await req('GET', '/api/housekeeping', 'STAFF');
+    expect(list.statusCode).toBe(200);
+    expect(JSON.parse(list.body).data.map((task: { id: string }) => task.id)).toEqual([ownTask.id]);
+
+    const stats = await req('GET', '/api/housekeeping/stats', 'STAFF');
+    expect(stats.statusCode).toBe(200);
+    expect(JSON.parse(stats.body).data.total).toBe(1);
+
+    const ownUpdate = await req('PATCH', `/api/housekeeping/${ownTask.id}/status`, 'STAFF', {
+      status: 'IN_PROGRESS',
+      expectedStatus: 'PENDING',
+    });
+    expect(ownUpdate.statusCode).toBe(200);
+
+    const idempotentRetry = await req('PATCH', `/api/housekeeping/${ownTask.id}/status`, 'STAFF', {
+      status: 'IN_PROGRESS',
+      expectedStatus: 'PENDING',
+    });
+    expect(idempotentRetry.statusCode).toBe(200);
+
+    const staleOfflineUpdate = await req('PATCH', `/api/housekeeping/${ownTask.id}/status`, 'STAFF', {
+      status: 'COMPLETED',
+      expectedStatus: 'PENDING',
+    });
+    expect(staleOfflineUpdate.statusCode).toBe(409);
+    expect(JSON.parse(staleOfflineUpdate.body).code).toBe('HOUSEKEEPING_STATUS_CONFLICT');
+
+    for (const taskId of [otherTask.id, unassignedTask.id]) {
+      const denied = await req('PATCH', `/api/housekeeping/${taskId}/status`, 'STAFF', {
+        status: 'COMPLETED',
+      });
+      expect(denied.statusCode).toBe(404);
+    }
   });
 
   it('STAFF cannot POST /api/housekeeping (create task)', async () => {
