@@ -1,10 +1,10 @@
 # ResortPro Android Architecture
 
-> Status: Proposed architecture — implementation has not started
+> Status: Phase 0 foundation complete; Phase 1 device verification in progress
 >
 > Target path: `apps/android/`
 >
-> Last repository review: 2026-08-09
+> Last repository review: 2026-08-29
 >
 > Audience: Android engineers and backend engineers building the ResortPro staff app
 
@@ -58,7 +58,7 @@ must not be treated as implicit MVP requirements.
 | Language | Kotlin | Use the stable version supported by the selected Android Gradle Plugin. |
 | UI | Jetpack Compose + Material 3 | Single-activity application with Compose Navigation. |
 | Architecture | Feature-oriented MVVM with domain boundaries | Add use cases where business rules justify them; avoid empty layers. |
-| Dependency injection | Hilt | One DI framework for the application. |
+| Dependency injection | Manual `AppContainer` | Keeps the current app small; feature ViewModels are created at their Navigation destination. Revisit Hilt only when boilerplate becomes measurable. |
 | Networking | Retrofit + OkHttp | Kotlinx Serialization converter and centralized error mapping. |
 | Local data | Room | Cache operational data and queued work only when a sync contract exists. |
 | Preferences | DataStore | Store non-sensitive preferences such as theme and last tenant slug. |
@@ -118,8 +118,12 @@ Example login body:
 5. Never use `runBlocking` inside an OkHttp interceptor to read DataStore.
 6. Never log tokens, cookies, passwords, guest documents, or full payment data.
 
-Before implementation, prove the cookie flow with an integration test against the
-real API. If OkHttp cookie persistence cannot satisfy the contract safely, design
+The first implementation persists only `rp_refresh`, encrypts it with an Android
+Keystore-backed AES/GCM key, and uses one synchronized refresh coordinator for
+concurrent `401` responses. It clears the session on terminal auth failures while
+preserving the cookie for retry after network and server failures. Prove this flow
+against the real API on an emulator and physical device before treating Phase 1 as
+complete. If OkHttp cookie persistence cannot satisfy the contract safely, design
 an explicit native-client refresh contract with the backend rather than adding an
 insecure client workaround.
 
@@ -186,60 +190,105 @@ The MVP is offline-tolerant, not fully offline-first:
 - Cache dashboard, room, and housekeeping reads with `fetchedAt` metadata.
 - Display cached content with a visible “Last updated” state.
 - Never present cached availability as guaranteed availability.
-- Queue only idempotent mutations with an agreed server idempotency contract.
+- Queue housekeeping status mutations only. Each queued request includes the
+  status originally observed; the API treats same-target retries as idempotent
+  and rejects stale changes with `HOUSEKEEPING_STATUS_CONFLICT`.
 - Do not queue booking creation in the MVP; booking conflicts require an online
   server decision.
-- When reconnecting, refresh from the server before applying new operational
-  actions.
+- WorkManager flushes the housekeeping outbox when connectivity returns. A
+  terminal conflict is removed from retry and the next server read reconciles it.
 
 Full offline writes require version fields, conflict rules, idempotency keys,
 retry limits, and an operator-visible conflict screen. That is a separate design.
 
 ## 9. Delivery roadmap and exit criteria
 
-### Phase 0 — Contract and project foundation
+### Phase 0 — Contract and project foundation (complete)
 
-- Create `apps/android/` and a reproducible Gradle build.
-- Record supported `minSdk`, `compileSdk`, and `targetSdk` after checking current
-  Play requirements and the chosen dependency versions.
-- Add Hilt, Retrofit, Kotlinx Serialization, Room, DataStore, and test tooling.
-- Prove login, refresh-cookie rotation, logout, and a bearer-authenticated request.
+- [x] Create the initial `apps/android/` single-module Compose scaffold and Gradle
+  wrapper.
+- [x] Record `minSdk 24`, `compileSdk 37`, and `targetSdk 36` after checking
+  current Play requirements and selected stable dependencies.
+- [x] Verify the foundation with `lintDebug`, `testDebugUnitTest`, and
+  `assembleDebug` (2026-08-28).
+- [x] Add Retrofit, OkHttp, Kotlinx Serialization, coroutines, and unit-test
+  tooling.
+- [x] Build and statically verify debug and R8-minified release variants
+  (2026-08-29).
+- [x] Add Room for dashboard, room, and housekeeping cache entries plus the
+  housekeeping status outbox.
+- [ ] Add DataStore when non-sensitive persisted preferences first require it.
+- [ ] Prove login, refresh-cookie rotation, process-death restore, logout, and a
+  bearer-authenticated request against the real API on a device.
 
 Exit: CI builds debug and release variants; auth integration tests pass.
 
-### Phase 1 — Authentication and app shell
+### Phase 1 — Authentication and app shell (implementation complete; device verification in progress)
 
-- Build login, email-verification-required, loading, error, and signed-out states.
-- Add role-aware navigation and ResortPro design tokens.
-- Add accessibility semantics and screenshot tests for core states.
+- [x] Build login, email-verification-required, loading, retry, error, and
+  signed-out states.
+- [x] Add role-aware landing states and ResortPro design tokens.
+- [x] Restrict financial dashboard data to Owner/Manager, omit it for
+  Receptionist, give Staff a limited state, and use only `/api/shareholders/me`
+  for the Shareholder landing state.
+- [x] Add Compose UI coverage for login-to-home and the critical walk-in submit
+  controls; add a real OkHttp 401 refresh-and-retry integration test.
+- [ ] Add screenshot tests and complete an accessibility pass for core states.
+- [ ] Complete live API and process-death device verification.
 
 Exit: a verified test user can sign in, restart the app, refresh safely, and log out.
 
-### Phase 2 — Role-aware dashboard, rooms, and shareholder view
+### Phase 2 — Role-aware dashboard, rooms, and shareholder view (in progress)
 
-- Integrate `GET /api/dashboard`, room list, room details, and availability.
-- For `SHAREHOLDER`, expose only the approved read-only dashboard/analytics and
+- [x] Integrate `GET /api/dashboard`, paginated room list, and date-range
+  availability with loading, empty, error, and retry states.
+- [ ] Add room details.
+- [x] Add visible cache-age/offline states for dashboard and room reads.
+- [x] For `SHAREHOLDER`, expose only the approved read-only dashboard/analytics and
   personal investment experience.
-- Integrate `/api/shareholders/me` and `/api/shareholders/me/payouts`; never use
+- [ ] Integrate shareholder payout history from
+  `/api/shareholders/me/payouts`; never use
   owner-only shareholder-management endpoints from the shareholder experience.
-- Add cached read states, explicit staleness, pull-to-refresh, and retry.
+- [x] Add cached read states and explicit staleness.
+- [ ] Add pull-to-refresh.
 
 Exit: operational users can understand dashboard and room data during a network
 interruption, while shareholders can see only their own cached investment data.
 
-### Phase 3 — Housekeeping
+### Phase 3 — Housekeeping (implementation complete; integration hardening pending)
 
-- List/filter tasks and update task status.
-- Apply optimistic UI only with rollback and a visible failure state.
-- Respect server role and feature-entitlement errors.
+- [x] List/filter tasks and update task status.
+- [x] Apply optimistic UI with rollback and a visible failure state.
+- [x] Respect server role and feature-entitlement errors in Android error states.
+- [x] Limit the Staff UI to tasks whose assignee `userId` matches the signed-in
+  user.
+- [x] Enforce the same Staff assignment scope in API list, stats, and status-update
+  queries. Integration coverage verifies own, other-user, and unassigned tasks.
+- [x] Cache scoped tasks and queue offline status changes through a WorkManager
+  outbox protected by the server expected-status contract.
+- [ ] Verify between-stay room status transitions and rollback behavior against the
+  real API on a physical device.
 
 Exit: authorized staff can complete the daily task flow on a physical device.
 
-### Phase 4 — Walk-in booking
+### Phase 4 — Walk-in booking (implementation complete; device verification pending)
 
-- Confirm booking DTOs and availability behavior against the current API.
-- Build form validation, quote/summary, submission, and conflict handling.
-- Do not cache or silently retry a submitted booking mutation.
+- [x] Confirm booking DTOs, live availability, rate-plan quote, payment method,
+  advance, and conflict behavior against the current API.
+- [x] Build guest/stay validation, capacity checks, room selection, server quote,
+  submission, success, and conflict states.
+- [x] Prevent double taps and never cache or automatically retry a booking
+  mutation.
+- [x] Treat lost connections, response parsing failures, and server failures after
+  submission as uncertain; require staff to check Front Desk before manually
+  enabling retry.
+- [x] Accept Prisma Decimal values represented as either JSON strings or numbers in
+  Android room/booking monetary DTOs.
+- [x] Add Compose UI coverage for double-submit blocking and the manual
+  acknowledgement required after an uncertain outcome.
+- [ ] Add repository-level MockWebServer coverage for successful booking and
+  `409` conflict responses.
+- [ ] Verify the full flow against a test tenant on a physical device.
 
 Exit: exactly one booking is created, conflicts are clear, and interrupted submits
 can be reconciled safely.

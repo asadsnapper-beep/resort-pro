@@ -1,10 +1,10 @@
 # ResortPro Android Play Release Checklist
 
-> Status: Planning checklist — no Android release has been built or verified
+> Status: Android implementation in progress — unsigned release APK verified, no store release
 >
-> Target application: proposed `apps/android/`
+> Target application: `apps/android/`
 >
-> Last repository review: 2026-08-09
+> Last repository review: 2026-08-29
 >
 > External policy verification: not performed for this revision
 
@@ -31,14 +31,14 @@ Do not mark an item Verified because a plan says it will exist.
 
 | Item | Current status | Evidence / gap |
 | --- | --- | --- |
-| Android application | Not started | `apps/android/` does not exist. |
+| Android application | In progress | Compose auth, Rooms/Availability, Housekeeping, and Walk-in Booking vertical slices exist in `apps/android`; Room-backed offline reads, a guarded housekeeping outbox, Navigation Compose, unit tests, and compiled instrumented tests are present. Debug and R8-minified unsigned release builds pass as of 2026-08-29. Live device/API verification remains. |
 | Privacy page source | In progress | Web route exists at `apps/web/src/app/privacy/page.tsx`; production availability and mobile link are unverified. |
 | In-app privacy link | Not started | Requires Android Settings UI. |
 | Account deletion in app | Not started | No Android UI exists. |
 | Public account-deletion flow | Not started | No confirmed public deletion form or `#account-deletion` flow was found. |
 | Data Safety declaration | Not started | Must be based on the final app, SDKs, and backend behavior. |
-| Runtime permissions | Not started | No Android manifest exists. |
-| Signed App Bundle | Not started | No Android build or signing configuration exists. |
+| Runtime permissions | In progress | Manifest currently declares `INTERNET` and `ACCESS_NETWORK_STATE`; neither is a runtime permission. Camera, notifications, and Bluetooth remain deferred. |
+| Signed App Bundle | Not started | An unsigned release APK builds successfully; production signing and an Android App Bundle are not configured. |
 | Device testing | Not started | Record device/OS evidence after implementation. |
 | Store listing assets | Not started | No verified release assets are linked here. |
 
