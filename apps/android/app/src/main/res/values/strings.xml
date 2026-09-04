@@ -1,4 +1,81 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">ResortPro</string>
+
+    <!-- Sign in -->
+    <string name="login_tagline">Your resort operations, wherever you are.</string>
+    <string name="login_slug_label">Resort slug</string>
+    <string name="login_slug_hint">Example: palm-paradise</string>
+    <string name="login_email_label">Email</string>
+    <string name="login_password_label">Password</string>
+    <string name="login_show">Show</string>
+    <string name="login_hide">Hide</string>
+    <string name="login_submit">Sign in</string>
+    <string name="login_roles">Owner · Manager · Receptionist · Staff · Shareholder</string>
+    <string name="login_failed">Sign in failed</string>
+    <string name="login_verify_title">Verify your email</string>
+    <string name="login_verify_body">Open the verification link sent to your email, then sign in again.</string>
+
+    <!-- App lock -->
+    <string name="lock_title">ResortPro is locked</string>
+    <string name="lock_body">Unlock the way you unlock this phone, and carry on where you left off.</string>
+    <string name="lock_unlock">Unlock</string>
+    <string name="lock_use_password">Sign in with a password instead</string>
+    <string name="lock_prompt_title">Unlock ResortPro</string>
+    <string name="lock_prompt_subtitle">Confirm it\'s you to continue where you left off</string>
+    <string name="lock_offer_title">Lock the app?</string>
+    <string name="lock_offer_body">You stay signed in for a week. Ask to be unlocked when reopening — however you unlock this phone — so the resort\'s data is safe if it is left lying around.</string>
+    <string name="lock_offer_enable">Turn on</string>
+    <string name="lock_offer_decline">Not now</string>
+
+    <!-- Shared -->
+    <string name="action_back">Back</string>
+    <string name="action_sign_out">Sign out</string>
+    <string name="action_try_again">Try again</string>
+    <string name="action_dismiss">Dismiss</string>
+
+    <!-- Housekeeping -->
+    <string name="hk_title">Housekeeping</string>
+    <string name="hk_my_tasks">My assigned tasks</string>
+    <string name="hk_updated">Updated %1$s</string>
+    <string name="hk_offline_synced">Offline · Last synced %1$s</string>
+    <string name="hk_loading">Loading housekeeping tasks…</string>
+    <string name="hk_updating">Updating…</string>
+    <string name="hk_queued">Saved offline · will sync when connected</string>
+    <string name="hk_load_failed">Could not load tasks</string>
+    <string name="hk_update_failed">Update failed</string>
+    <string name="hk_update_failed_body">%1$s The previous status was restored.</string>
+    <string name="hk_none_title">No tasks</string>
+    <string name="hk_none_assigned">No housekeeping tasks are assigned to you.</string>
+    <string name="hk_none_match">No tasks match this filter.</string>
+    <string name="hk_all_done">All done</string>
+    <string name="hk_left">%1$d left</string>
+    <string name="hk_task_count">%1$d tasks</string>
+    <string name="hk_room">Room %1$s</string>
+    <string name="hk_room_named">Room %1$s · %2$s</string>
+    <string name="hk_room_task">Room task</string>
+    <string name="hk_assigned_to">Assigned to %1$s</string>
+
+    <!-- Housekeeping filters -->
+    <string name="hk_filter_all">All</string>
+    <string name="hk_filter_pending">Pending</string>
+    <string name="hk_filter_in_progress">In progress</string>
+    <string name="hk_filter_completed">Completed</string>
+    <string name="hk_filter_skipped">Skipped</string>
+
+    <!-- Housekeeping statuses and actions -->
+    <string name="hk_status_pending">Pending</string>
+    <string name="hk_status_in_progress">In progress</string>
+    <string name="hk_status_completed">Completed</string>
+    <string name="hk_status_skipped">Skipped</string>
+    <string name="hk_action_start">Start</string>
+    <string name="hk_action_complete">Complete</string>
+    <string name="hk_action_skip">Skip</string>
+
+    <!-- Task types -->
+    <string name="hk_type_daily">Daily</string>
+    <string name="hk_type_deep_clean">Deep clean</string>
+    <string name="hk_type_turndown">Turndown</string>
+    <string name="hk_type_checkout">Checkout clean</string>
+    <string name="hk_type_checkin">Check-in prep</string>
 </resources>

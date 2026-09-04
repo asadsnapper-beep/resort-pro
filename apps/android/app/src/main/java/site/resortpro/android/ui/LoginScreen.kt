@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -26,6 +27,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import site.resortpro.android.R
 import site.resortpro.android.feature.auth.AuthUiState
 import site.resortpro.android.ui.components.NoticeCard
 
@@ -47,25 +49,25 @@ fun LoginScreen(
             item {
                 Text("ResortPro", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
                 Text(
-                    "Your resort operations, wherever you are.",
+                    stringResource(R.string.login_tagline),
                     modifier = Modifier.padding(top = 8.dp, bottom = 28.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 when {
                     state.verificationRequired -> NoticeCard(
-                        "Verify your email",
-                        "Open the verification link sent to your email, then sign in again.",
+                        stringResource(R.string.login_verify_title),
+                        stringResource(R.string.login_verify_body),
                     )
-                    state.errorMessage != null -> NoticeCard("Sign in failed", state.errorMessage, true)
+                    state.errorMessage != null -> NoticeCard(stringResource(R.string.login_failed), state.errorMessage, true)
                 }
                 if (state.verificationRequired || state.errorMessage != null) Spacer(Modifier.height(16.dp))
 
                 LoginField(
                     value = state.slug,
                     onChange = onSlugChange,
-                    label = "Resort slug",
+                    label = stringResource(R.string.login_slug_label),
                     error = state.validation.slugError,
-                    helper = "Example: palm-paradise",
+                    helper = stringResource(R.string.login_slug_hint),
                     type = KeyboardType.Ascii,
                     enabled = !state.isSubmitting,
                 )
@@ -73,7 +75,7 @@ fun LoginScreen(
                 LoginField(
                     value = state.email,
                     onChange = onEmailChange,
-                    label = "Email",
+                    label = stringResource(R.string.login_email_label),
                     error = state.validation.emailError,
                     type = KeyboardType.Email,
                     enabled = !state.isSubmitting,
@@ -84,12 +86,12 @@ fun LoginScreen(
                     onValueChange = onPasswordChange,
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !state.isSubmitting,
-                    label = { Text("Password") },
+                    label = { Text(stringResource(R.string.login_password_label)) },
                     supportingText = state.validation.passwordError?.let { { Text(it) } },
                     isError = state.validation.passwordError != null,
                     singleLine = true,
                     visualTransformation = if (state.passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                    trailingIcon = { TextButton(onClick = onTogglePassword) { Text(if (state.passwordVisible) "Hide" else "Show") } },
+                    trailingIcon = { TextButton(onClick = onTogglePassword) { Text(stringResource(if (state.passwordVisible) R.string.login_hide else R.string.login_show)) } },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { keyboard?.hide(); onSubmit() }),
                 )
@@ -100,10 +102,10 @@ fun LoginScreen(
                     enabled = !state.isSubmitting,
                 ) {
                     if (state.isSubmitting) CircularProgressIndicator(Modifier.height(22.dp), strokeWidth = 2.dp)
-                    else Text("Sign in")
+                    else Text(stringResource(R.string.login_submit))
                 }
                 Text(
-                    "Owner · Manager · Receptionist · Staff · Shareholder",
+                    stringResource(R.string.login_roles),
                     modifier = Modifier.padding(top = 24.dp, bottom = 32.dp),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

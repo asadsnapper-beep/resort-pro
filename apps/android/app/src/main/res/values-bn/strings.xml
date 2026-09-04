@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ResortPro-র বাংলা। ফোনের ভাষা বাংলা হলেই দেখা যাবে — কখনো জোর করে নয়।
+         হাউসকিপিং কর্মীরাই এই অ্যাপের মূল ব্যবহারকারী, তাই যে শব্দগুলো তাঁরা
+         কাজের সময় বলেন সেগুলোই রাখা হয়েছে — "রুম", "হাউসকিপিং" — বইয়ের
+         বাংলা নয়। -->
+
+    <!-- সাইন ইন -->
+    <string name="login_tagline">আপনার রিসোর্টের কাজ, যেখানেই থাকুন।</string>
+    <string name="login_slug_label">রিসোর্ট আইডি</string>
+    <string name="login_slug_hint">যেমন: palm-paradise</string>
+    <string name="login_email_label">ইমেইল</string>
+    <string name="login_password_label">পাসওয়ার্ড</string>
+    <string name="login_show">দেখুন</string>
+    <string name="login_hide">লুকান</string>
+    <string name="login_submit">সাইন ইন</string>
+    <string name="login_roles">মালিক · ম্যানেজার · রিসেপশনিস্ট · স্টাফ · শেয়ারহোল্ডার</string>
+    <string name="login_failed">সাইন ইন হয়নি</string>
+    <string name="login_verify_title">ইমেইল যাচাই করুন</string>
+    <string name="login_verify_body">ইমেইলে পাঠানো লিংকটি খুলুন, তারপর আবার সাইন ইন করুন।</string>
+
+    <!-- অ্যাপ লক -->
+    <string name="lock_title">ResortPro লক করা আছে</string>
+    <string name="lock_body">ফোন যেভাবে খোলেন সেভাবেই খুলুন, যেখানে ছিলেন সেখান থেকেই চলবে।</string>
+    <string name="lock_unlock">খুলুন</string>
+    <string name="lock_use_password">পাসওয়ার্ড দিয়ে সাইন ইন করুন</string>
+    <string name="lock_prompt_title">ResortPro খুলুন</string>
+    <string name="lock_prompt_subtitle">আপনি কিনা নিশ্চিত করুন</string>
+    <string name="lock_offer_title">অ্যাপ লক করবেন?</string>
+    <string name="lock_offer_body">আপনি এক সপ্তাহ সাইন ইন থাকবেন। অ্যাপ আবার খুললে — ফোন যেভাবে খোলেন সেভাবে — খুলতে বলবে, যাতে ফোন পড়ে থাকলেও রিসোর্টের তথ্য নিরাপদ থাকে।</string>
+    <string name="lock_offer_enable">চালু করুন</string>
+    <string name="lock_offer_decline">এখন নয়</string>
+
+    <!-- সাধারণ -->
+    <string name="action_back">পেছনে</string>
+    <string name="action_sign_out">সাইন আউট</string>
+    <string name="action_try_again">আবার চেষ্টা করুন</string>
+    <string name="action_dismiss">বন্ধ করুন</string>
+
+    <!-- হাউসকিপিং -->
+    <string name="hk_title">হাউসকিপিং</string>
+    <string name="hk_my_tasks">আমার কাজ</string>
+    <string name="hk_updated">হালনাগাদ %1$s</string>
+    <string name="hk_offline_synced">অফলাইন · সর্বশেষ %1$s</string>
+    <string name="hk_loading">কাজের তালিকা আসছে…</string>
+    <string name="hk_updating">হচ্ছে…</string>
+    <string name="hk_queued">অফলাইনে রাখা · নেট এলে পাঠানো হবে</string>
+    <string name="hk_load_failed">তালিকা আনা যায়নি</string>
+    <string name="hk_update_failed">বদলানো যায়নি</string>
+    <string name="hk_update_failed_body">%1$s আগের অবস্থাই রাখা হয়েছে।</string>
+    <string name="hk_none_title">কোনো কাজ নেই</string>
+    <string name="hk_none_assigned">আপনার নামে কোনো কাজ নেই।</string>
+    <string name="hk_none_match">এই ছাঁকনিতে কোনো কাজ নেই।</string>
+    <string name="hk_all_done">সব শেষ</string>
+    <string name="hk_left">%1$dটি বাকি</string>
+    <string name="hk_task_count">%1$dটি কাজ</string>
+    <string name="hk_room">রুম %1$s</string>
+    <string name="hk_room_named">রুম %1$s · %2$s</string>
+    <string name="hk_room_task">রুমের কাজ</string>
+    <string name="hk_assigned_to">দায়িত্বে %1$s</string>
+
+    <!-- ছাঁকনি -->
+    <string name="hk_filter_all">সব</string>
+    <string name="hk_filter_pending">বাকি</string>
+    <string name="hk_filter_in_progress">চলছে</string>
+    <string name="hk_filter_completed">শেষ</string>
+    <string name="hk_filter_skipped">বাদ</string>
+
+    <!-- অবস্থা ও কাজ -->
+    <string name="hk_status_pending">বাকি</string>
+    <string name="hk_status_in_progress">চলছে</string>
+    <string name="hk_status_completed">শেষ</string>
+    <string name="hk_status_skipped">বাদ</string>
+    <string name="hk_action_start">শুরু</string>
+    <string name="hk_action_complete">শেষ</string>
+    <string name="hk_action_skip">বাদ</string>
+
+    <!-- কাজের ধরন -->
+    <string name="hk_type_daily">প্রতিদিন</string>
+    <string name="hk_type_deep_clean">গভীর পরিষ্কার</string>
+    <string name="hk_type_turndown">সন্ধ্যার প্রস্তুতি</string>
+    <string name="hk_type_checkout">চেক-আউট পরিষ্কার</string>
+    <string name="hk_type_checkin">চেক-ইন প্রস্তুতি</string>
+</resources>

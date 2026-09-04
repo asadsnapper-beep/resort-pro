@@ -13,6 +13,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import site.resortpro.android.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -35,19 +37,19 @@ fun LockedScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("ResortPro is locked", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.lock_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text(
-            "Unlock the way you unlock this phone, and carry on where you left off.",
+            stringResource(R.string.lock_body),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
         )
         Button(onClick = onUnlock, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-            Text("Unlock")
+            Text(stringResource(R.string.lock_unlock))
         }
         TextButton(onClick = onSignOut, modifier = Modifier.padding(top = 8.dp)) {
-            Text("Sign in with a password instead")
+            Text(stringResource(R.string.lock_use_password))
         }
     }
 }

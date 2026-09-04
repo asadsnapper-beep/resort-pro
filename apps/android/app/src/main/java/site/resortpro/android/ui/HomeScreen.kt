@@ -21,12 +21,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import java.text.NumberFormat
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
+import site.resortpro.android.R
 import site.resortpro.android.core.network.DashboardStats
 import site.resortpro.android.feature.auth.AuthUiState
 import site.resortpro.android.feature.auth.AuthenticatedSession
@@ -71,7 +73,7 @@ fun HomeScreen(
                             )
                         }
                     }
-                    TextButton(onClick = onLogout, enabled = !state.isSubmitting) { Text("Sign out") }
+                    TextButton(onClick = onLogout, enabled = !state.isSubmitting) { Text(stringResource(R.string.action_sign_out)) }
                 }
             }
             // Asked once, right after a password sign-in, and only where the
@@ -80,11 +82,9 @@ fun HomeScreen(
             if (state.offerAppLock) item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
-                        Text("Lock the app?", fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.lock_offer_title), fontWeight = FontWeight.Bold)
                         Text(
-                            "You stay signed in for a week. Ask to be unlocked when " +
-                                "reopening — however you unlock this phone — so the resort's " +
-                                "data is safe if it is left lying around.",
+                            stringResource(R.string.lock_offer_body),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -93,10 +93,10 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Button(onClick = onEnableAppLock, modifier = Modifier.weight(1f).height(50.dp)) {
-                                Text("Turn on")
+                                Text(stringResource(R.string.lock_offer_enable))
                             }
                             TextButton(onClick = onDeclineAppLock, modifier = Modifier.weight(1f)) {
-                                Text("Not now")
+                                Text(stringResource(R.string.lock_offer_decline))
                             }
                         }
                     }

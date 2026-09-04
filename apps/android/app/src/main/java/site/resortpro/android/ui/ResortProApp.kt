@@ -7,6 +7,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -16,6 +17,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import site.resortpro.android.R
 import site.resortpro.android.core.AppContainer
 import site.resortpro.android.feature.auth.AuthViewModel
 import site.resortpro.android.feature.auth.HomeKind
@@ -61,11 +63,14 @@ fun ResortProApp(viewModel: AuthViewModel, container: AppContainer, activity: Fr
                 // dismissing it does not immediately raise it again, and
                 // pressing Unlock does.
                 if (state.lockPromptPending) {
+                    // Read outside the effect: stringResource is a composable.
+                    val promptTitle = stringResource(R.string.lock_prompt_title)
+                    val promptSubtitle = stringResource(R.string.lock_prompt_subtitle)
                     LaunchedEffect(state.lockedSession, state.lockPromptPending) {
                         val unlocked = container.appLock.authenticate(
                             activity = activity,
-                            title = "Unlock ResortPro",
-                            subtitle = "Confirm it's you to continue where you left off",
+                            title = promptTitle,
+                            subtitle = promptSubtitle,
                         )
                         if (unlocked) viewModel.unlocked() else viewModel.lockRefused()
                     }
