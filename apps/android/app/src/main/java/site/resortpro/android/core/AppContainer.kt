@@ -13,6 +13,7 @@ import site.resortpro.android.core.network.AuthHeaderInterceptor
 import site.resortpro.android.core.network.RefreshCoordinator
 import site.resortpro.android.core.network.SessionAuthenticator
 import site.resortpro.android.core.database.ResortProDatabase
+import site.resortpro.android.core.security.LastResortStore
 import site.resortpro.android.core.security.SecureRefreshCookieJar
 import site.resortpro.android.core.security.SessionStore
 import site.resortpro.android.feature.auth.AuthRepository
@@ -30,6 +31,9 @@ class AppContainer(context: Context) {
 
     private val sessionStore = SessionStore()
     private val cookieJar = SecureRefreshCookieJar(context, json)
+
+    /** Which resort was last signed into — see LastResortStore for why it is separate. */
+    val lastResortStore = LastResortStore(context)
     private val baseUrl = BuildConfig.API_BASE_URL.toHttpUrl()
     private val database = ResortProDatabase.create(context)
 

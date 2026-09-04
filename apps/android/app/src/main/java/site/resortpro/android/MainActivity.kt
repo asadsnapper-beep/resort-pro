@@ -14,7 +14,7 @@ class MainActivity : ComponentActivity() {
         val container = (application as ResortProApplication).container
         ViewModelProvider(
             this,
-            AuthViewModel.Factory(container.authRepository),
+            AuthViewModel.Factory(container.authRepository, container.lastResortStore),
         )[AuthViewModel::class.java]
     }
 

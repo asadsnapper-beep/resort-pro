@@ -56,8 +56,21 @@ class SecureRefreshCookieJar(
         if (cookie.matches(url)) listOf(cookie) else emptyList()
     }
 
-    fun hasRefreshCookie(url: HttpUrl): Boolean = loadForRequest(url)
-        .any { it.name == REFRESH_COOKIE_NAME }
+    /**
+     * Is there a session to resume?
+     *
+     * Takes the API's base URL and resolves the refresh endpoint itself, rather
+     * than trusting the caller to pass a URL inside the cookie's path. The
+     * server scopes this cookie to `/api/auth`, and a cookie only matches a
+     * request whose path sits under its own — "/" never does. Both callers
+     * asked with the base URL, so this answered "no session" every time:
+     * restore never ran, and a 401 could never be refreshed either. See
+     * RefreshCookiePathTest.
+     */
+    fun hasRefreshCookie(baseUrl: HttpUrl): Boolean {
+        val refreshUrl = baseUrl.resolve(REFRESH_PATH) ?: return false
+        return loadForRequest(refreshUrl).any { it.name == REFRESH_COOKIE_NAME }
+    }
 
     fun clear() = synchronized(lock) {
         clearLocked()
@@ -129,6 +142,7 @@ class SecureRefreshCookieJar(
         const val PREFERENCES_NAME = "resortpro_secure_session"
         const val COOKIE_KEY = "encrypted_refresh_cookie"
         const val REFRESH_COOKIE_NAME = "rp_refresh"
+        const val REFRESH_PATH = "api/auth/refresh"
         const val KEYSTORE_PROVIDER = "AndroidKeyStore"
         const val KEY_ALIAS = "resortpro_refresh_cookie_key"
         const val TRANSFORMATION = "AES/GCM/NoPadding"

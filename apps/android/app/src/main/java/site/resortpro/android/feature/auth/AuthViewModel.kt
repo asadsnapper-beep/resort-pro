@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import site.resortpro.android.core.network.ApiException
+import site.resortpro.android.core.security.LastResortStore
 
 data class AuthUiState(
     val isRestoring: Boolean = true,
@@ -30,8 +31,13 @@ data class AuthUiState(
 
 class AuthViewModel(
     private val repository: AuthRepository,
+    private val lastResort: LastResortStore,
 ) : ViewModel() {
-    private val mutableState = MutableStateFlow(AuthUiState())
+    // Prefilled before the first frame, so the fields are never briefly empty
+    // and then filled in underneath someone who has already started typing.
+    private val mutableState = MutableStateFlow(
+        AuthUiState(slug = lastResort.lastSlug(), email = lastResort.lastEmail()),
+    )
     val state: StateFlow<AuthUiState> = mutableState.asStateFlow()
 
     init {
@@ -84,6 +90,9 @@ class AuthViewModel(
                     slug = current.slug.trim(),
                 )
             }.onSuccess { session ->
+                // Remembered only after the server accepted them, so a typo is
+                // never what greets the next launch.
+                lastResort.remember(slug = current.slug.trim(), email = current.email.trim())
                 mutableState.update {
                     it.copy(
                         isSubmitting = false,
@@ -104,7 +113,13 @@ class AuthViewModel(
         viewModelScope.launch {
             mutableState.update { it.copy(isSubmitting = true) }
             repository.logout()
-            mutableState.value = AuthUiState(isRestoring = false)
+            // The slug and email survive a sign-out: the usual reason to sign
+            // out is to hand the phone to a colleague at the same resort.
+            mutableState.value = AuthUiState(
+                isRestoring = false,
+                slug = lastResort.lastSlug(),
+                email = lastResort.lastEmail(),
+            )
         }
     }
 
@@ -159,11 +174,12 @@ class AuthViewModel(
 
     class Factory(
         private val repository: AuthRepository,
+        private val lastResort: LastResortStore,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             require(modelClass.isAssignableFrom(AuthViewModel::class.java))
-            return AuthViewModel(repository) as T
+            return AuthViewModel(repository, lastResort) as T
         }
     }
 }
