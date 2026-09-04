@@ -135,7 +135,8 @@ reach the checkout total. P0 is what unblocks all of them.
 |------|---------|--------|
 | [platform-owner-dashboard.md](./platform-owner-dashboard.md) | Super Admin — MRR, growth funnel, feature adoption, impersonation | ✅ Built |
 | [tenant-backup-restore.md](./tenant-backup-restore.md) | Auto/manual backup, cloud storage, selective restore, plan retention | ❌ Not built — 🔴 High priority chilo originally, ekhono kono code nai |
-| [mobile-electron-architecture.md](./mobile-electron-architecture.md) | Mobile + desktop app architecture | 🟡 Partial — Desktop (Electron, `apps/desktop`) built; Mobile (Expo) explicitly archived |
+| [mobile-app-ux.md](./mobile-app-ux.md) | **Mobile UX plan.** The app gives every role the same three buttons — navigation derived from API permissions, not from the job. Role-specific home screens, housekeeper as the primary user, Bangla localisation, offline made visible | 📋 Plan — no UX plan existed before |
+| [mobile-electron-architecture.md](./mobile-electron-architecture.md) | Mobile + desktop app architecture | 🟡 Partial — Desktop (Electron, `apps/desktop`) built; Expo mobile archived and **replaced by a native Kotlin app** (`apps/android`) — auth, rooms, housekeeping, walk-in |
 
 ---
 
