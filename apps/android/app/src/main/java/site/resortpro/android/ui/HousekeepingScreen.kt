@@ -19,6 +19,8 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -139,8 +141,16 @@ fun HousekeepingScreen(
                 }
                 else -> {
                     item {
+                        // A housekeeper counts what is left, not what exists.
+                        // "8 tasks" includes the five she has already finished,
+                        // which is the one number that cannot help her.
+                        val remaining = state.visibleTasks.count { !HousekeepingPolicy.isFinished(it.status) }
                         Text(
-                            "${state.visibleTasks.size} tasks",
+                            if (state.isStaffView) {
+                                if (remaining == 0) "All done" else "$remaining left"
+                            } else {
+                                "${state.visibleTasks.size} tasks"
+                            },
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                         )
@@ -150,6 +160,7 @@ fun HousekeepingScreen(
                             task = task,
                             isUpdating = task.id in state.updatingTaskIds,
                             isQueued = task.id in state.queuedTaskIds,
+                            isStaffView = state.isStaffView,
                             onUpdateStatus = { status -> viewModel.updateStatus(task.id, status) },
                         )
                     }
@@ -165,6 +176,7 @@ private fun HousekeepingTaskCard(
     task: HousekeepingTaskDto,
     isUpdating: Boolean,
     isQueued: Boolean,
+    isStaffView: Boolean,
     onUpdateStatus: (String) -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -178,15 +190,31 @@ private fun HousekeepingTaskCard(
                 verticalAlignment = Alignment.Top,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        task.room?.let { "Room ${it.number} · ${it.name}" } ?: "Room task",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        "${task.type.displayLabel()} · ${task.scheduledDate.take(10)}",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    if (isStaffView) {
+                        // The room number is the only thing she needs to read
+                        // while walking, so it is the largest thing on the card.
+                        // The room's name is how the resort sells it, not how
+                        // she finds it.
+                        Text(
+                            task.room?.let { "Room ${it.number}" } ?: "Room task",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            task.type.displayLabel(),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        Text(
+                            task.room?.let { "Room ${it.number} · ${it.name}" } ?: "Room task",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            "${task.type.displayLabel()} · ${task.scheduledDate.take(10)}",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
                 Text(
                     task.status.displayLabel(),
@@ -195,8 +223,12 @@ private fun HousekeepingTaskCard(
                 )
             }
 
-            task.assignedTo?.user?.let { user ->
-                Text("Assigned to ${user.firstName} ${user.lastName}")
+            // Every row on a housekeeper's own list said "Assigned to Rina
+            // Akter". Whose list it is was already answered by the heading.
+            if (!isStaffView) {
+                task.assignedTo?.user?.let { user ->
+                    Text("Assigned to ${user.firstName} ${user.lastName}")
+                }
             }
             if (!task.notes.isNullOrBlank()) {
                 Text(task.notes, style = MaterialTheme.typography.bodyMedium)
@@ -219,10 +251,36 @@ private fun HousekeepingTaskCard(
                     Text("Updating…", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else if (actions.isNotEmpty()) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    actions.forEach { status ->
-                        TextButton(onClick = { onUpdateStatus(status) }) {
-                            Text(status.actionLabel())
+                if (isStaffView) {
+                    // Full-width buttons at the foot of the card: 56dp so they
+                    // can be hit while holding linen, and low enough on the
+                    // screen to reach with the thumb of the hand holding the
+                    // phone. Text buttons tucked mid-card are a mouse's idea of
+                    // an action.
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        actions.forEachIndexed { index, status ->
+                            if (index == 0) {
+                                Button(
+                                    onClick = { onUpdateStatus(status) },
+                                    modifier = Modifier.weight(1f).height(56.dp),
+                                ) { Text(status.actionLabel()) }
+                            } else {
+                                OutlinedButton(
+                                    onClick = { onUpdateStatus(status) },
+                                    modifier = Modifier.weight(1f).height(56.dp),
+                                ) { Text(status.actionLabel()) }
+                            }
+                        }
+                    }
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        actions.forEach { status ->
+                            TextButton(onClick = { onUpdateStatus(status) }) {
+                                Text(status.actionLabel())
+                            }
                         }
                     }
                 }

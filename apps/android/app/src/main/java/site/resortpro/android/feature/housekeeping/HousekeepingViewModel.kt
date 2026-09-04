@@ -23,7 +23,14 @@ data class HousekeepingUiState(
     val queuedTaskIds: Set<String> = emptySet(),
 ) {
     val visibleTasks: List<HousekeepingTaskDto>
-        get() = HousekeepingPolicy.filter(tasks, filter)
+        get() = HousekeepingPolicy.filter(tasks, filter).let { filtered ->
+            // Unfinished work first, for staff. Opening the app to two rooms
+            // you already cleaned, with the next job below the fold, is the
+            // list telling you about its own history instead of your day.
+            // Managers keep the server's order — they are reading the whole
+            // board, not working through it.
+            if (isStaffView) filtered.sortedBy { HousekeepingPolicy.isFinished(it.status) } else filtered
+        }
 }
 
 class HousekeepingViewModel(

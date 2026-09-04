@@ -19,4 +19,7 @@ object HousekeepingPolicy {
 
     fun filter(tasks: List<HousekeepingTaskDto>, filter: HousekeepingFilter): List<HousekeepingTaskDto> =
         filter.status?.let { status -> tasks.filter { it.status == status } } ?: tasks
+
+    /** Nothing more for the person holding the phone to do about it. */
+    fun isFinished(status: String): Boolean = status == "COMPLETED" || status == "SKIPPED"
 }
