@@ -37,7 +37,7 @@ fun LockedScreen(
     ) {
         Text("ResortPro is locked", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text(
-            "Unlock with your fingerprint or PIN to carry on where you left off.",
+            "Unlock the way you unlock this phone, and carry on where you left off.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

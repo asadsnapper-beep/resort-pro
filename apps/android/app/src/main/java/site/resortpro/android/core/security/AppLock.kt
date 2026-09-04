@@ -22,9 +22,13 @@ import kotlinx.coroutines.suspendCancellableCoroutine
  * already proves who you are. This proves it is still the same person a day
  * later.
  *
- * `DEVICE_CREDENTIAL` is accepted alongside a fingerprint on purpose: a
- * housekeeper with wet or gloved hands must still be able to get in with the
- * PIN she already uses to unlock the phone. Refusing that would mean staff
+ * Nothing here names a fingerprint. The prompt offers whatever the phone
+ * actually has — face, fingerprint, or the device PIN — and the strings the
+ * user reads say "the way you unlock this phone" for the same reason.
+ *
+ * `DEVICE_CREDENTIAL` is accepted on purpose: a housekeeper with wet or gloved
+ * hands, or a face the camera cannot find in a dim corridor, must still be able
+ * to get in with the PIN she already uses. Refusing that would mean staff
  * turning the lock off entirely.
  */
 class AppLock(context: Context) {
@@ -89,9 +93,12 @@ class AppLock(context: Context) {
         const val PREFERENCES_NAME = "resortpro_app_lock"
         const val KEY_ENABLED = "enabled"
 
-        // BIOMETRIC_WEAK rather than STRONG: nothing here is unlocked by the
-        // Keystore, so a class-3 sensor is not required, and insisting on it
-        // would exclude a lot of the mid-range phones staff actually carry.
+        // BIOMETRIC_WEAK rather than STRONG, and this is the decision that
+        // makes face unlock work at all: most Android face unlock is class 2
+        // (weak), while fingerprint is usually class 3. Demanding STRONG would
+        // silently exclude every face-only phone and leave those staff with
+        // just a PIN. Nothing here is unlocked by the Keystore, so class 3
+        // buys no real protection to trade for that.
         const val ALLOWED = BIOMETRIC_WEAK or DEVICE_CREDENTIAL
     }
 }

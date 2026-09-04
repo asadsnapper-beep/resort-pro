@@ -82,9 +82,9 @@ fun HomeScreen(
                     Column(Modifier.padding(16.dp)) {
                         Text("Lock the app?", fontWeight = FontWeight.Bold)
                         Text(
-                            "You stay signed in for a week. Ask for your fingerprint or " +
-                                "PIN when reopening, so the resort's data is safe if the " +
-                                "phone is left lying around.",
+                            "You stay signed in for a week. Ask to be unlocked when " +
+                                "reopening — however you unlock this phone — so the resort's " +
+                                "data is safe if it is left lying around.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
