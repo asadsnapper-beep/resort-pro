@@ -42,6 +42,8 @@ fun HomeScreen(
     onOpenHousekeeping: (() -> Unit)?,
     onOpenWalkIn: (() -> Unit)?,
     onLogout: () -> Unit,
+    onEnableAppLock: () -> Unit,
+    onDeclineAppLock: () -> Unit,
 ) {
     Scaffold(modifier = Modifier.statusBarsPadding()) { padding ->
         LazyColumn(
@@ -70,6 +72,34 @@ fun HomeScreen(
                         }
                     }
                     TextButton(onClick = onLogout, enabled = !state.isSubmitting) { Text("Sign out") }
+                }
+            }
+            // Asked once, right after a password sign-in, and only where the
+            // device can actually do it. Not a settings screen buried three
+            // taps away that nobody will ever find.
+            if (state.offerAppLock) item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("Lock the app?", fontWeight = FontWeight.Bold)
+                        Text(
+                            "You stay signed in for a week. Ask for your fingerprint or " +
+                                "PIN when reopening, so the resort's data is safe if the " +
+                                "phone is left lying around.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Row(
+                            Modifier.fillMaxWidth().padding(top = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Button(onClick = onEnableAppLock, modifier = Modifier.weight(1f).height(50.dp)) {
+                                Text("Turn on")
+                            }
+                            TextButton(onClick = onDeclineAppLock, modifier = Modifier.weight(1f)) {
+                                Text("Not now")
+                            }
+                        }
+                    }
                 }
             }
             navigationButton("Rooms & availability", onOpenRooms)
