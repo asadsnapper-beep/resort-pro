@@ -40,7 +40,8 @@ import site.resortpro.android.feature.housekeeping.HousekeepingViewModel
 fun HousekeepingScreen(
     viewModel: HousekeepingViewModel,
     session: AuthenticatedSession,
-    onBack: () -> Unit,
+    /** Null when this screen *is* the home — staff have nowhere to go back to. */
+    onBack: (() -> Unit)?,
     onLogout: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -69,7 +70,7 @@ fun HousekeepingScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextButton(onClick = onBack) { Text("Back") }
+                    if (onBack != null) TextButton(onClick = onBack) { Text("Back") }
                     TextButton(onClick = onLogout) { Text("Sign out") }
                 }
                 Text(

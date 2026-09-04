@@ -18,6 +18,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import site.resortpro.android.core.AppContainer
 import site.resortpro.android.feature.auth.AuthViewModel
+import site.resortpro.android.feature.auth.HomeKind
 import site.resortpro.android.feature.auth.RolePolicy
 import site.resortpro.android.feature.housekeeping.HousekeepingViewModel
 import site.resortpro.android.feature.rooms.RoomsViewModel
@@ -84,7 +85,13 @@ fun ResortProApp(viewModel: AuthViewModel, container: AppContainer, activity: Fr
             )
             else -> {
                 val navController = rememberNavController()
-                NavHost(navController = navController, startDestination = Route.HOME) {
+                // Housekeeping is not a place staff navigate to — it is their
+                // whole job. Their old home screen existed only to say "Open
+                // Housekeeping to view and update your assigned tasks", which
+                // is a signpost standing where the thing itself should be.
+                val isFieldStaff = RolePolicy.homeKind(session.user.role) == HomeKind.STAFF
+                val startDestination = if (isFieldStaff) Route.HOUSEKEEPING else Route.HOME
+                NavHost(navController = navController, startDestination = startDestination) {
                     composable(Route.HOME) {
                         HomeScreen(
                             state = state,
@@ -122,7 +129,12 @@ fun ResortProApp(viewModel: AuthViewModel, container: AppContainer, activity: Fr
                         val screenModel: HousekeepingViewModel = viewModel(
                             factory = HousekeepingViewModel.Factory(container.housekeepingRepository),
                         )
-                        HousekeepingScreen(screenModel, session, navController::navigateUp, viewModel::logout)
+                        HousekeepingScreen(
+                            viewModel = screenModel,
+                            session = session,
+                            onBack = if (isFieldStaff) null else { { navController.navigateUp() } },
+                            onLogout = viewModel::logout,
+                        )
                     }
                     composable(Route.WALK_IN) {
                         if (!RolePolicy.canCreateWalkIn(session.user.role)) {
