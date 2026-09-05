@@ -154,6 +154,16 @@ enum OrderStatus {
   CANCELLED
 }
 
+// How a food order gets settled. Stored rather than inferred from bookingId
+// being non-null, so a comped order and a room-charged one stay distinguishable
+// in reporting. See plan/restaurant-room-billing.md §2.
+enum FoodSettlement {
+  PAY_NOW
+  CHARGE_TO_ROOM
+  COMPLIMENTARY
+  CORPORATE
+}
+
 enum InventoryCategory {
   LINEN
   TOILETRIES
@@ -1567,6 +1577,10 @@ model FoodOrder {
   tableNumber       String?
   restaurantTableId String?
   status            OrderStatus    @default(PENDING)
+  settlement        FoodSettlement @default(PAY_NOW)
+  compReason        String?
+  compBy            String?
+  idempotencyKey    String?
   paymentStatus     PaymentStatus  @default(PENDING)
   paymentMethod     PaymentMethod?
   gatewayPaymentId  String?
@@ -1581,6 +1595,7 @@ model FoodOrder {
   restaurantTable RestaurantTable? @relation(fields: [restaurantTableId], references: [id], onDelete: SetNull)
   items           FoodOrderItem[]
 
+  @@unique([tenantId, idempotencyKey])
   @@index([tenantId])
   @@index([status])
   @@index([restaurantTableId])
