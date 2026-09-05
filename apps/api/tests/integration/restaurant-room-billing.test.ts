@@ -266,3 +266,74 @@ describe('a client replaying an order it never saw acknowledged', () => {
     expect(await prisma.foodOrder.count({ where: { idempotencyKey } })).toBe(2);
   });
 });
+
+describe('finding the stay to charge', () => {
+  let staying: string;
+  let departed: string;
+  let notArrived: string;
+  let roomNumber: string;
+
+  const inHouse = (q?: string) => app.inject({
+    method: 'GET',
+    url: `/api/bookings/in-house${q === undefined ? '' : `?q=${encodeURIComponent(q)}`}`,
+    headers: auth(),
+  });
+
+  beforeAll(async () => {
+    const room = await prisma.room.create({
+      data: { tenantId, number: '902', name: 'Garden Suite', basePrice: 5000 },
+    });
+    roomNumber = room.number;
+    const guest = await prisma.guest.create({
+      data: { tenantId, firstName: 'Nusrat', lastName: 'Jahan', email: `nusrat-${slug}@test.com`, phone: '+8801711000000' },
+    });
+    staying = await makeBooking('CHECKED_IN', guest.id, room.id);
+    departed = await makeBooking('CHECKED_OUT', guest.id, room.id);
+    notArrived = await makeBooking('CONFIRMED', guest.id, room.id);
+  });
+
+  it('lists only guests who are checked in', async () => {
+    const res = await inHouse();
+    expect(res.statusCode).toBe(200);
+    const ids = JSON.parse(res.body).data.map((s: { id: string }) => s.id);
+
+    expect(ids).toContain(staying);
+    expect(ids).not.toContain(departed);
+    expect(ids).not.toContain(notArrived);
+  });
+
+  it('finds the stay by room number, by name, and by confirmation number', async () => {
+    const confirmationNo = (await prisma.booking.findUniqueOrThrow({ where: { id: staying } })).confirmationNo;
+
+    for (const q of [roomNumber, 'Nusrat', 'Jahan', 'nusrat jahan', confirmationNo]) {
+      const res = await inHouse(q);
+      const ids = JSON.parse(res.body).data.map((s: { id: string }) => s.id);
+      expect(ids, `searching for "${q}"`).toContain(staying);
+    }
+  });
+
+  it('answers with nothing rather than everything when the search matches no one', async () => {
+    const res = await inHouse('no-such-guest-xyz');
+    expect(JSON.parse(res.body).data).toEqual([]);
+  });
+
+  it('does not reach into another resort', async () => {
+    const res = await inHouse();
+    const ids = JSON.parse(res.body).data.map((s: { id: string }) => s.id);
+
+    expect(ids).not.toContain(otherBookingId);
+    expect(res.body).not.toMatch(/Someone|Else/);
+  });
+
+  it('tells the order-taker who and where, and nothing else', async () => {
+    const res = await inHouse(roomNumber);
+    const stay = JSON.parse(res.body).data.find((s: { id: string }) => s.id === staying);
+
+    expect(stay.room.number).toBe('902');
+    expect(stay.guest.firstName).toBe('Nusrat');
+    expect(stay.checkOut).toBeTruthy();
+    // The restaurant identifies a stay; it has no business reading the guest's
+    // contact details or what the room is costing.
+    expect(res.body).not.toMatch(/8801711000000|nusrat-.*@test\.com|totalAmount|paidAmount/);
+  });
+});

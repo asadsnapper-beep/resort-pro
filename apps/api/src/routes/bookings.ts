@@ -280,6 +280,61 @@ export async function bookingRoutes(app: FastifyInstance) {
     },
   });
 
+  // GET /api/bookings/in-house?q=  — who is staying here right now.
+  //
+  // Backs the restaurant's "charge to the room" picker. The order-taker is
+  // asking one question — which stay is this food for — and the answer is only
+  // ever a guest who is currently checked in, never the resort's whole guest
+  // list. Rooms come first in the search because a waiter knows the room
+  // number and not the spelling of the guest's name.
+  app.get('/in-house', {
+    schema: { tags: ['bookings'], summary: 'Find a stay that is currently checked in', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
+    handler: async (request) => {
+      const { db } = request;
+      const { q } = request.query as { q?: string };
+      const search = q?.trim() ?? '';
+
+      const match = (): Prisma.BookingWhereInput | undefined => {
+        if (!search) return undefined;
+        const terms = search.split(/\s+/);
+        const or: Prisma.BookingWhereInput[] = [
+          { room: { number: { contains: search, mode: 'insensitive' } } },
+          { confirmationNo: { contains: search, mode: 'insensitive' } },
+          { guest: { firstName: { contains: search, mode: 'insensitive' } } },
+          { guest: { lastName: { contains: search, mode: 'insensitive' } } },
+        ];
+        // "Karim Hossain" matches neither name field on its own.
+        if (terms.length > 1) {
+          or.push({
+            guest: {
+              firstName: { contains: terms[0], mode: 'insensitive' },
+              lastName: { contains: terms[terms.length - 1], mode: 'insensitive' },
+            },
+          });
+        }
+        return { OR: or };
+      };
+
+      const stays = await db.booking.findMany({
+        where: { status: 'CHECKED_IN', ...match() },
+        // Deliberately narrow: the restaurant needs to identify a stay, not to
+        // read the guest's contact details or what the room is costing.
+        select: {
+          id: true,
+          confirmationNo: true,
+          checkOut: true,
+          room: { select: { id: true, number: true, name: true } },
+          guest: { select: { id: true, firstName: true, lastName: true } },
+        },
+        orderBy: { room: { number: 'asc' } },
+        take: 25,
+      });
+
+      return ok(stays);
+    },
+  });
+
   // GET /api/bookings/:id
   app.get('/:id', {
     schema: { tags: ['bookings'], summary: 'Get booking by ID', security: [{ bearerAuth: [] }] },
