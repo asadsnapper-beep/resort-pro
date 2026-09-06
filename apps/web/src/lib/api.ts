@@ -298,7 +298,9 @@ export const foodOrdersApi = {
   list:         (params?: Record<string, unknown>) => api.get('/food-orders', { params }),
   stats:        () => api.get('/food-orders/stats'),
   create:       (data: unknown) => api.post('/food-orders', data),
-  updateStatus: (id: string, status: string) => api.patch(`/food-orders/${id}/status`, { status }),
+  /** `reason` is required to cancel an order that was already served. */
+  updateStatus: (id: string, status: string, reason?: string) =>
+    api.patch(`/food-orders/${id}/status`, reason ? { status, reason } : { status }),
   markPaid:     (id: string, method: string) => api.patch(`/food-orders/${id}/payment`, { method }),
 };
 

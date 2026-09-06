@@ -12,9 +12,7 @@ and idempotency (§8).
 
 Not built: `COMPLIMENTARY` and `CORPORATE`, which the API refuses; QR
 room-charging (§7), still `PAY_NOW` only; and the restaurant reporting
-breakdown (§9). §5 is server-side only — the dashboard shows a cancel control
-for orders that have not been served yet, so voiding a billed charge is
-reachable through the API alone.
+breakdown (§9).
 Depends on: [checkout-billing-completeness.md](./checkout-billing-completeness.md)
 
 ---

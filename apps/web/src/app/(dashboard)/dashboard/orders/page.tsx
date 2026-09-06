@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
+import { ModalShell } from '@/components/ui/modal-shell';
 import { StatusBadge } from '@/components/ui/badge';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -363,15 +364,27 @@ function OrderCard({ order, expanded, onToggleExpand }: {
   order: FoodOrder; expanded: boolean; onToggleExpand: () => void;
 }) {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
+  const canVoid = user?.role === 'OWNER' || user?.role === 'MANAGER';
   const [payMethod, setPayMethod] = useState('CASH');
+  const [voidOpen, setVoidOpen] = useState(false);
+  const [voidReason, setVoidReason] = useState('');
   const statusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) => foodOrdersApi.updateStatus(id, status),
+    mutationFn: ({ id, status, reason }: { id: string; status: string; reason?: string }) =>
+      foodOrdersApi.updateStatus(id, status, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['food-orders'] });
       queryClient.invalidateQueries({ queryKey: ['food-orders-stats'] });
+      setVoidOpen(false);
+      setVoidReason('');
       toast({ title: 'Order updated' });
     },
-    onError: () => toast({ title: 'Error', description: 'Failed to update order', variant: 'destructive' }),
+    onError: (err: unknown) => toast({
+      title: 'Error',
+      description: (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        ?? 'Failed to update order',
+      variant: 'destructive',
+    }),
   });
   const markPaidMutation = useMutation({
     mutationFn: ({ id, method }: { id: string; method: string }) => foodOrdersApi.markPaid(id, method),
@@ -466,6 +479,13 @@ function OrderCard({ order, expanded, onToggleExpand }: {
                 <XCircle className="h-[14px] w-[14px]" />
               </button>
             )}
+            {order.status === 'DELIVERED' && canVoid && (
+              <button
+                onClick={() => setVoidOpen(true)}
+                className="rounded-rp-sm border border-rp-border-md bg-rp-surface-3 px-[12px] py-[6px] text-rp-meta font-medium text-rp-text transition-colors hover:bg-rp-surface-4">
+                Cancel &amp; credit
+              </button>
+            )}
           </div>
         </div>
         {expanded && (
@@ -479,6 +499,40 @@ function OrderCard({ order, expanded, onToggleExpand }: {
             {order.notes && <p className="text-[11.5px] text-[#64748b] mt-1 italic">📝 {order.notes}</p>}
           </div>
         )}
+        <ModalShell
+          open={voidOpen}
+          onClose={() => setVoidOpen(false)}
+          title="Cancel a served order"
+          description="The charge stays on the invoice and a credit is added against it."
+          maxWidth="440px"
+          footer={
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setVoidOpen(false)}
+                className="rounded-rp-btn border border-rp-border-md px-4 py-2 text-rp-body font-medium text-rp-muted">
+                Keep it
+              </button>
+              <button
+                type="button"
+                disabled={!voidReason.trim() || statusMutation.isPending}
+                onClick={() => statusMutation.mutate({ id: order.id, status: 'CANCELLED', reason: voidReason.trim() })}
+                className="rounded-rp-btn bg-rp-danger px-4 py-2 text-rp-body font-medium text-white disabled:opacity-40">
+                {statusMutation.isPending ? 'Cancelling…' : 'Cancel and credit'}
+              </button>
+            </div>
+          }
+        >
+          <label className="block text-rp-label font-medium text-rp-muted mb-1.5">Why is it being cancelled?</label>
+          <input
+            autoFocus
+            value={voidReason}
+            onChange={e => setVoidReason(e.target.value)}
+            placeholder="Wrong dish, never served, guest complaint…"
+            className="w-full rounded-rp-ctrl border border-rp-border-md bg-rp-surface-3 px-3 py-2 text-rp-body text-rp-text placeholder:text-rp-muted focus:outline-none"
+          />
+          <p className="mt-2 text-rp-label text-rp-muted">
+            Recorded against your name on the invoice’s audit trail.
+          </p>
+        </ModalShell>
       </div>
     </div>
   );
