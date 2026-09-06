@@ -1035,16 +1035,26 @@ model StayTimeGrant {
   overrideReason String?
   approvedBy     String // User.id — an unattributable grant is what this prevents
 
+  // The fee this grant put on the bill, so voiding the grant can find it.
+  invoiceExtraId String?
+
   // A second grant of the same kind supersedes the first rather than
   // overwriting it; the earlier one is voided and its charge adjusted.
   voidedAt DateTime?
   voidedBy String?
+
+  // "ACTIVE" while the grant stands, replaced by the grant's own id when it is
+  // voided. That lets the unique index below keep the whole history while
+  // permitting only one live grant of each kind per booking — so a retried
+  // request is refused by the database rather than charging the guest twice.
+  activeKey String @default("ACTIVE")
 
   createdAt DateTime @default(now())
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
+  @@unique([bookingId, kind, activeKey])
   @@index([tenantId, bookingId])
   @@map("stay_time_grants")
 }

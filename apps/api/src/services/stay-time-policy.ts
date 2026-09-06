@@ -31,6 +31,8 @@ export type StayTimeBlocker = {
 export type StayTimeQuote = {
   kind: StayTimeKind;
   requestedFor: Date;
+  /** The zone every time in this quote was read in — the resort's own. */
+  timezone: string;
   /** Whether the room can be handed over at that time at all. */
   available: boolean;
   blockers: StayTimeBlocker[];
@@ -119,7 +121,7 @@ export async function quoteStayTime(
   // up quoting for a room that is still dirty.
   if (!available || !policyEnabled) {
     return {
-      kind: input.kind, requestedFor: input.at, available, blockers,
+      kind: input.kind, requestedFor: input.at, timezone, available, blockers,
       policyEnabled, withinNormalHours,
       band: null, quotedFee: 0, chargeBasis, nightlyRate,
       requiresOverride: !available,
@@ -132,7 +134,7 @@ export async function quoteStayTime(
   const factor = band === 'FREE' ? 0 : band === 'HALF' ? (policy!.halfRatePercent ?? 50) / 100 : 1;
 
   return {
-    kind: input.kind, requestedFor: input.at, available, blockers,
+    kind: input.kind, requestedFor: input.at, timezone, available, blockers,
     policyEnabled, withinNormalHours,
     band, quotedFee: round2(nightlyRate * factor), chargeBasis, nightlyRate,
     requiresOverride: false,

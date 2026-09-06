@@ -17,7 +17,8 @@ import { createGuestPaymentLink } from './billing';
 import { resolveRate } from './ratePlans';
 import { findReturningGuestId } from '../utils/guest-lookup';
 import { bill } from '../services/billing';
-import { quoteStayTime } from '../services/stay-time-policy';
+import { quoteStayTime, type StayTimeQuote } from '../services/stay-time-policy';
+import { round2 } from '../services/billing';
 import { resolveTenantEntitlement } from '../utils/entitlement';
 import { createAdminNotification } from '../utils/notifications';
 import { nextDocumentNumber } from '../utils/sequence';
@@ -120,6 +121,17 @@ const createBookingSchema = z.object({
   guestPhone: z.string().optional(),
   corporateAccountId: z.string().uuid().optional(), // bill to company instead of guest
 });
+
+/**
+ * The granted hour as the resort reads it, for the invoice line. Rendering it
+ * in server time would print an hour the guest never agreed to.
+ */
+function formatTenantTime(at: Date, quote: StayTimeQuote): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: quote.timezone,
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(at);
+}
 
 export async function bookingRoutes(app: FastifyInstance) {
   // GET /api/bookings
@@ -618,6 +630,143 @@ export async function bookingRoutes(app: FastifyInstance) {
       }
 
       return reply.send(ok(await quoteStayTime(tenantId, id, { kind, at }), 'Stay time quote'));
+    },
+  });
+
+  // POST /api/bookings/:id/stay-time  — grant an early arrival or late departure
+  //
+  // The quote above says what may be offered; this is the act of offering it,
+  // and it moves money. Every path through it leaves a record of what was
+  // quoted, what was given away, and who decided.
+  app.post('/:id/stay-time', {
+    schema: { tags: ['bookings'], summary: 'Grant an early check-in or late checkout', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
+    handler: async (request, reply) => {
+      const { tenantId, sub: actorId, role } = request.user as JwtPayload;
+      const { id } = request.params as { id: string };
+
+      const parsed = z.object({
+        kind: z.enum(['EARLY_CHECKIN', 'LATE_CHECKOUT']),
+        at: z.string().datetime({ offset: true }),
+        waive: z.boolean().optional(),
+        reason: z.string().max(500).optional(),
+      }).safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          success: false,
+          error: 'kind, and an ISO instant in at, are required',
+        });
+      }
+      const { kind, waive, reason } = parsed.data;
+      const at = new Date(parsed.data.at);
+
+      const entitlement = await resolveTenantEntitlement(tenantId);
+      if (!entitlement.flags.stay_time_policy) {
+        return reply.status(403).send({
+          success: false, error: 'This feature requires a higher plan.',
+          code: 'PLAN_UPGRADE_REQUIRED', upgradeRequired: true,
+        });
+      }
+
+      const policy = await request.db.stayTimePolicy.findFirst({ where: {} });
+      if (!policy?.enabled) {
+        // Advisory mode: the desk sees the timing and decides by hand. There is
+        // no fee to record, so there is no grant to make.
+        return reply.status(400).send({
+          success: false,
+          error: 'Turn on the early check-in and late checkout policy before recording grants',
+        });
+      }
+
+      const quote = await quoteStayTime(tenantId, id, { kind, at }).catch((err) => {
+        if ((err as { statusCode?: number }).statusCode === 404) return null;
+        throw err;
+      });
+      if (!quote) return reply.status(404).send({ success: false, error: 'Booking not found' });
+
+      const isManager = role === 'OWNER' || role === 'MANAGER';
+
+      // Handing over a room the availability check says cannot be handed over
+      // is a decision outside the policy, not a discount on it.
+      if (!quote.available) {
+        if (!isManager) {
+          return reply.status(403).send({
+            success: false,
+            error: `Only a manager can grant this — ${quote.blockers.map((b) => b.detail).join('; ')}`,
+          });
+        }
+        if (!reason?.trim()) {
+          return reply.status(400).send({
+            success: false,
+            error: `Give a reason for granting this anyway — ${quote.blockers.map((b) => b.detail).join('; ')}`,
+          });
+        }
+      }
+
+      if (waive && quote.quotedFee > 0) {
+        if (!isManager && policy.waiverRequiresManager) {
+          return reply.status(403).send({ success: false, error: 'Only a manager can waive this fee' });
+        }
+        if (!reason?.trim()) {
+          return reply.status(400).send({ success: false, error: 'Give a reason for waiving the fee' });
+        }
+      }
+
+      const waivedAmount = waive ? quote.quotedFee : 0;
+      const chargedFee = round2(quote.quotedFee - waivedAmount);
+
+      try {
+        const grant = await prisma.$transaction(async (tx) => {
+          // The fee is an InvoiceExtra and reaches the guest through bill(),
+          // which is the only thing allowed to add up a stay.
+          const extra = chargedFee > 0
+            ? await tx.invoiceExtra.create({
+                data: {
+                  tenantId, bookingId: id,
+                  description: `${kind === 'EARLY_CHECKIN' ? 'Early check-in' : 'Late checkout'} (${formatTenantTime(at, quote)}, ${quote.band?.toLowerCase()} day)`,
+                  amount: chargedFee, quantity: 1,
+                },
+              })
+            : null;
+
+          const created = await tx.stayTimeGrant.create({
+            data: {
+              tenantId, bookingId: id, kind,
+              requestedFor: at, approvedFor: at,
+              policyBand: quote.band ?? 'FREE',
+              quotedFee: quote.quotedFee,
+              waivedAmount, chargedFee,
+              invoiceExtraId: extra?.id ?? null,
+              overrideReason: quote.available ? null : reason!.trim(),
+              approvedBy: actorId,
+            },
+          });
+
+          // Waived revenue has to be reportable, and attributable.
+          if (waivedAmount > 0) {
+            await tx.billingAudit.create({
+              data: {
+                tenantId, bookingId: id,
+                action: 'WAIVE', amount: -waivedAmount,
+                reason: reason?.trim() || null, actorId,
+                metadata: { stayTimeGrantId: created.id, kind, band: quote.band, quotedFee: quote.quotedFee },
+              },
+            });
+          }
+
+          return created;
+        });
+
+        return reply.status(201).send(ok({ grant, quote }, 'Granted'));
+      } catch (err) {
+        if ((err as { code?: string }).code === 'P2002') {
+          return reply.status(409).send({
+            success: false,
+            error: 'This stay already has a live grant of that kind',
+          });
+        }
+        throw err;
+      }
     },
   });
 

@@ -16,6 +16,7 @@ import { buildApp } from '../../src/app';
 import { prisma } from '@resort-pro/database';
 import { verifyOwnerAndLogin } from '../helpers/auth';
 import { quoteStayTime } from '../../src/services/stay-time-policy';
+import { bill } from '../../src/services/billing';
 import type { FastifyInstance } from 'fastify';
 
 let app: FastifyInstance;
@@ -23,6 +24,8 @@ const slug = `stay-time-${Date.now()}`;
 const password = 'TestPass123!';
 let tenantId: string;
 let guestId: string;
+let ownerToken: string;
+let receptionistToken: string;
 let roomSeq = 0;
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
@@ -84,7 +87,7 @@ beforeAll(async () => {
     data: { planStatus: 'active', plan: 'ENTERPRISE', taxRate: 0, timezone: 'Asia/Dhaka', checkInTime: '14:00', checkOutTime: '11:00' },
   });
 
-  void token;
+  ownerToken = token;
 
   guestId = (await prisma.guest.create({
     data: { tenantId, firstName: 'Early', lastName: 'Bird', email: `guest-${slug}@test.com` },
@@ -309,9 +312,6 @@ describe('a resort that has not turned the policy on', () => {
 });
 
 describe('GET /api/bookings/:id/stay-time', () => {
-  let ownerToken: string;
-  let receptionistToken: string;
-
   const quote = (bookingId: string, params: Record<string, string>, token = ownerToken) => app.inject({
     method: 'GET',
     url: `/api/bookings/${bookingId}/stay-time?${new URLSearchParams(params)}`,
@@ -319,7 +319,6 @@ describe('GET /api/bookings/:id/stay-time', () => {
   });
 
   beforeAll(async () => {
-    ownerToken = await verifyOwnerAndLogin(app, { tenantId, email: `owner-${slug}@test.com`, password, slug });
     await prisma.tenantFeatureFlag.upsert({
       where: { tenantId_flag: { tenantId, flag: 'stay_time_policy' } },
       create: { tenantId, flag: 'stay_time_policy', enabled: true },
@@ -423,6 +422,175 @@ describe('GET /api/bookings/:id/stay-time', () => {
         where: { tenantId_flag: { tenantId, flag: 'stay_time_policy' } },
         data: { enabled: true },
       });
+    }
+  });
+});
+
+describe('POST /api/bookings/:id/stay-time — granting it', () => {
+  const grant = (bookingId: string, body: Record<string, unknown>, token = ownerToken) => app.inject({
+    method: 'POST', url: `/api/bookings/${bookingId}/stay-time`,
+    headers: { Authorization: `Bearer ${token}` }, payload: body,
+  });
+
+  beforeAll(async () => {
+    await prisma.tenantFeatureFlag.upsert({
+      where: { tenantId_flag: { tenantId, flag: 'stay_time_policy' } },
+      create: { tenantId, flag: 'stay_time_policy', enabled: true },
+      update: { enabled: true },
+    });
+    await setPolicy({ earlyFreeAfter: '11:00', earlyHalfAfter: '06:00', halfRatePercent: 50, waiverRequiresManager: false });
+  });
+
+  it('puts the fee on the bill through an extra, not a total of its own', async () => {
+    const booking = await makeBooking();
+    const res = await grant(booking.id, { kind: 'EARLY_CHECKIN', at: dhaka('2029-03-10', '08:30').toISOString() });
+
+    expect(res.statusCode).toBe(201);
+    const { grant: g } = JSON.parse(res.body).data;
+    expect(g.policyBand).toBe('HALF');
+    expect(g.quotedFee).toBe(2000);
+    expect(g.chargedFee).toBe(2000);
+
+    const extras = await prisma.invoiceExtra.findMany({ where: { bookingId: booking.id } });
+    expect(extras).toHaveLength(1);
+    expect(extras[0]!.amount).toBe(2000);
+    expect(extras[0]!.description).toContain('08:30');   // the resort's clock
+    expect(g.invoiceExtraId).toBe(extras[0]!.id);
+  });
+
+  it('reaches the guest’s bill exactly once', async () => {
+    const booking = await makeBooking({ status: 'CONFIRMED' });
+    await grant(booking.id, { kind: 'EARLY_CHECKIN', at: dhaka('2029-03-10', '08:30').toISOString() });
+
+    const billed = await bill(tenantId, booking.id);
+    const lines = billed.lines.filter(l => l.description.includes('Early check-in'));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]!.total).toBe(2000);
+    expect(billed.grandTotal).toBe(8000 + 2000);
+  });
+
+  it('records nothing to collect when the arrival is free', async () => {
+    const booking = await makeBooking();
+    const res = await grant(booking.id, { kind: 'EARLY_CHECKIN', at: dhaka('2029-03-10', '12:00').toISOString() });
+
+    expect(res.statusCode).toBe(201);
+    const { grant: g } = JSON.parse(res.body).data;
+    expect(g.policyBand).toBe('FREE');
+    expect(g.chargedFee).toBe(0);
+    expect(await prisma.invoiceExtra.count({ where: { bookingId: booking.id } })).toBe(0);
+  });
+
+  it('refuses a repeat of the same grant instead of charging twice', async () => {
+    const booking = await makeBooking();
+    const at = dhaka('2029-03-10', '08:30').toISOString();
+
+    const first = await grant(booking.id, { kind: 'EARLY_CHECKIN', at });
+    const again = await grant(booking.id, { kind: 'EARLY_CHECKIN', at });
+
+    expect([first.statusCode, again.statusCode]).toEqual([201, 409]);
+    expect(await prisma.invoiceExtra.count({ where: { bookingId: booking.id } })).toBe(1);
+  });
+
+  it('holds even when both requests arrive at once', async () => {
+    const booking = await makeBooking();
+    const at = dhaka('2029-03-10', '08:30').toISOString();
+
+    const [a, b] = await Promise.all([
+      grant(booking.id, { kind: 'EARLY_CHECKIN', at }),
+      grant(booking.id, { kind: 'EARLY_CHECKIN', at }),
+    ]);
+
+    expect([a.statusCode, b.statusCode].filter(c => c === 201)).toHaveLength(1);
+    expect(await prisma.stayTimeGrant.count({ where: { bookingId: booking.id } })).toBe(1);
+    expect(await prisma.invoiceExtra.count({ where: { bookingId: booking.id } })).toBe(1);
+  });
+
+  it('waives the fee with a reason, and says so in the audit trail', async () => {
+    const booking = await makeBooking();
+    const res = await grant(booking.id, {
+      kind: 'EARLY_CHECKIN', at: dhaka('2029-03-10', '08:30').toISOString(),
+      waive: true, reason: 'Regular guest, flight landed at dawn',
+    });
+
+    expect(res.statusCode).toBe(201);
+    const { grant: g } = JSON.parse(res.body).data;
+    expect(g.quotedFee).toBe(2000);     // what it would have cost
+    expect(g.waivedAmount).toBe(2000);  // what was given away
+    expect(g.chargedFee).toBe(0);
+    expect(await prisma.invoiceExtra.count({ where: { bookingId: booking.id } })).toBe(0);
+
+    const audit = await prisma.billingAudit.findFirstOrThrow({ where: { bookingId: booking.id, action: 'WAIVE' } });
+    expect(audit.amount).toBe(-2000);
+    expect(audit.reason).toBe('Regular guest, flight landed at dawn');
+    expect(audit.actorId).toBeTruthy();
+  });
+
+  it('will not waive silently', async () => {
+    const booking = await makeBooking();
+    const res = await grant(booking.id, { kind: 'EARLY_CHECKIN', at: dhaka('2029-03-10', '08:30').toISOString(), waive: true });
+
+    expect(res.statusCode).toBe(400);
+    expect(await prisma.stayTimeGrant.count({ where: { bookingId: booking.id } })).toBe(0);
+  });
+
+  it('keeps the waiver from the desk when the resort says a manager decides', async () => {
+    await setPolicy({ waiverRequiresManager: true });
+    try {
+      const booking = await makeBooking();
+      const res = await grant(booking.id, {
+        kind: 'EARLY_CHECKIN', at: dhaka('2029-03-10', '08:30').toISOString(),
+        waive: true, reason: 'Goodwill',
+      }, receptionistToken);
+
+      expect(res.statusCode).toBe(403);
+      expect(await prisma.stayTimeGrant.count({ where: { bookingId: booking.id } })).toBe(0);
+    } finally {
+      await setPolicy({ waiverRequiresManager: false });
+    }
+  });
+
+  it('lets the desk waive when the resort says it may', async () => {
+    const booking = await makeBooking();
+    const res = await grant(booking.id, {
+      kind: 'EARLY_CHECKIN', at: dhaka('2029-03-10', '08:30').toISOString(),
+      waive: true, reason: 'Goodwill',
+    }, receptionistToken);
+
+    expect(res.statusCode).toBe(201);
+  });
+
+  it('needs a manager and a reason to hand over a room that is not ready', async () => {
+    const booking = await makeBooking();
+    await prisma.room.update({ where: { id: booking.roomId }, data: { status: 'CLEANING' } });
+    try {
+      const at = dhaka('2029-03-10', '08:30').toISOString();
+
+      const desk = await grant(booking.id, { kind: 'EARLY_CHECKIN', at, reason: 'Guest waiting' }, receptionistToken);
+      expect(desk.statusCode).toBe(403);
+
+      const silent = await grant(booking.id, { kind: 'EARLY_CHECKIN', at });
+      expect(silent.statusCode).toBe(400);
+
+      const withReason = await grant(booking.id, { kind: 'EARLY_CHECKIN', at, reason: 'Room ready early, status stale' });
+      expect(withReason.statusCode).toBe(201);
+      expect(JSON.parse(withReason.body).data.grant.overrideReason).toBe('Room ready early, status stale');
+      // Overridden, so the room was given — but no fee was invented for it.
+      expect(JSON.parse(withReason.body).data.grant.chargedFee).toBe(0);
+    } finally {
+      await prisma.room.update({ where: { id: booking.roomId }, data: { status: 'AVAILABLE' } });
+    }
+  });
+
+  it('records no grant while the policy is off', async () => {
+    await prisma.stayTimePolicy.update({ where: { tenantId }, data: { enabled: false } });
+    try {
+      const booking = await makeBooking();
+      const res = await grant(booking.id, { kind: 'EARLY_CHECKIN', at: dhaka('2029-03-10', '08:30').toISOString() });
+
+      expect(res.statusCode).toBe(400);
+      expect(await prisma.stayTimeGrant.count({ where: { bookingId: booking.id } })).toBe(0);
+    } finally {
+      await setPolicy({});
     }
   });
 });
