@@ -178,6 +178,11 @@ export const FLAG_REGISTRY: FlagDefinition[] = [
     flag: 'multi_property', label: 'Multi-property Management',
     description: 'Manage multiple resort properties from one account.', category: 'Modules', defaultOn: false,
   },
+  {
+    flag: 'stay_time_policy', label: 'Early Check-in & Late Checkout',
+    description: 'Quote and charge for early arrival and late departure, using your own free/half/full windows. Off means the desk sees the timing but no fee is proposed.',
+    category: 'Modules', defaultOn: false, ownerControllable: true,
+  },
 
   // ── Beta ──────────────────────────────────────────────────────────────────
   {

@@ -527,6 +527,8 @@ model Tenant {
   themePurchases         ThemePurchase[]
   trialEmailLogs         TrialEmailLog[]
   deletionRequests       TenantDeletionRequest[]
+  stayTimePolicy         StayTimePolicy?
+  stayTimeGrants         StayTimeGrant[]
 
   @@map("tenants")
 }
@@ -838,6 +840,7 @@ model Booking {
   foodOrders          FoodOrder[]
   supportTickets      SupportTicket[]
   invoiceExtras       InvoiceExtra[]
+  stayTimeGrants      StayTimeGrant[]
   bookingPackages     BookingPackage[]
   bookingOffers       BookingOffer[]
   invoice             Invoice?
@@ -977,6 +980,73 @@ model TenantPaymentConfig {
   updatedAt DateTime @updatedAt
 
   @@map("tenant_payment_configs")
+}
+
+// Per-tenant policy for early check-in and late checkout. Off by default: a
+// resort that never configures this sees the time context and no fee proposal.
+// See plan/early-checkin-late-checkout.md §4.
+model StayTimePolicy {
+  id       String  @id @default(cuid())
+  tenantId String  @unique
+  enabled  Boolean @default(false)
+
+  // Wall-clock times in Tenant.timezone. Arriving after earlyFreeAfter is free;
+  // between earlyHalfAfter and it, half; before earlyHalfAfter, a full night.
+  earlyFreeAfter String @default("11:00")
+  earlyHalfAfter String @default("06:00")
+
+  // Leaving before lateFreeUntil is free; before lateHalfUntil, half; after, a
+  // full night.
+  lateFreeUntil String @default("14:00")
+  lateHalfUntil String @default("18:00")
+
+  halfRatePercent Float  @default(50)
+  // EFFECTIVE — the booking's own nightly rate, so a guest on a promotional
+  // rate pays half of their rate. BASE — the room's rack price.
+  chargeBasis     String @default("EFFECTIVE")
+
+  waiverRequiresManager Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("stay_time_policies")
+}
+
+// One granted early check-in or late checkout. Every field here is an audit
+// requirement rather than a convenience: without policyBand, quotedFee and
+// waivedAmount there is no answering "how much did we give away last month,
+// and who authorised it". Snapshotted, so editing the policy mid-stay cannot
+// rewrite what a guest was told.
+model StayTimeGrant {
+  id           String   @id @default(cuid())
+  tenantId     String
+  bookingId    String
+  kind         String // EARLY_CHECKIN | LATE_CHECKOUT
+  requestedFor DateTime // the time the guest asked for
+  approvedFor  DateTime // the time actually granted
+  policyBand   String // FREE | HALF | FULL
+  quotedFee    Float
+  waivedAmount Float    @default(0)
+  chargedFee   Float
+
+  overrideReason String?
+  approvedBy     String // User.id — an unattributable grant is what this prevents
+
+  // A second grant of the same kind supersedes the first rather than
+  // overwriting it; the earlier one is voided and its charge adjusted.
+  voidedAt DateTime?
+  voidedBy String?
+
+  createdAt DateTime @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, bookingId])
+  @@map("stay_time_grants")
 }
 
 model InvoiceExtra {
