@@ -51,3 +51,22 @@ export function tenantDayOffset(offset: number, timezone = 'Asia/Dhaka'): Date {
 export function tenantTodayRange(timezone = 'Asia/Dhaka'): { gte: Date; lt: Date } {
   return { gte: tenantToday(timezone), lt: tenantDayOffset(1, timezone) };
 }
+
+/**
+ * The wall-clock time of `instant` in `timezone`, as minutes past midnight.
+ *
+ * Policy windows are wall-clock strings — a resort says "free after 11:00",
+ * meaning 11:00 where the resort is. Comparing those against server-local time
+ * would price a guest by the hour in Virginia.
+ */
+export function tenantWallMinutes(instant: Date, timezone = 'Asia/Dhaka'): number {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(instant);
+  const part = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  // en-GB renders midnight as 24:00 in some ICU versions; normalise it to 0.
+  return (part('hour') % 24) * 60 + part('minute');
+}
