@@ -17,6 +17,8 @@ import { createGuestPaymentLink } from './billing';
 import { resolveRate } from './ratePlans';
 import { findReturningGuestId } from '../utils/guest-lookup';
 import { bill } from '../services/billing';
+import { quoteStayTime } from '../services/stay-time-policy';
+import { resolveTenantEntitlement } from '../utils/entitlement';
 import { createAdminNotification } from '../utils/notifications';
 import { nextDocumentNumber } from '../utils/sequence';
 import type { JwtPayload } from '@resort-pro/types';
@@ -557,6 +559,65 @@ export async function bookingRoutes(app: FastifyInstance) {
         // either a bad id or another tenant's booking — same answer either way.
         return reply.status(404).send({ success: false, error: 'Booking not found' });
       }
+    },
+  });
+
+  // GET /api/bookings/:id/stay-time?kind=EARLY_CHECKIN|LATE_CHECKOUT&at=<ISO>
+  //
+  // What the desk may offer: whether the room can be handed over at that hour
+  // at all, and only then what it would cost. Read-only — granting is a
+  // separate, audited act.
+  app.get('/:id/stay-time', {
+    schema: { tags: ['bookings'], summary: 'Quote an early check-in or late checkout', security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
+    handler: async (request, reply) => {
+      const { tenantId } = request.user as JwtPayload;
+      const { id } = request.params as { id: string };
+      const query = request.query as { kind?: string; at?: string };
+
+      const parsed = z.object({
+        kind: z.enum(['EARLY_CHECKIN', 'LATE_CHECKOUT']),
+        at: z.string().datetime({ offset: true }).optional(),
+      }).safeParse(query);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          success: false,
+          error: 'kind must be EARLY_CHECKIN or LATE_CHECKOUT, and at must be an ISO instant',
+        });
+      }
+      const { kind } = parsed.data;
+      const at = parsed.data.at ? new Date(parsed.data.at) : new Date();
+
+      // Rollout flag: a resort that has not been given the feature sees no
+      // change at all, not an empty panel. See the plan's §12.
+      const entitlement = await resolveTenantEntitlement(tenantId);
+      if (!entitlement.flags.stay_time_policy) {
+        return reply.status(403).send({
+          success: false,
+          error: 'This feature requires a higher plan.',
+          code: 'PLAN_UPGRADE_REQUIRED',
+          upgradeRequired: true,
+        });
+      }
+
+      const booking = await request.db.booking.findFirst({ where: { id }, select: { status: true } });
+      if (!booking) return reply.status(404).send({ success: false, error: 'Booking not found' });
+
+      // Quoting an early arrival for a guest who has left, or a late departure
+      // for one who never came, is a question with no sensible answer.
+      const allowed = kind === 'EARLY_CHECKIN'
+        ? ['CONFIRMED', 'PENDING']
+        : ['CHECKED_IN'];
+      if (!allowed.includes(booking.status)) {
+        return reply.status(400).send({
+          success: false,
+          error: kind === 'EARLY_CHECKIN'
+            ? 'Only a guest who has not checked in yet can arrive early'
+            : 'Only a guest who is checked in can leave late',
+        });
+      }
+
+      return reply.send(ok(await quoteStayTime(tenantId, id, { kind, at }), 'Stay time quote'));
     },
   });
 

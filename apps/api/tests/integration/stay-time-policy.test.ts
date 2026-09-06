@@ -307,3 +307,122 @@ describe('a resort that has not turned the policy on', () => {
     }
   });
 });
+
+describe('GET /api/bookings/:id/stay-time', () => {
+  let ownerToken: string;
+  let receptionistToken: string;
+
+  const quote = (bookingId: string, params: Record<string, string>, token = ownerToken) => app.inject({
+    method: 'GET',
+    url: `/api/bookings/${bookingId}/stay-time?${new URLSearchParams(params)}`,
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  beforeAll(async () => {
+    ownerToken = await verifyOwnerAndLogin(app, { tenantId, email: `owner-${slug}@test.com`, password, slug });
+    await prisma.tenantFeatureFlag.upsert({
+      where: { tenantId_flag: { tenantId, flag: 'stay_time_policy' } },
+      create: { tenantId, flag: 'stay_time_policy', enabled: true },
+      update: { enabled: true },
+    });
+    await setPolicy({ earlyFreeAfter: '11:00', earlyHalfAfter: '06:00', lateFreeUntil: '14:00', lateHalfUntil: '18:00' });
+
+    const bcrypt = await import('bcryptjs');
+    const email = `desk-${slug}@test.com`;
+    await prisma.user.create({
+      data: {
+        tenantId, email, passwordHash: await bcrypt.hash(password, 10),
+        firstName: 'Rita', lastName: 'Desk', role: 'RECEPTIONIST', emailVerifiedAt: new Date(),
+      },
+    });
+    const login = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email, password, slug } });
+    receptionistToken = JSON.parse(login.body).data.token;
+  });
+
+  it('quotes an early arrival', async () => {
+    const booking = await makeBooking();
+    const res = await quote(booking.id, { kind: 'EARLY_CHECKIN', at: dhaka('2029-03-10', '08:30').toISOString() });
+
+    expect(res.statusCode).toBe(200);
+    const q = JSON.parse(res.body).data;
+    expect(q.available).toBe(true);
+    expect(q.band).toBe('HALF');
+    expect(q.quotedFee).toBe(2000);
+  });
+
+  it('is readable by the receptionist who is standing at the desk', async () => {
+    const booking = await makeBooking();
+    const res = await quote(booking.id, { kind: 'EARLY_CHECKIN', at: dhaka('2029-03-10', '08:30').toISOString() }, receptionistToken);
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('says a room cannot be given without naming a price for it', async () => {
+    const booking = await makeBooking();
+    await prisma.room.update({ where: { id: booking.roomId }, data: { status: 'CLEANING' } });
+    try {
+      const res = await quote(booking.id, { kind: 'EARLY_CHECKIN', at: dhaka('2029-03-10', '08:30').toISOString() });
+      const q = JSON.parse(res.body).data;
+
+      expect(q.available).toBe(false);
+      expect(q.band).toBeNull();
+      expect(res.body).not.toMatch(/"quotedFee":[1-9]/);
+    } finally {
+      await prisma.room.update({ where: { id: booking.roomId }, data: { status: 'AVAILABLE' } });
+    }
+  });
+
+  it('refuses a question with no sensible answer', async () => {
+    const arrived = await makeBooking({ status: 'CHECKED_IN' });
+    const early = await quote(arrived.id, { kind: 'EARLY_CHECKIN', at: dhaka('2029-03-10', '08:30').toISOString() });
+    expect(early.statusCode).toBe(400);
+
+    const notArrived = await makeBooking({ status: 'CONFIRMED' });
+    const late = await quote(notArrived.id, { kind: 'LATE_CHECKOUT', at: dhaka('2029-03-12', '17:00').toISOString() });
+    expect(late.statusCode).toBe(400);
+  });
+
+  it('rejects a malformed question rather than guessing', async () => {
+    const booking = await makeBooking();
+    expect((await quote(booking.id, { kind: 'WHENEVER' })).statusCode).toBe(400);
+    expect((await quote(booking.id, { kind: 'EARLY_CHECKIN', at: 'tomorrow morning' })).statusCode).toBe(400);
+  });
+
+  it('does not answer for another resort’s booking', async () => {
+    const other = await prisma.tenant.create({ data: { name: 'Other', slug: `${slug}-other` } });
+    try {
+      const room = await prisma.room.create({ data: { tenantId: other.id, number: '1', name: 'R', basePrice: 100 } });
+      const guest = await prisma.guest.create({ data: { tenantId: other.id, firstName: 'A', lastName: 'B', email: `x-${slug}@t.com` } });
+      const foreign = await prisma.booking.create({
+        data: {
+          tenantId: other.id, roomId: room.id, guestId: guest.id,
+          checkIn: new Date('2029-03-10'), checkOut: new Date('2029-03-12'),
+          totalAmount: 100, status: 'CONFIRMED', confirmationNo: `OT-${randomUUID().slice(0, 8)}`,
+        },
+      });
+      const res = await quote(foreign.id, { kind: 'EARLY_CHECKIN', at: dhaka('2029-03-10', '08:30').toISOString() });
+      expect(res.statusCode).toBe(404);
+    } finally {
+      await prisma.tenant.delete({ where: { id: other.id } });
+    }
+  });
+
+  it('is invisible to a resort that has not been given the feature', async () => {
+    await prisma.tenantFeatureFlag.update({
+      where: { tenantId_flag: { tenantId, flag: 'stay_time_policy' } },
+      data: { enabled: false },
+    });
+    try {
+      const booking = await makeBooking();
+      const res = await quote(booking.id, { kind: 'EARLY_CHECKIN', at: dhaka('2029-03-10', '08:30').toISOString() });
+
+      expect(res.statusCode).toBe(403);
+      expect(JSON.parse(res.body).code).toBe('PLAN_UPGRADE_REQUIRED');
+    } finally {
+      await prisma.tenantFeatureFlag.update({
+        where: { tenantId_flag: { tenantId, flag: 'stay_time_policy' } },
+        data: { enabled: true },
+      });
+    }
+  });
+});
