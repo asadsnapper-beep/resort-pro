@@ -107,6 +107,8 @@ export const roomsApi = {
 // ── Bookings ──────────────────────────────────────────────────────────────────
 export const bookingsApi = {
   list: (params?: Record<string, unknown>) => api.get('/bookings', { params }),
+  /** Stays that are checked in right now — backs the restaurant's room picker. */
+  inHouse: (q?: string) => api.get('/bookings/in-house', { params: q ? { q } : undefined }),
   get: (id: string) => api.get(`/bookings/${id}`),
   create: (data: unknown) => api.post('/bookings', data),
   checkIn: (id: string, data?: { deposit?: number; roomNotes?: string; roomId?: string }) =>

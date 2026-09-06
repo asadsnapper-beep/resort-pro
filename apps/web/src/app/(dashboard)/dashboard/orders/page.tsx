@@ -3,7 +3,7 @@
 import { useTheme } from 'next-themes';
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { foodOrdersApi, menuApi, guestsApi } from '@/lib/api';
+import { foodOrdersApi, menuApi, guestsApi, bookingsApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { Modal } from '@/components/ui/modal';
 import { StatusBadge } from '@/components/ui/badge';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { useDebounce } from '@/hooks/use-debounce';
 import { cn } from '@/lib/utils';
 import {
   Plus, ShoppingBag, Clock, ChefHat, CheckCircle2, XCircle,
@@ -28,10 +29,19 @@ interface OrderItem {
   menuItem: { name: string; price: number };
 }
 
+interface InHouseStay {
+  id: string;
+  confirmationNo: string;
+  checkOut: string;
+  room: { id: string; number: string; name: string } | null;
+  guest: { id: string; firstName: string; lastName: string } | null;
+}
+
 interface FoodOrder {
   id: string;
   status: string;
   paymentStatus: string;
+  settlement?: string;
   bookingId?: string | null;
   totalAmount: number;
   tableNumber?: string;
@@ -97,6 +107,13 @@ function isToday(dateStr: string) {
     d.getDate() === now.getDate();
 }
 
+// Complimentary and corporate settlements exist in the data model but the API
+// refuses them until their billing does: see plan/restaurant-room-billing.md §2.
+const SETTLEMENT_CHOICES = [
+  { value: 'PAY_NOW' as const, label: 'Restaurant guest', hint: 'Collect payment now' },
+  { value: 'CHARGE_TO_ROOM' as const, label: 'Staying with us', hint: 'Charge to the room' },
+];
+
 // ── New Order Modal ───────────────────────────────────────────────────────────
 function NewOrderModal({ open, onClose, loading, onSubmit }: {
   open: boolean; onClose: () => void; loading: boolean;
@@ -107,14 +124,33 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
   const menuItems: MenuItem[] = (menuData?.data?.data ?? []).filter((i: MenuItem) => i.isAvailable);
   const guests = guestsData?.data?.data ?? [];
 
+  const [settlement, setSettlement] = useState<'PAY_NOW' | 'CHARGE_TO_ROOM'>('PAY_NOW');
   const [guestId, setGuestId] = useState('');
   const [tableNumber, setTableNumber] = useState('');
+  const [staySearch, setStaySearch] = useState('');
+  const [stay, setStay] = useState<InHouseStay | null>(null);
   const [notes, setNotes] = useState('');
   const [cart, setCart] = useState<{ menuItemId: string; name: string; price: number; quantity: number; notes: string }[]>([]);
+  // One key per order being composed, so a double-click or a retry over a bad
+  // connection lands as one order rather than two.
+  const [idempotencyKey, setIdempotencyKey] = useState('');
 
   useEffect(() => {
-    if (open) { setGuestId(''); setTableNumber(''); setNotes(''); setCart([]); }
+    if (open) {
+      setSettlement('PAY_NOW'); setGuestId(''); setTableNumber('');
+      setStaySearch(''); setStay(null); setNotes(''); setCart([]);
+      setIdempotencyKey(crypto.randomUUID());
+    }
   }, [open]);
+
+  // Only guests who are in the building — asked for as the waiter types.
+  const debouncedStaySearch = useDebounce(staySearch, 250);
+  const { data: staysData, isFetching: staysLoading } = useQuery({
+    queryKey: ['in-house-stays', debouncedStaySearch],
+    queryFn: () => bookingsApi.inHouse(debouncedStaySearch || undefined),
+    enabled: open && settlement === 'CHARGE_TO_ROOM',
+  });
+  const stays: InHouseStay[] = staysData?.data?.data ?? [];
 
   const addToCart = (item: MenuItem) => {
     setCart(c => {
@@ -134,9 +170,18 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0) { toast({ title: 'Empty order', description: 'Add at least one item', variant: 'destructive' }); return; }
+    if (settlement === 'CHARGE_TO_ROOM' && !stay) {
+      toast({ title: 'Which room?', description: 'Choose the stay this order is charged to', variant: 'destructive' });
+      return;
+    }
     onSubmit({
-      guestId: guestId || undefined,
-      tableNumber: tableNumber || undefined,
+      settlement,
+      // The room and the guest come from the stay itself — the server reads them
+      // from the booking and ignores anything sent alongside.
+      ...(settlement === 'CHARGE_TO_ROOM'
+        ? { bookingId: stay!.id }
+        : { guestId: guestId || undefined, tableNumber: tableNumber || undefined }),
+      idempotencyKey,
       notes: notes || undefined,
       items: cart.map(i => ({ menuItemId: i.menuItemId, quantity: i.quantity, notes: i.notes || undefined })),
     });
@@ -149,21 +194,89 @@ function NewOrderModal({ open, onClose, loading, onSubmit }: {
   return (
     <Modal open={open} onClose={onClose} title="New F&B Order" description="Create a food & beverage order" className="max-w-2xl">
       <form onSubmit={handleSubmit} className="space-y-4 pt-1">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className={labelCls}>Guest (optional)</label>
-            <select value={guestId} onChange={e => setGuestId(e.target.value)} className={selectCls}>
-              <option value="">Walk-in</option>
-              {guests.map((g: { id: string; firstName: string; lastName: string }) => (
-                <option key={g.id} value={g.id}>{g.firstName} {g.lastName}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className={labelCls}>Table Number</label>
-            <input className={inputCls} value={tableNumber} onChange={e => setTableNumber(e.target.value)} placeholder="Table 4, Room 201…" />
+        <div>
+          <label className={labelCls}>Who is this order for?</label>
+          <div className="grid grid-cols-2 gap-2">
+            {SETTLEMENT_CHOICES.map(choice => (
+              <button
+                key={choice.value}
+                type="button"
+                onClick={() => setSettlement(choice.value)}
+                className={cn(
+                  'rounded-rp-ctrl border px-3 py-2 text-left transition-colors',
+                  settlement === choice.value
+                    ? 'border-rp-brand bg-rp-teal-bg'
+                    : 'border-rp-border-md bg-rp-surface-3 hover:bg-rp-surface-4',
+                )}
+              >
+                <span className="block text-rp-body font-medium text-rp-text">{choice.label}</span>
+                <span className="block text-rp-label text-rp-muted">{choice.hint}</span>
+              </button>
+            ))}
           </div>
         </div>
+
+        {settlement === 'PAY_NOW' ? (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Guest (optional)</label>
+              <select value={guestId} onChange={e => setGuestId(e.target.value)} className={selectCls}>
+                <option value="">Walk-in</option>
+                {guests.map((g: { id: string; firstName: string; lastName: string }) => (
+                  <option key={g.id} value={g.id}>{g.firstName} {g.lastName}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Table Number</label>
+              <input className={inputCls} value={tableNumber} onChange={e => setTableNumber(e.target.value)} placeholder="Table 4" />
+            </div>
+          </div>
+        ) : stay ? (
+          <div className="flex items-center justify-between rounded-rp-ctrl border border-rp-brand bg-rp-teal-bg px-3 py-2">
+            <span className="text-rp-body font-medium text-rp-text">
+              {stay.room ? `Room ${stay.room.number}` : stay.confirmationNo}
+              {stay.guest && ` · ${stay.guest.firstName} ${stay.guest.lastName}`}
+              <span className="text-rp-label font-normal text-rp-muted"> · until {formatDate(stay.checkOut)}</span>
+            </span>
+            <button type="button" onClick={() => { setStay(null); setStaySearch(''); }}
+              className="text-rp-label font-medium text-rp-muted hover:text-rp-text">
+              Change
+            </button>
+          </div>
+        ) : (
+          <div>
+            <label className={labelCls}>Which room?</label>
+            <input
+              className={inputCls}
+              value={staySearch}
+              onChange={e => setStaySearch(e.target.value)}
+              placeholder="Room number, guest name, or confirmation no."
+              autoFocus
+            />
+            <div className="mt-1.5 max-h-40 overflow-y-auto rounded-rp-panel border border-rp-border divide-y divide-rp-border">
+              {stays.map(s => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setStay(s)}
+                  className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-rp-surface-2"
+                >
+                  <span className="text-rp-body font-medium text-rp-text">
+                    {s.room ? `Room ${s.room.number}` : s.confirmationNo}
+                    {s.guest && <span className="font-normal text-rp-muted"> · {s.guest.firstName} {s.guest.lastName}</span>}
+                  </span>
+                  <span className="text-rp-label text-rp-muted">until {formatDate(s.checkOut)}</span>
+                </button>
+              ))}
+              {stays.length === 0 && (
+                <p className="py-4 text-center text-rp-body text-rp-muted">
+                  {staysLoading ? 'Looking…' : staySearch ? 'No one staying matches that' : 'No guests are checked in'}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
         <div>
           <label className={labelCls}>Menu Items</label>
           <div className="max-h-48 overflow-y-auto rounded-[10px] border divide-y" style={{ borderColor: 'var(--rp-border)' }}>
@@ -270,9 +383,10 @@ function OrderCard({ order, expanded, onToggleExpand }: {
   });
   const nextStatus = STATUS_NEXT[order.status];
   const cfg = ORDER_STATUS_PILL[order.status] ?? ORDER_STATUS_PILL.PENDING;
-  // Room-service orders settle via the booking's own invoice at checkout —
-  // only a direct walk-in/table sale needs an explicit "mark as paid" here.
-  const needsPaymentAction = !order.bookingId && order.paymentStatus && order.paymentStatus !== 'PAID' && order.status !== 'CANCELLED';
+  // An order charged to a room is settled at checkout, not at the counter —
+  // asking the front desk to collect for it would collect it twice.
+  const chargedToRoom = order.settlement === 'CHARGE_TO_ROOM' || (!order.settlement && !!order.bookingId);
+  const needsPaymentAction = !chargedToRoom && order.paymentStatus && order.paymentStatus !== 'PAID' && order.status !== 'CANCELLED';
 
   return (
     <div className="rounded-[14px] border bg-white overflow-hidden transition-shadow hover:shadow-sm"
@@ -288,6 +402,11 @@ function OrderCard({ order, expanded, onToggleExpand }: {
               {needsPaymentAction && (
                 <span className="inline-flex items-center rounded-rp-xs border border-red-200/20 px-[10px] py-[4px] text-rp-micro font-semibold bg-rp-red-bg text-rp-danger">
                   Unpaid
+                </span>
+              )}
+              {chargedToRoom && order.status !== 'CANCELLED' && (
+                <span className="inline-flex items-center rounded-rp-xs border border-rp-border-md bg-rp-surface-3 px-[10px] py-[4px] text-rp-micro font-semibold text-rp-text">
+                  On the room
                 </span>
               )}
               {order.guest && (
