@@ -417,6 +417,8 @@ export const tenantApi = {
   completeOnboarding: () => api.patch('/tenant/onboarding', {}),
   getEmailSettings: () => api.get('/tenant/email-settings'),
   updateEmailSettings: (data: unknown) => api.patch('/tenant/email-settings', data),
+  getStayTimePolicy: () => api.get('/tenant/stay-time-policy'),
+  updateStayTimePolicy: (data: unknown) => api.patch('/tenant/stay-time-policy', data),
   sendTestEmail: (toEmail: string) => api.post('/tenant/email-settings/test', { toEmail }),
   // Custom domain
   setDomain: (domain: string | null) => api.put('/tenant/domain', { domain }),

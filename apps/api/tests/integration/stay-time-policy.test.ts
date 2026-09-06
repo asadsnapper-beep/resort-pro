@@ -729,3 +729,71 @@ describe('replacing a grant, and the cleaning queue', () => {
     expect((await prisma.housekeepingTask.findUniqueOrThrow({ where: { id: elsewhere.id } })).notBefore).toBeNull();
   });
 });
+
+describe('the policy settings themselves', () => {
+  const read = (token = ownerToken) => app.inject({
+    method: 'GET', url: '/api/tenant/stay-time-policy', headers: { Authorization: `Bearer ${token}` },
+  });
+  const write = (body: Record<string, unknown>, token = ownerToken) => app.inject({
+    method: 'PATCH', url: '/api/tenant/stay-time-policy', headers: { Authorization: `Bearer ${token}` }, payload: body,
+  });
+
+  it('answers with the defaults before the resort has decided anything', async () => {
+    await prisma.stayTimePolicy.deleteMany({ where: { tenantId } });
+    try {
+      const res = await read();
+      const p = JSON.parse(res.body).data;
+
+      expect(res.statusCode).toBe(200);
+      expect(p.enabled).toBe(false);
+      expect(p.earlyFreeAfter).toBe('11:00');
+      // Reading is not deciding — no row was written.
+      expect(await prisma.stayTimePolicy.count({ where: { tenantId } })).toBe(0);
+    } finally {
+      await setPolicy({});
+    }
+  });
+
+  it('saves the resort’s own windows', async () => {
+    const res = await write({ enabled: true, earlyFreeAfter: '10:00', halfRatePercent: 40, chargeBasis: 'BASE' });
+
+    expect(res.statusCode).toBe(200);
+    const saved = await prisma.stayTimePolicy.findFirstOrThrow({ where: { tenantId } });
+    expect(saved.earlyFreeAfter).toBe('10:00');
+    expect(saved.halfRatePercent).toBe(40);
+    expect(saved.chargeBasis).toBe('BASE');
+  });
+
+  it('refuses windows that would make a band unreachable', async () => {
+    // Half starting after free means no arrival is ever half price — a quiet
+    // way for the money to come out wrong.
+    const early = await write({ earlyHalfAfter: '12:00', earlyFreeAfter: '11:00' });
+    expect(early.statusCode).toBe(400);
+    expect(JSON.parse(early.body).error).toMatch(/half price/i);
+
+    const late = await write({ lateFreeUntil: '19:00', lateHalfUntil: '18:00' });
+    expect(late.statusCode).toBe(400);
+  });
+
+  it('refuses times that are not times', async () => {
+    expect((await write({ earlyFreeAfter: '25:00' })).statusCode).toBe(400);
+    expect((await write({ earlyFreeAfter: 'morning' })).statusCode).toBe(400);
+    expect((await write({ halfRatePercent: 150 })).statusCode).toBe(400);
+  });
+
+  it('is readable by the desk but editable only above it', async () => {
+    expect((await read(receptionistToken)).statusCode).toBe(200);
+    expect((await write({ enabled: false }, receptionistToken)).statusCode).toBe(403);
+  });
+
+  it('leaves the rest of the policy alone when one field changes', async () => {
+    await setPolicy({ earlyFreeAfter: '11:00', earlyHalfAfter: '06:00', halfRatePercent: 50, chargeBasis: 'EFFECTIVE' });
+    await write({ halfRatePercent: 30 });
+
+    const saved = await prisma.stayTimePolicy.findFirstOrThrow({ where: { tenantId } });
+    expect(saved.halfRatePercent).toBe(30);
+    expect(saved.earlyFreeAfter).toBe('11:00');
+    expect(saved.chargeBasis).toBe('EFFECTIVE');
+    await setPolicy({ halfRatePercent: 50 });
+  });
+});

@@ -514,6 +514,86 @@ export async function tenantRoutes(app: FastifyInstance) {
     },
   });
 
+  // GET /api/tenant/stay-time-policy
+  //
+  // Read-only for anyone who may see a quote: the desk needs to know what the
+  // windows are to explain the number it is about to say out loud.
+  app.get('/stay-time-policy', {
+    schema: { tags: ['tenant'], summary: 'Early check-in / late checkout policy', security: [{ bearerAuth: [] }] },
+    preHandler: requireAuth,
+    handler: async (request) => {
+      const { db } = request;
+      const { tenantId } = request.user as JwtPayload;
+      const policy = await db.stayTimePolicy.findFirst({ where: {} });
+      // Not created on read. A resort that has never opened this page has not
+      // decided anything, and a row saying "disabled" is a decision.
+      return ok(policy ?? {
+        tenantId, enabled: false,
+        earlyFreeAfter: '11:00', earlyHalfAfter: '06:00',
+        lateFreeUntil: '14:00', lateHalfUntil: '18:00',
+        halfRatePercent: 50, chargeBasis: 'EFFECTIVE',
+        waiverRequiresManager: false,
+      });
+    },
+  });
+
+  // PATCH /api/tenant/stay-time-policy
+  app.patch('/stay-time-policy', {
+    schema: { tags: ['tenant'], summary: 'Edit the early check-in / late checkout policy', security: [{ bearerAuth: [] }] },
+    preHandler: [requireAuth, requireRole('OWNER', 'MANAGER')],
+    handler: async (request, reply) => {
+      const { db } = request;
+      const { tenantId } = request.user as JwtPayload;
+
+      const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use a 24-hour time like 08:30');
+      const parsed = z.object({
+        enabled: z.boolean().optional(),
+        earlyFreeAfter: time.optional(),
+        earlyHalfAfter: time.optional(),
+        lateFreeUntil: time.optional(),
+        lateHalfUntil: time.optional(),
+        halfRatePercent: z.number().min(0).max(100).optional(),
+        chargeBasis: z.enum(['EFFECTIVE', 'BASE']).optional(),
+        waiverRequiresManager: z.boolean().optional(),
+      }).safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          success: false, error: 'Invalid policy',
+          details: parsed.error.errors.map((e) => ({ field: e.path.join('.'), message: e.message })),
+        });
+      }
+
+      const existing = await db.stayTimePolicy.findFirst({ where: {} });
+      const next = {
+        earlyFreeAfter: '11:00', earlyHalfAfter: '06:00',
+        lateFreeUntil: '14:00', lateHalfUntil: '18:00',
+        ...(existing ?? {}), ...parsed.data,
+      };
+
+      // Windows that cross over do not fail loudly at quote time — they just
+      // make a band unreachable, and nobody notices until the money is wrong.
+      if (next.earlyHalfAfter >= next.earlyFreeAfter) {
+        return reply.status(400).send({
+          success: false,
+          error: 'The half-rate window has to start before the free window, or no arrival can ever be half price',
+        });
+      }
+      if (next.lateFreeUntil >= next.lateHalfUntil) {
+        return reply.status(400).send({
+          success: false,
+          error: 'The free window has to end before the half-rate window, or no departure can ever be half price',
+        });
+      }
+
+      const policy = await db.stayTimePolicy.upsert({
+        where: { tenantId },
+        create: { tenantId, ...parsed.data },
+        update: parsed.data,
+      });
+      return ok(policy, 'Policy saved');
+    },
+  });
+
   // POST /api/tenant/email-settings/test
   app.post('/email-settings/test', {
     schema: { tags: ['tenant'], security: [{ bearerAuth: [] }] },

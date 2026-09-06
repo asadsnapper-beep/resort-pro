@@ -180,6 +180,49 @@ export default function SettingsPage() {
     replyToEmail: '',
     footerText: '',
   });
+  const [stayTime, setStayTime] = useState({
+    enabled: false,
+    earlyFreeAfter: '11:00',
+    earlyHalfAfter: '06:00',
+    lateFreeUntil: '14:00',
+    lateHalfUntil: '18:00',
+    halfRatePercent: 50,
+    chargeBasis: 'EFFECTIVE',
+    waiverRequiresManager: false,
+  });
+
+  const { data: stayTimeData } = useQuery({
+    queryKey: ['stay-time-policy'],
+    queryFn: () => tenantApi.getStayTimePolicy(),
+    enabled: tab === 'operations',
+  });
+
+  useEffect(() => {
+    const p = stayTimeData?.data?.data;
+    if (p) {
+      setStayTime({
+        enabled: p.enabled ?? false,
+        earlyFreeAfter: p.earlyFreeAfter ?? '11:00',
+        earlyHalfAfter: p.earlyHalfAfter ?? '06:00',
+        lateFreeUntil: p.lateFreeUntil ?? '14:00',
+        lateHalfUntil: p.lateHalfUntil ?? '18:00',
+        halfRatePercent: p.halfRatePercent ?? 50,
+        chargeBasis: p.chargeBasis ?? 'EFFECTIVE',
+        waiverRequiresManager: p.waiverRequiresManager ?? false,
+      });
+    }
+  }, [stayTimeData]);
+
+  const saveStayTime = useMutation({
+    mutationFn: () => tenantApi.updateStayTimePolicy(stayTime),
+    onSuccess: () => toast({ title: 'Policy saved' }),
+    onError: (err: unknown) => toast({
+      title: 'Save failed',
+      description: (err as { response?: { data?: { error?: string } } })?.response?.data?.error,
+      variant: 'destructive',
+    }),
+  });
+
   const [testEmailAddr, setTestEmailAddr] = useState('');
   const [testSending, setTestSending] = useState(false);
 
@@ -513,6 +556,121 @@ export default function SettingsPage() {
                   className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
                   {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz.replace('/', ' / ').replace('_', ' ')}</option>)}
                 </select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Early check-in / late checkout — sits beside the check-in times it
+              is measured against. */}
+          <Card className="lg:col-span-2">
+            <CardContent className="p-6 space-y-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="font-semibold text-rp-text flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-rp-brand" /> Early Check-in &amp; Late Checkout
+                  </h3>
+                  <p className="text-rp-meta text-rp-muted mt-1">
+                    While this is off the desk still sees how early or late a guest is, and no fee is proposed.
+                  </p>
+                </div>
+                <button type="button" onClick={() => setStayTime(s => ({ ...s, enabled: !s.enabled }))}>
+                  {stayTime.enabled
+                    ? <ToggleRight className="h-7 w-7 text-rp-brand" />
+                    : <ToggleLeft className="h-7 w-7 text-rp-faint" />}
+                </button>
+              </div>
+
+              {stayTime.enabled && (
+                <>
+                  <div className="grid gap-5 md:grid-cols-2">
+                    <div className="space-y-3">
+                      <p className="text-rp-label font-semibold uppercase tracking-wide text-rp-muted">
+                        Arriving before {form.checkInTime ?? '14:00'}
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="mb-1 block text-rp-meta text-rp-muted">Free from</label>
+                          <Input type="time" value={stayTime.earlyFreeAfter}
+                            onChange={e => setStayTime(s => ({ ...s, earlyFreeAfter: e.target.value }))} />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-rp-meta text-rp-muted">Half rate from</label>
+                          <Input type="time" value={stayTime.earlyHalfAfter}
+                            onChange={e => setStayTime(s => ({ ...s, earlyHalfAfter: e.target.value }))} />
+                        </div>
+                      </div>
+                      <p className="text-rp-label text-rp-muted">
+                        Before {stayTime.earlyHalfAfter} counts as the night before, and is charged in full.
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <p className="text-rp-label font-semibold uppercase tracking-wide text-rp-muted">
+                        Leaving after {form.checkOutTime ?? '11:00'}
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="mb-1 block text-rp-meta text-rp-muted">Free until</label>
+                          <Input type="time" value={stayTime.lateFreeUntil}
+                            onChange={e => setStayTime(s => ({ ...s, lateFreeUntil: e.target.value }))} />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-rp-meta text-rp-muted">Half rate until</label>
+                          <Input type="time" value={stayTime.lateHalfUntil}
+                            onChange={e => setStayTime(s => ({ ...s, lateHalfUntil: e.target.value }))} />
+                        </div>
+                      </div>
+                      <p className="text-rp-label text-rp-muted">
+                        After {stayTime.lateHalfUntil} is charged as a full night.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-5 md:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-rp-meta text-rp-muted">Half rate is</label>
+                      <div className="flex items-center gap-2">
+                        <Input type="number" min={0} max={100} value={stayTime.halfRatePercent}
+                          onChange={e => setStayTime(s => ({ ...s, halfRatePercent: Number(e.target.value) }))} />
+                        <span className="text-rp-body text-rp-muted">% of a night</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-rp-meta text-rp-muted">Charged on</label>
+                      <select value={stayTime.chargeBasis}
+                        onChange={e => setStayTime(s => ({ ...s, chargeBasis: e.target.value }))}
+                        className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                        <option value="EFFECTIVE">This guest&rsquo;s own nightly rate</option>
+                        <option value="BASE">The room&rsquo;s standard rate</option>
+                      </select>
+                      <p className="mt-1 text-rp-label text-rp-muted">
+                        A guest on a promotional rate pays half of their rate, not half of the rack rate.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-rp-border pt-4">
+                    <div>
+                      <p className="text-rp-body font-medium text-rp-text">Only a manager may waive the fee</p>
+                      <p className="text-rp-label text-rp-muted mt-0.5">
+                        Either way it takes a reason, and the audit trail names who decided.
+                      </p>
+                    </div>
+                    <button type="button"
+                      onClick={() => setStayTime(s => ({ ...s, waiverRequiresManager: !s.waiverRequiresManager }))}>
+                      {stayTime.waiverRequiresManager
+                        ? <ToggleRight className="h-7 w-7 text-rp-brand" />
+                        : <ToggleLeft className="h-7 w-7 text-rp-faint" />}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              <div className="flex justify-end">
+                <button type="button" onClick={() => saveStayTime.mutate()} disabled={saveStayTime.isPending}
+                  className="rounded-rp-btn bg-rp-btn-accent px-4 py-2 text-rp-body font-medium text-rp-btn-accent-text disabled:opacity-50">
+                  {saveStayTime.isPending ? 'Saving…' : 'Save policy'}
+                </button>
               </div>
             </CardContent>
           </Card>
