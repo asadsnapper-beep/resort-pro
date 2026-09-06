@@ -1503,6 +1503,11 @@ model HousekeepingTask {
   type          HousekeepingType   @default(DAILY)
   status        HousekeepingStatus @default(PENDING)
   scheduledDate DateTime           @db.Date
+  // The room is not free before this instant. scheduledDate is a calendar date
+  // and cannot say "released at 17:00", so a granted late checkout would leave
+  // the board showing an 11:00 arrear that is nobody's fault. Null means the
+  // resort's normal checkout hour applies.
+  notBefore     DateTime?
   completedAt   DateTime?
   notes         String?
   createdAt     DateTime           @default(now())

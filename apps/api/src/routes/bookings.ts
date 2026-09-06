@@ -18,6 +18,7 @@ import { resolveRate } from './ratePlans';
 import { findReturningGuestId } from '../utils/guest-lookup';
 import { bill } from '../services/billing';
 import { quoteStayTime, type StayTimeQuote } from '../services/stay-time-policy';
+import { startOfTenantDay } from '../utils/tenant-day';
 import { round2 } from '../services/billing';
 import { resolveTenantEntitlement } from '../utils/entitlement';
 import { createAdminNotification } from '../utils/notifications';
@@ -649,6 +650,7 @@ export async function bookingRoutes(app: FastifyInstance) {
         kind: z.enum(['EARLY_CHECKIN', 'LATE_CHECKOUT']),
         at: z.string().datetime({ offset: true }),
         waive: z.boolean().optional(),
+        supersede: z.boolean().optional(),
         reason: z.string().max(500).optional(),
       }).safeParse(request.body);
       if (!parsed.success) {
@@ -657,7 +659,7 @@ export async function bookingRoutes(app: FastifyInstance) {
           error: 'kind, and an ISO instant in at, are required',
         });
       }
-      const { kind, waive, reason } = parsed.data;
+      const { kind, waive, supersede, reason } = parsed.data;
       const at = new Date(parsed.data.at);
 
       const entitlement = await resolveTenantEntitlement(tenantId);
@@ -715,8 +717,59 @@ export async function bookingRoutes(app: FastifyInstance) {
       const waivedAmount = waive ? quote.quotedFee : 0;
       const chargedFee = round2(quote.quotedFee - waivedAmount);
 
+      // Replacing a grant that has already been billed would take money back
+      // out of a frozen invoice. Corrections after checkout are adjustments.
+      const finalized = await request.db.invoice.findFirst({
+        where: { bookingId: id, finalizedAt: { not: null } }, select: { id: true },
+      });
+
       try {
         const grant = await prisma.$transaction(async (tx) => {
+          const live = await tx.stayTimeGrant.findFirst({
+            where: { tenantId, bookingId: id, kind, activeKey: 'ACTIVE' },
+          });
+          if (live) {
+            if (!supersede) {
+              throw Object.assign(
+                new Error('This stay already has a live grant of that kind'),
+                { statusCode: 409 },
+              );
+            }
+            if (!reason?.trim()) {
+              throw Object.assign(
+                new Error('Give a reason for replacing the grant already on this stay'),
+                { statusCode: 400 },
+              );
+            }
+            if (finalized) {
+              throw Object.assign(
+                new Error('This stay has already been billed — correct it with an adjustment instead'),
+                { statusCode: 409 },
+              );
+            }
+
+            // The earlier grant is voided, never overwritten: its band, its
+            // quote and who approved it stay readable. activeKey moves off
+            // 'ACTIVE' so the unique index lets the replacement in.
+            await tx.stayTimeGrant.update({
+              where: { id: live.id },
+              data: { voidedAt: new Date(), voidedBy: actorId, activeKey: live.id },
+            });
+            if (live.invoiceExtraId) {
+              await tx.invoiceExtra.deleteMany({ where: { id: live.invoiceExtraId, tenantId } });
+            }
+            if (live.chargedFee > 0) {
+              await tx.billingAudit.create({
+                data: {
+                  tenantId, bookingId: id,
+                  action: 'VOID', amount: -live.chargedFee,
+                  reason: reason.trim(), actorId,
+                  metadata: { stayTimeGrantId: live.id, kind, replacedBy: 'pending' },
+                },
+              });
+            }
+          }
+
           // The fee is an InvoiceExtra and reaches the guest through bill(),
           // which is the only thing allowed to add up a stay.
           const extra = chargedFee > 0
@@ -754,12 +807,32 @@ export async function bookingRoutes(app: FastifyInstance) {
             });
           }
 
+          // A room released at 17:00 is not overdue at 11:00. Left alone, every
+          // late checkout puts a false arrear on the housekeeping board.
+          // scheduledDate is a calendar date and cannot carry the hour, which
+          // is what notBefore is for.
+          if (kind === 'LATE_CHECKOUT') {
+            await tx.housekeepingTask.updateMany({
+              where: {
+                tenantId, roomId: quote.room.id, type: 'CHECKOUT',
+                status: { in: ['PENDING', 'IN_PROGRESS'] },
+              },
+              data: { notBefore: at, scheduledDate: startOfTenantDay(at, quote.timezone) },
+            });
+          }
+
           return created;
         });
 
         return reply.status(201).send(ok({ grant, quote }, 'Granted'));
       } catch (err) {
-        if ((err as { code?: string }).code === 'P2002') {
+        const e = err as { statusCode?: number; message?: string; code?: string };
+        if (e.statusCode === 400 || e.statusCode === 409) {
+          return reply.status(e.statusCode).send({ success: false, error: e.message });
+        }
+        // Two grants racing: the unique index picks one, and the loser is told
+        // what the winner already did.
+        if (e.code === 'P2002') {
           return reply.status(409).send({
             success: false,
             error: 'This stay already has a live grant of that kind',

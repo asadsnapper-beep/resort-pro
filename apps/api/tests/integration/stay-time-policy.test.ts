@@ -594,3 +594,138 @@ describe('POST /api/bookings/:id/stay-time — granting it', () => {
     }
   });
 });
+
+describe('replacing a grant, and the cleaning queue', () => {
+  const grant = (bookingId: string, body: Record<string, unknown>) => app.inject({
+    method: 'POST', url: `/api/bookings/${bookingId}/stay-time`,
+    headers: { Authorization: `Bearer ${ownerToken}` }, payload: body,
+  });
+
+  beforeAll(() => setPolicy({
+    earlyFreeAfter: '11:00', earlyHalfAfter: '06:00',
+    lateFreeUntil: '14:00', lateHalfUntil: '18:00', halfRatePercent: 50,
+  }));
+
+  it('voids the earlier grant instead of overwriting it', async () => {
+    const booking = await makeBooking();
+    await grant(booking.id, { kind: 'EARLY_CHECKIN', at: dhaka('2029-03-10', '08:30').toISOString() });
+
+    const res = await grant(booking.id, {
+      kind: 'EARLY_CHECKIN', at: dhaka('2029-03-10', '04:00').toISOString(),
+      supersede: true, reason: 'Guest arrived earlier than they said',
+    });
+    expect(res.statusCode).toBe(201);
+
+    const grants = await prisma.stayTimeGrant.findMany({ where: { bookingId: booking.id }, orderBy: { createdAt: 'asc' } });
+    expect(grants).toHaveLength(2);
+    // The first is still readable — its band, its quote, who approved it.
+    expect(grants[0]!.voidedAt).not.toBeNull();
+    expect(grants[0]!.policyBand).toBe('HALF');
+    expect(grants[0]!.activeKey).toBe(grants[0]!.id);
+    expect(grants[1]!.voidedAt).toBeNull();
+    expect(grants[1]!.policyBand).toBe('FULL');
+  });
+
+  it('leaves the guest with one fee, not two', async () => {
+    const booking = await makeBooking();
+    await grant(booking.id, { kind: 'EARLY_CHECKIN', at: dhaka('2029-03-10', '08:30').toISOString() });
+    await grant(booking.id, {
+      kind: 'EARLY_CHECKIN', at: dhaka('2029-03-10', '04:00').toISOString(),
+      supersede: true, reason: 'Arrived earlier',
+    });
+
+    const extras = await prisma.invoiceExtra.findMany({ where: { bookingId: booking.id } });
+    expect(extras).toHaveLength(1);
+    expect(extras[0]!.amount).toBe(4000);          // the full night, not 2000 + 4000
+    expect((await bill(tenantId, booking.id)).grandTotal).toBe(8000 + 4000);
+  });
+
+  it('records who dropped the earlier charge and why', async () => {
+    const booking = await makeBooking();
+    await grant(booking.id, { kind: 'EARLY_CHECKIN', at: dhaka('2029-03-10', '08:30').toISOString() });
+    await grant(booking.id, {
+      kind: 'EARLY_CHECKIN', at: dhaka('2029-03-10', '12:00').toISOString(),
+      supersede: true, reason: 'Quoted the wrong hour',
+    });
+
+    const audit = await prisma.billingAudit.findFirstOrThrow({ where: { bookingId: booking.id, action: 'VOID' } });
+    expect(audit.amount).toBe(-2000);
+    expect(audit.reason).toBe('Quoted the wrong hour');
+  });
+
+  it('will not replace a grant silently', async () => {
+    const booking = await makeBooking();
+    const at = dhaka('2029-03-10', '08:30').toISOString();
+    await grant(booking.id, { kind: 'EARLY_CHECKIN', at });
+
+    const noReason = await grant(booking.id, { kind: 'EARLY_CHECKIN', at, supersede: true });
+    expect(noReason.statusCode).toBe(400);
+
+    const noFlag = await grant(booking.id, { kind: 'EARLY_CHECKIN', at });
+    expect(noFlag.statusCode).toBe(409);
+
+    expect(await prisma.stayTimeGrant.count({ where: { bookingId: booking.id, voidedAt: null } })).toBe(1);
+  });
+
+  it('refuses to rewrite a stay that has already been billed', async () => {
+    const booking = await makeBooking();
+    await grant(booking.id, { kind: 'EARLY_CHECKIN', at: dhaka('2029-03-10', '08:30').toISOString() });
+    await prisma.invoice.create({
+      data: {
+        tenantId, bookingId: booking.id, guestName: 'Early Bird',
+        invoiceNumber: `INV-ST-${randomUUID().slice(0, 8)}`, finalizedAt: new Date(),
+      },
+    });
+
+    const res = await grant(booking.id, {
+      kind: 'EARLY_CHECKIN', at: dhaka('2029-03-10', '04:00').toISOString(),
+      supersede: true, reason: 'Too late to change this',
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(JSON.parse(res.body).error).toMatch(/adjustment/i);
+    // The charge the guest was billed is untouched.
+    expect(await prisma.invoiceExtra.count({ where: { bookingId: booking.id } })).toBe(1);
+  });
+
+  it('moves the room’s cleaning to the hour it is actually released', async () => {
+    const booking = await makeBooking({ status: 'CHECKED_IN' });
+    const task = await prisma.housekeepingTask.create({
+      data: {
+        tenantId, roomId: booking.roomId, type: 'CHECKOUT', status: 'PENDING',
+        scheduledDate: new Date('2029-03-12T05:00:00Z'),   // 11:00 Dhaka, normal checkout
+      },
+    });
+
+    const releaseAt = dhaka('2029-03-12', '17:00');
+    const res = await grant(booking.id, { kind: 'LATE_CHECKOUT', at: releaseAt.toISOString() });
+    expect(res.statusCode).toBe(201);
+
+    const moved = await prisma.housekeepingTask.findUniqueOrThrow({ where: { id: task.id } });
+    // scheduledDate is a calendar date, so the hour lives in notBefore — the
+    // board can say "released at 17:00" instead of showing an 11:00 arrear.
+    expect(moved.notBefore?.toISOString()).toBe(releaseAt.toISOString());
+    expect(moved.scheduledDate.toISOString()).toBe('2029-03-12T00:00:00.000Z');
+  });
+
+  it('does not disturb cleaning already finished, or other rooms', async () => {
+    const booking = await makeBooking({ status: 'CHECKED_IN' });
+    const done = await prisma.housekeepingTask.create({
+      data: {
+        tenantId, roomId: booking.roomId, type: 'CHECKOUT', status: 'COMPLETED',
+        scheduledDate: new Date('2029-03-12T05:00:00Z'),
+      },
+    });
+    const elsewhere = await prisma.housekeepingTask.create({
+      data: {
+        tenantId, roomId: (await makeRoom()).id, type: 'CHECKOUT', status: 'PENDING',
+        scheduledDate: new Date('2029-03-12T05:00:00Z'),
+      },
+    });
+
+    await grant(booking.id, { kind: 'LATE_CHECKOUT', at: dhaka('2029-03-12', '17:00').toISOString() });
+
+    expect((await prisma.housekeepingTask.findUniqueOrThrow({ where: { id: done.id } })).notBefore).toBeNull();
+    expect((await prisma.housekeepingTask.findUniqueOrThrow({ where: { id: elsewhere.id } })).notBefore).toBeNull();
+  });
+});
