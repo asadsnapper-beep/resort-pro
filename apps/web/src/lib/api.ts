@@ -107,6 +107,10 @@ export const roomsApi = {
 // ── Bookings ──────────────────────────────────────────────────────────────────
 export const bookingsApi = {
   list: (params?: Record<string, unknown>) => api.get('/bookings', { params }),
+  /** What may be offered for an early arrival or a late departure. */
+  stayTimeQuote: (id: string, kind: string, at: string) =>
+    api.get(`/bookings/${id}/stay-time`, { params: { kind, at } }),
+  grantStayTime: (id: string, data: unknown) => api.post(`/bookings/${id}/stay-time`, data),
   /** Stays that are checked in right now — backs the restaurant's room picker. */
   inHouse: (q?: string) => api.get('/bookings/in-house', { params: q ? { q } : undefined }),
   get: (id: string) => api.get(`/bookings/${id}`),

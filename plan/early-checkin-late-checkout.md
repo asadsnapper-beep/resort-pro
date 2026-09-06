@@ -4,7 +4,15 @@
 > cannot be given at any price, and a policy engine that forgets this will
 > quote a fee for a room the guest cannot have.
 
-Status: ❌ Not built · **P1** · Implements [billing-contract.md](./billing-contract.md)
+Status: ✅ Built · **P1** · Implements [billing-contract.md](./billing-contract.md)
+
+Built: the availability gate and banding (§2, §3), the per-tenant policy (§4)
+and its settings page, the fee basis (§5), grants with their charge, waiver and
+override (§6, §8), the housekeeping release hour (§7), superseding (§9), and the
+front-desk panel (§10), all behind the `stay_time_policy` flag (§12).
+
+Not built: quoting a "ready by ~HH:MM" estimate for a room being cleaned — the
+panel names the blocker without predicting when it clears.
 Depends on: [checkout-billing-completeness.md](./checkout-billing-completeness.md)
 
 ---

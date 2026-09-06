@@ -58,6 +58,168 @@ function ModalInput({ label, children }: { label: string; children: React.ReactN
 const inputCls = "w-full rounded-[9px] border border-black/[0.07] bg-[#f5f4f1] px-4 py-[10px] text-[13px] text-[#183153] placeholder:text-[#64748b] focus:outline-none focus:ring-1 focus:ring-resort-600/25";
 
 // ── Check-In Modal ─────────────────────────────────────────────────────────────
+/** What the server says may be offered for this hour. */
+type StayTimeQuote = {
+  kind: 'EARLY_CHECKIN' | 'LATE_CHECKOUT';
+  timezone: string;
+  room: { id: string; number: string };
+  available: boolean;
+  blockers: { kind: string; detail: string }[];
+  policyEnabled: boolean;
+  withinNormalHours: boolean;
+  band: 'FREE' | 'HALF' | 'FULL' | null;
+  quotedFee: number;
+  nightlyRate: number;
+  requiresOverride: boolean;
+};
+
+/**
+ * Early check-in and late checkout, at the moment the desk is deciding.
+ *
+ * The order on screen is the order of the decision: whether the room can be
+ * given at all, and only then what it costs. A receptionist shown just a
+ * number will promise a room that is being cleaned.
+ */
+function StayTimePanel({ bookingId, kind }: { bookingId: string; kind: 'EARLY_CHECKIN' | 'LATE_CHECKOUT' }) {
+  const { tenant, user } = useAuthStore();
+  const qc = useQueryClient();
+  const isManager = user?.role === 'OWNER' || user?.role === 'MANAGER';
+  // Pinned when the panel opens: the quote and the grant must be about the
+  // same instant, or the guest is told one hour and charged for another.
+  const [at] = useState(() => new Date().toISOString());
+  const [reason, setReason] = useState('');
+  const [granted, setGranted] = useState<{ policyBand: string; chargedFee: number; waivedAmount: number } | null>(null);
+
+  const { data: quote, isLoading, isError } = useQuery<StayTimeQuote>({
+    queryKey: ['stay-time', bookingId, kind, at],
+    queryFn: () => bookingsApi.stayTimeQuote(bookingId, kind, at).then(r => r.data.data),
+    retry: false,
+  });
+
+  const grant = useMutation({
+    mutationFn: (waive: boolean) =>
+      bookingsApi.grantStayTime(bookingId, { kind, at, waive, reason: reason.trim() || undefined }),
+    onSuccess: (res: { data: { data: { grant: { policyBand: string; chargedFee: number; waivedAmount: number } } } }) => {
+      setGranted(res.data.data.grant);
+      // The fee is on the bill now, so the balance beside it has to be re-read
+      // rather than patched here — the server's calculation stays the only one.
+      qc.invalidateQueries({ queryKey: ['booking-bill', bookingId] });
+      toast({ title: kind === 'EARLY_CHECKIN' ? 'Early check-in granted' : 'Late checkout granted' });
+    },
+    onError: (e: { response?: { data?: { error?: string } } }) =>
+      toast({ title: 'Not granted', description: e.response?.data?.error, variant: 'destructive' }),
+  });
+
+  // A resort without the feature, or a booking the question makes no sense
+  // for, gets nothing here at all rather than an empty box.
+  if (isLoading || isError || !quote) return null;
+  if (quote.withinNormalHours && !granted) return null;
+
+  const localTime = new Intl.DateTimeFormat('en-GB', {
+    timeZone: quote.timezone, hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(new Date(at));
+
+  if (granted) {
+    return (
+      <div className="rounded-rp-panel border border-rp-border bg-rp-teal-bg p-3 text-rp-meta text-rp-text">
+        <span className="font-semibold">
+          {kind === 'EARLY_CHECKIN' ? 'Early check-in' : 'Late checkout'} {localTime}
+        </span>{' '}
+        · {granted.chargedFee > 0
+          ? `${fmt(granted.chargedFee, tenant?.currency)} charged`
+          : granted.waivedAmount > 0
+            ? `${fmt(granted.waivedAmount, tenant?.currency)} waived`
+            : 'no charge'}
+      </div>
+    );
+  }
+
+  if (!quote.available) {
+    return (
+      <div className="rounded-rp-panel border border-rp-border-md bg-rp-surface-3 p-3 space-y-2">
+        <p className="text-rp-meta font-semibold text-rp-danger">
+          Not available at {localTime}
+        </p>
+        <ul className="text-rp-label text-rp-muted space-y-0.5">
+          {quote.blockers.map(b => <li key={b.kind}>· {b.detail}</li>)}
+        </ul>
+        {isManager ? (
+          <>
+            <input
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              placeholder="Reason for going ahead anyway"
+              className={inputCls}
+            />
+            <button
+              type="button"
+              disabled={!reason.trim() || grant.isPending}
+              onClick={() => grant.mutate(false)}
+              className="w-full rounded-rp-btn border border-rp-border-md py-2 text-rp-meta font-medium text-rp-text disabled:opacity-40"
+            >
+              Give the room anyway
+            </button>
+          </>
+        ) : (
+          <p className="text-rp-label text-rp-muted">A manager can override this.</p>
+        )}
+      </div>
+    );
+  }
+
+  if (!quote.policyEnabled) {
+    return (
+      <div className="rounded-rp-panel border border-rp-border bg-rp-surface-3 p-3 text-rp-label text-rp-muted">
+        {kind === 'EARLY_CHECKIN' ? 'Arriving' : 'Leaving'} at {localTime}, outside the usual hours.
+      </div>
+    );
+  }
+
+  if (quote.band === 'FREE') {
+    return (
+      <div className="rounded-rp-panel border border-rp-border bg-rp-teal-bg p-3 flex items-center justify-between gap-3">
+        <p className="text-rp-meta text-rp-text">
+          <span className="font-semibold">Free</span> · within the resort&rsquo;s window at {localTime}
+        </p>
+        <button type="button" onClick={() => grant.mutate(false)} disabled={grant.isPending}
+          className="rounded-rp-btn border border-rp-border-md px-3 py-1.5 text-rp-label font-medium text-rp-text">
+          Record it
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-rp-panel border border-rp-border-md bg-rp-surface-3 p-3 space-y-2.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-rp-meta text-rp-text">
+          <span className="font-semibold">{quote.band === 'HALF' ? 'Half day' : 'Full night'}</span>
+          {' '}at {localTime}
+        </p>
+        <p className="text-rp-body font-semibold text-rp-text">{fmt(quote.quotedFee, tenant?.currency)}</p>
+      </div>
+      <input
+        value={reason}
+        onChange={e => setReason(e.target.value)}
+        placeholder="Reason (needed to waive)"
+        className={inputCls}
+      />
+      {/* Waive sits level with Charge on purpose: hospitality needs the free
+          option to be easy, and the audit row is what keeps it accountable. */}
+      <div className="flex gap-2">
+        <button type="button" onClick={() => grant.mutate(false)} disabled={grant.isPending}
+          className="flex-1 rounded-rp-btn bg-rp-btn-accent py-2 text-rp-meta font-medium text-rp-btn-accent-text disabled:opacity-50">
+          Charge {fmt(quote.quotedFee, tenant?.currency)}
+        </button>
+        <button type="button" onClick={() => grant.mutate(true)} disabled={grant.isPending || !reason.trim()}
+          className="flex-1 rounded-rp-btn border border-rp-border-md py-2 text-rp-meta font-medium text-rp-text disabled:opacity-40">
+          Waive it
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function CheckInModal({ booking, onClose, onSuccess }: { booking: Booking; onClose: () => void; onSuccess: () => void }) {
   const { tenant } = useAuthStore();
   const qc = useQueryClient();
@@ -106,6 +268,7 @@ function CheckInModal({ booking, onClose, onSuccess }: { booking: Booking; onClo
           </div>
         )}
       </div>
+      <StayTimePanel bookingId={booking.id} kind="EARLY_CHECKIN" />
       <ModalInput label="Deposit collected (optional)">
         <div className="relative">
           <Banknote className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748b]" />
@@ -310,6 +473,9 @@ function CheckOutModal({ booking, onClose, onSuccess }: { booking: Booking; onCl
           </div>
         </div>
       )}
+      {/* Before the money is collected, not after — a late-checkout fee added
+          once the balance is on screen is a fee the desk has to re-total. */}
+      <StayTimePanel bookingId={booking.id} kind="LATE_CHECKOUT" />
       {balance > 0 && (
         <ModalInput label="Collect payment">
           <input type="number" value={extraPayment} onChange={e => { setTouchedAmount(true); setExtraPayment(e.target.value); }} placeholder={String(balance)} className={`${inputCls} mb-2`} />

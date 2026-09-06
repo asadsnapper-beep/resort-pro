@@ -63,7 +63,7 @@ reach the checkout total. P0 is what unblocks all of them.
 |------|---------|--------|
 | [offers-promotions.md](./offers-promotions.md) | Offer creation, promo codes, website display, booking form integration | ✅ Built |
 | [launch-pricing-and-trial-abuse-prevention.md](./launch-pricing-and-trial-abuse-prevention.md) | **Active pricing decision:** Free Forever + $19 Independent Resort + $59 Resort Group, customer rights, migration, billing and launch steps | 📋 Approved direction — implementation pending |
-| [early-checkin-late-checkout.md](./early-checkin-late-checkout.md) | **P1.** Availability and room readiness gate before price; per-tenant free/half/full policy in tenant timezone; fee from the booking's own effective rate; grants audited with quoted vs waived | ❌ Not built — needs P0 |
+| [early-checkin-late-checkout.md](./early-checkin-late-checkout.md) | **P1.** Availability and room readiness gate before price; per-tenant free/half/full policy in tenant timezone; fee from the booking's own effective rate; grants audited with quoted vs waived | ✅ Built — behind the `stay_time_policy` flag |
 | [dynamic-pricing.md](./dynamic-pricing.md) | Seasonal rules, occupancy-based, day-of-week, advance/last-minute pricing | ❌ Not built — কোনো PricingRule model/seasonal logic নাই |
 | [online-payment.md](./online-payment.md) | Stripe + bKash payment integration | ✅ Built — Stripe + bKash + SSLCommerz সব real |
 | [corporate-accounts.md](./corporate-accounts.md) | Company/B2B client accounts — consolidated billing, credit terms, corporate rates (separate from one-off Group Bookings) | ✅ Built |
