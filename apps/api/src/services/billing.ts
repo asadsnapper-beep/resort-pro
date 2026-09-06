@@ -14,7 +14,7 @@ import { prisma, type Prisma } from '@resort-pro/database';
  */
 
 /** Round money once, at the point it becomes a line total. Half-up, 2dp. */
-function round2(n: number): number {
+export function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 

@@ -468,3 +468,155 @@ describe('from the waiter’s order to the guest’s bill', () => {
     expect(invoice.total).toBe(8000);
   });
 });
+
+describe('cancelling food the guest has already been billed for', () => {
+  let receptionistToken: string;
+
+  const setStatus = (orderId: string, status: string, payload: Record<string, unknown> = {}, token = ownerToken) =>
+    app.inject({
+      method: 'PATCH', url: `/api/food-orders/${orderId}/status`,
+      headers: { Authorization: `Bearer ${token}` },
+      payload: { status, ...payload },
+    });
+  const checkOut = (bookingId: string) => app.inject({
+    method: 'PATCH', url: `/api/bookings/${bookingId}/check-out`, headers: auth(), payload: {},
+  });
+
+  /** A stay whose delivered food has been billed and frozen at check-out. */
+  async function billedOrder() {
+    const bookingId = await makeBooking('CHECKED_IN');
+    const placed = await order({ bookingId, settlement: 'CHARGE_TO_ROOM' });
+    const orderId = JSON.parse(placed.body).data.id;
+    await setStatus(orderId, 'DELIVERED');
+    await checkOut(bookingId);
+    const invoice = await prisma.invoice.findFirstOrThrow({ where: { bookingId } });
+    return { bookingId, orderId, invoice };
+  }
+
+  beforeAll(async () => {
+    const bcrypt = await import('bcryptjs');
+    const email = `reception-${slug}@test.com`;
+    await prisma.user.create({
+      data: {
+        tenantId, email, passwordHash: await bcrypt.hash(password, 10),
+        firstName: 'Rita', lastName: 'Front', role: 'RECEPTIONIST',
+        emailVerifiedAt: new Date(),
+      },
+    });
+    const login = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email, password, slug } });
+    receptionistToken = JSON.parse(login.body).data.token;
+  });
+
+  it('credits the invoice without touching the original charge', async () => {
+    const { orderId, invoice } = await billedOrder();
+    expect(invoice.total).toBe(8000 + 1200);
+
+    const res = await setStatus(orderId, 'CANCELLED', { reason: 'Kitchen sent the wrong dish' });
+    expect(res.statusCode).toBe(200);
+
+    const items = await prisma.invoiceItem.findMany({ where: { invoiceId: invoice.id } });
+    const charge = items.find(i => i.sourceType === 'FOOD_ORDER' && i.sourceId === orderId);
+    const credit = items.find(i => i.sourceType === 'ADJUSTMENT' && i.sourceId === orderId);
+
+    expect(charge!.total).toBe(1200);   // the history stays true
+    expect(credit!.total).toBe(-1200);
+    expect(credit!.description).toContain('Cancelled');
+    expect((await prisma.invoice.findUniqueOrThrow({ where: { id: invoice.id } })).total).toBe(8000);
+  });
+
+  it('records who cancelled it and why', async () => {
+    const { bookingId, orderId } = await billedOrder();
+    await setStatus(orderId, 'CANCELLED', { reason: 'Guest never received it' });
+
+    const audit = await prisma.billingAudit.findFirstOrThrow({
+      where: { bookingId, action: 'VOID' },
+    });
+    expect(audit.reason).toBe('Guest never received it');
+    expect(audit.amount).toBe(-1200);
+    expect(audit.actorId).toBeTruthy();
+    expect((audit.metadata as { foodOrderId: string }).foodOrderId).toBe(orderId);
+  });
+
+  it('credits once however many times cancel is pressed', async () => {
+    const { orderId, invoice } = await billedOrder();
+
+    await setStatus(orderId, 'CANCELLED', { reason: 'Wrong dish' });
+    await setStatus(orderId, 'CANCELLED', { reason: 'Wrong dish' });
+
+    const credits = await prisma.invoiceItem.findMany({
+      where: { invoiceId: invoice.id, sourceType: 'ADJUSTMENT' },
+    });
+    expect(credits).toHaveLength(1);
+    expect((await prisma.invoice.findUniqueOrThrow({ where: { id: invoice.id } })).total).toBe(8000);
+  });
+
+  it('says what the resort now owes the guest back', async () => {
+    const bookingId = await makeBooking('CHECKED_IN');
+    const placed = await order({ bookingId, settlement: 'CHARGE_TO_ROOM' });
+    const orderId = JSON.parse(placed.body).data.id;
+    await setStatus(orderId, 'DELIVERED');
+    // Guest settles the whole bill on the way out, food included.
+    await app.inject({
+      method: 'PATCH', url: `/api/bookings/${bookingId}/check-out`, headers: auth(),
+      payload: { additionalPayment: 9200, paymentMethod: 'CASH' },
+    });
+
+    const res = await setStatus(orderId, 'CANCELLED', { reason: 'Never served' });
+
+    expect(JSON.parse(res.body).data.credited.refundDue).toBe(1200);
+  });
+
+  it('is a manager’s decision, and needs a reason', async () => {
+    const a = await billedOrder();
+    const refused = await setStatus(a.orderId, 'CANCELLED', { reason: 'Wrong dish' }, receptionistToken);
+    expect(refused.statusCode).toBe(403);
+
+    const b = await billedOrder();
+    const noReason = await setStatus(b.orderId, 'CANCELLED');
+    expect(noReason.statusCode).toBe(400);
+
+    // Neither refusal may have moved money or the order.
+    for (const { orderId, invoice } of [a, b]) {
+      expect((await prisma.foodOrder.findUniqueOrThrow({ where: { id: orderId } })).status).toBe('DELIVERED');
+      expect((await prisma.invoice.findUniqueOrThrow({ where: { id: invoice.id } })).total).toBe(9200);
+    }
+  });
+
+  it('needs neither when the food never reached the guest', async () => {
+    const bookingId = await makeBooking('CHECKED_IN');
+    const placed = await order({ bookingId, settlement: 'CHARGE_TO_ROOM' });
+    const orderId = JSON.parse(placed.body).data.id;
+    await setStatus(orderId, 'PREPARING');
+
+    const res = await setStatus(orderId, 'CANCELLED', {}, receptionistToken);
+
+    expect(res.statusCode).toBe(200);
+    await checkOut(bookingId);
+    const invoice = await prisma.invoice.findFirstOrThrow({ where: { bookingId }, include: { items: true } });
+    expect(invoice.total).toBe(8000);
+    expect(invoice.items.some(i => i.sourceId === orderId)).toBe(false);
+  });
+
+  it('credits the tax the guest paid on it too', async () => {
+    await prisma.tenant.update({ where: { id: tenantId }, data: { taxRate: 10 } });
+    try {
+      const bookingId = await makeBooking('CHECKED_IN');
+      const placed = await order({ bookingId, settlement: 'CHARGE_TO_ROOM' });
+      const orderId = JSON.parse(placed.body).data.id;
+      await setStatus(orderId, 'DELIVERED');
+      await checkOut(bookingId);
+
+      const before = await prisma.invoice.findFirstOrThrow({ where: { bookingId } });
+      expect(before.total).toBe((8000 + 1200) * 1.1);
+
+      await setStatus(orderId, 'CANCELLED', { reason: 'Wrong dish' });
+
+      const after = await prisma.invoice.findUniqueOrThrow({ where: { id: before.id } });
+      expect(after.subtotal).toBe(8000);
+      expect(after.taxAmount).toBe(800);
+      expect(after.total).toBe(8800);
+    } finally {
+      await prisma.tenant.update({ where: { id: tenantId }, data: { taxRate: 0 } });
+    }
+  });
+});

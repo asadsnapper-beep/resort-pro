@@ -7,12 +7,14 @@ Status: 🟡 Phase 1 built · **P1** · Implements [billing-contract.md](./billi
 
 Built: the settlement model (§2, `PAY_NOW` and `CHARGE_TO_ROOM` only), the
 server-side validation (§3), provenance and the one-line-per-order rule (§4),
-the order form and in-house picker (§6), and idempotency (§8).
+cancellation after finalisation (§5), the order form and in-house picker (§6),
+and idempotency (§8).
 
-Not built: `COMPLIMENTARY` and `CORPORATE`, which the API refuses; cancellation
-after finalisation (§5) — cancelling a billed order today leaves the charge on
-the invoice with no offsetting adjustment and no audit row; QR room-charging
-(§7), still `PAY_NOW` only; and the restaurant reporting breakdown (§9).
+Not built: `COMPLIMENTARY` and `CORPORATE`, which the API refuses; QR
+room-charging (§7), still `PAY_NOW` only; and the restaurant reporting
+breakdown (§9). §5 is server-side only — the dashboard shows a cancel control
+for orders that have not been served yet, so voiding a billed charge is
+reachable through the API alone.
 Depends on: [checkout-billing-completeness.md](./checkout-billing-completeness.md)
 
 ---

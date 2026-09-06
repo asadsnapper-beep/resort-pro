@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@resort-pro/database';
 import type { JwtPayload } from '@resort-pro/types';
 import { requireRole } from '../middleware/auth';
+import { round2 } from '../services/billing';
 import { ok, paginated, parsePageParams } from '../utils/response';
 
 const orderSchema = z.object({
@@ -212,14 +213,122 @@ export async function foodOrderRoutes(app: FastifyInstance) {
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST', 'CHEF'),
     handler: async (request, reply) => {
       const { db } = request;
+      const { tenantId, sub: actorId, role } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
-      const { status } = z.object({
+      const { status, reason } = z.object({
         status: z.enum(['PENDING', 'PREPARING', 'READY', 'DELIVERED', 'CANCELLED']),
+        reason: z.string().max(500).optional(),
       }).parse(request.body);
+
       const order = await db.foodOrder.findFirst({ where: { id } });
       if (!order) return reply.status(404).send({ success: false, error: 'Order not found' });
-      const updated = await db.foodOrder.update({ where: { id }, data: { status: status as never } });
-      return ok(updated, 'Order status updated');
+
+      // Food that has already reached the guest cannot be un-served. Cancelling
+      // it is a decision about money, not a correction of a typo, so it is a
+      // manager's to make and it has to say why.
+      if (status === 'CANCELLED' && order.status === 'DELIVERED') {
+        if (role !== 'OWNER' && role !== 'MANAGER') {
+          return reply.status(403).send({ success: false, error: 'Only a manager can cancel an order that was already served' });
+        }
+        if (!reason?.trim()) {
+          return reply.status(400).send({ success: false, error: 'Give a reason for cancelling a served order' });
+        }
+      }
+
+      if (status !== 'CANCELLED') {
+        const updated = await db.foodOrder.update({ where: { id }, data: { status: status as never } });
+        return ok(updated, 'Order status updated');
+      }
+
+      // Cancelling may have to reach a bill the guest has already settled.
+      // See plan/restaurant-room-billing.md §5 and billing-contract.md R5: the
+      // original charge stays on the invoice and the correction is appended.
+      let credited: { amount: number; invoiceNumber: string; refundDue: number } | null = null;
+      try {
+        credited = await prisma.$transaction(async (tx) => {
+          // Compare-and-set: a second cancel matches no rows, so no second
+          // credit can be written even if the button is pressed twice.
+          const claimed = await tx.foodOrder.updateMany({
+            where: { id, tenantId, status: { not: 'CANCELLED' } },
+            data: { status: 'CANCELLED' },
+          });
+          if (claimed.count === 0) return null;
+
+          // Was this order actually billed? Asking the invoice is exact; asking
+          // bill() again would only re-derive what it would have charged.
+          const billedLine = await tx.invoiceItem.findFirst({
+            where: {
+              sourceType: 'FOOD_ORDER',
+              sourceId: id,
+              invoice: { tenantId, finalizedAt: { not: null } },
+            },
+            include: { invoice: true },
+          });
+          if (!billedLine) return null;
+
+          const invoice = billedLine.invoice;
+          const credit = round2(billedLine.total);
+          const taxCredit = round2(credit * ((invoice.taxRate ?? 0) / 100));
+          const newTotal = round2(Math.max(0, invoice.total - credit - taxCredit));
+
+          await tx.invoiceItem.create({
+            data: {
+              invoiceId: invoice.id,
+              description: `Cancelled — ${billedLine.description}`,
+              category: 'FOOD',
+              quantity: 1,
+              unitPrice: -credit,
+              total: -credit,
+              // sourceId is the order, so the provenance constraint allows one
+              // credit per cancelled order and refuses a second.
+              sourceType: 'ADJUSTMENT',
+              sourceId: id,
+            },
+          });
+
+          await tx.invoice.update({
+            where: { id: invoice.id },
+            data: {
+              subtotal: round2(Math.max(0, invoice.subtotal - credit)),
+              taxAmount: round2(Math.max(0, invoice.taxAmount - taxCredit)),
+              total: newTotal,
+              status: newTotal - invoice.paidAmount <= 0 ? 'PAID' : invoice.paidAmount > 0 ? 'PARTIAL' : 'SENT',
+            },
+          });
+
+          await tx.billingAudit.create({
+            data: {
+              tenantId, bookingId: order.bookingId, invoiceId: invoice.id,
+              action: 'VOID',
+              amount: -round2(credit + taxCredit),
+              reason: reason?.trim() || null,
+              actorId,
+              metadata: {
+                foodOrderId: id,
+                invoiceNumber: invoice.invoiceNumber,
+                previousTotal: invoice.total,
+                newTotal,
+              },
+            },
+          });
+
+          return {
+            amount: round2(credit + taxCredit),
+            invoiceNumber: invoice.invoiceNumber,
+            // Money already taken that the resort now owes back. Paying it is
+            // the payment path's job, not the bill's.
+            refundDue: round2(Math.max(0, invoice.paidAmount - newTotal)),
+          };
+        });
+      } catch (err) {
+        // Two cancellations racing: the credit exists, written by the other one.
+        if ((err as { code?: string }).code !== 'P2002') throw err;
+      }
+
+      const updated = await db.foodOrder.findFirst({ where: { id } });
+      return ok({ ...updated, credited }, credited
+        ? `Order cancelled — ${credited.amount} credited to invoice ${credited.invoiceNumber}`
+        : 'Order status updated');
     },
   });
 
