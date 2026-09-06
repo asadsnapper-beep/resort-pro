@@ -398,7 +398,12 @@ function OrderCard({ order, expanded, onToggleExpand }: {
   const cfg = ORDER_STATUS_PILL[order.status] ?? ORDER_STATUS_PILL.PENDING;
   // An order charged to a room is settled at checkout, not at the counter —
   // asking the front desk to collect for it would collect it twice.
-  const chargedToRoom = order.settlement === 'CHARGE_TO_ROOM' || (!order.settlement && !!order.bookingId);
+  //
+  // The test is the bookingId, not the settlement label, because bill() bills
+  // by bookingId: any unpaid order attached to a stay reaches that stay's
+  // invoice whatever it calls itself. Trusting the label instead would make a
+  // mislabelled row ask for cash the guest is also billed for at checkout.
+  const chargedToRoom = !!order.bookingId;
   const needsPaymentAction = !chargedToRoom && order.paymentStatus && order.paymentStatus !== 'PAID' && order.status !== 'CANCELLED';
 
   return (

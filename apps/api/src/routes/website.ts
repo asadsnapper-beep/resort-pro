@@ -907,6 +907,11 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
           tenantId: tenant.id,
           guestId,
           bookingId,
+          // An order tied to a stay rides that stay's invoice at checkout, so it
+          // has to say so. Left at the PAY_NOW default it would read as a
+          // counter sale the front desk still has to collect — and bill() would
+          // put it on the room anyway, which is how a guest gets charged twice.
+          settlement: bookingId ? 'CHARGE_TO_ROOM' : 'PAY_NOW',
           tableNumber: body.roomNumber ? `Room ${body.roomNumber}` : undefined,
           notes: body.notes ? `From: ${body.guestName}${body.email ? ` <${body.email}>` : ''}. ${body.notes}` : `From: ${body.guestName}${body.email ? ` <${body.email}>` : ''}`,
           totalAmount,

@@ -862,6 +862,9 @@ export async function seedDemo(opts: { refresh?: boolean } = {}) {
         tenantId:   demo.id,
         bookingId:  bk.id,
         guestId:    bk.guestId,
+        // Demo data has to be data the product could actually produce: an order
+        // on a stay is charged to the room.
+        settlement: 'CHARGE_TO_ROOM',
         status:     foodOrderStatuses[i] as any,
         totalAmount: total,
         notes:      i % 2 === 0 ? 'No spicy please' : 'Extra sauce on side',

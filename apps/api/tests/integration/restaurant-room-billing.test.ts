@@ -620,3 +620,50 @@ describe('cancelling food the guest has already been billed for', () => {
     }
   });
 });
+
+describe('orders that arrive from outside the dashboard', () => {
+  /**
+   * The guest's own ordering page and the embeddable widget attach a booking
+   * when the guest gives a confirmation number. bill() bills by bookingId, so
+   * such an order reaches the room whatever it is labelled — and a row left at
+   * the PAY_NOW default reads to the front desk as cash still to collect.
+   */
+  it('labels a public order against a stay as charged to the room', async () => {
+    const bookingId = await makeBooking('CHECKED_IN');
+    const booking = await prisma.booking.findUniqueOrThrow({ where: { id: bookingId } });
+
+    const res = await app.inject({
+      method: 'POST', url: `/site/${slug}/order`,
+      payload: {
+        guestName: 'Karim Hossain',
+        bookingRef: booking.confirmationNo,
+        roomNumber: '901',
+        items: [{ menuItemId, quantity: 1 }],
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const created = await prisma.foodOrder.findUniqueOrThrow({ where: { id: JSON.parse(res.body).data.orderId } });
+    expect(created.bookingId).toBe(bookingId);
+    expect(created.settlement).toBe('CHARGE_TO_ROOM');
+  });
+
+  it('leaves a public order with no stay as a counter sale', async () => {
+    const res = await app.inject({
+      method: 'POST', url: `/site/${slug}/order`,
+      payload: { guestName: 'Passer By', items: [{ menuItemId, quantity: 1 }] },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const created = await prisma.foodOrder.findUniqueOrThrow({ where: { id: JSON.parse(res.body).data.orderId } });
+    expect(created.bookingId).toBeNull();
+    expect(created.settlement).toBe('PAY_NOW');
+  });
+
+  it('never leaves an order attached to a stay looking like a counter sale', async () => {
+    const mislabelled = await prisma.foodOrder.count({
+      where: { tenantId, bookingId: { not: null }, settlement: 'PAY_NOW' },
+    });
+    expect(mislabelled).toBe(0);
+  });
+});

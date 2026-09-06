@@ -165,6 +165,9 @@ export async function embedRoutes(app: FastifyInstance) {
           tenantId: tenant.id,
           guestId,
           bookingId,
+          // Same rule as the website's own ordering page: attached to a stay
+          // means charged to the room, and the record has to say so.
+          settlement: bookingId ? 'CHARGE_TO_ROOM' : 'PAY_NOW',
           tableNumber: body.tableNo,
           notes: `Embed order — ${body.guestName}${body.guestPhone ? ` (${body.guestPhone})` : ''}`,
           totalAmount,
