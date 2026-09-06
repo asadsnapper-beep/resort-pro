@@ -91,7 +91,7 @@ reach the checkout total. P0 is what unblocks all of them.
 | File | কী আছে | Status |
 |------|---------|--------|
 | [guest-crm.md](./guest-crm.md) | Guest profiles, booking history, loyalty program, points system, tiers | ✅ Built |
-| [restaurant-room-billing.md](./restaurant-room-billing.md) | **P1.** Explicit settlement (pay now / charge to room / comp / corporate), server-side validation that the stay is `CHECKED_IN`, only `DELIVERED` orders bill, signed tokens for QR room-charging, idempotent orders | ❌ Not built — needs P0 |
+| [restaurant-room-billing.md](./restaurant-room-billing.md) | **P1.** Explicit settlement (pay now / charge to room / comp / corporate), server-side validation that the stay is `CHECKED_IN`, only `DELIVERED` orders bill, signed tokens for QR room-charging, idempotent orders | 🟡 Phase 1 built — pay-now and charge-to-room, validated and idempotent, on the bill once. Comp/corporate, cancellation adjustments, QR tokens and reporting still open |
 | [in-room-dining.md](./in-room-dining.md) | QR-based room food ordering, F&B billing | 🟡 Partial — table-QR ordering আছে, room-QR ordering নাই |
 
 ---

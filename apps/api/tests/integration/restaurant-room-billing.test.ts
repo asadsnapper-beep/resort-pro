@@ -337,3 +337,134 @@ describe('finding the stay to charge', () => {
     expect(res.body).not.toMatch(/8801711000000|nusrat-.*@test\.com|totalAmount|paidAmount/);
   });
 });
+
+describe('from the waiter’s order to the guest’s bill', () => {
+  let secondItemId: string;
+
+  const setStatus = (orderId: string, status: string) => app.inject({
+    method: 'PATCH', url: `/api/food-orders/${orderId}/status`, headers: auth(), payload: { status },
+  });
+  const checkOut = (bookingId: string) => app.inject({
+    method: 'PATCH', url: `/api/bookings/${bookingId}/check-out`, headers: auth(), payload: {},
+  });
+  const invoiceFor = (bookingId: string) => prisma.invoice.findFirstOrThrow({
+    where: { bookingId }, include: { items: true },
+  });
+
+  beforeAll(async () => {
+    secondItemId = (await prisma.menuItem.create({
+      data: { tenantId, name: 'Test Dessert', category: 'DINNER' as never, price: 300, isAvailable: true },
+    })).id;
+  });
+
+  it('puts a delivered room charge on the finalised invoice exactly once', async () => {
+    const bookingId = await makeBooking('CHECKED_IN');
+    const placed = await order({ bookingId, settlement: 'CHARGE_TO_ROOM' });
+    const orderId = JSON.parse(placed.body).data.id;
+    await setStatus(orderId, 'DELIVERED');
+
+    expect((await checkOut(bookingId)).statusCode).toBe(200);
+
+    const invoice = await invoiceFor(bookingId);
+    const foodLines = invoice.items.filter(i => i.sourceType === 'FOOD_ORDER' && i.sourceId === orderId);
+    expect(foodLines).toHaveLength(1);
+    expect(foodLines[0]!.total).toBe(1200);      // 2 × 600, the price at order time
+    expect(invoice.total).toBe(8000 + 1200);     // room + food, tax 0
+    expect(invoice.finalizedAt).not.toBeNull();
+  });
+
+  it('writes one line for an order of several dishes, not one per dish', async () => {
+    const bookingId = await makeBooking('CHECKED_IN');
+    const placed = await app.inject({
+      method: 'POST', url: '/api/food-orders', headers: auth(),
+      payload: {
+        bookingId, settlement: 'CHARGE_TO_ROOM',
+        items: [{ menuItemId, quantity: 1 }, { menuItemId: secondItemId, quantity: 2 }],
+      },
+    });
+    const orderId = JSON.parse(placed.body).data.id;
+    await setStatus(orderId, 'DELIVERED');
+    await checkOut(bookingId);
+
+    const invoice = await invoiceFor(bookingId);
+    const foodLines = invoice.items.filter(i => i.sourceType === 'FOOD_ORDER');
+    // One line per order is what the (invoiceId, sourceType, sourceId) unique
+    // constraint requires — a line per dish would collide on the second write.
+    expect(foodLines).toHaveLength(1);
+    expect(foodLines[0]!.total).toBe(600 + 600);
+    expect(foodLines[0]!.description).toContain('Test Dessert');
+  });
+
+  it('does not bill the food a second time when check-out is retried', async () => {
+    const bookingId = await makeBooking('CHECKED_IN');
+    const placed = await order({ bookingId, settlement: 'CHARGE_TO_ROOM' });
+    const orderId = JSON.parse(placed.body).data.id;
+    await setStatus(orderId, 'DELIVERED');
+
+    const first = await checkOut(bookingId);
+    const again = await checkOut(bookingId);
+
+    expect([first.statusCode, again.statusCode]).toEqual([200, 409]);
+    const invoice = await invoiceFor(bookingId);
+    expect(invoice.items.filter(i => i.sourceId === orderId)).toHaveLength(1);
+    expect(invoice.total).toBe(8000 + 1200);
+  });
+
+  it('leaves food still being cooked off the bill and says so', async () => {
+    const bookingId = await makeBooking('CHECKED_IN');
+    const placed = await order({ bookingId, settlement: 'CHARGE_TO_ROOM' });
+    const orderId = JSON.parse(placed.body).data.id;
+    await setStatus(orderId, 'PREPARING');
+
+    const res = await checkOut(bookingId);
+    const summary = JSON.parse(res.body).data.checkoutSummary;
+
+    expect(summary.grandTotal).toBe(8000);
+    expect(summary.unbilled).toHaveLength(1);
+    expect(summary.unbilled[0].sourceId).toBe(orderId);
+    expect(summary.unbilled[0].amount).toBe(1200);
+    const invoice = await invoiceFor(bookingId);
+    expect(invoice.items.some(i => i.sourceId === orderId)).toBe(false);
+  });
+
+  it('refuses to charge a stay the guest has already settled and left', async () => {
+    const bookingId = await makeBooking('CHECKED_IN');
+    await checkOut(bookingId);
+
+    const late = await order({ bookingId, settlement: 'CHARGE_TO_ROOM' });
+
+    // Two reasons now hold — the stay is CHECKED_OUT and its invoice is
+    // finalised — and either alone must be enough.
+    expect(late.statusCode).toBe(400);
+    expect(await prisma.foodOrder.count({ where: { bookingId } })).toBe(0);
+  });
+
+  it('never puts a walk-in’s dinner on anyone’s room', async () => {
+    const bookingId = await makeBooking('CHECKED_IN');
+    const walkIn = await order({ tableNumber: 'Table 9' });
+    const orderId = JSON.parse(walkIn.body).data.id;
+    await setStatus(orderId, 'DELIVERED');
+
+    await checkOut(bookingId);
+
+    const invoice = await invoiceFor(bookingId);
+    expect(invoice.items.some(i => i.sourceId === orderId)).toBe(false);
+    expect(invoice.total).toBe(8000);
+  });
+
+  it('does not bill an order the guest already paid for at the restaurant', async () => {
+    const bookingId = await makeBooking('CHECKED_IN');
+    const placed = await order({ bookingId, settlement: 'CHARGE_TO_ROOM' });
+    const orderId = JSON.parse(placed.body).data.id;
+    await setStatus(orderId, 'DELIVERED');
+    await app.inject({
+      method: 'PATCH', url: `/api/food-orders/${orderId}/payment`, headers: auth(), payload: { method: 'CASH' },
+    });
+
+    await checkOut(bookingId);
+
+    const invoice = await invoiceFor(bookingId);
+    expect(invoice.items.some(i => i.sourceId === orderId)).toBe(false);
+    expect(invoice.total).toBe(8000);
+  });
+});

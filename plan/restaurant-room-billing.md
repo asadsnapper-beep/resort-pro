@@ -3,7 +3,16 @@
 > Walk-in restaurant customers are handled correctly today. Guests staying at
 > the resort are not: they order, assume it goes on the room, and it never does.
 
-Status: ❌ Not built · **P1** · Implements [billing-contract.md](./billing-contract.md)
+Status: 🟡 Phase 1 built · **P1** · Implements [billing-contract.md](./billing-contract.md)
+
+Built: the settlement model (§2, `PAY_NOW` and `CHARGE_TO_ROOM` only), the
+server-side validation (§3), provenance and the one-line-per-order rule (§4),
+the order form and in-house picker (§6), and idempotency (§8).
+
+Not built: `COMPLIMENTARY` and `CORPORATE`, which the API refuses; cancellation
+after finalisation (§5) — cancelling a billed order today leaves the charge on
+the invoice with no offsetting adjustment and no audit row; QR room-charging
+(§7), still `PAY_NOW` only; and the restaurant reporting breakdown (§9).
 Depends on: [checkout-billing-completeness.md](./checkout-billing-completeness.md)
 
 ---
