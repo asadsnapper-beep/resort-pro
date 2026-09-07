@@ -206,6 +206,17 @@ export async function seedDemo(opts: { refresh?: boolean } = {}) {
   } else if (existing) {
     const bookingCount = await prisma.booking.count({ where: { tenantId: existing.id } });
     if (bookingCount > 0) {
+      // The demo is a resort that is already running, so it must not present
+      // itself as one waiting to be set up. Signing in through the normal login
+      // form sends a tenant with no onboardingCompletedAt to the setup wizard —
+      // and this branch, not the upsert below, is the one that runs on a
+      // deployed environment, so the correction has to live here too.
+      if (existing.isDemo) {
+        await prisma.tenant.updateMany({
+          where: { id: existing.id, onboardingCompletedAt: null },
+          data: { onboardingStep: 6, onboardingCompletedAt: new Date() },
+        });
+      }
       console.log(`✅ Demo tenant already seeded (${bookingCount} bookings). Skipping to avoid duplicates.`);
       console.log('   Run with --refresh to rebuild it with current dates.');
       return;
@@ -218,6 +229,8 @@ export async function seedDemo(opts: { refresh?: boolean } = {}) {
     update: {
       isDemo: true, plan: 'PROFESSIONAL', planStatus: 'active',
       logoUrl: DEMO_LOGO, coverImageUrl: IMG_COVER, galleryImages: IMG_GALLERY,
+      // Seeded complete: everything the wizard would ask for is created below.
+      onboardingStep: 6, onboardingCompletedAt: new Date(),
     },
     create: {
       name: 'Coral Bay Resort',
@@ -225,6 +238,11 @@ export async function seedDemo(opts: { refresh?: boolean } = {}) {
       plan: 'PROFESSIONAL',
       planStatus: 'active',
       isDemo: true,
+      // The wizard exists to collect rooms, rates and contact details. This
+      // script has just written all of them, so asking again would be asking a
+      // visitor to set up a resort that is already running.
+      onboardingStep: 6,
+      onboardingCompletedAt: new Date(),
       // The discovery page (stay.resortpro.site) renders a card per resort;
       // without a cover the demo shows up as the one grey tile in the grid.
       logoUrl: DEMO_LOGO,
