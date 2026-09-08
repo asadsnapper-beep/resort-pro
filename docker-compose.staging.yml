@@ -124,7 +124,13 @@ services:
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_USER: ${POSTGRES_USER:-resortpro}
-      PGPASSWORD: ${POSTGRES_PASSWORD}
+      # The same default as the postgres service and DATABASE_URL above. Without
+      # it this was the one place in the file that read POSTGRES_PASSWORD bare,
+      # so on a stack whose env does not set it the database came up with
+      # "resortpro_staging" and the backup tried to connect with an empty
+      # password — pg_dump failing every night, unread, for as long as that was
+      # true. Defaults that disagree inside one file are how that happens.
+      PGPASSWORD: ${POSTGRES_PASSWORD:-resortpro_staging}
       POSTGRES_DB: ${POSTGRES_DB:-resortpro}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
     volumes:
