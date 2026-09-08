@@ -1,11 +1,15 @@
 package site.resortpro.android.core.network
 
 import kotlinx.serialization.json.JsonElement
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.PATCH
+import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -60,4 +64,20 @@ interface AuthApi {
     suspend fun createWalkIn(
         @Body request: WalkInRequest,
     ): Response<ApiEnvelope<WalkInBookingDto>>
+
+    /**
+     * A photograph of the guest's ID, attached to the stay it was taken for.
+     *
+     * bookingId is optional to the server, which drops it if it does not belong
+     * to this guest — so the document lands on the guest either way, and never
+     * on the wrong stay.
+     */
+    @Multipart
+    @POST("api/guests/{id}/documents")
+    suspend fun uploadGuestDocument(
+        @Path("id") guestId: String,
+        @Part file: MultipartBody.Part,
+        @Part("docType") docType: RequestBody,
+        @Part("bookingId") bookingId: RequestBody?,
+    ): Response<ApiEnvelope<JsonElement>>
 }

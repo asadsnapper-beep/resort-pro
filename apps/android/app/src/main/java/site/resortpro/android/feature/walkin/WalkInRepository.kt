@@ -1,6 +1,9 @@
 package site.resortpro.android.feature.walkin
 
 import java.io.IOException
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import retrofit2.Response
@@ -27,6 +30,32 @@ class WalkInRepository(
 
     suspend fun create(request: WalkInRequest): WalkInBookingDto = call {
         api.createWalkIn(request).requireData()
+    }
+
+    /**
+     * Attach a photographed ID to the stay that was just created.
+     *
+     * Deliberately separate from [create]: the booking is the thing the guest
+     * is standing there waiting for, and a failed upload must not undo a
+     * check-in that already happened. The caller decides what to say about it.
+     */
+    suspend fun uploadDocument(
+        guestId: String,
+        bookingId: String,
+        docType: String,
+        jpeg: ByteArray,
+    ) = call {
+        val file = MultipartBody.Part.createFormData(
+            "file",
+            "guest-document.jpg",
+            jpeg.toRequestBody("image/jpeg".toMediaType()),
+        )
+        api.uploadGuestDocument(
+            guestId = guestId,
+            file = file,
+            docType = docType.toRequestBody("text/plain".toMediaType()),
+            bookingId = bookingId.toRequestBody("text/plain".toMediaType()),
+        ).requireData()
     }
 
     private suspend fun <T> call(block: suspend () -> T): T = try {
