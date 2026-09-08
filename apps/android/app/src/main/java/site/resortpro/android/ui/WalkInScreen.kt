@@ -24,6 +24,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
@@ -57,9 +58,12 @@ import java.io.File
 import java.text.NumberFormat
 import java.util.Locale
 import site.resortpro.android.core.media.DocumentImage
+import site.resortpro.android.core.media.MAX_GUEST_DOCUMENTS
+import site.resortpro.android.core.media.copyIntoDocumentCache
 import site.resortpro.android.core.media.newDocumentCaptureFile
 import site.resortpro.android.core.network.RoomDto
 import site.resortpro.android.feature.auth.AuthenticatedSession
+import site.resortpro.android.feature.walkin.CapturedDocument
 import site.resortpro.android.feature.walkin.GuestDocumentType
 import site.resortpro.android.feature.walkin.WalkInUiState
 import site.resortpro.android.feature.walkin.WalkInViewModel
@@ -218,10 +222,11 @@ fun WalkInScreen(
                         minLines = 2,
                     )
                     GuestDocumentCapture(
-                        documentPath = state.documentPath,
+                        documents = state.documents,
                         documentType = state.documentType,
                         enabled = !state.isSubmitting,
-                        onCaptured = viewModel::setDocument,
+                        onCaptured = viewModel::addDocument,
+                        onRemove = viewModel::removeDocument,
                         onTypeChange = viewModel::setDocumentType,
                     )
                 }
@@ -467,23 +472,29 @@ private fun formatWalkInMoney(value: Double): String {
 }
 
 /**
- * Photograph the ID the guest just handed over.
+ * Photograph, or pick, the documents the guest just handed over.
  *
- * The system camera app takes the picture, into a file in our own cache. That
- * keeps the passport out of the shared gallery, and means the app needs no
- * CAMERA permission of its own — declaring one would only make it required.
+ * Two ways in, because both happen. The camera is for the paper on the counter
+ * right now; the picker is for the photo the guest already has on their own
+ * phone, or one taken a minute ago before the app was open.
  *
- * Optional on purpose: a guest standing at the desk at midnight with no ID on
- * them still has to be able to check in. The document can be added later from
- * their profile.
+ * More than one, because one document is often several pictures: a passport
+ * and the visa in it, an NID with two sides. Each keeps the type that was
+ * selected when it was added, so a passport page and a visa page do not have
+ * to be filed as the same thing.
+ *
+ * The system camera and the system photo picker do the work, so the app needs
+ * neither a CAMERA nor a storage permission — the picker hands over only the
+ * images the guest's own hand chose.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun GuestDocumentCapture(
-    documentPath: String?,
+    documents: List<CapturedDocument>,
     documentType: String,
     enabled: Boolean,
-    onCaptured: (String?) -> Unit,
+    onCaptured: (String) -> Unit,
+    onRemove: (String) -> Unit,
     onTypeChange: (String) -> Unit,
 ) {
     val context = LocalContext.current
@@ -494,23 +505,31 @@ private fun GuestDocumentCapture(
         if (saved && path != null) {
             onCaptured(path)
         } else {
-            // Cancelled, or the camera app wrote nothing: leave no empty file
+            // Cancelled, or the camera wrote nothing: leave no empty file
             // behind pretending to be a document.
             path?.let { File(it).delete() }
-            onCaptured(null)
         }
         pendingFile = null
     }
 
+    val pickImages = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(MAX_GUEST_DOCUMENTS),
+    ) { uris ->
+        // Copied into our own cache rather than held as a foreign content URI:
+        // the permission granted over that URI is temporary, and everything
+        // downstream already reads files.
+        uris.forEach { uri ->
+            context.copyIntoDocumentCache(uri)?.let { file -> onCaptured(file.absolutePath) }
+        }
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            "Guest document (optional)",
+            "Guest documents (optional)",
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        // Wraps rather than squeezing: on a narrow phone the fourth chip was
-        // being crushed to one letter per line.
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             GuestDocumentType.OFFERED.forEach { type ->
                 FilterChip(
@@ -522,53 +541,81 @@ private fun GuestDocumentCapture(
             }
         }
 
-        if (documentPath != null) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
+        if (documents.isNotEmpty()) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                // The photograph itself, so the person who took it can see
-                // whether it is readable before the guest walks away. Decoded
-                // here rather than through an image-loading library: it is one
-                // known local file, and a 72dp thumbnail does not justify a
-                // dependency.
-                val thumbnail = remember(documentPath) { decodeThumbnail(documentPath) }
-                if (thumbnail != null) {
-                    Image(
-                        bitmap = thumbnail,
-                        contentDescription = "Photographed guest document",
-                        modifier = Modifier
-                            .size(72.dp)
-                            .clip(RoundedCornerShape(8.dp)),
-                        contentScale = ContentScale.Crop,
+                documents.forEach { document ->
+                    CapturedDocumentThumbnail(
+                        document = document,
+                        enabled = enabled,
+                        onRemove = { onRemove(document.path) },
                     )
                 }
-                TextButton(
-                    onClick = {
-                        File(documentPath).delete()
-                        onCaptured(null)
-                    },
-                    enabled = enabled,
-                ) { Text("Remove") }
             }
         }
 
-        OutlinedButton(
-            onClick = {
-                val file = context.newDocumentCaptureFile()
-                pendingFile = file.absolutePath
-                takePicture.launch(
-                    FileProvider.getUriForFile(context, "${context.packageName}.documents", file),
-                )
-            },
-            enabled = enabled,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-        ) {
-            Text(if (documentPath == null) "Take a photo of the ID" else "Retake")
+        val atLimit = documents.size >= MAX_GUEST_DOCUMENTS
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = {
+                    val file = context.newDocumentCaptureFile()
+                    pendingFile = file.absolutePath
+                    takePicture.launch(
+                        FileProvider.getUriForFile(context, "${context.packageName}.documents", file),
+                    )
+                },
+                enabled = enabled && !atLimit,
+                modifier = Modifier.weight(1f).height(56.dp),
+            ) {
+                Text(if (documents.isEmpty()) "Take a photo" else "Add another")
+            }
+            OutlinedButton(
+                onClick = {
+                    pickImages.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                    )
+                },
+                enabled = enabled && !atLimit,
+                modifier = Modifier.weight(1f).height(56.dp),
+            ) {
+                Text("Choose photos")
+            }
         }
+        if (atLimit) {
+            Text(
+                "That is as many as one check-in needs. Remove one to add another.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** One photograph, with its type and a way to drop it. */
+@Composable
+private fun CapturedDocumentThumbnail(
+    document: CapturedDocument,
+    enabled: Boolean,
+    onRemove: () -> Unit,
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        val thumbnail = remember(document.path) { decodeThumbnail(document.path) }
+        if (thumbnail != null) {
+            Image(
+                bitmap = thumbnail,
+                contentDescription = "Photographed ${documentTypeLabel(document.docType)}",
+                modifier = Modifier.size(84.dp).clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Crop,
+            )
+        }
+        Text(
+            documentTypeLabel(document.docType),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TextButton(onClick = onRemove, enabled = enabled) { Text("Remove") }
     }
 }
 
@@ -576,6 +623,7 @@ private fun documentTypeLabel(type: String): String = when (type) {
     GuestDocumentType.NATIONAL_ID -> "NID"
     GuestDocumentType.PASSPORT -> "Passport"
     GuestDocumentType.DRIVERS_LICENSE -> "Licence"
+    GuestDocumentType.VISA -> "Visa"
     else -> "Other"
 }
 

@@ -42,8 +42,8 @@ data class WalkInUiState(
     val conflictMessage: String? = null,
     val submissionUncertain: Boolean = false,
     val createdBooking: WalkInBookingDto? = null,
-    /** A photographed ID waiting to go up with the booking, if one was taken. */
-    val documentPath: String? = null,
+    /** Photographs waiting to go up with the booking, in the order taken. */
+    val documents: List<CapturedDocument> = emptyList(),
     val documentType: String = GuestDocumentType.NATIONAL_ID,
     /** Set only when the check-in worked but the photograph did not go up. */
     val documentNote: String? = null,
@@ -119,8 +119,13 @@ class WalkInViewModel(
         )
     }
 
-    fun setDocument(path: String?) {
-        mutableState.update { it.copy(documentPath = path) }
+    fun addDocument(path: String) {
+        mutableState.update { it.copy(documents = it.documents + CapturedDocument(path, it.documentType)) }
+    }
+
+    fun removeDocument(path: String) {
+        File(path).delete()
+        mutableState.update { it.copy(documents = it.documents.filterNot { doc -> doc.path == path }) }
     }
 
     fun setDocumentType(docType: String) {
@@ -213,33 +218,48 @@ class WalkInViewModel(
     }
 
     /**
-     * Send the photographed ID, if one was taken, and report only failure.
+     * Send the photographs, if any were taken, and report only what failed.
      *
-     * Returns null when there is nothing to say: no document, or it uploaded.
-     * The file is deleted either way — a guest's passport must not outlive the
-     * check-in in a cache directory, and the desk can add it again from the
-     * guest's profile if this failed.
+     * Each is uploaded on its own because the server takes one file per
+     * request, and one failing must not strand the rest — a passport page that
+     * uploaded is still worth having when its second page did not. Returns null
+     * when there is nothing to say.
+     *
+     * Every file is deleted either way. A guest's documents must not outlive
+     * the check-in in a cache directory, and the desk can add them again from
+     * the guest's profile.
      */
-    private suspend fun attachDocument(
+    private suspend fun attachDocuments(
         state: WalkInUiState,
         booking: WalkInBookingDto,
     ): String? {
-        val path = state.documentPath ?: return null
-        val file = File(path)
-        return try {
-            val jpeg = file.readAsUploadableJpeg()
-                ?: return "Checked in, but the photo could not be read. Add it from the guest's profile."
-            repository.uploadDocument(
-                guestId = booking.guestId,
-                bookingId = booking.id,
-                docType = state.documentType,
-                jpeg = jpeg,
-            )
-            null
-        } catch (error: Throwable) {
-            "Checked in, but the document did not upload. Add it from the guest's profile."
-        } finally {
-            file.delete()
+        if (state.documents.isEmpty()) return null
+        var failed = 0
+        for (document in state.documents) {
+            val file = File(document.path)
+            try {
+                val jpeg = file.readAsUploadableJpeg()
+                if (jpeg == null) {
+                    failed++
+                    continue
+                }
+                repository.uploadDocument(
+                    guestId = booking.guestId,
+                    bookingId = booking.id,
+                    docType = document.docType,
+                    jpeg = jpeg,
+                )
+            } catch (error: Throwable) {
+                failed++
+            } finally {
+                file.delete()
+            }
+        }
+        if (failed == 0) return null
+        return if (failed == state.documents.size) {
+            "Checked in, but the documents did not upload. Add them from the guest's profile."
+        } else {
+            "Checked in. $failed of ${state.documents.size} photos did not upload — add them from the guest's profile."
         }
     }
 
@@ -292,12 +312,12 @@ class WalkInViewModel(
                     // The booking is the thing the guest is standing there
                     // waiting for; the photograph rides behind it and is never
                     // allowed to take it back down.
-                    val documentNote = attachDocument(current, booking)
+                    val documentNote = attachDocuments(current, booking)
                     mutableState.update {
                         it.copy(
                             isSubmitting = false,
                             createdBooking = booking,
-                            documentPath = null,
+                            documents = emptyList(),
                             documentNote = documentNote,
                         )
                     }

@@ -1,6 +1,7 @@
 package site.resortpro.android.core.media
 
 import android.content.Context
+import android.net.Uri
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import java.io.ByteArrayOutputStream
@@ -95,4 +96,48 @@ fun File.readAsUploadableJpeg(): ByteArray? {
  * that needed it.
  */
 fun Context.newDocumentCaptureFile(): File =
-    File(cacheDir, "guest-doc-${System.currentTimeMillis()}.jpg")
+    File(cacheDir, "$DOCUMENT_CAPTURE_PREFIX${System.currentTimeMillis()}.jpg")
+
+private const val DOCUMENT_CAPTURE_PREFIX = "guest-doc-"
+
+/**
+ * How many photographs one check-in may carry.
+ *
+ * Not a technical limit — a passport, its visa page and both sides of an NID
+ * is already four, and past that someone is photographing the wrong thing. The
+ * cap keeps a mistake at the desk from becoming a dozen uploads on a phone
+ * connection.
+ */
+const val MAX_GUEST_DOCUMENTS = 6
+
+/**
+ * Copy a picked image into our own cache.
+ *
+ * The photo picker hands back a content URI whose read permission lasts only
+ * as long as this task, so it cannot be relied on at submit time — and
+ * everything downstream already reads files. Returns null if the picked item
+ * cannot be read, which is a bad pick rather than a crash.
+ */
+fun Context.copyIntoDocumentCache(uri: Uri): File? = try {
+    val destination = newDocumentCaptureFile()
+    contentResolver.openInputStream(uri)?.use { input ->
+        destination.outputStream().use { output -> input.copyTo(output) }
+    }
+    destination.takeIf { it.length() > 0 } ?: run { destination.delete(); null }
+} catch (_: Exception) {
+    null
+}
+
+/**
+ * Delete document photographs left over from a previous run.
+ *
+ * A capture that is taken and then abandoned — the walk-in cancelled, the app
+ * closed mid-form — leaves a guest's ID in the cache with nothing left holding
+ * a reference to it. Nothing in the app survives process death holding those
+ * paths, so on a cold start every one of them is an orphan, and a guest's
+ * passport should not outlive the check-in it was taken for.
+ */
+fun Context.purgeAbandonedDocumentCaptures() {
+    cacheDir.listFiles { file -> file.name.startsWith(DOCUMENT_CAPTURE_PREFIX) }
+        ?.forEach { it.delete() }
+}

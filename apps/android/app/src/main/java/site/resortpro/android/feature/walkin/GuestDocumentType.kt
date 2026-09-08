@@ -9,8 +9,9 @@ object GuestDocumentType {
     const val NATIONAL_ID = "NATIONAL_ID"
     const val PASSPORT = "PASSPORT"
     const val DRIVERS_LICENSE = "DRIVERS_LICENSE"
+    const val VISA = "VISA"
     const val OTHER = "OTHER"
 
     /** Offered in the order a Bangladeshi resort actually meets them. */
-    val OFFERED = listOf(NATIONAL_ID, PASSPORT, DRIVERS_LICENSE, OTHER)
+    val OFFERED = listOf(NATIONAL_ID, PASSPORT, VISA, DRIVERS_LICENSE, OTHER)
 }
