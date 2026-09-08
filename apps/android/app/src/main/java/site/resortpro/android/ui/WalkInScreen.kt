@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -530,7 +531,13 @@ private fun GuestDocumentCapture(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Scrolls sideways rather than wrapping, matching Payment directly
+        // below it. Five chips wrapped onto two ragged lines and read as a
+        // different kind of control from the one under it.
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             GuestDocumentType.OFFERED.forEach { type ->
                 FilterChip(
                     selected = type == documentType,
@@ -542,9 +549,9 @@ private fun GuestDocumentCapture(
         }
 
         if (documents.isNotEmpty()) {
-            FlowRow(
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 documents.forEach { document ->
                     CapturedDocumentThumbnail(
@@ -569,7 +576,7 @@ private fun GuestDocumentCapture(
                 enabled = enabled && !atLimit,
                 modifier = Modifier.weight(1f).height(56.dp),
             ) {
-                Text(if (documents.isEmpty()) "Take a photo" else "Add another")
+                Text("Camera")
             }
             OutlinedButton(
                 onClick = {
@@ -580,7 +587,7 @@ private fun GuestDocumentCapture(
                 enabled = enabled && !atLimit,
                 modifier = Modifier.weight(1f).height(56.dp),
             ) {
-                Text("Choose photos")
+                Text("Gallery")
             }
         }
         if (atLimit) {
@@ -600,7 +607,13 @@ private fun CapturedDocumentThumbnail(
     enabled: Boolean,
     onRemove: () -> Unit,
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    // Fixed to the width of the image so a row of these reads as a strip of
+    // photographs rather than three loose columns of text.
+    Column(
+        modifier = Modifier.width(84.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
         val thumbnail = remember(document.path) { decodeThumbnail(document.path) }
         if (thumbnail != null) {
             Image(
@@ -614,8 +627,18 @@ private fun CapturedDocumentThumbnail(
             documentTypeLabel(document.docType),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
         )
-        TextButton(onClick = onRemove, enabled = enabled) { Text("Remove") }
+        // A plain tappable label, not a TextButton: the button's own padding
+        // made each photo twice as tall as the picture in it.
+        Text(
+            "Remove",
+            modifier = Modifier
+                .clickable(enabled = enabled) { onRemove() }
+                .padding(vertical = 4.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
     }
 }
 
