@@ -1,92 +1,98 @@
-# Verify the guest-document backup on staging
+# Verify the daily backup on staging (round 2)
 
 Paste this whole file into a session that can reach the staging server.
-Everything here is read-only apart from one backup run, which only writes into
-the backups volume.
+Read-only apart from reading logs.
 
 ---
 
-## What is being checked
+## What changed since the last check
 
-Commit `757e791` (deployed to staging) makes the daily backup archive the
-uploads volume as well as dumping the database. Until now `guest_documents`
-rows were backed up and the passport and ID photographs they point at were not,
-so a restore would have produced a database full of broken links.
+The last check found two things. Both are now fixed and deployed to staging in
+`46d7e7a`:
 
-Staging received the compose change automatically — its deploy workflow sends
-the whole compose file as text. So no edit is needed here; this is purely
-checking that it works before the same thing is turned on for production.
+1. **`PGPASSWORD` was empty.** `docker-compose.staging.yml` spelled the password
+   three times; the postgres service and `DATABASE_URL` both defaulted it to
+   `resortpro_staging`, and the backup service alone read it bare. So the
+   database had a password and the backup connected without one. `pg_dump` had
+   been failing every night, unread. It now uses the same default as the other
+   two.
 
-## 1. Did the mount arrive?
+2. **A failing dump cancelled the uploads backup.** The uploads archive was
+   chained onto the end of the dump under `set -e`, so pg_dump failing stopped
+   the script before it ran. `backup-db.sh` is now an orchestrator that runs
+   `backup-postgres.sh` and `backup-uploads.sh` as separate processes and
+   reports on both.
+
+The manual run already proved the uploads logic works. What is unproven is the
+**container's own scheduled run** — which is the only one that matters, and the
+one that was broken.
+
+## 1. Read the container's own startup run
+
+The stack was just redeployed, so the backup container has run once on start.
+Do not run anything by hand first — that would hide the thing being checked.
 
 ```bash
 docker ps --format '{{.Names}}' | grep -i backup
-docker inspect <backup-container-name> --format '{{range .Mounts}}{{.Name}} -> {{.Destination}} (rw={{.RW}}){{println}}{{end}}'
+docker logs <backup-container-name> 2>&1 | grep '\[backup\]'
 ```
 
-Expect two mounts: `backups_staging_data -> /backups` and
-`uploads_staging_data -> /app/uploads (rw=false)`.
-
-`rw=false` matters. This sidecar archives guest ID photographs; it must not be
-able to alter or delete them.
-
-If the uploads mount is absent, the deploy did not replace the stack — say so
-and stop.
-
-## 2. Run one backup and read what it says
-
-```bash
-docker exec <backup-container-name> sh /app/scripts/backup-uploads.sh
-```
-
-Expect:
+Expect **two** `ok` lines from that one run:
 
 ```
+[backup] dumping resortpro_staging from postgres → /backups/resortpro_staging-<stamp>.dump
+[backup] ok — <bytes> bytes, <n> tables with data
+[backup] pruned 0 dump(s) older than 14 days
 [backup] archiving /app/uploads → /backups/uploads-<stamp>.tar
 [backup] ok — <bytes> bytes, <n> file(s)
+[backup] pruned 0 upload archive(s) older than 14 days
 ```
 
-**If `<n>` is 0, stop and report it.** An empty archive reporting success is
-the exact failure this change exists to prevent — it would mean the mount is
-pointing somewhere empty.
+- `fe_sendauth: no password supplied` still present → the stack did not pick up
+  the new compose. Say so.
+- dump line fine, uploads line missing → say so; that is the coupling bug back.
+- both `ok` → this is the result we are after.
 
-## 3. Are the guest documents actually inside?
+## 2. Confirm both files exist from that run
 
 ```bash
-docker exec <backup-container-name> sh -c 'tar -tf $(ls -t /backups/uploads-*.tar | head -1) | grep guest-docs | head -5'
-docker exec <backup-container-name> sh -c 'tar -tf $(ls -t /backups/uploads-*.tar | head -1) | grep -c guest-docs'
+docker exec <backup-container-name> ls -lh /backups
 ```
 
-Paths look like `./<tenant-id>/guest-docs/<hex>.jpg`. The count is the number
-that matters.
+Expect a `.dump` and a `.tar` with timestamps within a second or two of each
+other. **The `.dump` is the one that has never existed on staging before** — if
+it is there, staging has a database backup for the first time.
 
-If the count is 0 but step 2 found files, that is not necessarily a failure —
-it can simply mean no guest document has ever been uploaded on staging. Check:
+## 3. Prove the dump is actually restorable
+
+A dump that has never been read is not a backup. This is read-only against the
+existing database — it restores into a **new scratch database**, never over
+`resortpro_staging`:
 
 ```bash
-docker exec <postgres-container> psql -U resortpro -d resortpro -t -c \
-  "SELECT count(*) FROM guest_documents;"
+docker exec <postgres-container> psql -U resortpro -d postgres -c "CREATE DATABASE restore_check;"
+docker exec <backup-container-name> sh -c 'sh /app/scripts/restore-db.sh $(ls -t /backups/*.dump | head -1) restore_check'
+docker exec <postgres-container> psql -U resortpro -d restore_check -c \
+  "SELECT (SELECT count(*) FROM tenants) tenants, (SELECT count(*) FROM bookings) bookings, (SELECT count(*) FROM guest_documents) docs;"
 ```
 
-If that count is also 0, upload one document from the dashboard (Guests → any
-guest → Documents → Scan Document) and repeat step 2. A backup of nothing
-proves nothing.
-
-## 4. Does the daily loop do it on its own?
-
-Step 2 ran the script by hand. Confirm the scheduled run does it too:
+Compare those three counts against the live database:
 
 ```bash
-docker logs --tail 40 <backup-container-name> | grep '\[backup\]'
+docker exec <postgres-container> psql -U resortpro -d resortpro_staging -c \
+  "SELECT (SELECT count(*) FROM tenants) tenants, (SELECT count(*) FROM bookings) bookings, (SELECT count(*) FROM guest_documents) docs;"
 ```
 
-Expect **two** `[backup] ok` lines per run — one ending `tables with data`
-(the dump), one ending `file(s)` (the uploads). One without the other is a
-failure, and the log line above it says which.
+They should match. Then clean up the scratch database:
 
-## 5. Report back
+```bash
+docker exec <postgres-container> psql -U resortpro -d postgres -c "DROP DATABASE restore_check;"
+```
 
-- the two mounts from step 1, including `rw=false`
-- both `[backup] ok` lines
-- the `guest-docs` count from step 3
-- whether step 4 shows both lines from the container's own daily run
+## 4. Report back
+
+- the full `[backup]` log block from step 1 — both `ok` lines or whichever is missing
+- the `ls -lh /backups` listing
+- the two count rows from step 3, side by side
+
+Nothing here touches `resortpro_staging` except to read from it.
