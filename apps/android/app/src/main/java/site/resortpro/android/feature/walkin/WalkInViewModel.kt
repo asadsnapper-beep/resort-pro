@@ -47,6 +47,8 @@ data class WalkInUiState(
     val documentType: String = GuestDocumentType.NATIONAL_ID,
     /** Set only when the check-in worked but the photograph did not go up. */
     val documentNote: String? = null,
+    /** A retry of the photographs is in flight. */
+    val isUploadingDocuments: Boolean = false,
 ) {
     val selectedRoom: RoomDto? get() = availableRooms.firstOrNull { it.id == selectedRoomId }
     val nights: Int get() = nightsBetween(checkIn, checkOut)
@@ -218,48 +220,68 @@ class WalkInViewModel(
     }
 
     /**
-     * Send the photographs, if any were taken, and report only what failed.
+     * Send the photographs, if any were taken, and report what did not land.
      *
-     * Each is uploaded on its own because the server takes one file per
-     * request, and one failing must not strand the rest — a passport page that
-     * uploaded is still worth having when its second page did not. Returns null
-     * when there is nothing to say.
+     * A file is deleted the moment it can no longer be of use — sent, or not a
+     * readable image. A failed *send* keeps its file, because the receptionist
+     * can tap Retry while the guest is still at the desk. Deleting those too is
+     * what made a dropped connection cost the guest their passport a second
+     * time: the photograph lived only in this app's cache, so there was nothing
+     * left to add "from the guest's profile" with.
      *
-     * Every file is deleted either way. A guest's documents must not outlive
-     * the check-in in a cache directory, and the desk can add them again from
-     * the guest's profile.
+     * The files still do not outlive the walk-in — [onCleared] and the cold-start
+     * purge both clear them.
      */
     private suspend fun attachDocuments(
-        state: WalkInUiState,
+        documents: List<CapturedDocument>,
         booking: WalkInBookingDto,
-    ): String? {
-        if (state.documents.isEmpty()) return null
-        var failed = 0
-        for (document in state.documents) {
-            val file = File(document.path)
+    ): DocumentUploadOutcome = sendDocuments(
+        documents = documents,
+        send = { document ->
             try {
-                val jpeg = file.readAsUploadableJpeg()
+                val jpeg = File(document.path).readAsUploadableJpeg()
                 if (jpeg == null) {
-                    failed++
-                    continue
+                    DocumentSendResult.UNREADABLE
+                } else {
+                    repository.uploadDocument(
+                        guestId = booking.guestId,
+                        bookingId = booking.id,
+                        docType = document.docType,
+                        jpeg = jpeg,
+                    )
+                    DocumentSendResult.SENT
                 }
-                repository.uploadDocument(
-                    guestId = booking.guestId,
-                    bookingId = booking.id,
-                    docType = document.docType,
-                    jpeg = jpeg,
-                )
             } catch (error: Throwable) {
-                failed++
-            } finally {
-                file.delete()
+                DocumentSendResult.FAILED
             }
-        }
-        if (failed == 0) return null
-        return if (failed == state.documents.size) {
-            "Checked in, but the documents did not upload. Add them from the guest's profile."
-        } else {
-            "Checked in. $failed of ${state.documents.size} photos did not upload — add them from the guest's profile."
+        },
+        discard = { document -> File(document.path).delete() },
+    )
+
+    /**
+     * Try the photographs that did not go up the first time.
+     *
+     * Only reachable from the success screen, so the booking already exists and
+     * nothing here can put it at risk.
+     */
+    fun retryDocuments() {
+        val current = mutableState.value
+        val booking = current.createdBooking ?: return
+        if (current.isUploadingDocuments || current.documents.isEmpty()) return
+
+        mutableState.update { it.copy(isUploadingDocuments = true, documentNote = null) }
+        viewModelScope.launch {
+            val outcome = attachDocuments(current.documents, booking)
+            mutableState.update {
+                it.copy(
+                    isUploadingDocuments = false,
+                    documents = outcome.pending,
+                    // Guarded above on a non-empty list, so no note means every
+                    // one of them landed — worth saying, since the previous
+                    // line said they had not.
+                    documentNote = outcome.note ?: "Documents uploaded.",
+                )
+            }
         }
     }
 
@@ -312,13 +334,13 @@ class WalkInViewModel(
                     // The booking is the thing the guest is standing there
                     // waiting for; the photograph rides behind it and is never
                     // allowed to take it back down.
-                    val documentNote = attachDocuments(current, booking)
+                    val outcome = attachDocuments(current.documents, booking)
                     mutableState.update {
                         it.copy(
                             isSubmitting = false,
                             createdBooking = booking,
-                            documents = emptyList(),
-                            documentNote = documentNote,
+                            documents = outcome.pending,
+                            documentNote = outcome.note,
                         )
                     }
                 }
@@ -351,9 +373,27 @@ class WalkInViewModel(
     }
 
     fun startAnother() {
+        discardPendingDocuments()
         mutableState.value = WalkInUiState()
         prepared = false
         prepare()
+    }
+
+    /**
+     * A guest's ID does not outlive the walk-in it was taken for.
+     *
+     * Photographs kept for a retry are the one thing in this screen that
+     * survives on disk, so every way out of it has to clear them: starting
+     * another walk-in, and leaving the screen entirely. The cold-start purge is
+     * the backstop for a process that dies before either happens.
+     */
+    override fun onCleared() {
+        discardPendingDocuments()
+        super.onCleared()
+    }
+
+    private fun discardPendingDocuments() {
+        mutableState.value.documents.forEach { File(it.path).delete() }
     }
 
     class Factory(private val repository: WalkInRepository) : ViewModelProvider.Factory {

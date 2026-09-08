@@ -80,7 +80,7 @@ fun WalkInScreen(
     LaunchedEffect(Unit) { viewModel.prepare() }
 
     if (state.createdBooking != null) {
-        WalkInSuccessScreen(state, viewModel::startAnother, onBack)
+        WalkInSuccessScreen(state, viewModel::startAnother, viewModel::retryDocuments, onBack)
         return
     }
 
@@ -403,7 +403,12 @@ private fun WalkInQuoteCard(state: WalkInUiState) {
 }
 
 @Composable
-private fun WalkInSuccessScreen(state: WalkInUiState, onAnother: () -> Unit, onDone: () -> Unit) {
+private fun WalkInSuccessScreen(
+    state: WalkInUiState,
+    onAnother: () -> Unit,
+    onRetryDocuments: () -> Unit,
+    onDone: () -> Unit,
+) {
     val booking = state.createdBooking ?: return
     Scaffold(modifier = Modifier.statusBarsPadding()) { innerPadding ->
         Column(
@@ -431,8 +436,37 @@ private fun WalkInSuccessScreen(state: WalkInUiState, onAnother: () -> Unit, onD
                     note,
                     modifier = Modifier.padding(bottom = 16.dp),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
+                    // Green once they are all up: the same line said a moment
+                    // ago that they were not, so leaving it red would read as
+                    // a fresh failure.
+                    color = if (state.documents.isEmpty()) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
                 )
+            }
+            // Only while there is something a retry could still send. The
+            // photographs are on this phone and nowhere else, so this is the
+            // last chance before the desk has to ask the guest again.
+            if (state.documents.isNotEmpty()) {
+                OutlinedButton(
+                    onClick = onRetryDocuments,
+                    enabled = !state.isUploadingDocuments,
+                    modifier = Modifier.fillMaxWidth().height(50.dp).padding(bottom = 12.dp),
+                ) {
+                    if (state.isUploadingDocuments) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text(
+                            if (state.documents.size == 1) {
+                                "Retry the photo"
+                            } else {
+                                "Retry ${state.documents.size} photos"
+                            },
+                        )
+                    }
+                }
             }
             Button(onClick = onAnother, modifier = Modifier.fillMaxWidth().height(50.dp)) {
                 Text("Create another walk-in")
