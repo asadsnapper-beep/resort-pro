@@ -107,9 +107,14 @@ services:
 
 
   # ── Database backup ──────────────────────────────────────────────────────────
-  # A daily pg_dump, verified with `pg_restore --list` before it is kept. Uses
-  # the postgres image purely for its client tools, so nothing has to be
-  # installed on the host and this works the same under Portainer and Coolify.
+  # A daily pg_dump, verified with `pg_restore --list` before it is kept, plus a
+  # tar of the uploads volume: guest_documents rows hold only a URL, so a dump
+  # on its own restores every row and none of the passport and ID images those
+  # rows point at.
+  #
+  # Runs the API image, which carries both scripts and postgresql16-client, so
+  # nothing has to be installed on the host and this works the same under
+  # Portainer and Coolify.
   #
   # Scope, stated plainly: this protects against the failures that actually
   # happen — a bad migration, a mistaken delete, operator error. It does NOT
@@ -135,6 +140,9 @@ services:
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
     volumes:
       - backups_data:/backups
+      # Read-only: this sidecar archives the guest ID/passport images, it must
+      # never be able to alter or delete the originals.
+      - uploads_data:/app/uploads:ro
     depends_on:
       postgres:
         condition: service_healthy

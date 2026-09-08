@@ -7,13 +7,28 @@ once at start and then daily. Each run does a `pg_dump -Fc`, verifies the file
 with `pg_restore --list`, and deletes dumps older than `BACKUP_RETENTION_DAYS`
 (default 14).
 
+It then chains [scripts/backup-uploads.sh](../../scripts/backup-uploads.sh),
+which tars the uploads volume. That half is not optional: `guest_documents`
+rows hold only a URL, and the passport and ID photos themselves live on disk.
+A dump alone restores every row and no image — a database full of broken links,
+which looks like a successful restore until someone opens a document.
+
+The archive is a plain `tar`, not `tar.gz`: the contents are JPEG/PNG/WebP and
+already compressed. It is verified with `tar -tf` before it is kept, and pruned
+on the same retention as the dumps.
+
+If the uploads volume is not mounted into the backup container, the run **fails
+loudly and says so**. Silently archiving nothing is the exact bug this closes.
+
 The service runs the **API image**, which carries the scripts and
 `postgresql16-client`. It does not bind-mount them from the host, because the
 staging deploy hands Portainer the compose file as a *string* — the repo is not
 on that machine and a bind mount would resolve to an empty directory.
 
-Dumps land in the `backups_data` volume (`backups_staging_data` on staging), at
-`/backups/<db>-<UTC timestamp>.dump`.
+Both land in the `backups_data` volume (`backups_staging_data` on staging), at
+`/backups/<db>-<UTC timestamp>.dump` and `/backups/uploads-<UTC timestamp>.tar`.
+The uploads volume is mounted at `/app/uploads` **read-only** — this sidecar
+archives guest documents, it must never be able to alter or delete them.
 
 ## What this protects against, and what it does not
 
@@ -31,9 +46,15 @@ docker compose logs backup --tail 20
 docker compose exec backup ls -lh /backups
 ```
 
-A healthy run logs `[backup] ok — <bytes> bytes, <n> tables with data`. If the
-directory is empty more than a few minutes after start, the service is failing —
-read the logs rather than assuming it is slow.
+A healthy run logs two `[backup] ok` lines — `<n> tables with data` for the
+dump, `<n> file(s)` for the uploads archive. **One without the other is a
+failure**, and the log says which: `uploads dir ... is not mounted` means the
+compose change adding `- uploads_data:/app/uploads:ro` never reached this
+environment. On production that compose lives in Coolify's own database rather
+than in git, so it has to be edited there by hand.
+
+If the directory is empty more than a few minutes after start, the service is
+failing — read the logs rather than assuming it is slow.
 
 ## Restore
 
@@ -61,6 +82,21 @@ docker compose exec postgres psql -U resortpro -d restore_check -c \
 Only then, if the counts are right and you have decided to overwrite production,
 run the same restore against the real database — and take a fresh dump first, so
 the current state is recoverable if the restore turns out to be the wrong call.
+
+### Restoring the documents too
+
+The dump does not carry them. Restore the matching archive — the one with the
+same timestamp, so rows and files agree — into the API's uploads volume:
+
+```bash
+docker compose exec backup ls /backups/uploads-*.tar
+docker compose exec api sh -c 'tar -xf /backups/uploads-<stamp>.tar -C /app/uploads'
+```
+
+That needs `/backups` visible to the `api` service, which it normally is not.
+Either mount it for the restore, or copy the archive through the host with
+`docker cp`. Then open one guest document in the dashboard: a restore that has
+not had a single image opened has not been checked.
 
 ## Rehearsal result — 18 August 2026
 

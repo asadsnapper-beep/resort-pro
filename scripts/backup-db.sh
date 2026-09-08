@@ -41,3 +41,13 @@ echo "[backup] ok — ${size} bytes, ${tables} tables with data"
 # Prune only verified-good older dumps.
 deleted="$(find "$BACKUP_DIR" -name "${POSTGRES_DB}-*.dump" -type f -mtime "+${BACKUP_RETENTION_DAYS}" -print -delete | wc -l | tr -d ' ')"
 echo "[backup] pruned ${deleted} dump(s) older than ${BACKUP_RETENTION_DAYS} days"
+
+# The dump above holds the guest_documents rows; the images those rows point at
+# live in the uploads volume, which pg_dump cannot see. Archive them too, or a
+# restore comes back with every document as a broken link.
+#
+# Chained from here rather than added as a second command in the compose
+# entrypoint because production's compose lives in Coolify's own database, not
+# in git: an entrypoint change has to be typed on the server by hand, while a
+# change to this script ships with the image.
+sh "$(dirname "$0")/backup-uploads.sh"
