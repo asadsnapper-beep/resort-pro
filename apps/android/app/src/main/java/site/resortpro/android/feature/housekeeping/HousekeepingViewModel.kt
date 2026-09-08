@@ -39,6 +39,18 @@ class HousekeepingViewModel(
     private val mutableState = MutableStateFlow(HousekeepingUiState())
     val state: StateFlow<HousekeepingUiState> = mutableState.asStateFlow()
 
+    init {
+        // The queue is read from the database rather than remembered here. The
+        // sync worker empties it from outside this screen, and a housekeeper
+        // who closes the app still has changes waiting — neither is something
+        // an in-memory set can know.
+        viewModelScope.launch {
+            repository.observeQueuedTaskIds().collect { queued ->
+                mutableState.update { it.copy(queuedTaskIds = queued) }
+            }
+        }
+    }
+
     private var currentRole: String? = null
     private var currentUserId: String? = null
     private var currentTenantId: String? = null
@@ -128,11 +140,6 @@ class HousekeepingViewModel(
                                 }
                             },
                             updatingTaskIds = state.updatingTaskIds - taskId,
-                            queuedTaskIds = if (result.queued) {
-                                state.queuedTaskIds + taskId
-                            } else {
-                                state.queuedTaskIds - taskId
-                            },
                         )
                     }
                 }

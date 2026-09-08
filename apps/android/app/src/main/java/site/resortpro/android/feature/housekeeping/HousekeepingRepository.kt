@@ -15,6 +15,8 @@ import site.resortpro.android.core.network.PaginatedHousekeepingEnvelope
 import site.resortpro.android.core.network.UpdateHousekeepingStatusRequest
 import site.resortpro.android.core.database.CacheDao
 import site.resortpro.android.core.database.CacheEntryEntity
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import site.resortpro.android.core.database.HousekeepingOutboxDao
 import site.resortpro.android.core.database.HousekeepingOutboxEntity
 import site.resortpro.android.core.database.cacheKey
@@ -114,6 +116,10 @@ class HousekeepingRepository(
         scheduleOutbox()
         HousekeepingStatusResult(optimistic, queued = true)
     }
+
+    /** Task ids with a change still waiting to reach the server. */
+    fun observeQueuedTaskIds(): Flow<Set<String>> =
+        outboxDao.observeAll().map { entries -> entries.map { it.taskId }.toSet() }
 
     suspend fun flushOutbox(): Boolean {
         for (pending in outboxDao.all()) {

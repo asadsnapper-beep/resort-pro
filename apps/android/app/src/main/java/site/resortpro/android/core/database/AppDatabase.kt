@@ -10,6 +10,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "cache_entries")
 data class CacheEntryEntity(
@@ -48,6 +49,18 @@ interface CacheDao {
 interface HousekeepingOutboxDao {
     @Query("SELECT * FROM housekeeping_outbox ORDER BY queuedAt ASC")
     suspend fun all(): List<HousekeepingOutboxEntity>
+
+    /**
+     * The queue as it actually is, not as the screen last remembered it.
+     *
+     * A change waiting to be sent outlives the process that queued it, and the
+     * sync worker clears entries from outside the UI. Anything derived from
+     * in-memory state is therefore wrong twice: it forgets what is still
+     * pending after a restart, and it keeps claiming "will send" after the
+     * worker already sent it.
+     */
+    @Query("SELECT * FROM housekeeping_outbox ORDER BY queuedAt ASC")
+    fun observeAll(): Flow<List<HousekeepingOutboxEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entry: HousekeepingOutboxEntity)
