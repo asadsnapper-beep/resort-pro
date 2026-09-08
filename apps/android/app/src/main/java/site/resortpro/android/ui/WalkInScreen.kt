@@ -417,6 +417,17 @@ private fun WalkInSuccessScreen(state: WalkInUiState, onAnother: () -> Unit, onD
                 modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            // Said here rather than swallowed: the check-in worked, but someone
+            // has to know the ID is not on file, while the guest is still at
+            // the desk holding it.
+            state.documentNote?.let { note ->
+                Text(
+                    note,
+                    modifier = Modifier.padding(bottom = 16.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
             Button(onClick = onAnother, modifier = Modifier.fillMaxWidth().height(50.dp)) {
                 Text("Create another walk-in")
             }

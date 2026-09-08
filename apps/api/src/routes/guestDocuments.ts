@@ -84,8 +84,15 @@ export async function guestDocumentRoutes(app: FastifyInstance) {
         docType = 'OTHER';
       }
 
-      // Save to storage (guest-docs folder)
-      const result = await uploadToStorage(fileBuffer, mimeType, 'guest-docs', tenantId);
+      // Save to storage (guest-docs folder).
+      //
+      // The origin is passed because the URL this returns is *stored*, not
+      // derived on read: without it, any environment that does not set APP_URL
+      // freezes "http://localhost:4000/..." into the row, and the document is
+      // unreachable from every client for the rest of its life. upload.ts has
+      // always passed it; this route did not.
+      const requestOrigin = `${request.protocol}://${request.hostname}`;
+      const result = await uploadToStorage(fileBuffer, mimeType, 'guest-docs', tenantId, requestOrigin);
 
       // Create DB record
       const doc = await db.guestDocument.create({

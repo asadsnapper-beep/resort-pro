@@ -15,6 +15,8 @@ import site.resortpro.android.core.network.ApiException
 import site.resortpro.android.core.network.RateQuoteDto
 import site.resortpro.android.core.network.RoomDto
 import site.resortpro.android.core.network.WalkInBookingDto
+import java.io.File
+import site.resortpro.android.core.media.readAsUploadableJpeg
 import site.resortpro.android.core.network.WalkInRequest
 import site.resortpro.android.feature.rooms.AvailabilityValidator
 
@@ -43,6 +45,8 @@ data class WalkInUiState(
     /** A photographed ID waiting to go up with the booking, if one was taken. */
     val documentPath: String? = null,
     val documentType: String = GuestDocumentType.NATIONAL_ID,
+    /** Set only when the check-in worked but the photograph did not go up. */
+    val documentNote: String? = null,
 ) {
     val selectedRoom: RoomDto? get() = availableRooms.firstOrNull { it.id == selectedRoomId }
     val nights: Int get() = nightsBetween(checkIn, checkOut)
@@ -208,6 +212,37 @@ class WalkInViewModel(
         }
     }
 
+    /**
+     * Send the photographed ID, if one was taken, and report only failure.
+     *
+     * Returns null when there is nothing to say: no document, or it uploaded.
+     * The file is deleted either way — a guest's passport must not outlive the
+     * check-in in a cache directory, and the desk can add it again from the
+     * guest's profile if this failed.
+     */
+    private suspend fun attachDocument(
+        state: WalkInUiState,
+        booking: WalkInBookingDto,
+    ): String? {
+        val path = state.documentPath ?: return null
+        val file = File(path)
+        return try {
+            val jpeg = file.readAsUploadableJpeg()
+                ?: return "Checked in, but the photo could not be read. Add it from the guest's profile."
+            repository.uploadDocument(
+                guestId = booking.guestId,
+                bookingId = booking.id,
+                docType = state.documentType,
+                jpeg = jpeg,
+            )
+            null
+        } catch (error: Throwable) {
+            "Checked in, but the document did not upload. Add it from the guest's profile."
+        } finally {
+            file.delete()
+        }
+    }
+
     fun submit() {
         val current = mutableState.value
         if (current.isSubmitting || current.submissionUncertain || current.createdBooking != null) return
@@ -254,7 +289,18 @@ class WalkInViewModel(
         viewModelScope.launch {
             runCatching { repository.create(request) }
                 .onSuccess { booking ->
-                    mutableState.update { it.copy(isSubmitting = false, createdBooking = booking) }
+                    // The booking is the thing the guest is standing there
+                    // waiting for; the photograph rides behind it and is never
+                    // allowed to take it back down.
+                    val documentNote = attachDocument(current, booking)
+                    mutableState.update {
+                        it.copy(
+                            isSubmitting = false,
+                            createdBooking = booking,
+                            documentPath = null,
+                            documentNote = documentNote,
+                        )
+                    }
                 }
                 .onFailure { error ->
                     mutableState.update {
