@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Only the app's own cache is shared, and only with the camera app we hand the
+  URI to. A guest's document must not be reachable through the shared gallery.
+-->
+<paths>
+    <cache-path name="guest_documents" path="." />
+</paths>

@@ -5,6 +5,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,7 +22,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import android.graphics.BitmapFactory
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -28,16 +37,30 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.core.content.FileProvider
+import java.io.File
 import java.text.NumberFormat
 import java.util.Locale
+import site.resortpro.android.core.media.DocumentImage
+import site.resortpro.android.core.media.newDocumentCaptureFile
 import site.resortpro.android.core.network.RoomDto
 import site.resortpro.android.feature.auth.AuthenticatedSession
+import site.resortpro.android.feature.walkin.GuestDocumentType
 import site.resortpro.android.feature.walkin.WalkInUiState
 import site.resortpro.android.feature.walkin.WalkInViewModel
 
@@ -193,6 +216,13 @@ fun WalkInScreen(
                         label = { Text("Room notes (optional)") },
                         enabled = !state.isSubmitting,
                         minLines = 2,
+                    )
+                    GuestDocumentCapture(
+                        documentPath = state.documentPath,
+                        documentType = state.documentType,
+                        enabled = !state.isSubmitting,
+                        onCaptured = viewModel::setDocument,
+                        onTypeChange = viewModel::setDocumentType,
                     )
                 }
             }
@@ -423,4 +453,130 @@ private fun formatWalkInMoney(value: Double): String {
     val formatter = NumberFormat.getNumberInstance(Locale.forLanguageTag("en-BD"))
     formatter.maximumFractionDigits = 0
     return "৳${formatter.format(value)}"
+}
+
+/**
+ * Photograph the ID the guest just handed over.
+ *
+ * The system camera app takes the picture, into a file in our own cache. That
+ * keeps the passport out of the shared gallery, and means the app needs no
+ * CAMERA permission of its own — declaring one would only make it required.
+ *
+ * Optional on purpose: a guest standing at the desk at midnight with no ID on
+ * them still has to be able to check in. The document can be added later from
+ * their profile.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GuestDocumentCapture(
+    documentPath: String?,
+    documentType: String,
+    enabled: Boolean,
+    onCaptured: (String?) -> Unit,
+    onTypeChange: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    var pendingFile by rememberSaveable { mutableStateOf<String?>(null) }
+
+    val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
+        val path = pendingFile
+        if (saved && path != null) {
+            onCaptured(path)
+        } else {
+            // Cancelled, or the camera app wrote nothing: leave no empty file
+            // behind pretending to be a document.
+            path?.let { File(it).delete() }
+            onCaptured(null)
+        }
+        pendingFile = null
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            "Guest document (optional)",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        // Wraps rather than squeezing: on a narrow phone the fourth chip was
+        // being crushed to one letter per line.
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            GuestDocumentType.OFFERED.forEach { type ->
+                FilterChip(
+                    selected = type == documentType,
+                    onClick = { onTypeChange(type) },
+                    enabled = enabled,
+                    label = { Text(documentTypeLabel(type)) },
+                )
+            }
+        }
+
+        if (documentPath != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // The photograph itself, so the person who took it can see
+                // whether it is readable before the guest walks away. Decoded
+                // here rather than through an image-loading library: it is one
+                // known local file, and a 72dp thumbnail does not justify a
+                // dependency.
+                val thumbnail = remember(documentPath) { decodeThumbnail(documentPath) }
+                if (thumbnail != null) {
+                    Image(
+                        bitmap = thumbnail,
+                        contentDescription = "Photographed guest document",
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop,
+                    )
+                }
+                TextButton(
+                    onClick = {
+                        File(documentPath).delete()
+                        onCaptured(null)
+                    },
+                    enabled = enabled,
+                ) { Text("Remove") }
+            }
+        }
+
+        OutlinedButton(
+            onClick = {
+                val file = context.newDocumentCaptureFile()
+                pendingFile = file.absolutePath
+                takePicture.launch(
+                    FileProvider.getUriForFile(context, "${context.packageName}.documents", file),
+                )
+            },
+            enabled = enabled,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+        ) {
+            Text(if (documentPath == null) "Take a photo of the ID" else "Retake")
+        }
+    }
+}
+
+private fun documentTypeLabel(type: String): String = when (type) {
+    GuestDocumentType.NATIONAL_ID -> "NID"
+    GuestDocumentType.PASSPORT -> "Passport"
+    GuestDocumentType.DRIVERS_LICENSE -> "Licence"
+    else -> "Other"
+}
+
+/** A small preview of the captured file, sampled down so it costs nothing. */
+private fun decodeThumbnail(path: String): ImageBitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(path, bounds)
+    if (bounds.outWidth <= 0) return null
+    return BitmapFactory.decodeFile(
+        path,
+        BitmapFactory.Options().apply {
+            inSampleSize = DocumentImage.sampleSizeFor(bounds.outWidth, bounds.outHeight, maxEdge = 200)
+        },
+    )?.asImageBitmap()
 }

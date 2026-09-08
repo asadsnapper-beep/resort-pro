@@ -40,6 +40,9 @@ data class WalkInUiState(
     val conflictMessage: String? = null,
     val submissionUncertain: Boolean = false,
     val createdBooking: WalkInBookingDto? = null,
+    /** A photographed ID waiting to go up with the booking, if one was taken. */
+    val documentPath: String? = null,
+    val documentType: String = GuestDocumentType.NATIONAL_ID,
 ) {
     val selectedRoom: RoomDto? get() = availableRooms.firstOrNull { it.id == selectedRoomId }
     val nights: Int get() = nightsBetween(checkIn, checkOut)
@@ -110,6 +113,14 @@ class WalkInViewModel(
             advanceAmount = if (value == "LATER") "" else it.advanceAmount,
             validation = it.validation.copy(advanceError = null),
         )
+    }
+
+    fun setDocument(path: String?) {
+        mutableState.update { it.copy(documentPath = path) }
+    }
+
+    fun setDocumentType(docType: String) {
+        mutableState.update { it.copy(documentType = docType) }
     }
 
     fun updateAdvance(value: String) = mutableState.update {

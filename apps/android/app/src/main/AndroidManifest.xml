@@ -22,6 +22,22 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          Hands the camera app a URI into our own cache for the one photo it is
+          about to take. No CAMERA permission is declared on purpose: the
+          system camera app owns the hardware, and declaring the permission
+          here would make it required of us for no gain.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.documents"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/document_capture_paths" />
+        </provider>
     </application>
 
 </manifest>

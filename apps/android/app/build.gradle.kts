@@ -92,6 +92,8 @@ dependencies {
     implementation(platform(libs.okhttp.bom))
     implementation(libs.okhttp.core)
 
+    implementation(libs.androidx.fragment)
+
     testImplementation(libs.junit4)
     testImplementation(libs.androidx.room.testing)
 
