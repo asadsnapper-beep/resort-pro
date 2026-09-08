@@ -49,7 +49,7 @@ COPY --from=builder /app/apps/api/dist   ./dist
 COPY --from=builder /app/apps/api/package.json   ./package.json
 
 # Backup/restore scripts — versioned with the code that they protect.
-COPY scripts/backup-db.sh scripts/backup-uploads.sh scripts/restore-db.sh ./scripts/
+COPY scripts/backup-db.sh scripts/backup-postgres.sh scripts/backup-uploads.sh scripts/restore-db.sh ./scripts/
 RUN chmod +x ./scripts/*.sh
 
 EXPOSE 4000

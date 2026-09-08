@@ -3,15 +3,25 @@
 ## What exists
 
 A `backup` service in every compose file runs [scripts/backup-db.sh](../../scripts/backup-db.sh)
-once at start and then daily. Each run does a `pg_dump -Fc`, verifies the file
-with `pg_restore --list`, and deletes dumps older than `BACKUP_RETENTION_DAYS`
-(default 14).
+once at start and then daily. That script runs two independent legs and reports
+on both:
 
-It then chains [scripts/backup-uploads.sh](../../scripts/backup-uploads.sh),
-which tars the uploads volume. That half is not optional: `guest_documents`
-rows hold only a URL, and the passport and ID photos themselves live on disk.
-A dump alone restores every row and no image — a database full of broken links,
-which looks like a successful restore until someone opens a document.
+[scripts/backup-postgres.sh](../../scripts/backup-postgres.sh) does a
+`pg_dump -Fc`, verifies the file with `pg_restore --list`, and deletes dumps
+older than `BACKUP_RETENTION_DAYS` (default 14).
+
+[scripts/backup-uploads.sh](../../scripts/backup-uploads.sh) tars the uploads
+volume. That half is not optional: `guest_documents` rows hold only a URL, and
+the passport and ID photos themselves live on disk. A dump alone restores every
+row and no image — a database full of broken links, which looks like a
+successful restore until someone opens a document.
+
+**The two legs cannot stop each other**, and that is the point of the split. The
+first version chained the uploads archive onto the end of the dump under
+`set -e`. On staging, where `PGPASSWORD` was empty and `pg_dump` had been
+failing every night unread, the uploads leg was therefore never reached at all —
+one broken credential silently took out a backup it had nothing to do with.
+A failure in either leg now still fails the run, loudly, but only its own half.
 
 The archive is a plain `tar`, not `tar.gz`: the contents are JPEG/PNG/WebP and
 already compressed. It is verified with `tar -tf` before it is kept, and pruned
@@ -48,10 +58,19 @@ docker compose exec backup ls -lh /backups
 
 A healthy run logs two `[backup] ok` lines — `<n> tables with data` for the
 dump, `<n> file(s)` for the uploads archive. **One without the other is a
-failure**, and the log says which: `uploads dir ... is not mounted` means the
-compose change adding `- uploads_data:/app/uploads:ro` never reached this
-environment. On production that compose lives in Coolify's own database rather
-than in git, so it has to be edited there by hand.
+failure**, and the log names which leg:
+
+- `uploads dir ... is not mounted` — the compose change adding
+  `- uploads_data:/app/uploads:ro` never reached this environment. On production
+  that compose lives in Coolify's own database rather than in git, so it has to
+  be edited there by hand.
+- `fe_sendauth: no password supplied` — the backup container's `PGPASSWORD` is
+  empty while the database has one. This happened on staging and went unnoticed
+  for a long time, because nothing reads these logs unless someone goes looking.
+
+**Do this check after every deploy that touches the backup service.** Every
+failure described here announced itself correctly in the log and was still
+missed, which is a fact about how the log is read, not about how it is written.
 
 If the directory is empty more than a few minutes after start, the service is
 failing — read the logs rather than assuming it is slow.
@@ -85,8 +104,10 @@ the current state is recoverable if the restore turns out to be the wrong call.
 
 ### Restoring the documents too
 
-The dump does not carry them. Restore the matching archive — the one with the
-same timestamp, so rows and files agree — into the API's uploads volume:
+The dump does not carry them. Restore the archive from the same run as the dump
+you chose, so rows and files agree. The two legs can fail independently, so a
+dump may have no archive beside it — in that case take the closest later one:
+an image with no row is harmless, a row with no image is the broken link.
 
 ```bash
 docker compose exec backup ls /backups/uploads-*.tar
