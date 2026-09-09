@@ -26,17 +26,19 @@ plan/
 
 ### Recommended implementation order
 
-| Priority | Plan | Why this order |
-|---|---|---|
-| **P0** | [checkout-billing-completeness.md](./checkout-billing-completeness.md) | Four totals disagree today and money is collected against the smallest. Everything below adds charges this must be able to carry. |
-| **P1** | [restaurant-room-billing.md](./restaurant-room-billing.md) | Largest unbilled charge volume, and the backend is already shaped for it. |
-| **P1** | [early-checkin-late-checkout.md](./early-checkin-late-checkout.md) | New revenue, self-contained, adds no new charge plumbing. |
-| **P2** | [airport-transfers.md](./airport-transfers.md) — Phase A | Operational only. **Not blocked by billing**: a stranded guest is worse than an unbilled trip. |
-| **P3** | [airport-transfers.md](./airport-transfers.md) — Phase B | Transfer billing; needs P0 finished. |
+| Priority | Plan | Status | Why this order |
+|---|---|---|---|
+| **P0** | [checkout-billing-completeness.md](./checkout-billing-completeness.md) | ✅ Built | Four totals disagreed and money was collected against the smallest. Everything below adds charges this must be able to carry. |
+| **P1** | [restaurant-room-billing.md](./restaurant-room-billing.md) | 🟡 Phase 1 built | Largest unbilled charge volume, and the backend was already shaped for it. Comp/corporate, QR tokens and reporting remain. |
+| **P1** | [early-checkin-late-checkout.md](./early-checkin-late-checkout.md) | ✅ Built | New revenue, self-contained, adds no new charge plumbing. Off by default per tenant. |
+| **P2** | [airport-transfers.md](./airport-transfers.md) — Phase A | ❌ Not built | Operational only. **Not blocked by billing**: a stranded guest is worse than an unbilled trip. |
+| **P3** | [airport-transfers.md](./airport-transfers.md) — Phase B | ❌ Not built | Transfer billing. P0 is now finished, so this is unblocked. |
 
-Six charge sources already funnel through `InvoiceExtra` (minibar, laundry,
-vehicle rental, damages, and soon early/late and transfers) and none of them
-reach the checkout total. P0 is what unblocks all of them.
+Six charge sources funnel through `InvoiceExtra` (minibar, laundry, vehicle
+rental, damages, early/late, and eventually transfers). P0 is what made them
+reach the checkout total, and it is done — so any new charge source must
+conform to [billing-contract.md](./billing-contract.md) rather than inventing
+its own path to the bill.
 
 ---
 
@@ -46,7 +48,7 @@ reach the checkout total. P0 is what unblocks all of them.
 |------|---------|--------|
 | [billing-contract.md](./billing-contract.md) | **Normative.** The rules every charge source obeys — one `bill()`, `sourceType`/`sourceId` provenance, idempotent charge creation, immutable final invoice, adjustments not edits, conformance checklist for new modules | 📋 Contract — implemented by P0 |
 | [front-desk.md](./front-desk.md) | Check-in/out, walk-in booking, room map, daily arrivals/departures | ✅ Built |
-| [checkout-billing-completeness.md](./checkout-billing-completeness.md) | **P0.** One authoritative `bill(bookingId)`; room priced from `booking.totalAmount` not `basePrice`; food/extras/packages/tax in one place; checkout finalises the Invoice (immutable) with idempotent, provenance-tagged line items | ❌ Not built — **loses money today** |
+| [checkout-billing-completeness.md](./checkout-billing-completeness.md) | **P0.** One authoritative `bill(bookingId)`; room priced from `booking.totalAmount` not `basePrice`; food/extras/packages/tax in one place; checkout finalises the Invoice (immutable) with idempotent, provenance-tagged line items | ✅ Built — one `bill()`, settlement in a single transaction, invoice finalised on check-out |
 | [housekeeping.md](./housekeeping.md) | Room status tracking, cleaning tasks, staff assignment, floor map | ✅ Built |
 | [housekeeping-extras.md](./housekeeping-extras.md) | Lost & Found, Minibar (catalog + consumption), Laundry orders — new tabs on the Housekeeping page, with "Bill to Room" wired into the existing InvoiceExtra mechanism | ✅ Built |
 | [maintenance.md](./maintenance.md) | Issue reporting, assignment, OOO room management | ✅ Built |

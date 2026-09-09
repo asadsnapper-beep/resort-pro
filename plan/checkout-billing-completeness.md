@@ -4,7 +4,11 @@
 > them, the guest is emailed a fifth number, and the `Invoice` record is frozen
 > in the state it had on the day the booking was made.
 
-Status: ❌ Not built · **P0 — this loses money today.**
+Status: ✅ Built · **P0** · The evidence below is the state *before* the fix —
+kept because it is what the work was measured against, not a description of
+today. `bill()` is now the single calculation, charges carry
+`sourceType`/`sourceId` provenance, check-out settles in one transaction, and
+the finalised invoice is immutable (corrections are adjustments, never edits).
 Implements: [billing-contract.md](./billing-contract.md)
 
 ---

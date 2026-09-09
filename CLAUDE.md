@@ -80,8 +80,14 @@ See the global instructions — all new modals use `ModalShell` from
 `@/components/ui/modal-shell` (handles createPortal, body overflow, and the
 resort design). Don't use shadcn `<Modal>` in new code.
 
-## Active project memory
+## Active project memory — read this first, every time
 
-Read [memory/projects/resortpro.md](memory/projects/resortpro.md) before
-starting product, pricing, marketing, deployment, or design work. It records
-the current source-of-truth decisions and flags older plans that are now stale.
+**[memory/projects/resortpro.md](memory/projects/resortpro.md) is the entry
+point for any new conversation about this repository.** Read it before doing
+anything else — not only for product, pricing, deployment or design work.
+
+It records what is true today, how the founder wants to work, what shipped
+recently, what is still open, and — importantly — **which older documents in
+this repository are now wrong.** There are around a hundred plan files written
+over many months, and several describe as "not built" things that have since
+shipped. Where that file and another document disagree, that file wins.

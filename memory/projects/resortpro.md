@@ -1,8 +1,14 @@
 # ResortPro — Active Project Memory
 
-> Last reconciled: 2026-08-05. Read this before beginning a new task, then
+> Last reconciled: 2026-09-10. Read this before beginning a new task, then
 > open the linked source documents relevant to that task. This is a concise
 > working memory, not a replacement for the detailed plans.
+>
+> **This file is the entry point for a new conversation.** The repository holds
+> around a hundred plan documents and a dozen top-level ones, written over
+> months; several now describe things that have since shipped or changed. When
+> this file and another document disagree, this file wins — and if you find a
+> document that is wrong, say so rather than quietly working around it.
 
 ## Source-of-truth order
 
@@ -19,6 +25,74 @@ Several older documents are historical. In particular, references to a $0
 superseded by the locked pricing decision below. Never revive those choices
 without a new founder decision.
 
+## How the founder wants to work
+
+These have been said more than once. They are not preferences to weigh; treat
+them as constraints.
+
+- **Small steps.** Never take a large multi-file task in one go. Smallest
+  useful piece → verify it → check in → next. An approved plan is not approval
+  to do all of it silently.
+- **Never push without explicit approval.** Not to `dev`, not to `main`. Say
+  what would be pushed and wait.
+- **Anything that needs a server, write a prompt.** There is no access to the
+  staging or production hosts from here. Write a self-contained prompt, save it
+  under `plan/fixes/`, send the file — never a list of steps for the founder to
+  perform by hand. **And say plainly, before the file, which session to paste it
+  in, in what order, and what to bring back.** The founder has said they often
+  cannot tell which session a prompt belongs to.
+- **Production data safety is absolute.** Never `prisma db push`, never
+  `migrate reset`, never `--accept-data-loss` against a real database.
+  Migrations only. SQL in verification prompts is read-only.
+- **Bangla is gated.** No unconditional Bangla in the product UI — always
+  `isBn = useLocale() === 'bn'`. English is the default for everyone outside
+  Bangladesh. (Conversation with the founder is Bangla/Banglish; that is
+  separate.)
+- **Report honestly.** If a test fails, show it. If a step was skipped, say so.
+  If something was proven only by unit test and not on a device or server, say
+  which. A green CI run is not evidence that the code is live.
+
+## What shipped since the previous reconciliation (2026-08-05 → 2026-09-10)
+
+About 150 commits reached `main`. The parts that change how you should think
+about the codebase:
+
+- **Check-out billing is built.** One calculation for what a stay owes,
+  provenance on every charge (`sourceType` + `sourceId`), immutable finalised
+  invoices, adjustments instead of edits, and settlement in a single
+  transaction. The rules live in `plan/billing-contract.md` — read it before
+  touching anything that produces money.
+- **Restaurant charges reach the room.** A food order carries an explicit
+  `settlement` (`CHARGE_TO_ROOM` / `PAY_NOW`) rather than having it inferred.
+  Cancelling a billed order issues a credit; it never edits the original.
+- **Early check-in / late check-out.** `StayTimePolicy` per tenant, wall-clock
+  windows in `Tenant.timezone`, `StayTimeGrant` for what was actually given.
+  **Off by default** (`enabled` defaults to `false`) — a tenant turns it on in
+  settings.
+- **The Android staff app** — session restore, app lock, Bangla, housekeeping
+  laid out for the person doing the work, an outbox-backed sync badge, and
+  walk-in guest documents from the camera or the gallery.
+- **Backups now include the uploads volume.** `guest_documents` rows hold only
+  a URL; the images live on disk. See "Backups" below — this is partly still
+  open.
+
+## Documents that are wrong today
+
+Do not trust these without checking the code first. Fixing them is welcome;
+silently believing them is how a session goes wrong.
+
+- `plan/landing-page-design-instructions.md` still carries a $0-pricing
+  section. Use the locked commercial model below.
+- Anything describing mobile as Expo, archived, or deferred.
+- Corrected on 2026-09-10: `plan/README.md` and
+  `plan/checkout-billing-completeness.md` used to say P0 check-out billing was
+  "❌ Not built — loses money today" long after it shipped. Both now say built.
+  The evidence section inside the P0 plan is deliberately kept as the *before*
+  picture and is labelled as such — do not read it as current.
+- The general rule: a `plan/*.md` describes the state on the day it was
+  written. Check the code before believing a status line, and fix the line when
+  you find it wrong.
+
 ## Product and platform
 
 - ResortPro is a multi-tenant resort-management SaaS for small and independent
@@ -26,8 +100,13 @@ without a new founder decision.
   inventory, CRM, invoices, direct-booking websites, custom domains, analytics,
   and super-admin controls.
 - Runtime: Next.js web app, Fastify API, PostgreSQL/Prisma, Redis/BullMQ,
-  Resend email, Stripe/bKash/SSLCommerz. Desktop client is Electron; mobile
-  Expo work is archived/deferred.
+  Resend email, Stripe/bKash/SSLCommerz. Desktop client is Electron.
+- **Mobile is a native Android app** in `apps/android` — Kotlin, Jetpack
+  Compose, Room, `site.resortpro.android`, minSdk 24, versionName 0.1.0. It is
+  a staff app (housekeeping, walk-in check-in, guest documents), not a guest
+  app, and it is offline-first with a Room-backed outbox. The older Expo/React
+  Native effort is archived; do not resurrect it, and do not describe mobile as
+  "deferred".
 - The Electron desktop app is a web-app wrapper today. A true offline-first
   roadmap exists but is not complete: offline bookings must remain drafts until
   the server confirms availability; finance remains read-only offline; inventory
@@ -106,14 +185,48 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
   images, patches Coolify's stored raw compose via its API, then waits for API
   and web health checks. A green deploy workflow confirms both health endpoints,
   not necessarily every separate CI job.
-- Production deploys completed successfully for pricing/welcome-email changes
-  through commit `4b9b371` (2026-08-05 context).
-- The independent CI workflow currently has stale test expectations around the
-  old free/trial access behaviour; fix fixtures and the pnpm setup before using
-  its status as a release-quality signal.
+- **The two environments get their compose differently, and this trips people
+  up.** Staging's workflow sends the *whole* `docker-compose.staging.yml` as
+  text, so any edit to that file reaches staging on the next deploy.
+  Production's compose lives **in Coolify's own database, not in git**; the
+  workflow fetches it, rewrites only the image tags, and puts it back. So a
+  change to `docker-compose.coolify.yml` — a new volume, a new env var, a
+  changed entrypoint — **never reaches production on its own**. It has to be
+  typed into Coolify by hand. Design changes so the part that must ship in the
+  image does, and only the unavoidable line needs a manual edit.
+- A green deploy is not proof the new code is running. Prove it with something
+  only the new build has — a route that did not exist (401 rather than 404), a
+  row in `_prisma_migrations`, a changed response. If a batch adds no such
+  marker, say so instead of implying the deploy was verified.
+- The API's `CMD` chains `migrate deploy && seed-demo && seed-admin && index.js`
+  with `&&`. A failing seed therefore means the API never starts at all.
+- Staging deploys have hit a Cloudflare 100-second timeout (524) on the
+  Portainer stack update. It is not fixed and will recur.
 - Before production changes: preserve unrelated working-tree edits, run
   relevant build/tests, deploy only after an explicit implementation request,
   and report any configuration action that needs founder-owned credentials.
+
+### Backups — read before promising anything about them
+
+- The `backup` sidecar runs `scripts/backup-db.sh`, which runs two independent
+  legs: `backup-postgres.sh` (`pg_dump -Fc`, verified with `pg_restore --list`)
+  and `backup-uploads.sh` (a plain `tar` of the uploads volume, verified with
+  `tar -tf`). They are separate processes on purpose — neither may take the
+  other down.
+- **Guest ID and passport images are not in the database.** `guest_documents`
+  holds a URL; the file is on disk under `<tenantId>/guest-docs/`. A dump alone
+  restores every row and no image.
+- On 2026-09-09 staging was found to have had **no database backup at all** for
+  a long time: `PGPASSWORD` had no default in one place in the compose while
+  the database had one, so `pg_dump` failed nightly into a log nobody read.
+  Fixed. The lesson is not the fix — it is that **a manual run proving a script
+  works says nothing about the scheduled run.** Always read the container's own
+  startup log.
+- Still open: production's uploads mount must be added in Coolify by hand (see
+  `plan/fixes/enable-uploads-backup-production.md`), and **production's backup
+  has never been verified at all.** Backups also still sit on the same host as
+  the database; copying them off-box has not been done. Do not describe this
+  system as backed up.
 
 ## Project state and roadmap
 
@@ -132,13 +245,67 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
   default, enforce quotas, protect tenant data, and avoid model/API cost before
   real demand justifies it.
 
+## Known open, as of 2026-09-10
+
+Do not re-discover these; do not claim any of them is done without checking.
+
+- **Production's uploads backup mount** is not added yet, and production's
+  backup has never been verified. Prompts: `plan/fixes/enable-uploads-backup-production.md`,
+  `plan/fixes/verify-uploads-backup-staging.md`.
+- **Old guest documents on staging and production still carry `localhost`
+  URLs.** New uploads are fixed (the route now derives the origin from the
+  request); the existing rows were never repaired, and those documents are
+  unreachable. Repairing them is an undecided, separate job.
+- **Android:** a rejected sync change still vanishes silently (`flushOutbox`
+  deletes on 4xx); an offline restart logs the housekeeper out entirely; there
+  is no both-sides resolution UI for a 409; no global offline banner; "Report a
+  problem" does not create a maintenance ticket. The walk-in document Retry
+  button has not been pressed on a real device.
+- **`SEED_DEMO_REFRESH`** is set in Coolify's stored compose but no deploy has
+  used it. The safer first move is a one-off manual
+  `docker exec … SEED_DEMO_REFRESH=1 node dist/scripts/seed-demo.js`, because
+  the seed gates API startup.
+- **Signup and `/plans`:** open product question — whether every signup CTA
+  should route through `/plans` first. Also check whether the launch promotion
+  is actually live before "Start Free Trial" in `DemoBanner.tsx` keeps promising
+  a trial.
+- **Host DNS**, containers stuck in `Created` — root cause still unknown.
+- Restaurant billing remainder: COMPLIMENTARY/CORPORATE settlement, the QR
+  token flow, and reporting.
+
 ## Always read for a task
 
 | Task type | Read first |
 |---|---|
+| Anything that produces money | `plan/billing-contract.md` — provenance, idempotency, immutable invoices, adjustments over edits |
 | Dashboard UI or modal | `apps/web/DESIGN_TOKENS.md`, `plan/design-system-migration.md`, `AGENTS.md` |
 | Landing/marketing design | `plan/landing-page-design-instructions.md` plus this file's pricing correction |
 | Pricing/billing/onboarding | `plan/launch-pricing-and-trial-abuse-prevention.md`, `code-instructions/pricing-implementation-steps-2-4.md`, `packages/types/src/plans.ts` |
-| Deploy/production | `.github/workflows/deploy.yml`, `docs/coolify-deployment.md`, `DEPLOY.md` |
+| Android app | `apps/android/README.md`, `plan/mobile-app-ux.md`, `plan/offline-sync-conflicts.md` |
+| Deploy/production | `.github/workflows/deploy.yml`, `docs/coolify-deployment.md`, `DEPLOY.md`, and the compose caveat above |
+| Backups/restore | `plan/fixes/backup-restore-runbook.md` |
 | Feature work | `docs/PROGRESS.md`, then the relevant `plan/*.md` and task document |
 | Security/data | `plan/security-audit-2026-07.md`, `plan/auth-origin-hardening.md`, `docs/SYSTEM_REVIEW.md` |
+
+## Repository facts worth knowing before you start
+
+- pnpm workspace + Turbo. Apps: `apps/web` (Next.js), `apps/api` (Fastify),
+  `apps/android` (Kotlin), `apps/desktop` (Electron), `apps/embed`,
+  `apps/wordpress-plugin`. Shared: `packages/database` (Prisma),
+  `packages/types`.
+- Work usually happens in a **git worktree** under `.claude/worktrees/`, not
+  the main checkout. The stash stack is shared across worktrees — never bare
+  `git stash`.
+- The Android build needs JDK 17; there is no system Java. Use
+  `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"`.
+- The API container ships only `dist/` and has no `tsx`. Scripts run as
+  `node dist/scripts/<name>.js` and must be listed in `apps/api/tsup.config.ts`
+  to exist at all.
+- `prisma migrate diff --exit-code` against a shadow database is how you prove
+  hand-written SQL matches the datamodel. Do that rather than trusting a
+  migration by eye.
+- Tenant scoping does not survive a Prisma interactive transaction — the
+  callback hands back an unextended client, so pass `tenantId` explicitly
+  inside `$transaction`.
+- `createMany({ skipDuplicates })` drops duplicates **silently**, and Postgres
+  treats NULLs as distinct in unique indexes. Both have caused real bugs here.
