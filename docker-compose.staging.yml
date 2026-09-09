@@ -131,7 +131,7 @@ services:
       # password — pg_dump failing every night, unread, for as long as that was
       # true. Defaults that disagree inside one file are how that happens.
       PGPASSWORD: ${POSTGRES_PASSWORD:-resortpro_staging}
-      POSTGRES_DB: ${POSTGRES_DB:-resortpro}
+      POSTGRES_DB: ${POSTGRES_DB:-resortpro_staging}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
     volumes:
       - backups_staging_data:/backups

@@ -27,7 +27,16 @@ file="$BACKUP_DIR/${POSTGRES_DB}-${stamp}.dump"
 mkdir -p "$BACKUP_DIR"
 
 echo "[backup] dumping $POSTGRES_DB from $POSTGRES_HOST → $file"
-pg_dump -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc -f "$file"
+if ! pg_dump -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc -f "$file"; then
+  # pg_dump creates the output file before it finishes connecting, so a
+  # failure leaves an empty one behind. Under `set -e` the script used to exit
+  # right here — before the verification below could delete it — and staging
+  # accumulated about fifty 0-byte .dump files that read as backups in a
+  # directory listing. An empty file where a backup should be is worse than no
+  # file: it answers "is it backed up?" with a yes.
+  rm -f "$file"
+  exit 1
+fi
 
 # Verify before trusting it. pg_restore --list parses the archive's table of
 # contents, so a truncated or corrupt dump fails here rather than during the
