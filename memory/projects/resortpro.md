@@ -222,11 +222,27 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
   Fixed. The lesson is not the fix — it is that **a manual run proving a script
   works says nothing about the scheduled run.** Always read the container's own
   startup log.
-- Still open: production's uploads mount must be added in Coolify by hand (see
-  `plan/fixes/enable-uploads-backup-production.md`), and **production's backup
-  has never been verified at all.** Backups also still sit on the same host as
-  the database; copying them off-box has not been done. Do not describe this
-  system as backed up.
+- **Production has no backup service at all.** Established 2026-09-10 by
+  reading the server: Coolify's stored compose has four services — `postgres`,
+  `redis`, `api`, `web`. The `backup` and `worker` services exist only in
+  `docker-compose.coolify.yml` in git, which is **not** what production runs.
+  The deploy workflow only `sed`s the two image tags in Coolify's stored
+  compose (`deploy.yml`), so it can never add a service. No amount of
+  deploying will bring them into existence. **Production has never had a
+  database backup.** Do not describe it as backed up, and do not assume the
+  service is there and merely misconfigured.
+- **The worker has never run on production either**, so pre-arrival reminders,
+  iCal sync, daily reports, automation sequences, trial emails and the expiry
+  of abandoned public booking holds have never happened. Turning it on for the
+  first time is its own decision, not a side effect of a backup fix: it acts on
+  a backlog that has been accumulating for months. Read the second half of
+  `plan/fixes/backup-restore-runbook.md` before it is ever started.
+- Whatever is added, backups still sit on the same host as the database.
+  Copying them off-box has not been done.
+- The general lesson, which has now cost real time twice: **a service in a
+  compose file in git is not a service that is running.** Staging's whole file
+  is sent to Portainer on each deploy, so git is truth there. Production's is
+  not. Check the server before reasoning about production's topology.
 
 ## Project state and roadmap
 
@@ -249,9 +265,10 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
 
 Do not re-discover these; do not claim any of them is done without checking.
 
-- **Production's uploads backup mount** is not added yet, and production's
-  backup has never been verified. Prompts: `plan/fixes/enable-uploads-backup-production.md`,
-  `plan/fixes/verify-uploads-backup-staging.md`.
+- **Production has no backup service and no worker** — see "Backups" above for
+  the detail. The next step is reconnaissance, not a fix:
+  `plan/fixes/production-backup-recon.md`. Staging's own daily backup is being
+  verified with `plan/fixes/verify-uploads-backup-staging.md`.
 - **Old guest documents on staging and production still carry `localhost`
   URLs.** New uploads are fixed (the route now derives the origin from the
   request); the existing rows were never repaired, and those documents are
