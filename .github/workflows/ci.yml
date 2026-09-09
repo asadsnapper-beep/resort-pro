@@ -394,3 +394,32 @@ jobs:
 
       - name: Check for design system regressions
         run: node scripts/design-system-ratchet.mjs
+
+  # ── Backup credentials (blocking) ────────────────────────────────────────────
+  # The backup sidecar has to connect to the same database the application
+  # does. That stopped being true twice in two days, in one file, two lines
+  # apart — first the password default, then the database name — and each time
+  # pg_dump failed every night into a log nobody reads. Staging ran from August
+  # to September with about fifty 0-byte dump files and no backup at all.
+  #
+  # Blocking, because the failure is silent where it matters: everything looks
+  # healthy, and you find out when you need to restore. A comment warning about
+  # the hazard was already in the file and did not prevent the second one.
+  #
+  # Plain node, no dependencies — so, like the ratchet above, this job must not
+  # touch the package-manager cache.
+  backup-credentials:
+    name: Backup credentials match
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          package-manager-cache: false
+
+      - name: Assert the backup can reach the application's database
+        run: node scripts/check-backup-credentials.mjs --show
