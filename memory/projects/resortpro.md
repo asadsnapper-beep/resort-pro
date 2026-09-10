@@ -216,12 +216,23 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
 - **Guest ID and passport images are not in the database.** `guest_documents`
   holds a URL; the file is on disk under `<tenantId>/guest-docs/`. A dump alone
   restores every row and no image.
-- On 2026-09-09 staging was found to have had **no database backup at all** for
-  a long time: `PGPASSWORD` had no default in one place in the compose while
-  the database had one, so `pg_dump` failed nightly into a log nobody read.
-  Fixed. The lesson is not the fix — it is that **a manual run proving a script
-  works says nothing about the scheduled run.** Always read the container's own
-  startup log.
+- Staging had **no database backup at all** from August until 2026-09-10 —
+  about fifty consecutive 0-byte dump files. Two separate credential mismatches
+  in the same compose file, found one after the other: `PGPASSWORD` had no
+  default where the database had one, and then `POSTGRES_DB` defaulted to
+  `resortpro` where the database is `resortpro_staging`. Both fixed;
+  `scripts/check-backup-credentials.mjs` now asserts in CI that the backup
+  resolves to the same user, database and password as postgres, and prints them
+  in the log on every run.
+- Two lessons worth more than the fixes. **A manual run proving a script works
+  says nothing about the scheduled run** — read the container's own startup
+  log. And **a comment warning about a hazard does not prevent it**: the
+  PGPASSWORD fix carried a comment about mismatched defaults, written without
+  checking the line two below it, which held the next instance of exactly that
+  bug. Mechanical checks, not warnings.
+- Staging's backup was verified end to end on 2026-09-10: two `ok` lines from
+  the container's own startup run, a 361 KB dump, and a restore into a scratch
+  database whose tenant/booking counts matched the live database exactly.
 - **Production has no backup service at all.** Established 2026-09-10 by
   reading the server: Coolify's stored compose has four services — `postgres`,
   `redis`, `api`, `web`. The `backup` and `worker` services exist only in
@@ -267,8 +278,15 @@ Do not re-discover these; do not claim any of them is done without checking.
 
 - **Production has no backup service and no worker** — see "Backups" above for
   the detail. The next step is reconnaissance, not a fix:
-  `plan/fixes/production-backup-recon.md`. Staging's own daily backup is being
-  verified with `plan/fixes/verify-uploads-backup-staging.md`.
+  `plan/fixes/production-backup-recon.md`.
+- **Deleting a guest does not delete their ID photograph.** `GuestDocument`
+  cascades from both `Guest` and `Tenant`, so the rows go; the file on disk is
+  only ever removed by the explicit `DELETE /guests/:id/documents/:docId`
+  route. Every other path — deleting a guest, deleting a tenant, staging's
+  nightly demo refresh — leaves the passport or NID scan on disk with nothing
+  pointing at it. Staging currently holds four such orphans against zero
+  `guest_documents` rows. This is a privacy problem, not just wasted disk: a
+  guest asking to be deleted is not actually deleted.
 - **Old guest documents on staging and production still carry `localhost`
   URLs.** New uploads are fixed (the route now derives the origin from the
   request); the existing rows were never repaired, and those documents are
