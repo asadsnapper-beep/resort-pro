@@ -276,14 +276,13 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
 
 Do not re-discover these; do not claim any of them is done without checking.
 
-- **Production loses every uploaded file on each deploy.** Its `api` service
-  has no `volumes:` block, so `/app/uploads` is container-local. Confirmed
-  2026-09-10: two guest documents uploaded on 11 and 14 August now 404, and the
-  directory holds zero files. This is not only guest IDs — room photos, menu
-  pictures, website images and vehicle photos share that directory. Fix prompt:
-  `plan/fixes/production-stop-losing-uploads.md` with the validated compose in
-  `plan/fixes/production-compose-with-uploads.yml`. What is already gone cannot
-  be recovered.
+- ~~Production loses every uploaded file on each deploy.~~ **Fixed 2026-09-11.**
+  Its `api` service had no `volumes:` block, so `/app/uploads` was
+  container-local and every redeploy discarded it — guest IDs, room photos, menu
+  pictures, website and vehicle images alike. Two guest documents from 11 and 14
+  August were lost this way and cannot be recovered. The `uploads_data` volume
+  and `STORAGE_LOCAL_DIR` are now in Coolify's compose, verified the only way
+  that counts: upload a file, count it, redeploy, count again — 1 and 1.
 - **Production has no backup service and no worker** — see "Backups" above.
   Recon already done (`plan/fixes/production-backup-recon.md`); Coolify's own
   scheduled-backup feature does not apply, because production's postgres lives

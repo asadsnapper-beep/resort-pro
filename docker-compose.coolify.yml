@@ -134,6 +134,11 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-resortpro}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    # Every other service in this file is on the external `coolify` network.
+    # Without this the sidecar lands on the default network instead and cannot
+    # resolve `postgres` at all — it would start, fail to connect, and report a
+    # backup failure that looks like a credential problem.
+    networks: [coolify]
     volumes:
       - backups_data:/backups
       # Read-only: this sidecar archives the guest ID/passport images, it must
@@ -171,6 +176,10 @@ services:
     command: ['node', 'dist/worker.js']
     environment:
       <<: *api-env-coolify
+    # Same reason as the backup sidecar: everything else in this file is on the
+    # external `coolify` network, and without this the worker cannot resolve
+    # postgres or redis.
+    networks: [coolify]
     depends_on:
       api:
         condition: service_healthy
