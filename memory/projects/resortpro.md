@@ -276,9 +276,30 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
 
 Do not re-discover these; do not claim any of them is done without checking.
 
-- **Production has no backup service and no worker** — see "Backups" above for
-  the detail. The next step is reconnaissance, not a fix:
-  `plan/fixes/production-backup-recon.md`.
+- **Production loses every uploaded file on each deploy.** Its `api` service
+  has no `volumes:` block, so `/app/uploads` is container-local. Confirmed
+  2026-09-10: two guest documents uploaded on 11 and 14 August now 404, and the
+  directory holds zero files. This is not only guest IDs — room photos, menu
+  pictures, website images and vehicle photos share that directory. Fix prompt:
+  `plan/fixes/production-stop-losing-uploads.md` with the validated compose in
+  `plan/fixes/production-compose-with-uploads.yml`. What is already gone cannot
+  be recovered.
+- **Production has no backup service and no worker** — see "Backups" above.
+  Recon already done (`plan/fixes/production-backup-recon.md`); Coolify's own
+  scheduled-backup feature does not apply, because production's postgres lives
+  inside the service compose rather than being a standalone Coolify database
+  resource. Production's database is about 16 MB.
+- **Coolify's stored compose is a stale snapshot of `docker-compose.coolify.yml`
+  and nothing reconciles them.** Measured divergence on 2026-09-10 — missing on
+  production: the `uploads_data` volume and `STORAGE_LOCAL_DIR`; the `backup`
+  and `worker` services; every `STRIPE_*` variable including the secret key, so
+  **card payment cannot work there at all**; `BKASH_PRICE_FREE` and its annual
+  pair, so the Solo plan has no bKash price; and `NEXT_PUBLIC_CLARITY_ID` on
+  web. Production additionally has `SEED_DEMO_REFRESH: '1'` set as a literal,
+  added deliberately, which rebuilds the demo tenant on every API start — it is
+  guarded to refuse any tenant that is not both slug `demo` and `isDemo`.
+  Nothing detects this drift today; a deploy-time comparison that fails on
+  divergence would close the whole class.
 - **Deleting a guest does not delete their ID photograph.** `GuestDocument`
   cascades from both `Guest` and `Tenant`, so the rows go; the file on disk is
   only ever removed by the explicit `DELETE /guests/:id/documents/:docId`
