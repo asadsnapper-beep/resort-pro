@@ -1,5 +1,19 @@
 import axios from 'axios';
 
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    /**
+     * Handle a 403 `upgradeRequired` here instead of navigating the whole page
+     * to the upgrade screen.
+     *
+     * Set it on calls that *ask whether a feature is available*, as opposed to
+     * calls made because the user chose a feature. A question answered "no" is
+     * not a reason to throw someone off the page they were working on.
+     */
+    suppressUpgradeRedirect?: boolean;
+  }
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export const api = axios.create({
@@ -39,11 +53,20 @@ api.interceptors.response.use(
     if (
       error.response?.status === 403 &&
       error.response?.data?.upgradeRequired &&
+      !error.config?.suppressUpgradeRedirect &&
       typeof window !== 'undefined' &&
       !window.location.pathname.startsWith('/dashboard/upgrade')
     ) {
       // A server-side entitlement gate was hit. Route the owner to a clear
       // upgrade screen instead of leaving a paid module looking broken.
+      //
+      // Only for calls the user made by choosing a feature. A call that merely
+      // asks whether a feature is available opts out with
+      // suppressUpgradeRedirect: answering "no" by navigating away from the
+      // page mid-task is never what the caller wanted. That is what broke
+      // check-out for every tenant — the early/late panel probes its
+      // entitlement as the modal opens, so the reply threw the desk out of
+      // check-out before it could collect a single taka.
       window.location.assign('/dashboard/upgrade?reason=feature');
       return Promise.reject(error);
     }
@@ -107,9 +130,16 @@ export const roomsApi = {
 // ── Bookings ──────────────────────────────────────────────────────────────────
 export const bookingsApi = {
   list: (params?: Record<string, unknown>) => api.get('/bookings', { params }),
-  /** What may be offered for an early arrival or a late departure. */
+  /**
+   * What may be offered for an early arrival or a late departure.
+   *
+   * A probe, not a feature the user chose: the check-out panel calls it the
+   * moment it mounts, to decide whether to show itself at all. A resort
+   * without the feature must simply see no panel, so its 403 is handled by the
+   * caller rather than by the page-level upgrade redirect.
+   */
   stayTimeQuote: (id: string, kind: string, at: string) =>
-    api.get(`/bookings/${id}/stay-time`, { params: { kind, at } }),
+    api.get(`/bookings/${id}/stay-time`, { params: { kind, at }, suppressUpgradeRedirect: true }),
   grantStayTime: (id: string, data: unknown) => api.post(`/bookings/${id}/stay-time`, data),
   /** Stays that are checked in right now — backs the restaurant's room picker. */
   inHouse: (q?: string) => api.get('/bookings/in-house', { params: q ? { q } : undefined }),

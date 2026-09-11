@@ -15,13 +15,10 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.{test,spec}.{ts,tsx}', 'tests/unit/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['tests/e2e/**', 'node_modules/**', '.next/**'],
-    // There are no real unit tests in this app yet (only the e2e specs
-    // above). Vitest treats "0 tests" as a failure by default, which would
-    // permanently red a `pnpm test` CI step with nothing anyone can act on.
-    // Remove this once the first real unit test is added, so a genuinely
-    // empty suite (e.g. from a future include-pattern typo) starts failing
-    // loudly again instead of silently passing.
-    passWithNoTests: true,
+    // `passWithNoTests` was here while this app had no unit tests at all, with
+    // a note to remove it as soon as the first one arrived. src/lib/api.test.ts
+    // is that test, so it is gone: an empty suite — from an include-pattern
+    // typo, say — now fails loudly again instead of passing silently.
   },
   resolve: {
     alias: {
