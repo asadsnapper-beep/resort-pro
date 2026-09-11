@@ -70,6 +70,8 @@ its own path to the bill.
 | [online-payment.md](./online-payment.md) | Stripe + bKash payment integration | ✅ Built — Stripe + bKash + SSLCommerz সব real |
 | [corporate-accounts.md](./corporate-accounts.md) | Company/B2B client accounts — consolidated billing, credit terms, corporate rates (separate from one-off Group Bookings) | ✅ Built |
 | [reporting-analytics.md](./reporting-analytics.md) | Revenue, occupancy, room performance, guest analytics, scheduled email reports | ✅ Built |
+| [reports.md](./reports.md) | End-of-day summary — occupancy, revenue, arrivals, departures, no-shows, housekeeping, maintenance; view, print, email, or auto-dispatch each evening to Telegram/WhatsApp | 🟡 Built, but the evening auto-dispatch has never run on production — `startReportDispatchJob()` lives only in `worker.ts`, and the worker has never been deployed there |
+| [analytics.md](./analytics.md) | Owner analytics — revenue KPIs, occupancy trends, ADR/RevPAR, booking sources, guest nationalities, room-type and expense profitability | ✅ Built |
 
 ---
 
