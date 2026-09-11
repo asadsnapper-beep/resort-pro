@@ -9,6 +9,8 @@
 
 import cron from 'node-cron';
 import { prisma } from '@resort-pro/database';
+import { buildReport } from '../services/reporting/build-report';
+import { localDateToday, resolveReportPeriod } from '../services/reporting/period';
 
 // ── Telegram ──────────────────────────────────────────────────────────────────
 async function sendTelegram(botToken: string, chatId: string, text: string): Promise<boolean> {
@@ -137,131 +139,42 @@ Maintenance: ${report.maintenance.open} open, ${report.maintenance.resolvedToday
 Sent by ResortPro`;
 }
 
-// ── Import buildDailyReport (we re-implement a minimal DB-only version here) ──
-// Instead of importing from routes (which would create a circular dep via Fastify),
-// we inline the same logic here using prisma directly.
-async function buildDailyReport(tenantId: string, dateStr: string) {
-  const d = new Date(dateStr);
-  const start = new Date(d); start.setHours(0, 0, 0, 0);
-  const end   = new Date(d); end.setHours(23, 59, 59, 999);
-
-  const [
-    totalRooms, occupiedRooms,
-    arrivals, departures, noShows,
-    roomPayments, restaurantOrders, invoiceExtras,
-    housekeepingCompleted, housekeepingPending,
-    maintenanceOpen, maintenanceResolvedToday,
-    tenant,
-  ] = await Promise.all([
-    prisma.room.count({ where: { tenantId, isActive: true } }),
-    prisma.room.count({ where: { tenantId, status: 'OCCUPIED', isActive: true } }),
-    prisma.booking.findMany({
-      where: { tenantId, OR: [
-        { actualCheckIn: { gte: start, lte: end } },
-        { checkIn: { gte: start, lte: end }, status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
-      ]},
-      include: { guest: { select: { firstName: true, lastName: true } }, room: { select: { number: true, name: true } } },
-    }),
-    prisma.booking.findMany({
-      where: { tenantId, OR: [
-        { actualCheckOut: { gte: start, lte: end } },
-        { checkOut: { gte: start, lte: end }, status: { in: ['CHECKED_OUT', 'CHECKED_IN'] } },
-      ]},
-      include: {
-        guest: { select: { firstName: true, lastName: true } },
-        room: { select: { number: true, name: true } },
-        payments: { where: { status: 'PAID' } },
-      },
-    }),
-    prisma.booking.findMany({
-      where: { tenantId, checkIn: { gte: start, lte: end }, status: 'CONFIRMED', actualCheckIn: null },
-      include: { guest: { select: { firstName: true, lastName: true } }, room: { select: { number: true, name: true } } },
-    }),
-    prisma.payment.findMany({
-      where: { tenantId, processedAt: { gte: start, lte: end }, status: 'PAID' },
-    }),
-    prisma.foodOrder.aggregate({
-      where: { tenantId, createdAt: { gte: start, lte: end }, status: { not: 'CANCELLED' } },
-      _sum: { totalAmount: true },
-    }),
-    prisma.invoiceExtra.aggregate({
-      where: { tenantId, createdAt: { gte: start, lte: end } },
-      _sum: { amount: true },
-    }),
-    prisma.housekeepingTask.count({ where: { tenantId, status: 'COMPLETED', scheduledDate: { gte: start, lte: end } } }),
-    prisma.housekeepingTask.count({ where: { tenantId, status: { in: ['PENDING', 'IN_PROGRESS'] }, scheduledDate: { gte: start, lte: end } } }),
-    prisma.maintenanceTicket.count({ where: { tenantId, status: { not: 'RESOLVED' } } }),
-    prisma.maintenanceTicket.count({ where: { tenantId, status: 'RESOLVED', resolvedAt: { gte: start, lte: end } } }),
-    prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: { name: true, currency: true, waMode: true, waApiToken: true, waPhoneNumberId: true },
-    }),
-  ]);
-
-  const paymentsBreakdown = { CASH: 0, CARD: 0, BANK_TRANSFER: 0, STRIPE: 0, OTHER: 0 };
-  let roomRevenue = 0;
-  for (const p of roomPayments) {
-    const amt = Number(p.amount);
-    paymentsBreakdown[p.method as keyof typeof paymentsBreakdown] =
-      (paymentsBreakdown[p.method as keyof typeof paymentsBreakdown] ?? 0) + amt;
-    roomRevenue += amt;
-  }
-
-  const restaurantRevenue = Number(restaurantOrders._sum.totalAmount ?? 0);
-  const extrasRevenue     = Number(invoiceExtras._sum.amount ?? 0);
-  const totalRevenue      = roomRevenue + restaurantRevenue + extrasRevenue;
-  const occupancyRate     = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 1000) / 10 : 0;
-
-  const calcNights = (ci: Date, co: Date) => Math.max(1, Math.ceil((co.getTime() - ci.getTime()) / 86_400_000));
-
-  return {
-    date: dateStr,
-    tenant: { name: tenant?.name ?? '', currency: tenant?.currency ?? 'USD', waMode: tenant?.waMode, waApiToken: tenant?.waApiToken, waPhoneNumberId: tenant?.waPhoneNumberId },
-    occupancy: { totalRooms, occupied: occupiedRooms, rate: occupancyRate },
-    arrivals: arrivals.map(b => ({
-      guestName: `${b.guest.firstName} ${b.guest.lastName}`,
-      room: `${b.room.name} #${b.room.number}`,
-      nights: calcNights(b.checkIn, b.checkOut),
-    })),
-    departures: departures.map(b => ({
-      guestName: `${b.guest.firstName} ${b.guest.lastName}`,
-      room: `${b.room.name} #${b.room.number}`,
-      totalBill: Number(b.totalAmount),
-      paidAmount: b.payments.reduce((s: number, p: any) => s + Number(p.amount), 0),
-    })),
-    noShows: noShows.map(b => ({
-      guestName: `${b.guest.firstName} ${b.guest.lastName}`,
-    })),
-    revenue: { rooms: roomRevenue, restaurant: restaurantRevenue, extras: extrasRevenue, total: totalRevenue },
-    payments: {
-      cash: paymentsBreakdown.CASH,
-      card: paymentsBreakdown.CARD + paymentsBreakdown.STRIPE,
-      bankTransfer: paymentsBreakdown.BANK_TRANSFER,
-    },
-    housekeeping: { completed: housekeepingCompleted, pending: housekeepingPending },
-    maintenance:  { open: maintenanceOpen, resolvedToday: maintenanceResolvedToday },
-  };
-}
-
 // ── Main cron ─────────────────────────────────────────────────────────────────
 export function startReportDispatchJob() {
   // Runs every minute
   cron.schedule('* * * * *', async () => {
     const now = new Date();
-    const hh  = String(now.getHours()).padStart(2, '0');
-    const mm  = String(now.getMinutes()).padStart(2, '0');
-    const currentTime = `${hh}:${mm}`;
-    const todayStr    = now.toISOString().slice(0, 10);
 
-    // Find all tenants that have dispatch enabled and it's their dispatch time
+    // The dispatch time is the resort's wall clock, so the comparison has to be
+    // made per tenant. This used to read the server's hour and filter on it in
+    // SQL, which meant a resort asking for 20:00 was sent its evening report at
+    // 20:00 wherever the container happened to run — 02:00 the next day in
+    // Dhaka, on a UTC host. `todayStr` came from toISOString() for the same
+    // reason and was a day behind every evening after 18:00 local.
     const settings = await prisma.reportDispatchSettings.findMany({
-      where: {
-        enabled: true,
-        dispatchTime: currentTime,
+      where: { enabled: true },
+      // The WhatsApp credentials are fetched here rather than carried inside
+      // the report. The report object is also the body of an HTTP response, and
+      // an API token has no business travelling in one.
+      include: {
+        tenant: {
+          select: {
+            timezone: true, waMode: true, waApiToken: true, waPhoneNumberId: true,
+          },
+        },
       },
     });
 
     for (const setting of settings) {
+      const timezone = setting.tenant?.timezone || 'Asia/Dhaka';
+      const localTime = new Intl.DateTimeFormat('en-GB', {
+        timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false,
+      }).format(now).replace('24:', '00:');
+      const todayStr = localDateToday(timezone, now);
+
+      // Not this resort's minute yet.
+      if (setting.dispatchTime !== localTime) continue;
+
       // Skip if already dispatched today
       if (setting.lastDispatchDate === todayStr) continue;
 
@@ -269,7 +182,10 @@ export function startReportDispatchJob() {
       if (!setting.telegramEnabled && !setting.whatsappEnabled) continue;
 
       try {
-        const report = await buildDailyReport(setting.tenantId, todayStr);
+        const report = await buildReport(
+          setting.tenantId,
+          resolveReportPeriod({ from: todayStr, to: todayStr, timezone, kind: 'daily' }),
+        );
         let tgSent = false;
         let waSent = false;
 
@@ -281,7 +197,11 @@ export function startReportDispatchJob() {
         if (setting.whatsappEnabled && setting.whatsappPhone) {
           const text = buildReportTextPlain(report);
           waSent = await sendWhatsAppReport(
-            { waMode: report.tenant.waMode, waApiToken: report.tenant.waApiToken, waPhoneNumberId: report.tenant.waPhoneNumberId },
+            {
+              waMode: setting.tenant?.waMode,
+              waApiToken: setting.tenant?.waApiToken,
+              waPhoneNumberId: setting.tenant?.waPhoneNumberId,
+            },
             setting.whatsappPhone,
             text,
           );

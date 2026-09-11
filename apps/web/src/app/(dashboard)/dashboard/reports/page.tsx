@@ -400,8 +400,11 @@ export default function ReportsPage() {
 
             {/* ── KPI strip ── */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {/* Room-nights, not rooms whose status says OCCUPIED right now —
+                  so a report for a past date describes that date. For a single
+                  day the two read the same way. */}
               <KpiCard label="Occupancy" value={`${report.occupancy.rate}%`}
-                sub={`${report.occupancy.occupied} / ${report.occupancy.totalRooms} rooms`} icon={TrendingUp} color="#183153" />
+                sub={`${report.occupancy.occupiedRoomNights} / ${report.occupancy.availableRoomNights} room nights`} icon={TrendingUp} color="#183153" />
               <KpiCard label="Payments Received" value={formatCurrency(report.financial.cashCollected.total)}
                 sub="Money banked today" icon={Banknote} color="#183153" />
               <KpiCard label="Arrivals" value={report.arrivals.length}

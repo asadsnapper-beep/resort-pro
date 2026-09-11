@@ -4,209 +4,37 @@ import { requireAuth, requireRole } from '../middleware/auth';
 import { ok } from '../utils/response';
 import { sendEmail } from '../services/email';
 import type { JwtPayload } from '@resort-pro/types';
-import { resolveReportPeriod } from '../services/reporting/period';
+import { resolveReportPeriod, ReportPeriodError, weekContaining, localDateToday } from '../services/reporting/period';
+import { buildReport, type Report } from '../services/reporting/build-report';
 
-async function buildDailyReport(tenantId: string, dateStr: string) {
-  // The resort's timezone decides where its day begins, so it has to be known
-  // before any query is built. The previous version used `setHours`, which
-  // reads the server's timezone instead — see services/reporting/period.ts.
+/**
+ * Resolve the resort's timezone, then the period, in that order.
+ *
+ * The timezone has to be known before the period can be, which is the whole
+ * reason the old `dayBounds()` was wrong: it never asked.
+ */
+async function periodFor(
+  tenantId: string,
+  range: { from: string; to: string; kind?: 'daily' | 'weekly' | 'custom' },
+) {
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
-    select: {
-      name: true, currency: true, email: true, logoUrl: true,
-      brandPrimaryColor: true, timezone: true,
-    },
+    select: { timezone: true },
   });
+  return resolveReportPeriod({ ...range, timezone: tenant?.timezone });
+}
 
-  const period = resolveReportPeriod({
-    from: dateStr, to: dateStr, timezone: tenant?.timezone, kind: 'daily',
+/** The resort's own today, for defaulting a missing date. */
+async function todayFor(tenantId: string) {
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { timezone: true },
   });
+  return localDateToday(tenant?.timezone || 'Asia/Dhaka');
+}
 
-  // Timestamp columns want instants; `@db.Date` columns want dates. Mixing the
-  // two is what once had every Dhaka resort reporting zero arrivals.
-  const inPeriod = { gte: period.startInstant, lt: period.endInstantExclusive };
-  const onDates = { gte: period.startDate, lt: period.endDateExclusive };
-
-  const [
-    totalRooms,
-    occupiedRooms,
-    arrivals,
-    departures,
-    noShows,
-    roomPayments,
-    restaurantOrders,
-    invoiceExtras,
-    housekeepingCompleted,
-    housekeepingPending,
-    maintenanceOpen,
-    maintenanceResolvedToday,
-  ] = await Promise.all([
-    // Rooms
-    prisma.room.count({ where: { tenantId, isActive: true } }),
-    prisma.room.count({ where: { tenantId, status: 'OCCUPIED', isActive: true } }),
-
-    // Arrivals: checked in today (actualCheckIn within day) OR confirmed checkIn=today
-    prisma.booking.findMany({
-      where: {
-        tenantId,
-        OR: [
-          { actualCheckIn: inPeriod },
-          { checkIn: onDates, status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
-        ],
-      },
-      include: {
-        guest: { select: { firstName: true, lastName: true } },
-        room: { select: { number: true, name: true } },
-      },
-      orderBy: { checkIn: 'asc' },
-    }),
-
-    // Departures: checked out today
-    prisma.booking.findMany({
-      where: {
-        tenantId,
-        OR: [
-          { actualCheckOut: inPeriod },
-          { checkOut: onDates, status: { in: ['CHECKED_OUT', 'CHECKED_IN'] } },
-        ],
-      },
-      include: {
-        guest: { select: { firstName: true, lastName: true } },
-        room: { select: { number: true, name: true } },
-        payments: { where: { status: 'PAID' } },
-      },
-      orderBy: { checkOut: 'asc' },
-    }),
-
-    // No-shows: checkIn=today, status=CONFIRMED (never checked in)
-    prisma.booking.findMany({
-      where: {
-        tenantId,
-        checkIn: onDates,
-        status: 'CONFIRMED',
-        actualCheckIn: null,
-      },
-      include: {
-        guest: { select: { firstName: true, lastName: true } },
-        room: { select: { number: true, name: true } },
-      },
-    }),
-
-    // Room revenue: payments processed today
-    prisma.payment.findMany({
-      where: { tenantId, processedAt: inPeriod, status: 'PAID' },
-      include: { booking: { select: { id: true } } },
-    }),
-
-    // Restaurant revenue: food orders today
-    prisma.foodOrder.aggregate({
-      where: { tenantId, createdAt: inPeriod, status: { not: 'CANCELLED' } },
-      _sum: { totalAmount: true },
-    }),
-
-    // Invoice extras charged today
-    prisma.invoiceExtra.aggregate({
-      where: { tenantId, createdAt: inPeriod },
-      _sum: { amount: true },
-    }),
-
-    // Housekeeping
-    prisma.housekeepingTask.count({ where: { tenantId, status: 'COMPLETED', scheduledDate: onDates } }),
-    prisma.housekeepingTask.count({ where: { tenantId, status: { in: ['PENDING', 'IN_PROGRESS'] }, scheduledDate: onDates } }),
-
-    // Maintenance
-    prisma.maintenanceTicket.count({ where: { tenantId, status: { not: 'RESOLVED' } } }),
-    prisma.maintenanceTicket.count({ where: { tenantId, status: 'RESOLVED', resolvedAt: inPeriod } }),
-
-  ]);
-
-  // ── Money ─────────────────────────────────────────────────────────────────
-  //
-  // Two figures, never one. This used to be
-  //   revenue.total = payments + food orders + invoice extras
-  // and called "Total Revenue" on screen, in the evening email and in the
-  // Telegram message. Those are not the same kind of number, and for a stay
-  // whose food was charged to the room they are not independent either: the
-  // checkout payment already contains the food, so the food was counted twice.
-  // A room at 1200 with 600 of food, paid 1800 at checkout, was reported as
-  // 2400 — a third more money than the resort took.
-  //
-  // So: what arrived, and what was charged, side by side and never added.
-  const byMethod = { CASH: 0, CARD: 0, BANK_TRANSFER: 0, STRIPE: 0, OTHER: 0, PENDING: 0 };
-  let cashCollectedTotal = 0;
-  for (const p of roomPayments) {
-    const amt = Number(p.amount);
-    byMethod[p.method as keyof typeof byMethod] = (byMethod[p.method as keyof typeof byMethod] ?? 0) + amt;
-    cashCollectedTotal += amt;
-  }
-
-  const restaurantCharges = Number(restaurantOrders._sum.totalAmount ?? 0);
-  const extrasCharges = Number(invoiceExtras._sum.amount ?? 0);
-
-  const occupancyRate = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 1000) / 10 : 0;
-
-  // Calc nights sold: count of unique CHECKED_IN bookings with overlapping stay
-  const nightsSold = occupiedRooms; // 1 night per occupied room for the day
-
-  const calcNights = (checkIn: Date, checkOut: Date) =>
-    Math.max(1, Math.ceil((checkOut.getTime() - checkIn.getTime()) / 86_400_000));
-
-  return {
-    date: dateStr,
-    tenant: { name: tenant?.name ?? '', currency: tenant?.currency ?? 'USD' },
-    occupancy: { totalRooms, occupied: occupiedRooms, rate: occupancyRate, nightsSold },
-    arrivals: arrivals.map(b => ({
-      bookingId: b.id,
-      guestName: `${b.guest.firstName} ${b.guest.lastName}`,
-      room: `${b.room.name} #${b.room.number}`,
-      nights: calcNights(b.checkIn, b.checkOut),
-      checkOut: b.checkOut.toISOString().slice(0, 10),
-      status: b.status,
-    })),
-    departures: departures.map(b => ({
-      bookingId: b.id,
-      guestName: `${b.guest.firstName} ${b.guest.lastName}`,
-      room: `${b.room.name} #${b.room.number}`,
-      totalBill: Number(b.totalAmount),
-      paidAmount: b.payments.reduce((s, p) => s + Number(p.amount), 0),
-      status: b.status,
-    })),
-    noShows: noShows.map(b => ({
-      bookingId: b.id,
-      guestName: `${b.guest.firstName} ${b.guest.lastName}`,
-      room: `${b.room.name} #${b.room.number}`,
-    })),
-    period: {
-      kind: period.kind, from: period.from, to: period.to,
-      timezone: period.timezone, dayCount: period.dayCount,
-    },
-    financial: {
-      /**
-       * Money that arrived, from `Payment` rows alone. The method figures sum
-       * to the total, by construction.
-       *
-       * Known incomplete, and deliberately not papered over: a restaurant
-       * order settled in cash never creates a `Payment` row — marking it paid
-       * only flips `FoodOrder.paymentStatus`, and there is no column recording
-       * *when* that happened. So till money taken at the restaurant counter is
-       * not here. Closing that needs a `paidAt` on FoodOrder.
-       */
-      cashCollected: { byMethod, total: cashCollectedTotal },
-      /**
-       * Value charged to guests in the period. Not money; some of it is still
-       * owed, and some was paid in a different period.
-       *
-       * `room` is absent on purpose rather than guessed. Room charges accrue
-       * per night, so attributing them to a period needs the room-night engine
-       * in plan/report-periods-and-custom-range.md, and the choice between
-       * planned and actual stay dates is still an open product decision there.
-       * A wrong room figure here would be worse than none.
-       */
-      chargesPosted: { restaurant: restaurantCharges, extras: extrasCharges, room: null },
-    },
-    housekeeping: { completed: housekeepingCompleted, pending: housekeepingPending },
-    maintenance: { open: maintenanceOpen, resolvedToday: maintenanceResolvedToday },
-  };
+async function buildDailyReport(tenantId: string, dateStr: string) {
+  return buildReport(tenantId, await periodFor(tenantId, { from: dateStr, to: dateStr, kind: 'daily' }));
 }
 
 function fmt(n: number, currency = 'USD') {
@@ -214,7 +42,7 @@ function fmt(n: number, currency = 'USD') {
   catch { return `${currency} ${n.toFixed(2)}`; }
 }
 
-function buildReportEmail(report: Awaited<ReturnType<typeof buildDailyReport>>, primaryColor = '#1a6b5e') {
+function buildReportEmail(report: Report, primaryColor = '#1a6b5e') {
   const cur = report.tenant.currency;
   const row = (label: string, value: string, bold = false) =>
     `<tr style="border-bottom:1px solid #f0f0f0">
@@ -254,7 +82,7 @@ function buildReportEmail(report: Awaited<ReturnType<typeof buildDailyReport>>, 
   <tr><td style="padding:20px 28px 0">
     <h3 style="margin:0 0 10px;color:#1a1a1a;font-size:14px;text-transform:uppercase;letter-spacing:.5px">📊 Occupancy</h3>
     <table width="100%" style="border:1px solid #eee;border-radius:8px;overflow:hidden">
-      ${row('Rooms Occupied', `${report.occupancy.occupied} / ${report.occupancy.totalRooms}`)}
+      ${row('Rooms Occupied', `${report.occupancy.occupiedRoomNights} / ${report.occupancy.totalRooms}`)}
       ${row('Occupancy Rate', `${report.occupancy.rate}%`, true)}
     </table>
   </td></tr>
@@ -308,9 +136,9 @@ function buildReportEmail(report: Awaited<ReturnType<typeof buildDailyReport>>, 
     <h3 style="margin:0 0 10px;color:#1a1a1a;font-size:14px;text-transform:uppercase;letter-spacing:.5px">🔧 Operations</h3>
     <table width="100%" style="border:1px solid #eee;border-radius:8px;overflow:hidden">
       ${row('Housekeeping Completed', String(report.housekeeping.completed))}
-      ${row('Housekeeping Pending', String(report.housekeeping.pending))}
-      ${row('Maintenance Open', String(report.maintenance.open))}
-      ${row('Maintenance Resolved Today', String(report.maintenance.resolvedToday))}
+      ${row('Housekeeping Pending', String(report.housekeeping.pendingAtEnd))}
+      ${row('Maintenance Open', String(report.maintenance.openAtEnd))}
+      ${row('Maintenance Resolved Today', String(report.maintenance.resolved))}
       ${report.noShows.length > 0 ? row('No-Shows', String(report.noShows.length)) : ''}
     </table>
   </td></tr>
@@ -350,6 +178,51 @@ export async function reportRoutes(app: FastifyInstance) {
 
       const report = await buildDailyReport(tenantId, dateStr);
       return ok(report);
+    },
+  });
+
+  // GET /api/reports/period?from=YYYY-MM-DD&to=YYYY-MM-DD
+  //
+  // The canonical endpoint. `/daily` is the same builder with from === to, kept
+  // so existing clients keep working while the UI migrates.
+  //
+  // `week=YYYY-MM-DD` is a convenience: it answers with the Monday–Sunday week
+  // that date falls in, so the client does not have to know where a week
+  // starts. Quick ranges like "last 30 days" are the client's arithmetic; they
+  // arrive here as plain from/to.
+  app.get('/period', {
+    schema: { tags: ['reports'], security: [{ bearerAuth: [] }] },
+    preHandler: requireRole('OWNER', 'MANAGER'),
+    handler: async (request, reply) => {
+      const { tenantId } = request.user as JwtPayload;
+      const { from, to, week } = request.query as { from?: string; to?: string; week?: string };
+
+      let range: { from: string; to: string; kind?: 'daily' | 'weekly' | 'custom' };
+      if (week) {
+        range = { ...weekContaining(week), kind: 'weekly' };
+      } else if (from && to) {
+        range = { from, to };
+      } else {
+        return reply.status(400).send({
+          success: false,
+          error: 'Give both from and to, or a week date.',
+          field: from ? 'to' : 'from',
+        });
+      }
+
+      try {
+        const period = await periodFor(tenantId, range);
+        // No activity is a valid answer, not an error: every figure comes back
+        // zero and every list empty.
+        return ok(await buildReport(tenantId, period));
+      } catch (error) {
+        if (error instanceof ReportPeriodError) {
+          // Field-specific so the form can point at the offending input, and
+          // never silently corrected — a reversed range is the caller's to see.
+          return reply.status(400).send({ success: false, error: error.message, field: error.field });
+        }
+        throw error;
+      }
     },
   });
 
@@ -475,7 +348,7 @@ export async function reportRoutes(app: FastifyInstance) {
           try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(n); }
           catch { return `${cur} ${n.toFixed(0)}`; }
         };
-        const text = `<b>📊 Test Report — ${report.tenant.name}</b>\n📅 ${dateStr}\n\n<b>🏨 Occupancy</b>\nRooms: ${report.occupancy.occupied}/${report.occupancy.totalRooms} (${report.occupancy.rate}%)\n\n<b>💳 Received</b>\n<b>${fmt(report.financial.cashCollected.total)}</b>\n\n<i>✅ Test message from ResortPro</i>`;
+        const text = `<b>📊 Test Report — ${report.tenant.name}</b>\n📅 ${dateStr}\n\n<b>🏨 Occupancy</b>\nRooms: ${report.occupancy.occupiedRoomNights}/${report.occupancy.totalRooms} (${report.occupancy.rate}%)\n\n<b>💳 Received</b>\n<b>${fmt(report.financial.cashCollected.total)}</b>\n\n<i>✅ Test message from ResortPro</i>`;
         sent = await sendTelegramMsg(settings.telegramBotToken, settings.telegramChatId, text);
         if (!sent) error = 'Telegram delivery failed. Check your bot token and chat ID.';
       } else if (body.channel === 'whatsapp') {
