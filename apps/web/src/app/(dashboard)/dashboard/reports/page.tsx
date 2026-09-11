@@ -402,8 +402,8 @@ export default function ReportsPage() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <KpiCard label="Occupancy" value={`${report.occupancy.rate}%`}
                 sub={`${report.occupancy.occupied} / ${report.occupancy.totalRooms} rooms`} icon={TrendingUp} color="#183153" />
-              <KpiCard label="Total Revenue" value={formatCurrency(report.revenue.total)}
-                sub="Rooms + F&B + Extras" icon={Banknote} color="#183153" />
+              <KpiCard label="Payments Received" value={formatCurrency(report.financial.cashCollected.total)}
+                sub="Money banked today" icon={Banknote} color="#183153" />
               <KpiCard label="Arrivals" value={report.arrivals.length}
                 sub={`${report.arrivals.filter((a: any) => a.status === 'CHECKED_IN').length} checked in`} icon={LogIn} color="#b89040" />
               <KpiCard label="Departures" value={report.departures.length}
@@ -415,30 +415,37 @@ export default function ReportsPage() {
               {/* Revenue breakdown */}
               <div className="rounded-[14px] border bg-white p-5"
                 style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
-                <div className="pb-3"><SectionHeader icon={Banknote} title="Revenue Breakdown" /></div>
+                <div className="pb-3"><SectionHeader icon={Banknote} title="Charged to Guests" /></div>
                 <div className="space-y-3">
-                  {[
-                    { label: 'Room Revenue', amount: report.revenue.rooms, color: '#183153' },
-                    { label: 'Restaurant & F&B', amount: report.revenue.restaurant, color: '#b8724a' },
-                    { label: 'Extras & Charges', amount: report.revenue.extras, color: '#b89040' },
-                  ].map(({ label, amount, color }) => {
-                    const pct = report.revenue.total > 0 ? Math.round((amount / report.revenue.total) * 100) : 0;
-                    return (
-                      <div key={label}>
-                        <div className="flex justify-between text-[13px] mb-1.5">
-                          <span style={{ color: 'var(--rp-text-muted)' }}>{label}</span>
-                          <span className="font-medium text-[#183153] dark:text-[#f8fafc]">{formatCurrency(amount)}</span>
+                  {(() => {
+                    const charged = [
+                      { label: 'Restaurant & F&B', amount: report.financial.chargesPosted.restaurant, color: '#b8724a' },
+                      { label: 'Extras & Charges', amount: report.financial.chargesPosted.extras, color: '#b89040' },
+                    ];
+                    // Share of what was charged today — deliberately not a
+                    // share of payments received. Adding those together is what
+                    // made the old "Total Revenue" count room-charged food
+                    // twice.
+                    const chargedTotal = charged.reduce((sum, c) => sum + c.amount, 0);
+                    return charged.map(({ label, amount, color }) => {
+                      const pct = chargedTotal > 0 ? Math.round((amount / chargedTotal) * 100) : 0;
+                      return (
+                        <div key={label}>
+                          <div className="flex justify-between text-[13px] mb-1.5">
+                            <span style={{ color: 'var(--rp-text-muted)' }}>{label}</span>
+                            <span className="font-medium text-[#183153] dark:text-[#f8fafc]">{formatCurrency(amount)}</span>
+                          </div>
+                          <div className="h-[6px] w-full rounded-full" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-surface-4)' }}>
+                            <div className="h-[6px] rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+                          </div>
                         </div>
-                        <div className="h-[6px] w-full rounded-full" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'var(--rp-surface-4)' }}>
-                          <div className="h-[6px] rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div className="pt-2 border-t flex justify-between text-[13px] font-semibold" style={{ borderColor: 'rgba(0,0,0,0.04)' }}>
-                    <span style={{ color: 'var(--rp-text)' }}>Total</span>
-                    <span style={{ color: '#183153' }}>{formatCurrency(report.revenue.total)}</span>
-                  </div>
+                      );
+                    });
+                  })()}
+                  <p className="pt-2 border-t text-[11.5px]" style={{ borderColor: 'rgba(0,0,0,0.04)', color: 'var(--rp-text-muted)' }}>
+                    Added to guests&apos; bills today. Some of it is still owed, so it is not added to payments received.
+                    Room charges are not shown here yet — they accrue per night.
+                  </p>
                 </div>
               </div>
 
@@ -448,10 +455,10 @@ export default function ReportsPage() {
                 <div className="pb-3"><SectionHeader icon={CreditCard} title="Payment Methods" /></div>
                 <div className="space-y-2">
                   {[
-                    { label: 'Cash', icon: Banknote, amount: report.payments.cash, accent: '#183153', accentBg: 'var(--rp-teal-bg)' },
-                    { label: 'Card / Online', icon: CreditCard, amount: report.payments.card, accent: '#183153', accentBg: 'var(--rp-teal-bg)' },
-                    { label: 'Bank Transfer', icon: Building2, amount: report.payments.bankTransfer, accent: '#b89040', accentBg: 'var(--rp-amber-bg)' },
-                    { label: 'Other', icon: Banknote, amount: report.payments.other, accent: 'var(--rp-text-muted)', accentBg: 'var(--rp-surface-3)' },
+                    { label: 'Cash', icon: Banknote, amount: report.financial.cashCollected.byMethod.CASH, accent: '#183153', accentBg: 'var(--rp-teal-bg)' },
+                    { label: 'Card / Online', icon: CreditCard, amount: report.financial.cashCollected.byMethod.CARD + report.financial.cashCollected.byMethod.STRIPE, accent: '#183153', accentBg: 'var(--rp-teal-bg)' },
+                    { label: 'Bank Transfer', icon: Building2, amount: report.financial.cashCollected.byMethod.BANK_TRANSFER, accent: '#b89040', accentBg: 'var(--rp-amber-bg)' },
+                    { label: 'Other', icon: Banknote, amount: report.financial.cashCollected.byMethod.OTHER, accent: 'var(--rp-text-muted)', accentBg: 'var(--rp-surface-3)' },
                   ].map(({ label, icon: Icon, amount, accent, accentBg }) => (
                     <div key={label} className="flex items-center justify-between rounded-[9px] p-3"
                       style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'var(--rp-surface-2)' }}>

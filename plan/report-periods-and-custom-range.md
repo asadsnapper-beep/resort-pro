@@ -136,6 +136,20 @@ financial: {
 - **Cash collected:** only successful, non-refunded payments whose
   `processedAt` falls inside the selected period. Payment method totals must
   equal the cash-collected total.
+
+  > **Found while implementing, 2026-09-12.** This figure is structurally
+  > incomplete, and the gap is in the data model rather than the report. A
+  > restaurant order settled at the counter never creates a `Payment` row —
+  > `POST /food-orders/:id/pay` only sets `FoodOrder.paymentStatus = 'PAID'`
+  > and `paymentMethod`. There is also no column recording *when* it was paid;
+  > `updatedAt` moves on any later edit, so it cannot stand in. Till money
+  > taken at the restaurant is therefore invisible to cash-collected, for any
+  > period.
+  >
+  > Closing it needs a `paidAt DateTime?` on `FoodOrder`, set where
+  > `paymentStatus` is set, plus a decision about historical rows that have no
+  > timestamp to backfill from. Until then the report says so in plain words
+  > next to the figure rather than quietly under-reporting.
 - **Charges posted:** only charge records whose business event occurred in the
   period; cancelled/voided food is excluded. This is not a substitute for an
   invoice total.

@@ -81,16 +81,16 @@ function buildReportText(report: any): string {
 <b>🏨 Occupancy</b>
 Rooms: ${report.occupancy.occupied}/${report.occupancy.totalRooms} (${report.occupancy.rate}%)
 
-<b>💰 Revenue</b>
-Rooms: ${fmt(report.revenue.rooms)}
-Restaurant: ${fmt(report.revenue.restaurant)}
-Extras: ${fmt(report.revenue.extras)}
-<b>Total: ${fmt(report.revenue.total)}</b>
+<b>💳 Received</b>
+Cash: ${fmt(report.financial.cashCollected.byMethod.CASH)}
+Card/Online: ${fmt(report.financial.cashCollected.byMethod.CARD + report.financial.cashCollected.byMethod.STRIPE)}
+Bank Transfer: ${fmt(report.financial.cashCollected.byMethod.BANK_TRANSFER)}
+<b>Total: ${fmt(report.financial.cashCollected.total)}</b>
 
-<b>💳 Payments</b>
-Cash: ${fmt(report.payments.cash)}
-Card/Online: ${fmt(report.payments.card)}
-Bank Transfer: ${fmt(report.payments.bankTransfer)}
+<b>🧾 Charged to guests</b>
+Restaurant: ${fmt(report.financial.chargesPosted.restaurant)}
+Extras: ${fmt(report.financial.chargesPosted.extras)}
+<i>Charged, not yet all received — not added above.</i>
 
 <b>🛬 Arrivals: ${report.arrivals.length}</b>
 <b>🛫 Departures: ${report.departures.length}</b>
@@ -116,16 +116,16 @@ function buildReportTextPlain(report: any): string {
 🏨 Occupancy
 Rooms: ${report.occupancy.occupied}/${report.occupancy.totalRooms} (${report.occupancy.rate}%)
 
-💰 Revenue
-Rooms: ${fmt(report.revenue.rooms)}
-Restaurant: ${fmt(report.revenue.restaurant)}
-Extras: ${fmt(report.revenue.extras)}
-Total: ${fmt(report.revenue.total)}
+💳 Received
+Cash: ${fmt(report.financial.cashCollected.byMethod.CASH)}
+Card/Online: ${fmt(report.financial.cashCollected.byMethod.CARD + report.financial.cashCollected.byMethod.STRIPE)}
+Bank Transfer: ${fmt(report.financial.cashCollected.byMethod.BANK_TRANSFER)}
+Total: ${fmt(report.financial.cashCollected.total)}
 
-💳 Payments
-Cash: ${fmt(report.payments.cash)}
-Card/Online: ${fmt(report.payments.card)}
-Bank Transfer: ${fmt(report.payments.bankTransfer)}
+🧾 Charged to guests
+Restaurant: ${fmt(report.financial.chargesPosted.restaurant)}
+Extras: ${fmt(report.financial.chargesPosted.extras)}
+(Charged, not yet all received - not added above.)
 
 🛬 Arrivals: ${report.arrivals.length}
 🛫 Departures: ${report.departures.length}${report.noShows.length > 0 ? `\n⚠️ No-shows: ${report.noShows.length}` : ''}
