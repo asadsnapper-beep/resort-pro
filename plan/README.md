@@ -72,6 +72,7 @@ its own path to the bill.
 | [reporting-analytics.md](./reporting-analytics.md) | Revenue, occupancy, room performance, guest analytics, scheduled email reports | ✅ Built |
 | [reports.md](./reports.md) | End-of-day summary — occupancy, revenue, arrivals, departures, no-shows, housekeeping, maintenance; view, print, email, or auto-dispatch each evening to Telegram/WhatsApp | 🟡 Built, but the evening auto-dispatch has never run on production — `startReportDispatchJob()` lives only in `worker.ts`, and the worker has never been deployed there |
 | [analytics.md](./analytics.md) | Owner analytics — revenue KPIs, occupancy trends, ADR/RevPAR, booking sources, guest nationalities, room-type and expense profitability | ✅ Built |
+| [report-periods-and-custom-range.md](./report-periods-and-custom-range.md) | Daily, Monday–Sunday weekly, and inclusive custom-date reports; range-safe occupancy, separated cash/charge metrics, print/email/export rollout | ❌ Not built — current Reports page supports one day only |
 
 ---
 
