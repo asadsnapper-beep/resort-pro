@@ -49,7 +49,6 @@ const TIMEZONES = [
 
 interface TenantSettings {
   name: string;
-  slug: string;
   email?: string;
   phone?: string;
   address?: string;
@@ -120,7 +119,6 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>('general');
   const [form, setForm] = useState<TenantSettings>({
     name: '',
-    slug: '',
     email: '',
     phone: '',
     address: '',
@@ -142,7 +140,6 @@ export default function SettingsPage() {
     if (t) {
       setForm({
         name: t.name ?? '',
-        slug: t.slug ?? '',
         email: t.email ?? '',
         phone: t.phone ?? '',
         address: t.address ?? '',
@@ -460,13 +457,21 @@ export default function SettingsPage() {
                 <label className="mb-1 block text-sm font-medium text-gray-700">Resort Name *</label>
                 <Input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Palm Paradise Resort" />
               </div>
+              {/* Read-only, and no longer part of what Save submits. It was an
+                  editable input that nothing could ever store — the API's
+                  update schema has never accepted a slug — so saving answered
+                  "Settings saved!" while the public URL stayed exactly as it
+                  was. reports/qa/2026-09-09-settings-deep-qa.md (C-02). */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">URL Slug</label>
-                <div className="flex rounded-lg border border-input overflow-hidden">
-                  <span className="flex items-center px-3 bg-gray-50 text-sm text-muted-foreground border-r">resortpro.site/</span>
-                  <Input value={form.slug} onChange={e => set('slug', e.target.value)} className="rounded-none border-0 flex-1 focus:ring-0" placeholder="palm-paradise" />
+                <label className="mb-1 block text-sm font-medium text-gray-700">Workspace URL</label>
+                <div className="flex items-center gap-2 rounded-lg border border-input bg-gray-50 px-3 py-2">
+                  <span className="text-sm text-muted-foreground">resortpro.site/</span>
+                  <code className="text-sm font-medium text-gray-900">{tenantData?.slug ?? tenant?.slug ?? '—'}</code>
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">Used for your public URL and guest portal</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Your public URL and guest portal live here. It cannot be changed from Settings —
+                  existing links, QR codes and saved bookmarks all point at it. Contact support if you need it moved.
+                </p>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">Website URL</label>

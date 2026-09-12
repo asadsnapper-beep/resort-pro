@@ -42,6 +42,23 @@ const TENANT_SETTINGS_SELECT = {
 
 const updateTenantSchema = z.object({
   name: z.string().min(2).max(100).optional(),
+  /**
+   * Accepted only so that an attempt to change it can be refused out loud.
+   * Never written.
+   *
+   * The Settings page offered URL Slug as an editable field; this schema did
+   * not declare it, z.object stripped it, and the route answered 200 "Settings
+   * updated" — so an owner believed their public URL had changed when nothing
+   * had happened. reports/qa/2026-09-09-settings-deep-qa.md (C-02).
+   *
+   * Nothing anywhere in the API changes a slug: it is set at registration and
+   * never again, not even by an admin route. The handler below therefore
+   * refuses a *different* slug and accepts an identical one, so a cached older
+   * bundle that still submits the current value keeps working instead of
+   * losing the ability to save at all — which is exactly what the phantom
+   * `city` field did.
+   */
+  slug: z.string().optional(),
   phone: z.string().optional(),
   // Allow empty string to clear these fields — transform '' → undefined so Prisma skips the field
   email: z.union([z.string().email(), z.literal('')]).optional().transform(v => v === '' ? undefined : v),
@@ -263,13 +280,31 @@ export async function tenantRoutes(app: FastifyInstance) {
   app.patch('/', {
     schema: { tags: ['tenant'], summary: 'Update resort settings', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER'),
-    handler: async (request) => {
+    handler: async (request, reply) => {
       const { db } = request;
       const { tenantId } = request.user as JwtPayload;
-      const body = updateTenantSchema.parse(request.body);
+      const { slug: requestedSlug, ...updates } = updateTenantSchema.parse(request.body);
+
+      if (requestedSlug !== undefined) {
+        const current = await db.tenant.findUnique({
+          where: { id: tenantId },
+          select: { slug: true },
+        });
+        if (current && requestedSlug !== current.slug) {
+          // Said plainly rather than ignored. The old behaviour was to drop it
+          // and report success.
+          return reply.status(400).send({
+            success: false,
+            error: 'The workspace URL cannot be changed here. Contact support to change it — existing links, QR codes and the guest portal all point at the current one.',
+            code: 'SLUG_IMMUTABLE',
+            field: 'slug',
+          });
+        }
+      }
+
       const tenant = await db.tenant.update({
         where: { id: tenantId },
-        data: body,
+        data: updates,
         select: TENANT_SETTINGS_SELECT,
       });
       return ok(tenant, 'Settings updated');
