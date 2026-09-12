@@ -29,14 +29,12 @@ import { createAdminNotification } from '../utils/notifications';
 const TENANT_SETTINGS_SELECT = {
   id: true, name: true, slug: true, plan: true,
   phone: true, email: true, website: true, address: true,
-  // `city` and `country` are writable by updateTenantSchema below, and were
-  // missing here — so the Settings form hydrated them as empty strings and the
-  // next save of any unrelated field wrote those empties over the stored
-  // values. A resort's country silently became blank, which also decides which
-  // payment gateways it is offered. reports/qa/2026-09-09-settings-deep-qa.md
-  // (C-01). Everything writable must be readable, or the form destroys data by
-  // simply loading.
-  city: true, country: true,
+  // `country` is writable by updateTenantSchema below and was missing here, so
+  // the Settings form hydrated it as an empty string. Country decides which
+  // payment gateways a resort is offered. Everything writable must be readable,
+  // or a form destroys data simply by loading.
+  // reports/qa/2026-09-09-settings-deep-qa.md (C-01).
+  country: true,
   currency: true, timezone: true, checkInTime: true, checkOutTime: true,
   logoUrl: true, createdAt: true,
   customDomain: true, domainVerified: true, domainVerifiedAt: true,
@@ -49,7 +47,14 @@ const updateTenantSchema = z.object({
   email: z.union([z.string().email(), z.literal('')]).optional().transform(v => v === '' ? undefined : v),
   website: z.union([z.string().url(), z.literal('')]).optional().transform(v => v === '' ? undefined : v),
   address: z.string().optional(),
-  city: z.string().optional(),
+  // No `city` field here on purpose: the Tenant model has no such column. This
+  // schema used to accept one, so `data: body` carried it into Prisma and the
+  // whole save threw — the Settings form always submits every field, so
+  // General/Contact/Operations returned 500 every time. z.object strips keys it
+  // does not declare, which is what makes leaving it out sufficient.
+  //
+  // The City input that fed it has been removed from the page. Storing a city
+  // needs a migration; that is a decision, not an oversight to paper over.
   country: z.string().optional(),
   currency: z.string().length(3).optional(),
   timezone: z.string().optional(),

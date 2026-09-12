@@ -53,7 +53,6 @@ interface TenantSettings {
   email?: string;
   phone?: string;
   address?: string;
-  city?: string;
   country?: string;
   timezone: string;
   currency: string;
@@ -125,7 +124,6 @@ export default function SettingsPage() {
     email: '',
     phone: '',
     address: '',
-    city: '',
     country: '',
     timezone: 'America/New_York',
     currency: 'BDT',
@@ -148,7 +146,6 @@ export default function SettingsPage() {
         email: t.email ?? '',
         phone: t.phone ?? '',
         address: t.address ?? '',
-        city: t.city ?? '',
         country: t.country ?? '',
         timezone: t.timezone ?? 'America/New_York',
         currency: t.currency ?? 'BDT',
@@ -488,15 +485,16 @@ export default function SettingsPage() {
                 <label className="mb-1 block text-sm font-medium text-gray-700">Address</label>
                 <Input value={form.address ?? ''} onChange={e => set('address', e.target.value)} placeholder="123 Beach Road" />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">City</label>
-                  <Input value={form.city ?? ''} onChange={e => set('city', e.target.value)} placeholder="Kuta" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Country</label>
-                  <Input value={form.country ?? ''} onChange={e => set('country', e.target.value)} placeholder="Indonesia" />
-                </div>
+              {/* City is gone, not hidden: there is no city column on Tenant, so
+                  the input could never save. It also broke the whole form — the
+                  page submits every field, and the API's schema accepted a
+                  `city` it could not store, so Prisma threw and General,
+                  Contact and Operations all returned 500. Adding a city needs a
+                  migration, which is a decision rather than a gap to paper
+                  over. Country is a real column and stays. */}
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Country</label>
+                <Input value={form.country ?? ''} onChange={e => set('country', e.target.value)} placeholder="Bangladesh" />
               </div>
             </CardContent>
           </Card>

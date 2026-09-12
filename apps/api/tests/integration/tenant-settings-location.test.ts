@@ -1,18 +1,24 @@
 /**
- * Saving one Settings field must not erase another.
+ * Saving General Settings has to work, and must not erase the country.
  *
- * `city` and `country` were writable but not readable: the update schema
- * accepted them, the GET never returned them. The Settings form loads its state
- * from that GET and submits the whole form, so both fields hydrated as empty
- * strings and the next save of anything — a phone number, a check-in time —
- * wrote those empties over the stored values. A resort's country went blank on
- * its own, and country decides which payment gateways it is offered.
+ * Two defects in one form, found one behind the other.
  *
- * reports/qa/2026-09-09-settings-deep-qa.md (C-01), whose required fix asks for
- * exactly this regression test: prove an unrelated save preserves location.
+ * `updateTenantSchema` accepted a `city` field. There is no `city` column on
+ * Tenant — none anywhere in the datamodel. The page submits every field it
+ * holds, so `data` carried `city` into Prisma, Prisma rejected the unknown
+ * argument, and General, Contact and Operations returned 500 on every save. The
+ * QA report inferred from the code that the save succeeded and erased data; it
+ * did not succeed at all.
  *
- * The general rule worth keeping: anything writable has to be readable, or a
- * form destroys data simply by loading.
+ * Behind that, `country` — which is a real column, and decides which payment
+ * gateways a resort is offered — was writable but not returned by the read. So
+ * the form hydrated it blank, and once the 500 was out of the way, saving
+ * anything would have written that blank over the stored value.
+ *
+ * reports/qa/2026-09-09-settings-deep-qa.md (C-01).
+ *
+ * The rule worth keeping: anything writable has to be readable, and a schema
+ * must not accept what the database cannot store.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildApp } from '../../src/app';
@@ -28,15 +34,14 @@ let tenantId: string;
 
 const auth = () => ({ Authorization: `Bearer ${ownerToken}` });
 
-const CITY = 'Cox’s Bazar';
 const COUNTRY = 'BD';
 
-async function storedLocation() {
+async function storedCountry() {
   const row = await prisma.tenant.findUnique({
     where: { id: tenantId },
-    select: { city: true, country: true },
+    select: { country: true },
   });
-  return { city: row?.city, country: row?.country };
+  return row?.country;
 }
 
 beforeAll(async () => {
@@ -57,7 +62,7 @@ beforeAll(async () => {
 
   await prisma.tenant.update({
     where: { id: tenantId },
-    data: { planStatus: 'active', plan: 'ENTERPRISE', city: CITY, country: COUNTRY },
+    data: { planStatus: 'active', plan: 'ENTERPRISE', country: COUNTRY },
   });
 }, 30000);
 
@@ -67,32 +72,52 @@ afterAll(async () => {
 });
 
 describe('reading Settings', () => {
-  it('returns the location it will accept back', async () => {
+  it('returns the country it will accept back', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/tenant', headers: auth() });
     const data = JSON.parse(res.body).data;
 
-    // This is the whole defect: these two were absent, so the form could only
-    // ever load them as blank.
-    expect(data.city).toBe(CITY);
+    // Absent before: the form could only ever load this blank.
     expect(data.country).toBe(COUNTRY);
+  });
+
+  it('does not offer a city, because there is nowhere to put one', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/tenant', headers: auth() });
+    expect(JSON.parse(res.body).data.city).toBeUndefined();
   });
 });
 
-describe('saving an unrelated field', () => {
-  it('leaves the stored city and country alone', async () => {
+describe('saving General Settings', () => {
+  it('succeeds at all', async () => {
+    // The plainest possible save, and it used to be a 500.
     const res = await app.inject({
       method: 'PATCH', url: '/api/tenant', headers: auth(),
       payload: { phone: '+8801799999999' },
     });
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode, res.body).toBe(200);
+  });
 
-    expect(await storedLocation()).toEqual({ city: CITY, country: COUNTRY });
+  it('survives a stray city from an older client', async () => {
+    // z.object strips what it does not declare, so a cached bundle still
+    // sending `city` gets a working save rather than a 500.
+    const res = await app.inject({
+      method: 'PATCH', url: '/api/tenant', headers: auth(),
+      payload: { phone: '+8801788888888', city: 'Kuta' },
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(JSON.parse(res.body).data.city).toBeUndefined();
+  });
+
+  it('leaves the stored country alone when saving something else', async () => {
+    await app.inject({
+      method: 'PATCH', url: '/api/tenant', headers: auth(),
+      payload: { phone: '+8801777777777' },
+    });
+    expect(await storedCountry()).toBe(COUNTRY);
   });
 
   it('survives the round trip the form actually makes', async () => {
-    // What the page does: load, then submit every field it holds. With the GET
-    // returning the location, that round trip is harmless; without it, this is
-    // the exact sequence that wiped the data.
+    // Load, then submit every field held — the exact sequence that did the
+    // damage once the 500 was gone.
     const read = await app.inject({ method: 'GET', url: '/api/tenant', headers: auth() });
     const loaded = JSON.parse(read.body).data;
 
@@ -102,26 +127,24 @@ describe('saving an unrelated field', () => {
         name: loaded.name,
         phone: loaded.phone ?? '',
         address: loaded.address ?? '',
-        city: loaded.city ?? '',
         country: loaded.country ?? '',
         checkInTime: loaded.checkInTime,
         checkOutTime: loaded.checkOutTime,
       },
     });
-    expect(res.statusCode).toBe(200);
-
-    expect(await storedLocation()).toEqual({ city: CITY, country: COUNTRY });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(await storedCountry()).toBe(COUNTRY);
   });
 
-  it('still lets the owner clear the field on purpose', async () => {
-    // The fix must not turn a deliberate change into an ignored one.
+  it('still lets the owner change the country on purpose', async () => {
+    // The guard must not have been built by ignoring the field.
     const res = await app.inject({
       method: 'PATCH', url: '/api/tenant', headers: auth(),
-      payload: { city: 'Sylhet' },
+      payload: { country: 'LK' },
     });
     expect(res.statusCode).toBe(200);
-    expect((await storedLocation()).city).toBe('Sylhet');
+    expect(await storedCountry()).toBe('LK');
 
-    await prisma.tenant.update({ where: { id: tenantId }, data: { city: CITY } });
+    await prisma.tenant.update({ where: { id: tenantId }, data: { country: COUNTRY } });
   });
 });
