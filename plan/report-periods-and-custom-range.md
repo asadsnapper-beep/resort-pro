@@ -1,5 +1,26 @@
 # রিপোর্টিং: Daily, Weekly ও Custom Date Range
 
+> **Status, 2026-09-12.** Phase 1 and Phase 2 are built.
+> `GET /api/reports/period` takes `from`/`to` or `week=`, `/reports/daily` is
+> the same builder with `from === to`, and the Reports page has the three-way
+> selector, quick ranges, URL sync and Apply-gated custom dates.
+>
+> Deliberately not built yet, each for a stated reason rather than for lack of
+> time:
+>
+> - **`chargesPosted.room`** — needs the room-night engine below, and the
+>   planned-versus-actual-dates decision is still open. Returned as `null`.
+> - **`outstandingAsOfEnd`** — hidden, as this plan asks, until it can be
+>   computed from invoice provenance.
+> - **`POST /reports/period/email`** — so emailing is offered for a single day
+>   only, and the button says why. Sending a week's figures under a one-day
+>   subject would be worse than not offering it.
+> - **Export (CSV/PDF)** — Phase 2 of this plan's own ordering, after the
+>   in-page and print totals have been checked against reality.
+> - **Scheduled weekly dispatch** — still out of scope. And note the warning
+>   under "Auto-dispatch": no scheduled report has ever been sent on
+>   production, because the worker has never run there.
+
 ## কেন এই কাজ
 
 Resort owner আজকের daily report-এর পাশাপাশি গত সপ্তাহ, চলতি মাস, বা নিজের

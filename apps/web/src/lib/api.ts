@@ -544,7 +544,25 @@ export const packagesApi = {
 };
 
 // ── Reports ───────────────────────────────────────────────────────────────────
+/** What the report page asks for. `week` is any date inside the wanted week. */
+export type ReportPeriodQuery =
+  | { kind: 'daily' | 'custom'; from: string; to: string }
+  | { kind: 'weekly'; week: string };
+
 export const reportsApi = {
+  /**
+   * The canonical report call. One day, a Monday–Sunday week, or a range.
+   *
+   * For a week the anchor date is sent rather than a computed range, so where
+   * a week begins is decided in one place — the server — instead of here as
+   * well.
+   */
+  getPeriod: (query: ReportPeriodQuery) =>
+    api.get('/reports/period', {
+      params: query.kind === 'weekly'
+        ? { week: query.week }
+        : { from: query.from, to: query.to },
+    }),
   getDaily: (date?: string) => api.get('/reports/daily', { params: date ? { date } : {} }),
   emailDaily: (date?: string, toEmail?: string) =>
     api.post('/reports/daily/email', { toEmail }, { params: date ? { date } : {} }),

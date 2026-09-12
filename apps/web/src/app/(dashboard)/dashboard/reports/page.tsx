@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { reportsApi } from '@/lib/api';
+import { reportsApi, type ReportPeriodQuery } from '@/lib/api';
 // shadcn cards removed — using native divs with design tokens
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -20,10 +21,27 @@ function toLocalDate(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function formatDisplayDate(dateStr: string) {
-  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-  });
+function shiftDate(dateStr: string, days: number) {
+  // Noon avoids the DST edges where adding a day to local midnight can land
+  // back on the same date.
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + days);
+  return toLocalDate(d);
+}
+
+/** "20–25 September 2026 (6 days)" — one line an owner can read back to you. */
+function formatPeriodLabel(period: { from: string; to: string; dayCount: number; kind: string }) {
+  const from = new Date(period.from + 'T12:00:00');
+  const to = new Date(period.to + 'T12:00:00');
+  if (period.from === period.to) {
+    return from.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  const sameMonth = from.getMonth() === to.getMonth() && from.getFullYear() === to.getFullYear();
+  const left = sameMonth
+    ? String(from.getDate())
+    : from.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+  const right = to.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  return `${left}\u2013${right} (${period.dayCount} days)`;
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
@@ -261,17 +279,60 @@ export default function ReportsPage() {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const { toast } = useToast();
-  const [date, setDate] = useState(toLocalDate(new Date()));
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const today = toLocalDate(new Date());
+
+  // The query IS the state: it is what the API takes and what the URL carries,
+  // so there is no third representation to keep in step. A week is held as an
+  // anchor date rather than a computed range, leaving "where does a week
+  // start" to the server alone.
+  const [query, setQuery] = useState<ReportPeriodQuery>(() => {
+    const kind = searchParams.get('period');
+    if (kind === 'weekly') {
+      return { kind: 'weekly', week: searchParams.get('week') || today };
+    }
+    if (kind === 'custom') {
+      const from = searchParams.get('from');
+      const to = searchParams.get('to');
+      if (from && to) return { kind: 'custom', from, to };
+    }
+    const date = searchParams.get('date') || today;
+    return { kind: 'daily', from: date, to: date };
+  });
+
+  // Custom dates are edited freely and only take effect on Apply, so typing a
+  // half-finished range does not fire a request per keystroke.
+  const [draft, setDraft] = useState(() => ({
+    from: query.kind === 'weekly' ? today : query.from,
+    to: query.kind === 'weekly' ? today : query.to,
+  }));
+
   const [emailAddr, setEmailAddr] = useState('');
   const [showEmailInput, setShowEmailInput] = useState(false);
 
+  // Shareable and reload-safe: the URL says exactly which report is on screen.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    params.set('period', query.kind);
+    if (query.kind === 'weekly') params.set('week', query.week);
+    else if (query.kind === 'daily') params.set('date', query.from);
+    else { params.set('from', query.from); params.set('to', query.to); }
+    router.replace(`?${params.toString()}`, { scroll: false });
+  }, [query, router]);
+
   const { data: res, isLoading, refetch } = useQuery({
-    queryKey: ['daily-report', date],
-    queryFn: () => reportsApi.getDaily(date),
+    queryKey: ['report-period', query],
+    queryFn: () => reportsApi.getPeriod(query),
   });
 
+  // Only a single day can be emailed: the email endpoint takes a date, and
+  // POST /reports/period/email is not built yet. Sending a week's numbers under
+  // a one-day subject would be worse than not offering it.
+  const emailableDate = query.kind === 'daily' ? query.from : null;
+
   const emailMut = useMutation({
-    mutationFn: () => reportsApi.emailDaily(date, emailAddr || undefined),
+    mutationFn: () => reportsApi.emailDaily(emailableDate ?? today, emailAddr || undefined),
     onSuccess: () => {
       toast({ title: 'Report emailed', description: `Sent to ${emailAddr || 'your account email'}` });
       setShowEmailInput(false);
@@ -284,12 +345,40 @@ export default function ReportsPage() {
 
   const handlePrint = () => window.print();
 
-  // ── Navigation helpers ──────────────────────────────────────────────────────
-  const changeDate = (delta: number) => {
-    const d = new Date(date + 'T12:00:00');
-    d.setDate(d.getDate() + delta);
-    setDate(toLocalDate(d));
+  // ── Navigation ──────────────────────────────────────────────────────────────
+  // A step means one of whatever is on screen: a day in daily, a whole
+  // Monday–Sunday week in weekly.
+  const step = (delta: number) => {
+    setQuery((current) => {
+      if (current.kind === 'weekly') return { kind: 'weekly', week: shiftDate(current.week, delta * 7) };
+      const next = shiftDate(current.from, delta);
+      return { kind: 'daily', from: next, to: next };
+    });
   };
+
+  const canStepForward = query.kind === 'weekly'
+    ? shiftDate(query.week, 7) <= today
+    : query.kind === 'daily' && query.from < today;
+
+  const draftError = draft.to < draft.from
+    ? 'End date must be the same as or after start date.'
+    : draft.to > today || draft.from > today
+      ? 'A report cannot cover a date in the future.'
+      : null;
+
+  const applyDraft = () => {
+    if (draftError) return;
+    setQuery({ kind: 'custom', from: draft.from, to: draft.to });
+  };
+
+  const quickRanges: { label: string; apply: () => void }[] = [
+    { label: 'Today', apply: () => setQuery({ kind: 'daily', from: today, to: today }) },
+    { label: 'Yesterday', apply: () => { const d = shiftDate(today, -1); setQuery({ kind: 'daily', from: d, to: d }); } },
+    { label: 'This week', apply: () => setQuery({ kind: 'weekly', week: today }) },
+    { label: 'Last week', apply: () => setQuery({ kind: 'weekly', week: shiftDate(today, -7) }) },
+    { label: 'This month', apply: () => setQuery({ kind: 'custom', from: today.slice(0, 8) + '01', to: today }) },
+    { label: 'Last 30 days', apply: () => setQuery({ kind: 'custom', from: shiftDate(today, -29), to: today }) },
+  ];
 
   return (
     <>
@@ -306,34 +395,42 @@ export default function ReportsPage() {
       <PageShell gap={6}>
         {/* ── Header ── */}
         <PageHeader
-          title="Daily Report"
-          subtitle="End-of-day summary for front desk & management"
+          title="Reports"
+          subtitle="A day, a week, or any range you choose"
           align="responsive"
           className="no-print"
           actions={
           <div className="flex flex-wrap items-center gap-2">
-            {/* Date navigator */}
-            <div className="flex items-center overflow-hidden rounded-[9px] border" style={{ borderColor: 'var(--rp-border-md)' }}>
-              <button onClick={() => changeDate(-1)}
-                className="px-3 py-2 text-[13px] hover:bg-[#f4f1eb] transition-colors border-r"
-                style={{ borderColor: 'var(--rp-border)' }}>←</button>
-              <input type="date" value={date} max={toLocalDate(new Date())} onChange={(e) => setDate(e.target.value)}
-                className="px-3 py-2 text-[13px] bg-transparent focus:outline-none cursor-pointer text-[#183153]" />
-              <button onClick={() => changeDate(1)} disabled={date >= toLocalDate(new Date())}
-                className="px-3 py-2 text-[13px] hover:bg-[#f4f1eb] transition-colors border-l disabled:opacity-40"
-                style={{ borderColor: 'var(--rp-border)' }}>→</button>
-            </div>
-
-            {date !== toLocalDate(new Date()) && (
-              <button onClick={() => setDate(toLocalDate(new Date()))}
-                className="rounded-[9px] border px-3 py-2 text-[12px] transition-colors hover:bg-[#f4f1eb]"
-                style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>Today</button>
+            {/* Stepper. Hidden for a custom range, where "one step back" has
+                no obvious meaning — that mode has Apply instead. */}
+            {query.kind !== 'custom' && (
+              <div className="flex items-center overflow-hidden rounded-rp-ctrl border border-rp-border-md">
+                <button onClick={() => step(-1)} aria-label="Previous period"
+                  className="border-r border-rp-border px-3 py-2 text-rp-body transition-colors hover:bg-rp-surface-3">←</button>
+                <input
+                  type="date"
+                  aria-label={query.kind === 'weekly' ? 'A date in the week to report on' : 'Report date'}
+                  value={query.kind === 'weekly' ? query.week : query.from}
+                  max={today}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (!value) return;
+                    setQuery(query.kind === 'weekly'
+                      ? { kind: 'weekly', week: value }
+                      : { kind: 'daily', from: value, to: value });
+                  }}
+                  className="cursor-pointer bg-transparent px-3 py-2 text-rp-body text-rp-text focus:outline-none" />
+                <button onClick={() => step(1)} disabled={!canStepForward} aria-label="Next period"
+                  className="border-l border-rp-border px-3 py-2 text-rp-body transition-colors hover:bg-rp-surface-3 disabled:opacity-40">→</button>
+              </div>
             )}
 
             {/* Email button */}
             <button
               onClick={() => setShowEmailInput(!showEmailInput)}
-              className="flex items-center gap-1.5 rounded-[9px] border px-3 py-2 text-[13px] transition-colors hover:bg-[#f4f1eb]"
+              disabled={!emailableDate}
+              title={emailableDate ? undefined : 'Emailing is available for a single day. Pick Daily to send one.'}
+              className="flex items-center gap-1.5 rounded-[9px] border px-3 py-2 text-[13px] transition-colors hover:bg-[#f4f1eb] disabled:opacity-40"
               style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}
             >
               <Mail className="h-4 w-4" />
@@ -350,6 +447,69 @@ export default function ReportsPage() {
           </div>
           }
         />
+
+        {/* ── Period selector ── */}
+        <div className="no-print space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Three choices, not a pile of options: a day, a week, or a range. */}
+            <div className="flex items-center overflow-hidden rounded-rp-ctrl border border-rp-border-md">
+              {(['daily', 'weekly', 'custom'] as const).map((kind, index) => (
+                <button
+                  key={kind}
+                  onClick={() => {
+                    if (kind === query.kind) return;
+                    if (kind === 'weekly') setQuery({ kind: 'weekly', week: today });
+                    else if (kind === 'daily') setQuery({ kind: 'daily', from: today, to: today });
+                    else setQuery({ kind: 'custom', from: draft.from, to: draft.to });
+                  }}
+                  className={`px-3 py-2 text-rp-body capitalize transition-colors ${index > 0 ? 'border-l border-rp-border' : ''} ${
+                    query.kind === kind
+                      ? 'bg-rp-btn-accent text-rp-btn-accent-text font-medium'
+                      : 'text-rp-text-subtle hover:bg-rp-surface-3'
+                  }`}
+                >
+                  {kind}
+                </button>
+              ))}
+            </div>
+
+            {/* Shortcuts, not a fourth mode: each one just sets the controls. */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {quickRanges.map(({ label, apply }) => (
+                <button key={label} onClick={apply}
+                  className="rounded-rp-ctrl border border-rp-border-md px-2.5 py-1.5 text-rp-label text-rp-text-subtle transition-colors hover:bg-rp-surface-3">
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {query.kind === 'custom' && (
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-rp-label text-rp-muted">From</span>
+                <input type="date" value={draft.from} max={today}
+                  onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))}
+                  className="rounded-rp-ctrl border border-rp-border-md bg-transparent px-3 py-2 text-rp-body text-rp-text focus:outline-none" />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-rp-label text-rp-muted">To</span>
+                <input type="date" value={draft.to} max={today}
+                  onChange={(e) => setDraft((d) => ({ ...d, to: e.target.value }))}
+                  className="rounded-rp-ctrl border border-rp-border-md bg-transparent px-3 py-2 text-rp-body text-rp-text focus:outline-none" />
+              </label>
+              {/* Nothing is requested until Apply, so a half-typed range never
+                  reaches the server. */}
+              <button onClick={applyDraft} disabled={!!draftError}
+                className="rounded-rp-ctrl bg-rp-btn-accent px-4 py-2 text-rp-body font-medium text-rp-btn-accent-text transition-opacity disabled:opacity-50">
+                Apply
+              </button>
+              {draftError && (
+                <p className="w-full text-rp-label text-rp-danger" role="alert">{draftError}</p>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Email input row */}
         {showEmailInput && (
@@ -391,8 +551,12 @@ export default function ReportsPage() {
               <div className="flex items-center gap-3">
                 <Calendar className="h-[18px] w-[18px]" style={{ color: '#183153' }} />
                 <div>
-                  <p className="text-[13.5px] font-semibold" style={{ color: '#183153' }}>{formatDisplayDate(date)}</p>
-                  <p className="text-[12px]" style={{ color: '#183153' }}>{report.tenant.name}</p>
+                  <p className="text-[13.5px] font-semibold" style={{ color: '#183153' }}>
+                    <span className="capitalize">{report.period.kind}</span> report · {formatPeriodLabel(report.period)}
+                  </p>
+                  <p className="text-[12px]" style={{ color: '#183153' }}>
+                    {report.tenant.name} · times in {report.period.timezone}
+                  </p>
                 </div>
               </div>
               <span className="text-[11.5px]" style={{ color: '#6386a3' }}>Generated {new Date().toLocaleTimeString()}</span>
@@ -639,7 +803,15 @@ export default function ReportsPage() {
 
             {/* Print footer */}
             <div className="hidden print:block pt-4 border-t text-[11px] text-center" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-muted)' }}>
-              <p>{report.tenant.name} · Daily Report · {formatDisplayDate(date)} · Generated {new Date().toLocaleString()}</p>
+              <p>
+                {report.tenant.name} · <span className="capitalize">{report.period.kind}</span> report ·
+                {' '}{report.period.from} → {report.period.to} ({report.period.dayCount} days) ·
+                {' '}times in {report.period.timezone} · Generated {new Date().toLocaleString()}
+              </p>
+              <p className="mt-1">
+                Payments received is money banked in the period; charged to guests is what was added to bills
+                and is not all received. Occupancy is room nights.
+              </p>
               <p className="mt-1">Confidential — ResortPro</p>
             </div>
           </div>
@@ -648,7 +820,10 @@ export default function ReportsPage() {
         {!isLoading && !report && (
           <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
             <FileBarChart2 className="h-12 w-12 text-[#94a3b8] dark:text-[#7f99ab]" />
-            <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">No report data for {date}</p>
+            <p className="text-[13px] text-[#64748b] dark:text-[#a9c1d0]">
+              No report data for{' '}
+              {query.kind === 'weekly' ? `the week of ${query.week}` : query.kind === 'daily' ? query.from : `${query.from} → ${query.to}`}
+            </p>
             <button onClick={() => refetch()}
               className="mt-2 rounded-[9px] px-4 py-2 text-[13px] font-medium transition-colors"
               style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
