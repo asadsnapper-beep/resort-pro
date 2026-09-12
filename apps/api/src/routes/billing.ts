@@ -99,18 +99,46 @@ export function getPlatformBkash(): BkashConfig | null {
 }
 
 // ── Auth helper ────────────────────────────────────────────────────────────
-async function requireAuth(request: any, reply: any) {
+/**
+ * `ownerOnly` guards everything that can spend the resort's money or expose
+ * its billing history.
+ *
+ * Until the 2026-09-09 sidebar QA, hiding Billing from the sidebar was the only
+ * thing between a receptionist and this tenant's subscription — these routes
+ * accepted any authenticated role. Typing /dashboard/billing was enough, and
+ * POST /billing/portal opens Stripe's own billing portal, where a subscription
+ * can be cancelled and payment methods changed. Hidden navigation is not
+ * authorization.
+ *
+ * The role is read from the database rather than the token: a role changed
+ * after a token was issued must take effect at once, and this query is already
+ * being made.
+ *
+ * GET /status is deliberately left open to every authenticated role. The
+ * dashboard layout calls it on mount for the suspension and trial-expiry gate,
+ * and its failure path lets the user through — so restricting it would quietly
+ * mean staff of a suspended resort carry on working. It returns plan state and
+ * limits, never payment detail.
+ */
+async function requireAuth(request: any, reply: any, opts?: { ownerOnly?: boolean }) {
   try {
     await request.jwtVerify();
     const user = await prisma.user.findUnique({
       where: { id: request.user.sub },
-      select: { emailVerifiedAt: true, isActive: true, tenantId: true },
+      select: { emailVerifiedAt: true, isActive: true, tenantId: true, role: true },
     });
     if (!user || !user.isActive || !user.emailVerifiedAt || user.tenantId !== request.user.tenantId) {
       return reply.status(403).send({
         success: false,
         error: 'Verify your email before continuing.',
         code: 'EMAIL_VERIFICATION_REQUIRED',
+      });
+    }
+    if (opts?.ownerOnly && user.role !== 'OWNER') {
+      return reply.status(403).send({
+        success: false,
+        error: 'Only the workspace owner can manage billing.',
+        code: 'OWNER_ONLY',
       });
     }
   } catch {
@@ -206,7 +234,7 @@ export async function billingRoutes(app: FastifyInstance) {
   app.post<{ Body: { planKey: keyof typeof PLANS; interval?: 'month' | 'year' } }>(
     '/checkout',
     async (request, reply) => {
-      await requireAuth(request, reply);
+      await requireAuth(request, reply, { ownerOnly: true });
       if (reply.sent) return;
       const { tenantId } = request.user as any;
       const { planKey, interval = 'month' } = request.body;
@@ -282,7 +310,7 @@ export async function billingRoutes(app: FastifyInstance) {
 
   // POST /billing/portal — Stripe customer portal (manage/cancel subscription)
   app.post('/portal', async (request, reply) => {
-    await requireAuth(request, reply);
+    await requireAuth(request, reply, { ownerOnly: true });
     if (reply.sent) return;
     const { tenantId } = request.user as any;
 
@@ -312,7 +340,7 @@ export async function billingRoutes(app: FastifyInstance) {
   app.post<{ Body: { planKey: keyof typeof PLANS; interval?: 'month' | 'year' } }>(
     '/checkout/bkash',
     async (request, reply) => {
-      await requireAuth(request, reply);
+      await requireAuth(request, reply, { ownerOnly: true });
       if (reply.sent) return;
       const { tenantId } = request.user as any;
       const { planKey, interval = 'month' } = request.body;
@@ -436,7 +464,7 @@ export async function billingRoutes(app: FastifyInstance) {
 
   // GET /billing/invoices — list recent invoices
   app.get('/invoices', async (request, reply) => {
-    await requireAuth(request, reply);
+    await requireAuth(request, reply, { ownerOnly: true });
     if (reply.sent) return;
     const { tenantId } = request.user as any;
 
