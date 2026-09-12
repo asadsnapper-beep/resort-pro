@@ -20,6 +20,9 @@ and the git history.
 | Finding | Report | Fixed |
 |---|---|---|
 | Billing APIs accepted any authenticated role | Sidebar comprehensive QA, Critical | ✅ 2026-09-12 — owner-only on invoices/portal/checkout; `/status` left open on purpose, because the dashboard's suspension gate depends on it |
+| C-03 / M-02 and the Overview report-email finding — SMS, WhatsApp, email and report-email reported sends that never happened | Settings deep QA, Critical/Major | 🟡 2026-09-12 — the four endpoints are honest now (503 unconfigured, 502 rejected, 501 unbuilt). The other half of C-03 is untouched: the six notification trigger fields are still stored with nothing reading them, so guests receive nothing |
+| C-05 — update responses could expose tenant secrets | Settings deep QA, Critical | ✅ 2026-09-12 — safe selects on the tenant and Discovery PATCHes; the guard test derives forbidden names from schema.prisma so a new secret is covered automatically |
+| C-01 — an unrelated save could erase city and country | Settings deep QA, Critical | ✅ 2026-09-12 — both fields are returned by the read, so the form stops hydrating them blank; regression test covers the exact load-then-submit sequence |
 
 Everything else below is, as far as anyone has checked, still open. In
 particular the Settings audit's "not production-ready" verdict has not been

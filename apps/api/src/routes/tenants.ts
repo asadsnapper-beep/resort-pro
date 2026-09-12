@@ -29,6 +29,14 @@ import { createAdminNotification } from '../utils/notifications';
 const TENANT_SETTINGS_SELECT = {
   id: true, name: true, slug: true, plan: true,
   phone: true, email: true, website: true, address: true,
+  // `city` and `country` are writable by updateTenantSchema below, and were
+  // missing here — so the Settings form hydrated them as empty strings and the
+  // next save of any unrelated field wrote those empties over the stored
+  // values. A resort's country silently became blank, which also decides which
+  // payment gateways it is offered. reports/qa/2026-09-09-settings-deep-qa.md
+  // (C-01). Everything writable must be readable, or the form destroys data by
+  // simply loading.
+  city: true, country: true,
   currency: true, timezone: true, checkInTime: true, checkOutTime: true,
   logoUrl: true, createdAt: true,
   customDomain: true, domainVerified: true, domainVerifiedAt: true,
