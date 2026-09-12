@@ -290,7 +290,15 @@ export async function discoveryRoutes(fastify: FastifyInstance) {
     if (bookingPhone      !== undefined) data.bookingPhone      = bookingPhone;
     if (instagramHandle   !== undefined) data.instagramHandle   = instagramHandle;
 
-    const updated = await prisma.tenant.update({ where: { id: tenantId }, data });
+    // PUBLIC_SELECT covers every field this route can set, and nothing else.
+    // Without it the response carried the whole tenant row — including
+    // smsApiSecret, waApiToken and ssoClientSecret. See
+    // reports/qa/2026-09-09-settings-deep-qa.md (C-05).
+    const updated = await prisma.tenant.update({
+      where: { id: tenantId },
+      data,
+      select: PUBLIC_SELECT,
+    });
     return reply.send({ success: true, data: updated });
   });
 

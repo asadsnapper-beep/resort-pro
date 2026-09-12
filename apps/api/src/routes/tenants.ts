@@ -13,6 +13,27 @@ import crypto from 'crypto';
 import { ensureTenantReferralCode, referralRegistrationUrl } from '../utils/referral';
 import { createAdminNotification } from '../utils/notifications';
 
+/**
+ * What a Settings response may contain.
+ *
+ * Shared by the read and the update on purpose. The update used to answer with
+ * `db.tenant.update(...)`'s whole row and no select, and Tenant carries
+ * `smsApiKey`, `smsApiSecret`, `waApiToken` and `ssoClientSecret` — so every
+ * save put those into a response body, where they reach browser network logs,
+ * proxies and client-side error telemetry. Found by
+ * reports/qa/2026-09-09-settings-deep-qa.md (C-05).
+ *
+ * One constant rather than two lists, because two lists drift and the larger
+ * one wins by accident. Adding a field here exposes it deliberately.
+ */
+const TENANT_SETTINGS_SELECT = {
+  id: true, name: true, slug: true, plan: true,
+  phone: true, email: true, website: true, address: true,
+  currency: true, timezone: true, checkInTime: true, checkOutTime: true,
+  logoUrl: true, createdAt: true,
+  customDomain: true, domainVerified: true, domainVerifiedAt: true,
+} as const;
+
 const updateTenantSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   phone: z.string().optional(),
@@ -41,13 +62,7 @@ export async function tenantRoutes(app: FastifyInstance) {
       const { tenantId } = request.user as JwtPayload;
       const tenant = await db.tenant.findUnique({
         where: { id: tenantId },
-        select: {
-          id: true, name: true, slug: true, plan: true,
-          phone: true, email: true, website: true, address: true,
-          currency: true, timezone: true, checkInTime: true, checkOutTime: true,
-          logoUrl: true, createdAt: true,
-          customDomain: true, domainVerified: true, domainVerifiedAt: true,
-        },
+        select: TENANT_SETTINGS_SELECT,
       });
       if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
       return ok(tenant);
@@ -239,7 +254,11 @@ export async function tenantRoutes(app: FastifyInstance) {
       const { db } = request;
       const { tenantId } = request.user as JwtPayload;
       const body = updateTenantSchema.parse(request.body);
-      const tenant = await db.tenant.update({ where: { id: tenantId }, data: body });
+      const tenant = await db.tenant.update({
+        where: { id: tenantId },
+        data: body,
+        select: TENANT_SETTINGS_SELECT,
+      });
       return ok(tenant, 'Settings updated');
     },
   });
