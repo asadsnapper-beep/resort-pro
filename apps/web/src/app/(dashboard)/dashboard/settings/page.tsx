@@ -258,8 +258,16 @@ export default function SettingsPage() {
     try {
       await tenantApi.sendTestEmail(testEmailAddr);
       toast({ title: `Test email sent to ${testEmailAddr}` });
-    } catch {
-      toast({ title: 'Failed to send test email', variant: 'destructive' });
+    } catch (error) {
+      // The server now says why — "no email provider configured", or the
+      // provider's own rejection. "Failed" told the owner nothing they could
+      // act on, and this button exists to find out whether email works.
+      const reason = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast({
+        title: 'Test email not sent',
+        description: reason ?? 'The server did not say why.',
+        variant: 'destructive',
+      });
     }
     setTestSending(false);
   };
@@ -2344,16 +2352,27 @@ function NotificationsTab() {
     onError: () => toast({ title: 'Error', variant: 'destructive' }),
   });
 
+  // Both of these answer 501 today: no SMS or WhatsApp provider is wired up.
+  // They used to report a successful send, so an owner could believe guest
+  // notifications were working.
+  const deliveryError = (error: unknown) =>
+    (error as { response?: { data?: { error?: string } } })?.response?.data?.error
+      ?? 'The server did not say why.';
+
   const testSmsMut = useMutation({
     mutationFn: () => tenantApi.testSms(testPhone),
     onSuccess: () => toast({ title: '✓ Test SMS sent', description: `Sent to ${testPhone}` }),
-    onError: () => toast({ title: 'Failed', variant: 'destructive' }),
+    onError: (error) => toast({
+      title: 'Test SMS not sent', description: deliveryError(error), variant: 'destructive',
+    }),
   });
 
   const testWaMut = useMutation({
     mutationFn: () => tenantApi.testWhatsapp(testWaPhone),
     onSuccess: () => toast({ title: '✓ Test WhatsApp sent', description: `Sent to ${testWaPhone}` }),
-    onError: () => toast({ title: 'Failed', variant: 'destructive' }),
+    onError: (error) => toast({
+      title: 'Test WhatsApp not sent', description: deliveryError(error), variant: 'destructive',
+    }),
   });
 
   const d = data?.data?.data;

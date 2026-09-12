@@ -3,6 +3,7 @@ import { prisma } from '@resort-pro/database';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { ok } from '../utils/response';
 import { sendEmail } from '../services/email';
+import { deliveryVerdict } from '../utils/delivery';
 import type { JwtPayload } from '@resort-pro/types';
 import { resolveReportPeriod, ReportPeriodError, weekContaining, localDateToday } from '../services/reporting/period';
 import { buildReport, type Report } from '../services/reporting/build-report';
@@ -248,13 +249,22 @@ export async function reportRoutes(app: FastifyInstance) {
       if (!recipientEmail) return reply.status(400).send({ error: 'No email address available' });
 
       const html = buildReportEmail(report, tenant?.brandPrimaryColor ?? '#1a6b5e');
-      await sendEmail({
+      const verdict = deliveryVerdict(await sendEmail({
         to: recipientEmail,
         subject: `Daily Report — ${report.tenant.name} · ${dateStr}`,
         html,
-      });
+      }));
 
-      return ok({ sent: true, to: recipientEmail, date: dateStr });
+      // "Report emailed" used to appear whether or not anything was sent. An
+      // owner who believes the evening report went out does not go looking for
+      // it.
+      if (!verdict.delivered) {
+        return reply.status(verdict.status).send({
+          success: false, error: verdict.error, code: verdict.code,
+        });
+      }
+
+      return ok({ sent: true, to: recipientEmail, date: dateStr, id: verdict.id });
     },
   });
 

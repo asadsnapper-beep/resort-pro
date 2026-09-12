@@ -4,6 +4,7 @@
  */
 import { prisma } from '@resort-pro/database';
 import { bill } from '../services/billing';
+import type { DeliveryAttempt } from './delivery';
 import { sendEmail } from '../services/email';
 import { calculateNights } from './booking';
 import { createAdminNotification } from './notifications';
@@ -518,12 +519,22 @@ export async function sendWebBookingEmails(bookingId: string) {
   }
 }
 
-export async function sendTestEmail(tenantId: string, toEmail: string) {
+/**
+ * Returns the delivery attempt so the caller can be honest about it. It used to
+ * return nothing, which is how `{ sent: true }` came to be answered on a server
+ * with no email provider.
+ */
+export async function sendTestEmail(
+  tenantId: string,
+  toEmail: string,
+): Promise<DeliveryAttempt> {
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
     select: { name: true, email: true, logoUrl: true, brandPrimaryColor: true },
   });
-  if (!tenant) return;
+  // Another silent path: this returned undefined and the route reported
+  // success for a tenant that does not exist.
+  if (!tenant) return { id: null, error: 'tenant_not_found' };
 
   const settings = await getEmailSettings(tenantId);
   const primary = tenant.brandPrimaryColor ?? '#1a6b5e';
@@ -542,7 +553,7 @@ export async function sendTestEmail(tenantId: string, toEmail: string) {
     </div>
   `;
 
-  await sendEmail({
+  return sendEmail({
     to: toEmail,
     subject: `Test Email — ${tenant.name}`,
     html: wrapGuest({

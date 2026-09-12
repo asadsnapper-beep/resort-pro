@@ -8,6 +8,7 @@ import * as dns from 'dns/promises';
 import { FLAG_REGISTRY } from '../utils/feature-flags';
 import { resolveTenantEntitlement } from '../utils/entitlement';
 import { sendTestEmail } from '../utils/guest-emails';
+import { deliveryVerdict, notImplemented } from '../utils/delivery';
 import crypto from 'crypto';
 import { ensureTenantReferralCode, referralRegistrationUrl } from '../utils/referral';
 import { createAdminNotification } from '../utils/notifications';
@@ -601,8 +602,15 @@ export async function tenantRoutes(app: FastifyInstance) {
     handler: async (request, reply) => {
       const { tenantId } = request.user as JwtPayload;
       const { toEmail } = request.body as { toEmail: string };
-      await sendTestEmail(tenantId, toEmail); // uses tenantId param — bare helper
-      return ok({ sent: true, to: toEmail });
+      const verdict = deliveryVerdict(await sendTestEmail(tenantId, toEmail));
+      if (!verdict.delivered) {
+        // Said out loud instead of answered with `{ sent: true }`. The owner is
+        // testing email precisely to find out whether it works.
+        return reply.status(verdict.status).send({
+          success: false, error: verdict.error, code: verdict.code,
+        });
+      }
+      return ok({ sent: true, to: toEmail, id: verdict.id });
     },
   });
 
@@ -746,8 +754,13 @@ export async function tenantRoutes(app: FastifyInstance) {
     handler: async (request, reply) => {
       const { to } = request.body as { to: string };
       if (!to) return reply.status(400).send({ success: false, error: 'Phone number required' });
-      // Placeholder — real SMS service will be wired in Phase 1 implementation
-      return ok({ sent: true, to, message: `Test SMS from ResortPro — SMS notifications are configured correctly!` }, 'Test SMS queued (SMS service coming soon)');
+      // No SMS provider is wired up yet. This used to answer `{ sent: true }`
+      // with "coming soon" tucked into a message the UI never displayed, so the
+      // owner was told a test message had reached their phone.
+      const outcome = notImplemented('SMS delivery');
+      return reply.status(outcome.status).send({
+        success: false, error: outcome.error, code: outcome.code,
+      });
     },
   });
 
@@ -758,7 +771,10 @@ export async function tenantRoutes(app: FastifyInstance) {
     handler: async (request, reply) => {
       const { to } = request.body as { to: string };
       if (!to) return reply.status(400).send({ success: false, error: 'Phone number required' });
-      return ok({ sent: true, to }, 'WhatsApp test queued (WhatsApp service coming soon)');
+      const outcome = notImplemented('WhatsApp delivery');
+      return reply.status(outcome.status).send({
+        success: false, error: outcome.error, code: outcome.code,
+      });
     },
   });
 

@@ -338,7 +338,14 @@ export default function ReportsPage() {
       setShowEmailInput(false);
       setEmailAddr('');
     },
-    onError: () => toast({ title: 'Failed to send email', variant: 'destructive' }),
+    onError: (error: unknown) => toast({
+      // The API answers 503 when the server has no email provider, so "Report
+      // emailed" can no longer appear when nothing was sent.
+      title: 'Report not emailed',
+      description: (error as { response?: { data?: { error?: string } } })?.response?.data?.error
+        ?? 'The server did not say why.',
+      variant: 'destructive',
+    }),
   });
 
   const report = res?.data?.data;
