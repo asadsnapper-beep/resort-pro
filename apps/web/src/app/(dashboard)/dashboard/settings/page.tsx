@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tenantApi, api } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
@@ -1130,6 +1130,8 @@ function GatewayCard({
 }) {
   const [open, setOpen] = useState(false);
   const [showPass, setShowPass] = useState<Record<string, boolean>>({});
+  // One prefix per card instance: this component is rendered once per gateway.
+  const fieldIds = useId();
   const ui = GATEWAY_UI[gw.id] ?? { bg: 'bg-gray-50', accent: 'text-gray-600', description: gw.name };
   const isComingSoon = gw.status === 'coming_soon' || gw.status === 'stub';
 
@@ -1183,12 +1185,12 @@ function GatewayCard({
             <div className="grid grid-cols-2 gap-3">
               {gw.credentialFields.map(field => (
                 <div key={field.key}>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                  <label htmlFor={`${fieldIds}-${field.key}`} className="block text-xs font-medium text-gray-600 mb-1">
                     {field.label}
                     {field.required && <span className="text-red-400 ml-0.5">*</span>}
                   </label>
                   <div className="relative">
-                    <Input
+                    <Input id={`${fieldIds}-${field.key}`}
                       type={field.type === 'password' && !showPass[field.key] ? 'password' : 'text'}
                       value={credentials[field.key] ?? ''}
                       onChange={e => onCredentialChange(field.key, e.target.value)}
@@ -1438,8 +1440,8 @@ function PaymentGatewaysTab() {
               </div>
               <p className="text-xs text-gray-500 mb-3">Guest selects "Pay at Hotel" — booking saved as Pending until you confirm payment.</p>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Payment Instructions (shown to guest)</label>
-                <textarea
+                <label htmlFor="settings-manual-instructions" className="block text-xs font-medium text-gray-600 mb-1">Payment Instructions (shown to guest)</label>
+                <textarea id="settings-manual-instructions"
                   value={manualInstructions}
                   onChange={e => setManualInstructions(e.target.value)}
                   rows={2}
@@ -1765,7 +1767,7 @@ function GdprTab() {
             </div>
           }
         >
-          <textarea
+          <textarea aria-label="Why you are requesting deletion"
             autoFocus
             value={deleteReason}
             onChange={(e) => setDeleteReason(e.target.value)}
@@ -2506,8 +2508,8 @@ function NotificationsTab() {
             {smsMode === 'own' && (
               <div className="space-y-3 pt-2 border-t border-gray-100">
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Provider</label>
-                  <select value={smsProvider} onChange={e => setSmsProvider(e.target.value)}
+                  <label htmlFor="settings-sms-provider" className="text-sm font-medium text-gray-700">Provider</label>
+                  <select id="settings-sms-provider" value={smsProvider} onChange={e => setSmsProvider(e.target.value)}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-resort-500">
                     <option value="ssl_wireless">SSL Wireless (Bangladesh)</option>
                     <option value="alpha_net">Alpha.Net (Bangladesh)</option>
@@ -2516,9 +2518,9 @@ function NotificationsTab() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-sm font-medium text-gray-700">API Key</label>
+                    <label htmlFor="settings-sms-api-key" className="text-sm font-medium text-gray-700">API Key</label>
                     <div className="relative">
-                      <Input type={showSmsKey ? 'text' : 'password'} value={smsApiKey} onChange={e => setSmsApiKey(e.target.value)} placeholder="Your API key" />
+                      <Input id="settings-sms-api-key" type={showSmsKey ? 'text' : 'password'} value={smsApiKey} onChange={e => setSmsApiKey(e.target.value)} placeholder="Your API key" />
                       <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                         aria-label={showSmsKey ? 'Hide API key' : 'Show API key'}
                         onClick={() => setShowSmsKey(v => !v)}>
@@ -2528,14 +2530,14 @@ function NotificationsTab() {
                   </div>
                   {smsProvider === 'twilio' && (
                     <div className="space-y-1">
-                      <label className="text-sm font-medium text-gray-700">Auth Token</label>
-                      <Input type="password" value={smsApiSecret} onChange={e => setSmsApiSecret(e.target.value)} placeholder="Auth token" />
+                      <label htmlFor="settings-sms-auth-token" className="text-sm font-medium text-gray-700">Auth Token</label>
+                      <Input id="settings-sms-auth-token" type="password" value={smsApiSecret} onChange={e => setSmsApiSecret(e.target.value)} placeholder="Auth token" />
                     </div>
                   )}
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Sender ID <span className="text-gray-400 text-xs">(max 11 chars)</span></label>
-                  <Input value={smsSenderId} onChange={e => setSmsSenderId(e.target.value.slice(0, 11))} placeholder="e.g. RESORT" maxLength={11} />
+                  <label htmlFor="settings-sms-sender-id" className="text-sm font-medium text-gray-700">Sender ID <span className="text-gray-400 text-xs">(max 11 chars)</span></label>
+                  <Input id="settings-sms-sender-id" value={smsSenderId} onChange={e => setSmsSenderId(e.target.value.slice(0, 11))} placeholder="e.g. RESORT" maxLength={11} />
                   <p className="text-xs text-gray-400">This name appears as the sender on guest's phone</p>
                 </div>
               </div>
@@ -2552,7 +2554,7 @@ function NotificationsTab() {
           <div className="bg-white rounded-2xl border p-5 space-y-3">
             <p className="font-semibold text-gray-800">Send Test SMS</p>
             <div className="flex gap-2">
-              <Input value={testPhone} onChange={e => setTestPhone(e.target.value)} placeholder="+8801XXXXXXXXX" className="flex-1" />
+              <Input aria-label="Send the test SMS to" value={testPhone} onChange={e => setTestPhone(e.target.value)} placeholder="+8801XXXXXXXXX" className="flex-1" />
               <Button onClick={() => testSmsMut.mutate()} loading={testSmsMut.isPending} disabled={!testPhone} variant="outline" className="gap-2 shrink-0">
                 <Send className="h-3.5 w-3.5" /> Send Test
               </Button>
@@ -2622,17 +2624,17 @@ function NotificationsTab() {
                   <strong>How to get these:</strong> Meta Business Manager → WhatsApp → API Setup
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Phone Number ID</label>
-                  <Input value={waPhoneNumberId} onChange={e => setWaPhoneNumberId(e.target.value)} placeholder="e.g. 123456789012345" />
+                  <label htmlFor="settings-wa-phone-number-id" className="text-sm font-medium text-gray-700">Phone Number ID</label>
+                  <Input id="settings-wa-phone-number-id" value={waPhoneNumberId} onChange={e => setWaPhoneNumberId(e.target.value)} placeholder="e.g. 123456789012345" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Business Account ID</label>
-                  <Input value={waBusinessAccId} onChange={e => setWaBusinessAccId(e.target.value)} placeholder="e.g. 987654321098765" />
+                  <label htmlFor="settings-wa-business-account-id" className="text-sm font-medium text-gray-700">Business Account ID</label>
+                  <Input id="settings-wa-business-account-id" value={waBusinessAccId} onChange={e => setWaBusinessAccId(e.target.value)} placeholder="e.g. 987654321098765" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">API Token (Permanent)</label>
+                  <label htmlFor="settings-wa-api-token" className="text-sm font-medium text-gray-700">API Token (Permanent)</label>
                   <div className="relative">
-                    <Input type={showWaToken ? 'text' : 'password'} value={waApiToken} onChange={e => setWaApiToken(e.target.value)} placeholder="EAAxxxxx..." />
+                    <Input id="settings-wa-api-token" type={showWaToken ? 'text' : 'password'} value={waApiToken} onChange={e => setWaApiToken(e.target.value)} placeholder="EAAxxxxx..." />
                     <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                       aria-label={showWaToken ? 'Hide access token' : 'Show access token'}
                       onClick={() => setShowWaToken(v => !v)}>
@@ -2655,7 +2657,7 @@ function NotificationsTab() {
           <div className="bg-white rounded-2xl border p-5 space-y-3">
             <p className="font-semibold text-gray-800">Send Test WhatsApp</p>
             <div className="flex gap-2">
-              <Input value={testWaPhone} onChange={e => setTestWaPhone(e.target.value)} placeholder="+8801XXXXXXXXX" className="flex-1" />
+              <Input aria-label="Send the test WhatsApp message to" value={testWaPhone} onChange={e => setTestWaPhone(e.target.value)} placeholder="+8801XXXXXXXXX" className="flex-1" />
               <Button onClick={() => testWaMut.mutate()} loading={testWaMut.isPending} disabled={!testWaPhone}
                 className="gap-2 shrink-0 bg-green-600 hover:bg-green-700">
                 <Send className="h-3.5 w-3.5" /> Send Test
@@ -2693,13 +2695,13 @@ function NotificationsTab() {
                   <tr key={key} className="hover:bg-gray-50">
                     <td className="px-5 py-3.5 font-medium text-gray-700">{emoji} {label}</td>
                     <td className="px-4 py-3.5 text-center">
-                      <input type="checkbox"
+                      <input aria-label={`SMS — ${label}`} type="checkbox"
                         checked={!!triggers[key as keyof typeof triggers]}
                         onChange={e => setTriggers(p => ({ ...p, [key]: e.target.checked }))}
                         className="h-4 w-4 rounded accent-resort-600" />
                     </td>
                     <td className="px-4 py-3.5 text-center">
-                      <input type="checkbox"
+                      <input aria-label={`WhatsApp — ${label}`} type="checkbox"
                         checked={!!triggers[key as keyof typeof triggers]}
                         onChange={e => setTriggers(p => ({ ...p, [key]: e.target.checked }))}
                         className="h-4 w-4 rounded accent-green-600" />
@@ -2921,16 +2923,16 @@ function DiscoveryMapTab() {
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Latitude</label>
-                  <Input
+                  <label htmlFor="settings-latitude" className="text-xs text-gray-500 mb-1 block">Latitude</label>
+                  <Input id="settings-latitude"
                     placeholder="e.g. 22.3569"
                     value={form.latitude}
                     onChange={e => setForm(f => ({ ...f, latitude: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Longitude</label>
-                  <Input
+                  <label htmlFor="settings-longitude" className="text-xs text-gray-500 mb-1 block">Longitude</label>
+                  <Input id="settings-longitude"
                     placeholder="e.g. 91.7832"
                     value={form.longitude}
                     onChange={e => setForm(f => ({ ...f, longitude: e.target.value }))}
@@ -2947,8 +2949,8 @@ function DiscoveryMapTab() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Category</label>
-                  <select
+                  <label htmlFor="settings-resort-category" className="text-xs text-gray-500 mb-1 block">Category</label>
+                  <select id="settings-resort-category"
                     value={form.resortCategory}
                     onChange={e => setForm(f => ({ ...f, resortCategory: e.target.value }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#183153]/30">
@@ -2959,8 +2961,8 @@ function DiscoveryMapTab() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Starting Price / Night</label>
-                  <Input
+                  <label htmlFor="settings-price-from" className="text-xs text-gray-500 mb-1 block">Starting Price / Night</label>
+                  <Input id="settings-price-from"
                     placeholder="e.g. 5000"
                     value={form.priceFrom}
                     onChange={e => setForm(f => ({ ...f, priceFrom: e.target.value }))}
@@ -2969,8 +2971,8 @@ function DiscoveryMapTab() {
               </div>
 
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Short Description (1-2 lines)</label>
-                <textarea
+                <label htmlFor="settings-short-description" className="text-xs text-gray-500 mb-1 block">Short Description (1-2 lines)</label>
+                <textarea id="settings-short-description"
                   rows={2}
                   placeholder="A peaceful eco resort nestled in the hills of Bandarban..."
                   value={form.shortDescription}
@@ -2980,8 +2982,8 @@ function DiscoveryMapTab() {
               </div>
 
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Cover Image URL</label>
-                <Input
+                <label htmlFor="settings-cover-image-url" className="text-xs text-gray-500 mb-1 block">Cover Image URL</label>
+                <Input id="settings-cover-image-url"
                   placeholder="https://..."
                   value={form.coverImageUrl}
                   onChange={e => setForm(f => ({ ...f, coverImageUrl: e.target.value }))}
@@ -3006,18 +3008,18 @@ function DiscoveryMapTab() {
               </h3>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Booking Phone / WhatsApp</label>
-                  <Input
+                  <label htmlFor="settings-booking-phone" className="text-xs text-gray-500 mb-1 block">Booking Phone / WhatsApp</label>
+                  <Input id="settings-booking-phone"
                     placeholder="+880 1XXX-XXXXXX"
                     value={form.bookingPhone}
                     onChange={e => setForm(f => ({ ...f, bookingPhone: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Instagram Handle</label>
+                  <label htmlFor="settings-instagram-handle" className="text-xs text-gray-500 mb-1 block">Instagram Handle</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">@</span>
-                    <Input
+                    <Input id="settings-instagram-handle"
                       className="pl-7"
                       placeholder="yourresort"
                       value={form.instagramHandle}
@@ -3045,8 +3047,8 @@ function DiscoveryMapTab() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Booking Source</label>
-                  <select
+                  <label htmlFor="settings-affiliate-source" className="text-xs text-gray-500 mb-1 block">Booking Source</label>
+                  <select id="settings-affiliate-source"
                     value={form.affiliateSource}
                     onChange={e => setForm(f => ({ ...f, affiliateSource: e.target.value }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#183153]/30">
@@ -3057,8 +3059,8 @@ function DiscoveryMapTab() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Booking URL</label>
-                  <Input
+                  <label htmlFor="settings-affiliate-url" className="text-xs text-gray-500 mb-1 block">Booking URL</label>
+                  <Input id="settings-affiliate-url"
                     placeholder="https://booking.com/hotel/..."
                     value={form.affiliateUrl}
                     onChange={e => setForm(f => ({ ...f, affiliateUrl: e.target.value }))}
@@ -3112,7 +3114,7 @@ function DiscoveryMapTab() {
               {/* Add new */}
               {galleryArr.length < 8 && (
                 <div className="flex gap-2">
-                  <Input
+                  <Input aria-label="New gallery image URL"
                     placeholder="https://... (image URL)"
                     value={newGalleryUrl}
                     onChange={e => setNewGalleryUrl(e.target.value)}
@@ -3153,7 +3155,7 @@ function DiscoveryMapTab() {
 
               {amenitiesArr.length < 12 && (
                 <div className="flex gap-2">
-                  <Input
+                  <Input aria-label="New amenity"
                     placeholder="e.g. Swimming Pool, Free WiFi, Restaurant…"
                     value={newAmenity}
                     onChange={e => setNewAmenity(e.target.value)}

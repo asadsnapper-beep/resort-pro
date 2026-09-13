@@ -12,9 +12,12 @@
  * id in the same file. Not zero (points at nothing) and not two (ambiguous, and
  * duplicate ids are invalid HTML besides).
  *
- * This is a static check, so it cannot see an id built at runtime from a
- * template string or useId. Those are correct by construction and simply are
- * not counted here.
+ * Ids built from a template are checked too, by comparing the expression text:
+ * GatewayCard renders once per gateway, so its fields use
+ * id={`${fieldIds}-${field.key}`} with a useId prefix. Whether those come out
+ * unique at runtime is useId's contract; whether the label and the control were
+ * given the *same* expression is the part a typo can break, and that is what is
+ * compared here.
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -64,6 +67,41 @@ describe('label / control association', () => {
   });
 
   it('every htmlFor points at exactly one control', () => {
+    expect(broken).toEqual([]);
+  });
+});
+
+describe('label / control association built from a template', () => {
+  // id={`${prefix}-${field.key}`} on the control, the identical expression on
+  // the label. Compared as text: a typo in either half breaks the pair, and a
+  // pair that matches is pointing at the same element whatever useId returns.
+  const tmpl = (src: string, name: string) => {
+    const re = new RegExp(`\\b${name}=\\{(\`[^\`]+\`)\\}`, 'g');
+    const found: string[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(src)) !== null) found.push(m[1]);
+    return found;
+  };
+
+  const broken: string[] = [];
+  let pairs = 0;
+
+  for (const file of files) {
+    const src = fs.readFileSync(file, 'utf-8');
+    const ids = tmpl(src, 'id');
+    for (const target of tmpl(src, 'htmlFor')) {
+      pairs++;
+      if (!ids.includes(target)) {
+        broken.push(`${path.relative(SRC, file)}: htmlFor={${target}} has no control with the same id expression`);
+      }
+    }
+  }
+
+  it('found at least one, so the check is doing something', () => {
+    expect(pairs).toBeGreaterThan(0);
+  });
+
+  it('each one has a control carrying the same expression', () => {
     expect(broken).toEqual([]);
   });
 });
