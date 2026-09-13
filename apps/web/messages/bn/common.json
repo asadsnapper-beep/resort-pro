@@ -32,7 +32,13 @@
     "orders": "F&B অর্ডার",
     "properties": "প্রপার্টি",
     "tables": "টেবিল",
-    "aiContent": "AI Content"
+    "aiContent": "AI Content",
+    "venues": "ভেন্যু ও ইভেন্ট",
+    "corporateAccounts": "কর্পোরেট অ্যাকাউন্ট",
+    "vehicles": "গাড়ি ভাড়া",
+    "assets": "সম্পদ",
+    "shareholders": "শেয়ারহোল্ডার",
+    "myShares": "আমার শেয়ার"
   },
   "groups": {
     "overview": "সারসংক্ষেপ",

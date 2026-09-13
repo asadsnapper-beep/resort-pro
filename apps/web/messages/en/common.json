@@ -32,7 +32,13 @@
     "orders": "F&B Orders",
     "properties": "Properties",
     "tables": "Tables",
-    "aiContent": "AI Content"
+    "aiContent": "AI Content",
+    "venues": "Venues & Events",
+    "corporateAccounts": "Corporate Accounts",
+    "vehicles": "Vehicle Rental",
+    "assets": "Assets",
+    "shareholders": "Shareholders",
+    "myShares": "My Shares"
   },
   "groups": {
     "overview": "Overview",
