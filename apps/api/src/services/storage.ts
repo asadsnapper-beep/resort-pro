@@ -219,6 +219,42 @@ export async function uploadToStorage(
     : uploadLocal(buffer, mimetype, folder, tenantId, requestOrigin);
 }
 
+/**
+ * The storage key a stored URL refers to, or null if it does not belong to
+ * this tenant.
+ *
+ * Only the URL is kept on a record — `GuestDocument` has `imageUrl` and no
+ * `key` — so deleting the file means working backwards from it. Both drivers
+ * build the key the same way, `<tenantId>/<folder>/<filename>`, and differ
+ * only in what precedes it: `/uploads/` for local, the bucket's public base
+ * for S3. Finding the tenant segment therefore works for both, and for the
+ * older rows on staging and production whose host is still `localhost`.
+ *
+ * Requiring the key to start with the caller's own tenant id is the point, not
+ * a side effect. A URL is data on a row; deriving a path from it and handing
+ * that to unlink is how one tenant ends up able to delete another's files, or
+ * something outside the uploads directory entirely.
+ */
+export function storageKeyFromUrl(imageUrl: string, tenantId: string): string | null {
+  let pathname: string;
+  try {
+    pathname = new URL(imageUrl).pathname;
+  } catch {
+    // Some rows hold a bare path rather than an absolute URL.
+    pathname = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
+  }
+
+  const marker = `/${tenantId}/`;
+  const at = pathname.indexOf(marker);
+  if (at === -1) return null;
+
+  const key = pathname.slice(at + 1);
+  // `..` cannot appear in a key this code writes, so its presence means the URL
+  // was not written by the upload path.
+  if (key.includes('..')) return null;
+  return key;
+}
+
 export async function deleteFromStorage(key: string): Promise<void> {
   const cfg = await getStorageConfig();
   return cfg.driver === 's3' ? deleteS3(key, cfg) : deleteLocal(key);

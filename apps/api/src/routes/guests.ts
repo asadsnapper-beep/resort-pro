@@ -5,6 +5,7 @@ import { ok, paginated, parsePageParams } from '../utils/response';
 import { matchAllTerms } from '../utils/search-terms';
 import { findGuestIdsByPhone } from '../utils/guest-lookup';
 import type { JwtPayload } from '@resort-pro/types';
+import { deleteFromStorage, storageKeyFromUrl } from '../services/storage';
 
 const guestSchema = z.object({
   firstName: z.string().min(1).max(50),
@@ -175,6 +176,24 @@ export async function guestRoutes(app: FastifyInstance) {
           success: false,
           error: `Cannot delete guest — they have ${activeBookings} active booking${activeBookings > 1 ? 's' : ''}. Check out or cancel their bookings first.`,
         });
+      }
+
+      // GuestDocument rows cascade with the guest. The passport and ID
+      // photographs they point at did not: deleting a guest removed every
+      // record of them while their identity documents stayed on disk, which is
+      // the one kind of data that most needs to actually go.
+      //
+      // Files first. If this throws the guest is still here and can be deleted
+      // again; the other order would delete the rows naming the files and lose
+      // the only way to find them.
+      const documents = await db.guestDocument.findMany({
+        where: { guestId: id },
+        select: { imageUrl: true, tenantId: true },
+      });
+      for (const doc of documents) {
+        const key = storageKeyFromUrl(doc.imageUrl, doc.tenantId);
+        if (!key) continue;
+        try { await deleteFromStorage(key); } catch { /* best-effort, see above */ }
       }
 
       await db.guest.delete({ where: { id } });
