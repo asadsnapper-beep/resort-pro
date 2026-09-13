@@ -1,3 +1,11 @@
+> **SUPERSEDED — 2026-09-13.** The `backup:` service described here was added
+> to production and is running. It then failed every night on the database
+> dump, because `POSTGRES_HOST: postgres` below resolves to *Coolify's own*
+> database on the shared `coolify` network, not to ResortPro's.
+>
+> Do not follow this file. See
+> [production-fix-backup-hostname.md](./production-fix-backup-hostname.md).
+
 # Production has never had a backup
 
 Paste this whole file into the session with Coolify access.
