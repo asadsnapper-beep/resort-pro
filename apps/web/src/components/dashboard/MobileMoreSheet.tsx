@@ -7,7 +7,7 @@ import { useTranslations } from 'next-intl';
 import { X, LogOut } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { authApi } from '@/lib/api';
-import { NAV_ITEMS, getVisibleItems, groupItems } from '@/components/dashboard/sidebar';
+import { groupItems, useEntitledNavItems, type Role } from '@/components/dashboard/sidebar';
 
 /**
  * Mobile "More" menu — a bottom sheet listing EVERY dashboard page the
@@ -21,6 +21,12 @@ export function MobileMoreSheet({ open, onClose }: { open: boolean; onClose: () 
   const router = useRouter();
   const t = useTranslations('common');
   const { user, tenant, clearAuth } = useAuthStore();
+  const role = (user?.role ?? 'STAFF') as Role;
+
+  // Above the early return, because a hook cannot be called conditionally.
+  // This sheet used to filter by role alone, which is how a phone came to
+  // offer modules the tenant had not enabled.
+  const items = useEntitledNavItems(role);
 
   useEffect(() => {
     if (!open) return;
@@ -30,8 +36,7 @@ export function MobileMoreSheet({ open, onClose }: { open: boolean; onClose: () 
 
   if (!open || typeof document === 'undefined') return null;
 
-  const role = (user?.role ?? 'STAFF') as Parameters<typeof getVisibleItems>[0];
-  const groups = groupItems(getVisibleItems(role));
+  const groups = groupItems(items);
 
   const label = (labelKey: string, fallback: string) => {
     // t.has avoids next-intl's MISSING_MESSAGE console noise for keys

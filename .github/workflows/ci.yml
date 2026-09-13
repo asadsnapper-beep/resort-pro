@@ -329,6 +329,14 @@ jobs:
           DATABASE_URL: postgresql://resortpro:resortpro@localhost:5432/resortpro
           JWT_SECRET: ci-build-secret
 
+      # apps/web has a vitest suite that no CI job ever ran, so a failing web
+      # unit test could only be seen on whoever's laptop happened to run it.
+      # It goes after the build step because the suite imports
+      # @resort-pro/types, which that step compiles.
+      - name: Run web unit tests
+        working-directory: apps/web
+        run: pnpm exec vitest run
+
   # ── Typecheck (advisory) ─────────────────────────────────────────────────────
   # eslint was never actually installed in this repo, so the old Lint job could
   # never pass. Replaced with tsc typecheck. Advisory (non-blocking) for now:
