@@ -429,7 +429,7 @@ export default function SettingsPage() {
 
         {/* ── Mobile tab selector ────────────────────────────────────────── */}
         <div className="md:hidden w-full">
-          <select
+          <select aria-label="Settings section"
             value={tab}
             onChange={e => setTab(e.target.value as Tab)}
             className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-2 text-[13px] font-medium focus:outline-none focus:ring-1 focus:ring-resort-600/20"
@@ -454,8 +454,8 @@ export default function SettingsPage() {
             <CardContent className="p-6 space-y-4">
               <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Building2 className="h-4 w-4 text-resort-600" /> Resort Identity</h3>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Resort Name *</label>
-                <Input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Palm Paradise Resort" />
+                <label htmlFor="settings-resort-name" className="mb-1 block text-sm font-medium text-gray-700">Resort Name *</label>
+                <Input id="settings-resort-name" value={form.name} onChange={e => set('name', e.target.value)} placeholder="Palm Paradise Resort" />
               </div>
               {/* Read-only, and no longer part of what Save submits. It was an
                   editable input that nothing could ever store — the API's
@@ -474,10 +474,10 @@ export default function SettingsPage() {
                 </p>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Website URL</label>
+                <label htmlFor="settings-website" className="mb-1 block text-sm font-medium text-gray-700">Website URL</label>
                 <div className="relative">
                   <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input value={form.website ?? ''} onChange={e => set('website', e.target.value)} className="pl-9" placeholder="https://palmparadise.com" type="url" />
+                  <Input id="settings-website" value={form.website ?? ''} onChange={e => set('website', e.target.value)} className="pl-9" placeholder="https://palmparadise.com" type="url" />
                 </div>
               </div>
             </CardContent>
@@ -487,8 +487,8 @@ export default function SettingsPage() {
             <CardContent className="p-6 space-y-4">
               <h3 className="font-semibold text-gray-900 flex items-center gap-2"><MapPin className="h-4 w-4 text-resort-600" /> Location</h3>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Address</label>
-                <Input value={form.address ?? ''} onChange={e => set('address', e.target.value)} placeholder="123 Beach Road" />
+                <label htmlFor="settings-address" className="mb-1 block text-sm font-medium text-gray-700">Address</label>
+                <Input id="settings-address" value={form.address ?? ''} onChange={e => set('address', e.target.value)} placeholder="123 Beach Road" />
               </div>
               {/* City is gone, not hidden: there is no city column on Tenant, so
                   the input could never save. It also broke the whole form — the
@@ -498,8 +498,8 @@ export default function SettingsPage() {
                   migration, which is a decision rather than a gap to paper
                   over. Country is a real column and stays. */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Country</label>
-                <Input value={form.country ?? ''} onChange={e => set('country', e.target.value)} placeholder="Bangladesh" />
+                <label htmlFor="settings-country" className="mb-1 block text-sm font-medium text-gray-700">Country</label>
+                <Input id="settings-country" value={form.country ?? ''} onChange={e => set('country', e.target.value)} placeholder="Bangladesh" />
               </div>
             </CardContent>
           </Card>
@@ -513,17 +513,17 @@ export default function SettingsPage() {
             <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Phone className="h-4 w-4 text-resort-600" /> Contact Details</h3>
             <div className="grid grid-cols-2 gap-4 max-w-2xl">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+                <label htmlFor="settings-email" className="mb-1 block text-sm font-medium text-gray-700">Email</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input value={form.email ?? ''} onChange={e => set('email', e.target.value)} className="pl-9" placeholder="hello@resort.com" type="email" />
+                  <Input id="settings-email" value={form.email ?? ''} onChange={e => set('email', e.target.value)} className="pl-9" placeholder="hello@resort.com" type="email" />
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Phone</label>
+                <label htmlFor="settings-phone" className="mb-1 block text-sm font-medium text-gray-700">Phone</label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input value={form.phone ?? ''} onChange={e => set('phone', e.target.value)} className="pl-9" placeholder="+62 361 000 0000" />
+                  <Input id="settings-phone" value={form.phone ?? ''} onChange={e => set('phone', e.target.value)} className="pl-9" placeholder="+62 361 000 0000" />
                 </div>
               </div>
             </div>
@@ -539,12 +539,12 @@ export default function SettingsPage() {
               <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Clock className="h-4 w-4 text-resort-600" /> Check-In / Check-Out Times</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Check-In Time</label>
-                  <Input value={form.checkInTime ?? '14:00'} onChange={e => set('checkInTime', e.target.value)} type="time" />
+                  <label htmlFor="settings-checkin-time" className="mb-1 block text-sm font-medium text-gray-700">Check-In Time</label>
+                  <Input id="settings-checkin-time" value={form.checkInTime ?? '14:00'} onChange={e => set('checkInTime', e.target.value)} type="time" />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Check-Out Time</label>
-                  <Input value={form.checkOutTime ?? '11:00'} onChange={e => set('checkOutTime', e.target.value)} type="time" />
+                  <label htmlFor="settings-checkout-time" className="mb-1 block text-sm font-medium text-gray-700">Check-Out Time</label>
+                  <Input id="settings-checkout-time" value={form.checkOutTime ?? '11:00'} onChange={e => set('checkOutTime', e.target.value)} type="time" />
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">These times are shown to guests and used for booking calculations</p>
@@ -555,15 +555,15 @@ export default function SettingsPage() {
             <CardContent className="p-6 space-y-4">
               <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Banknote className="h-4 w-4 text-resort-600" /> Locale & Currency</h3>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Currency</label>
-                <select value={form.currency} onChange={e => set('currency', e.target.value)}
+                <label htmlFor="settings-currency" className="mb-1 block text-sm font-medium text-gray-700">Currency</label>
+                <select id="settings-currency" value={form.currency} onChange={e => set('currency', e.target.value)}
                   className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
                   {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Timezone</label>
-                <select value={form.timezone} onChange={e => set('timezone', e.target.value)}
+                <label htmlFor="settings-timezone" className="mb-1 block text-sm font-medium text-gray-700">Timezone</label>
+                <select id="settings-timezone" value={form.timezone} onChange={e => set('timezone', e.target.value)}
                   className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
                   {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz.replace('/', ' / ').replace('_', ' ')}</option>)}
                 </select>
@@ -606,13 +606,13 @@ export default function SettingsPage() {
                       </p>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="mb-1 block text-rp-meta text-rp-muted">Free from</label>
-                          <Input type="time" value={stayTime.earlyFreeAfter}
+                          <label htmlFor="settings-early-free-after" className="mb-1 block text-rp-meta text-rp-muted">Free from</label>
+                          <Input id="settings-early-free-after" type="time" value={stayTime.earlyFreeAfter}
                             onChange={e => setStayTime(s => ({ ...s, earlyFreeAfter: e.target.value }))} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-rp-meta text-rp-muted">Half rate from</label>
-                          <Input type="time" value={stayTime.earlyHalfAfter}
+                          <label htmlFor="settings-early-half-after" className="mb-1 block text-rp-meta text-rp-muted">Half rate from</label>
+                          <Input id="settings-early-half-after" type="time" value={stayTime.earlyHalfAfter}
                             onChange={e => setStayTime(s => ({ ...s, earlyHalfAfter: e.target.value }))} />
                         </div>
                       </div>
@@ -627,13 +627,13 @@ export default function SettingsPage() {
                       </p>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="mb-1 block text-rp-meta text-rp-muted">Free until</label>
-                          <Input type="time" value={stayTime.lateFreeUntil}
+                          <label htmlFor="settings-late-free-until" className="mb-1 block text-rp-meta text-rp-muted">Free until</label>
+                          <Input id="settings-late-free-until" type="time" value={stayTime.lateFreeUntil}
                             onChange={e => setStayTime(s => ({ ...s, lateFreeUntil: e.target.value }))} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-rp-meta text-rp-muted">Half rate until</label>
-                          <Input type="time" value={stayTime.lateHalfUntil}
+                          <label htmlFor="settings-late-half-until" className="mb-1 block text-rp-meta text-rp-muted">Half rate until</label>
+                          <Input id="settings-late-half-until" type="time" value={stayTime.lateHalfUntil}
                             onChange={e => setStayTime(s => ({ ...s, lateHalfUntil: e.target.value }))} />
                         </div>
                       </div>
@@ -645,16 +645,16 @@ export default function SettingsPage() {
 
                   <div className="grid gap-5 md:grid-cols-2">
                     <div>
-                      <label className="mb-1 block text-rp-meta text-rp-muted">Half rate is</label>
+                      <label htmlFor="settings-half-rate-percent" className="mb-1 block text-rp-meta text-rp-muted">Half rate is</label>
                       <div className="flex items-center gap-2">
-                        <Input type="number" min={0} max={100} value={stayTime.halfRatePercent}
+                        <Input id="settings-half-rate-percent" type="number" min={0} max={100} value={stayTime.halfRatePercent}
                           onChange={e => setStayTime(s => ({ ...s, halfRatePercent: Number(e.target.value) }))} />
                         <span className="text-rp-body text-rp-muted">% of a night</span>
                       </div>
                     </div>
                     <div>
-                      <label className="mb-1 block text-rp-meta text-rp-muted">Charged on</label>
-                      <select value={stayTime.chargeBasis}
+                      <label htmlFor="settings-charge-basis" className="mb-1 block text-rp-meta text-rp-muted">Charged on</label>
+                      <select id="settings-charge-basis" value={stayTime.chargeBasis}
                         onChange={e => setStayTime(s => ({ ...s, chargeBasis: e.target.value }))}
                         className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
                         <option value="EFFECTIVE">This guest&rsquo;s own nightly rate</option>
@@ -740,8 +740,8 @@ export default function SettingsPage() {
             <CardContent className="p-6 space-y-4">
               <h3 className="font-semibold text-gray-900 dark:text-white">Email Branding</h3>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reply-to Email</label>
-                <Input
+                <label htmlFor="settings-reply-to-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reply-to Email</label>
+                <Input id="settings-reply-to-email"
                   type="email"
                   placeholder="reservations@yourresort.com"
                   value={emailSettings.replyToEmail}
@@ -750,8 +750,8 @@ export default function SettingsPage() {
                 <p className="text-xs text-muted-foreground mt-1">Guests will reply to this address. Defaults to your resort email.</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Footer Text</label>
-                <textarea
+                <label htmlFor="settings-footer-text" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Footer Text</label>
+                <textarea id="settings-footer-text"
                   rows={2}
                   placeholder="Thank you for choosing us. We look forward to your next visit!"
                   value={emailSettings.footerText}
@@ -777,7 +777,7 @@ export default function SettingsPage() {
                 <p className="text-sm text-muted-foreground">Send a test email to verify your settings look correct.</p>
               </div>
               <div className="flex gap-2">
-                <Input
+                <Input aria-label="Send the test email to"
                   type="email"
                   placeholder={user?.email ?? 'you@example.com'}
                   value={testEmailAddr}
@@ -845,11 +845,11 @@ export default function SettingsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Your Domain</label>
+                <label htmlFor="settings-custom-domain" className="block text-sm font-medium text-gray-700 mb-1.5">Your Domain</label>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
+                    <Input id="settings-custom-domain"
                       value={domainInput}
                       onChange={e => setDomainInput(e.target.value.toLowerCase().trim())}
                       className="pl-9"
