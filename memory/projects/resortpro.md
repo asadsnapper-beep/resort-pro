@@ -72,9 +72,10 @@ about the codebase:
 - **The Android staff app** — session restore, app lock, Bangla, housekeeping
   laid out for the person doing the work, an outbox-backed sync badge, and
   walk-in guest documents from the camera or the gallery.
-- **Backups now include the uploads volume.** `guest_documents` rows hold only
-  a URL; the images live on disk. See "Backups" below — this is partly still
-  open.
+- **Backups include the uploads volume**, on staging and production both.
+  `guest_documents` rows hold only a URL; the images live on disk, so a dump on
+  its own would restore every row and none of the passports. See "Backups"
+  below for what is still open — chiefly that the copies sit on the same host.
 
 ## Documents that are wrong today
 
@@ -233,15 +234,22 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
 - Staging's backup was verified end to end on 2026-09-10: two `ok` lines from
   the container's own startup run, a 361 KB dump, and a restore into a scratch
   database whose tenant/booking counts matched the live database exactly.
-- **Production has no backup service at all.** Established 2026-09-10 by
-  reading the server: Coolify's stored compose has four services — `postgres`,
-  `redis`, `api`, `web`. The `backup` and `worker` services exist only in
-  `docker-compose.coolify.yml` in git, which is **not** what production runs.
-  The deploy workflow only `sed`s the two image tags in Coolify's stored
-  compose (`deploy.yml`), so it can never add a service. No amount of
-  deploying will bring them into existence. **Production has never had a
-  database backup.** Do not describe it as backed up, and do not assume the
-  service is there and merely misconfigured.
+- **Production is backed up as of 2026-09-13**, after roughly three months
+  with nothing. Getting there took three separate fixes, and the order matters
+  because each one hid the next: the uploads volume was missing (every
+  uploaded file was discarded on each deploy), then the `backup` service did
+  not exist at all, then — with the service running — the database leg failed
+  nightly on an ambiguous hostname. Now in place on production: the `backup`
+  sidecar with the uploads volume mounted read-only, an unambiguous database
+  hostname, a verified retention policy, and a restore test.
+- **A failing backup now tells someone.** A Coolify Scheduled Task checks the
+  result and emails through Resend, and the alert was proven by making a run
+  fail rather than by assuming the wiring works. This was the missing half:
+  staging's backup had been broken since August and nothing said so, which is
+  the only reason it ran for a month producing fifty zero-byte dumps.
+  The task and its alert live **in Coolify only** — they are not in git, so
+  they will not be recreated by any deploy, and nothing in this repository
+  will tell you they exist.
 - **The worker has never run on production either**, so pre-arrival reminders,
   iCal sync, daily reports, automation sequences, trial emails and the expiry
   of abandoned public booking holds have never happened. Turning it on for the
@@ -260,9 +268,16 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
   well and survived only by holding the pool it opened at startup, making every
   restart a coin flip. It failed safely purely because the two databases have
   different passwords; had they matched, `prisma migrate deploy` would have run
-  this schema into Coolify's database. Address it by a unique name —
-  `resortpro-postgres` in `docker-compose.coolify.yml`, or the container name
-  `postgres-<resource-id>` in Coolify's own stored compose.
+  this schema into Coolify's database.
+- **That hostname is fixed in both places, but not with the same name.** Git's
+  `docker-compose.coolify.yml` gives postgres the network alias
+  `resortpro-postgres` and addresses it that way (commit `b108746`), which is
+  what staging runs. Production's stored compose instead uses the container
+  name, `postgres-b48m2cix8odgfuvlyr8zr31p`, on both the `backup` service's
+  `POSTGRES_HOST` and the api's `DATABASE_URL`. Both are unambiguous and both
+  are correct; they are simply different strings. Do not "fix" one to match
+  the other without checking which file you are looking at — production's
+  compose is not generated from git.
 - The general lesson, which has now cost real time twice: **a service in a
   compose file in git is not a service that is running.** Staging's whole file
   is sent to Portainer on each deploy, so git is truth there. Production's is
@@ -296,11 +311,10 @@ Do not re-discover these; do not claim any of them is done without checking.
   August were lost this way and cannot be recovered. The `uploads_data` volume
   and `STORAGE_LOCAL_DIR` are now in Coolify's compose, verified the only way
   that counts: upload a file, count it, redeploy, count again — 1 and 1.
-- **Production has no backup service and no worker** — see "Backups" above.
-  Recon already done (`plan/fixes/production-backup-recon.md`); Coolify's own
-  scheduled-backup feature does not apply, because production's postgres lives
-  inside the service compose rather than being a standalone Coolify database
-  resource. Production's database is about 16 MB.
+- **Production has a backup; it still has no worker** — see "Backups" above.
+  Coolify's own scheduled-backup feature does not apply, because production's
+  postgres lives inside the service compose rather than being a standalone
+  Coolify database resource, which is why the sidecar exists instead. Production's database is about 16 MB.
 - **Coolify's stored compose is a stale snapshot of `docker-compose.coolify.yml`
   and nothing reconciles them.** Measured divergence on 2026-09-10 — missing on
   production: the `uploads_data` volume and `STORAGE_LOCAL_DIR`; the `backup`

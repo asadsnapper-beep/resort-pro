@@ -1,3 +1,9 @@
+> **DONE — 2026-09-13.** Applied on production. Both the `backup` service's
+> `POSTGRES_HOST` and the api's `DATABASE_URL` now use
+> `postgres-b48m2cix8odgfuvlyr8zr31p`. Retention and a restore were verified,
+> and a Coolify Scheduled Task now emails through Resend when a run fails —
+> proven by making one fail. Kept for the reasoning, not as a task.
+
 # Production backup: one line to change
 
 Paste this whole file into the session that has Coolify access.
