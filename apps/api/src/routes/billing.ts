@@ -538,7 +538,17 @@ export async function stripeWebhookRoute(app: FastifyInstance) {
         data: { processed: true },
       });
     } catch (err) {
-      app.log.info({ err, eventType: event.type }, 'Webhook handler error');
+      // This used to log at info level and fall through to 200. Stripe treats
+      // any 2xx as delivered and never sends that event again — so a database
+      // blip, or a timeout on the subscriptions.retrieve call below, while
+      // activating a subscription meant the customer had been charged and
+      // their plan would never switch on, with nothing left to retry it.
+      //
+      // A 500 makes Stripe redeliver with backoff for days. That is safe
+      // because the row above stays processed:false, and the idempotency check
+      // only short-circuits events that finished.
+      app.log.error({ err, eventType: event.type, eventId: event.id }, 'Stripe webhook handler failed; Stripe will retry');
+      return reply.status(500).send({ received: false });
     }
 
     return reply.send({ received: true });
@@ -567,14 +577,15 @@ async function handleStripeEvent(event: Stripe.Event) {
 
     case 'customer.subscription.deleted': {
       const sub = event.data.object as Stripe.Subscription;
-      await prisma.tenant.updateMany({
-        where: { stripeSubscriptionId: sub.id },
-        data: { planStatus: 'canceled', plan: 'FREE' },
-      });
-      // Find tenant for notification context
+      // Read before the downgrade. This used to run after it, so the admin
+      // notification always said the tenant had canceled a FREE subscription.
       const canceledTenant = await prisma.tenant.findFirst({
         where: { stripeSubscriptionId: sub.id },
         select: { id: true, name: true, slug: true, plan: true },
+      });
+      await prisma.tenant.updateMany({
+        where: { stripeSubscriptionId: sub.id },
+        data: { planStatus: 'canceled', plan: 'FREE' },
       });
       // Every upgrade path syncs the feature flags; this downgrade did not, so
       // a tenant who stopped paying kept every paid module switched on —
