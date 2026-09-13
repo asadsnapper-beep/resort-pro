@@ -10,6 +10,7 @@ import swaggerUi from '@fastify/swagger-ui';
 import websocket from '@fastify/websocket';
 import staticPlugin from '@fastify/static';
 import { isPrivateUploadKey, verifyUploadSignature } from './utils/signed-upload-url';
+import { corsDecision } from './utils/cors-policy';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
 
@@ -162,15 +163,12 @@ export async function buildApp() {
   const envOrigins = (process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000'])
     .map((s) => s.trim())
     .filter(Boolean);
-  const RESORTPRO_ORIGIN = /^https?:\/\/([a-z0-9-]+\.)*resortpro\.site$/i;
+  // Per request, because the embed widget runs on a resort's own domain and
+  // needs the public routes from there — without credentials. See cors-policy.ts.
   await app.register(cors, {
-    origin: (origin, cb) => {
-      // No Origin header = same-origin / server-to-server (curl, health checks)
-      if (!origin) return cb(null, true);
-      if (RESORTPRO_ORIGIN.test(origin) || envOrigins.includes(origin)) return cb(null, true);
-      return cb(null, false);
+    delegator: (req, cb) => {
+      cb(null, corsDecision(req.headers.origin, req.url, envOrigins));
     },
-    credentials: true,
   });
 
   await app.register(rateLimit, {
