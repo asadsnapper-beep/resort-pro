@@ -584,7 +584,13 @@ export default function SettingsPage() {
                     While this is off the desk still sees how early or late a guest is, and no fee is proposed.
                   </p>
                 </div>
-                <button type="button" onClick={() => setStayTime(s => ({ ...s, enabled: !s.enabled }))}>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={stayTime.enabled}
+                  aria-label="Early check-in and late checkout"
+                  onClick={() => setStayTime(s => ({ ...s, enabled: !s.enabled }))}
+                >
                   {stayTime.enabled
                     ? <ToggleRight className="h-7 w-7 text-rp-brand" />
                     : <ToggleLeft className="h-7 w-7 text-rp-faint" />}
@@ -667,8 +673,13 @@ export default function SettingsPage() {
                         Either way it takes a reason, and the audit trail names who decided.
                       </p>
                     </div>
-                    <button type="button"
-                      onClick={() => setStayTime(s => ({ ...s, waiverRequiresManager: !s.waiverRequiresManager }))}>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={stayTime.waiverRequiresManager}
+                      aria-label="Only a manager may waive the fee"
+                      onClick={() => setStayTime(s => ({ ...s, waiverRequiresManager: !s.waiverRequiresManager }))}
+                    >
                       {stayTime.waiverRequiresManager
                         ? <ToggleRight className="h-7 w-7 text-rp-brand" />
                         : <ToggleLeft className="h-7 w-7 text-rp-faint" />}
@@ -711,6 +722,9 @@ export default function SettingsPage() {
                   </div>
                   <button
                     type="button"
+                    role="switch"
+                    aria-checked={emailSettings[key]}
+                    aria-label={label}
                     onClick={() => setEmailSettings(s => ({ ...s, [key]: !s[key] }))}
                   >
                     {emailSettings[key]
@@ -949,7 +963,7 @@ export default function SettingsPage() {
                             {domainStatus.cnameTarget ?? `${tenantData?.slug}.resortpro.site`}
                           </td>
                           <td className="py-2">
-                            <button onClick={() => copyToClipboard(domainStatus.cnameTarget ?? '')}
+                            <button aria-label="Copy the CNAME target" onClick={() => copyToClipboard(domainStatus.cnameTarget ?? '')}
                               className="text-gray-400 hover:text-gray-600 transition-colors">
                               <Copy className="h-3.5 w-3.5" />
                             </button>
@@ -1137,14 +1151,27 @@ function GatewayCard({
             <p className="text-xs text-gray-500 truncate">{ui.description}</p>
           </div>
           {!isComingSoon && (
-            <button type="button" onClick={onToggle} className="flex-shrink-0">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isEnabled}
+              aria-label={`Enable ${gw.name}`}
+              onClick={onToggle}
+              className="flex-shrink-0"
+            >
               {isEnabled
                 ? <ToggleRight className={`h-7 w-7 ${ui.accent}`} />
                 : <ToggleLeft  className="h-7 w-7 text-gray-300" />}
             </button>
           )}
           {!isComingSoon && gw.credentialFields.length > 0 && (
-            <button type="button" onClick={() => setOpen(o => !o)} className="text-gray-400 ml-1 flex-shrink-0">
+            <button
+              type="button"
+              aria-expanded={open}
+              aria-label={`${gw.name} credentials`}
+              onClick={() => setOpen(o => !o)}
+              className="text-gray-400 ml-1 flex-shrink-0"
+            >
               {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </button>
           )}
@@ -1173,7 +1200,9 @@ function GatewayCard({
                       className={field.type === 'password' ? 'pr-9' : ''}
                     />
                     {field.type === 'password' && (
-                      <button type="button"
+                      <button
+                        type="button"
+                        aria-label={showPass[field.key] ? `Hide ${field.label}` : `Show ${field.label}`}
                         onClick={() => setShowPass(s => ({ ...s, [field.key]: !s[field.key] }))}
                         className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                         {showPass[field.key] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -1191,7 +1220,14 @@ function GatewayCard({
                   <p className="text-sm font-medium text-gray-800">Live Mode</p>
                   <p className="text-xs text-gray-500">Sandbox for testing — enable Live Mode for real payments</p>
                 </div>
-                <button type="button" onClick={() => onTestModeChange(!testMode)}>
+                <button
+                  type="button"
+                  role="switch"
+                  // Live is the ON state; testMode is the sandbox.
+                  aria-checked={!testMode}
+                  aria-label="Live Mode"
+                  onClick={() => onTestModeChange(!testMode)}
+                >
                   {!testMode
                     ? <ToggleRight className="h-7 w-7 text-emerald-600" />
                     : <ToggleLeft  className="h-7 w-7 text-gray-300" />}
@@ -2182,6 +2218,7 @@ function EmbedTab() {
                   <div key={sc} className="flex items-center justify-between gap-2">
                     <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-700 flex-1 truncate">{sc}</code>
                     <button
+                      aria-label={`Copy shortcode ${sc}`}
                       onClick={() => copy(sc, sc)}
                       className="shrink-0 p-1 text-gray-400 hover:text-gray-700"
                     >
@@ -2417,7 +2454,11 @@ function NotificationsTab() {
               <p className="font-semibold text-gray-900">SMS Notifications</p>
               <p className="text-sm text-gray-500 mt-0.5">Booking confirmations, payment receipts, check-in reminders via SMS</p>
             </div>
-            <button onClick={() => {
+            <button
+              role="switch"
+              aria-checked={triggers.smsEnabled}
+              aria-label="SMS Notifications"
+              onClick={() => {
                 const newTriggers = { ...triggers, smsEnabled: !triggers.smsEnabled };
                 setTriggers(newTriggers);
                 triggerMut.mutate(newTriggers);
@@ -2479,6 +2520,7 @@ function NotificationsTab() {
                     <div className="relative">
                       <Input type={showSmsKey ? 'text' : 'password'} value={smsApiKey} onChange={e => setSmsApiKey(e.target.value)} placeholder="Your API key" />
                       <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        aria-label={showSmsKey ? 'Hide API key' : 'Show API key'}
                         onClick={() => setShowSmsKey(v => !v)}>
                         {showSmsKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
@@ -2529,7 +2571,11 @@ function NotificationsTab() {
               <p className="font-semibold text-gray-900">WhatsApp Notifications</p>
               <p className="text-sm text-gray-500 mt-0.5">Booking confirmations, invoices, reminders via WhatsApp</p>
             </div>
-            <button onClick={() => { const newTriggers = { ...triggers, waEnabled: !triggers.waEnabled }; setTriggers(newTriggers); triggerMut.mutate(newTriggers); }}
+            <button
+              role="switch"
+              aria-checked={triggers.waEnabled}
+              aria-label="WhatsApp Notifications"
+              onClick={() => { const newTriggers = { ...triggers, waEnabled: !triggers.waEnabled }; setTriggers(newTriggers); triggerMut.mutate(newTriggers); }}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${triggers.waEnabled ? 'bg-green-500' : 'bg-gray-300'}`}>
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${triggers.waEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
@@ -2588,6 +2634,7 @@ function NotificationsTab() {
                   <div className="relative">
                     <Input type={showWaToken ? 'text' : 'password'} value={waApiToken} onChange={e => setWaApiToken(e.target.value)} placeholder="EAAxxxxx..." />
                     <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      aria-label={showWaToken ? 'Hide access token' : 'Show access token'}
                       onClick={() => setShowWaToken(v => !v)}>
                       {showWaToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -2845,6 +2892,9 @@ function DiscoveryMapTab() {
           <p className="text-xs text-gray-500 mt-0.5">Make your resort visible to travelers on stay.resortpro.site</p>
         </div>
         <button
+          role="switch"
+          aria-checked={form.mapVisible}
+          aria-label="List this resort on the discovery map"
           onClick={() => setForm(f => ({ ...f, mapVisible: !f.mapVisible }))}
           className={`flex items-center gap-2 text-sm font-semibold transition-colors ${
             form.mapVisible ? 'text-[#183153]' : 'text-gray-400'
@@ -3049,6 +3099,7 @@ function DiscoveryMapTab() {
                         onError={e => { (e.target as HTMLImageElement).style.opacity = '0.3'; }}
                       />
                       <button
+                        aria-label={`Remove gallery image ${i + 1}`}
                         onClick={() => removeGallery(url)}
                         className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         ×
@@ -3094,7 +3145,7 @@ function DiscoveryMapTab() {
                   {amenitiesArr.map((item, i) => (
                     <span key={i} className="inline-flex items-center gap-1 bg-[#f2f7fb] border border-[#d4e4ef] text-[#183153] text-xs font-medium px-2.5 py-1 rounded-full">
                       {item}
-                      <button onClick={() => removeAmenity(item)} className="ml-0.5 hover:text-red-500 transition-colors">×</button>
+                      <button aria-label={`Remove ${item}`} onClick={() => removeAmenity(item)} className="ml-0.5 hover:text-red-500 transition-colors">×</button>
                     </span>
                   ))}
                 </div>
