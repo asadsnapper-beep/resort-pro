@@ -287,6 +287,27 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
   are correct; they are simply different strings. Do not "fix" one to match
   the other without checking which file you are looking at — production's
   compose is not generated from git.
+- **What "no Stripe on production" actually means** (read 2026-09-14). Three
+  different things get called card payment, and only two depend on the
+  platform's `STRIPE_*` variables:
+  1. *Guests paying a resort by card* uses **the resort's own** gateway
+     credentials, entered in Settings → Payment Gateways. Not affected. A
+     Bangladeshi resort takes cards through **SSLCommerz** (active in the
+     payment registry, Visa/Mastercard plus mobile banking) with no Stripe at
+     all.
+  2. *Resorts paying ResortPro by card* (billing.ts `/checkout`) needs the
+     platform secret key and `STRIPE_PRICE_*`. Without them it answers an
+     honest 400, "Payment gateway not configured", not a false success.
+     Subscriptions by **bKash** (`/checkout/bkash`) do not need Stripe.
+  3. *The dashboard's "payment link"* (bookings.ts `/:id/payment-link`) needs
+     the platform key and answers an honest 400 without it.
+  So nothing is lying; a channel is simply absent. Whether to add it is a
+  business decision, and it has a real-world precondition: as far as is
+  known, Stripe does not open accounts for businesses registered in
+  Bangladesh, so platform card billing needs a company in a Stripe-supported
+  country first. The payment registry nevertheless lists `stripe` among the
+  BD gateways, which invites a Bangladeshi resort to try an account it may not
+  be able to open.
 - The general lesson, which has now cost real time twice: **a service in a
   compose file in git is not a service that is running.** Staging's whole file
   is sent to Portainer on each deploy, so git is truth there. Production's is
@@ -333,8 +354,11 @@ Do not re-discover these; do not claim any of them is done without checking.
   reaches production on its own. Missing on
   production: the `uploads_data` volume and `STORAGE_LOCAL_DIR`; the `backup`
   and `worker` services; every `STRIPE_*` variable including the secret key, so
-  **card payment cannot work there at all**; `BKASH_PRICE_FREE` and its annual
-  pair, so the Solo plan has no bKash price; and `NEXT_PUBLIC_CLARITY_ID` on
+  the *platform's* card billing is off (see "What 'no Stripe' actually
+  means" below — it is narrower than it sounds); `BKASH_PRICE_FREE` and its
+  annual pair, which turned out not to matter — billing.ts falls back to
+  `PLAN_PRICING` when a BKASH_PRICE_* variable is unset, so the Solo plan still
+  has a bKash price; and `NEXT_PUBLIC_CLARITY_ID` on
   web. Production additionally has `SEED_DEMO_REFRESH: '1'` set as a literal,
   added deliberately, which rebuilds the demo tenant on every API start — it is
   guarded to refuse any tenant that is not both slug `demo` and `isDemo`.
