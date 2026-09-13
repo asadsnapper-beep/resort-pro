@@ -250,12 +250,21 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
   The task and its alert live **in Coolify only** — they are not in git, so
   they will not be recreated by any deploy, and nothing in this repository
   will tell you they exist.
-- **The worker has never run on production either**, so pre-arrival reminders,
-  iCal sync, daily reports, automation sequences, trial emails and the expiry
-  of abandoned public booking holds have never happened. Turning it on for the
-  first time is its own decision, not a side effect of a backup fix: it acts on
-  a backlog that has been accumulating for months. Read the second half of
-  `plan/fixes/backup-restore-runbook.md` before it is ever started.
+- **The worker runs on production as of 2026-09-13.** Until then pre-arrival
+  reminders, iCal sync, daily reports, automation sequences, trial emails and
+  the expiry of abandoned booking holds had never run there at all.
+- **The "months of backlog" warning attached to starting it was wrong**, and it
+  was repeated in this file and in `plan/fixes/backup-restore-runbook.md`
+  before anyone read the jobs. They are bounded: pre-arrival queries `checkIn`
+  within *tomorrow* only, trial emails are limited to `trialEndsAt` inside 31
+  days and deduplicated by a unique constraint, and automation touches only
+  `status: 'ACTIVE'` sequences. The first run confirmed it — `0 email(s) sent`,
+  and a `[trial-cron] First run in this environment — suppressed 0 stale
+  win-back(s)` line showing the code has its own first-run guard.
+- The only bulk action on that first run was the abandoned-hold expiry, which
+  sends no email: it cancelled **2** unpaid `PENDING` bookings (WEB-MSL5BVT6,
+  WEB-MSMAK3XW), freeing rooms they had been blocking. It never touches a
+  booking with any recorded payment.
 - Whatever is added, backups still sit on the same host as the database.
   Copying them off-box has not been done.
 - **`postgres` is an ambiguous hostname on production.** Coolify's `coolify`
@@ -311,12 +320,17 @@ Do not re-discover these; do not claim any of them is done without checking.
   August were lost this way and cannot be recovered. The `uploads_data` volume
   and `STORAGE_LOCAL_DIR` are now in Coolify's compose, verified the only way
   that counts: upload a file, count it, redeploy, count again — 1 and 1.
-- **Production has a backup; it still has no worker** — see "Backups" above.
+- **Production has both a backup and a worker** — see "Backups" above.
   Coolify's own scheduled-backup feature does not apply, because production's
   postgres lives inside the service compose rather than being a standalone
   Coolify database resource, which is why the sidecar exists instead. Production's database is about 16 MB.
 - **Coolify's stored compose is a stale snapshot of `docker-compose.coolify.yml`
-  and nothing reconciles them.** Measured divergence on 2026-09-10 — missing on
+  and nothing reconciles them.** The gap is smaller than it was: `uploads_data`
+  / `STORAGE_LOCAL_DIR`, the `backup` service and the `worker` service have all
+  since been typed into Coolify by hand, and the database hostname was made
+  unambiguous there. Everything below is the 2026-09-10 measurement, kept
+  because the *mechanism* has not changed — a service in git still never
+  reaches production on its own. Missing on
   production: the `uploads_data` volume and `STORAGE_LOCAL_DIR`; the `backup`
   and `worker` services; every `STRIPE_*` variable including the secret key, so
   **card payment cannot work there at all**; `BKASH_PRICE_FREE` and its annual

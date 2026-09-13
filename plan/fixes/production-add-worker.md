@@ -1,3 +1,8 @@
+> **DONE — 2026-09-13.** The worker service was added to production and is
+> running. First run: 0 trial emails, 0 iCal calendars, and 2 abandoned unpaid
+> PENDING bookings cancelled (WEB-MSL5BVT6, WEB-MSMAK3XW). No errors. Kept for
+> the reasoning about why the first run is safe.
+
 # Production has no worker
 
 Paste this whole file into the session that has Coolify access.
