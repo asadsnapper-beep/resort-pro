@@ -250,6 +250,19 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
   `plan/fixes/backup-restore-runbook.md` before it is ever started.
 - Whatever is added, backups still sit on the same host as the database.
   Copying them off-box has not been done.
+- **`postgres` is an ambiguous hostname on production.** Coolify's `coolify`
+  network is shared by every project on the host, and Coolify's own database
+  container carries the alias `postgres` too — so DNS returns two addresses and
+  each lookup can land on either. From 10 September the production backup
+  resolved it to Coolify's own database and failed nightly with "password
+  authentication failed", while the password, the pg_hba rules and
+  `password_encryption` were all correct. The API resolved to the wrong host as
+  well and survived only by holding the pool it opened at startup, making every
+  restart a coin flip. It failed safely purely because the two databases have
+  different passwords; had they matched, `prisma migrate deploy` would have run
+  this schema into Coolify's database. Address it by a unique name —
+  `resortpro-postgres` in `docker-compose.coolify.yml`, or the container name
+  `postgres-<resource-id>` in Coolify's own stored compose.
 - The general lesson, which has now cost real time twice: **a service in a
   compose file in git is not a service that is running.** Staging's whole file
   is sent to Portainer on each deploy, so git is truth there. Production's is

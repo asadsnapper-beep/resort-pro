@@ -24,8 +24,30 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-resortpro}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # `coolify` is an EXTERNAL network shared by every Coolify project on the
+    # host, and a compose service is reachable there under its own service name.
+    # Coolify's own database container also carries the alias `postgres`, so
+    # that name is ambiguous: Docker's DNS returns both addresses and each
+    # lookup can land on either.
+    #
+    # It happened. From 10 September the production backup resolved `postgres`
+    # to Coolify's own database and failed every night with "password
+    # authentication failed for user resortpro" — with the password, the
+    # pg_hba rules and password_encryption all perfectly correct, because the
+    # problem was never the credential. The API resolved the same name to the
+    # wrong host too; it survived only because it holds the pool it opened at
+    # startup, so every restart was a coin flip.
+    #
+    # It failed safely only by luck: the two databases have different
+    # passwords, so authentication stopped it. Had they matched,
+    # `prisma migrate deploy` would have run this schema into Coolify's own
+    # database.
+    #
+    # So this project addresses its database by a name no other project uses.
     networks:
-      - coolify
+      coolify:
+        aliases:
+          - resortpro-postgres
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-resortpro}']
       interval: 10s
@@ -58,7 +80,7 @@ services:
       NODE_ENV: production
       PORT: 4000
       HOST: 0.0.0.0
-      DATABASE_URL: postgresql://${POSTGRES_USER:-resortpro}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-resortpro}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-resortpro}:${POSTGRES_PASSWORD}@resortpro-postgres:5432/${POSTGRES_DB:-resortpro}
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
@@ -129,7 +151,7 @@ services:
     pull_policy: always
     restart: unless-stopped
     environment:
-      POSTGRES_HOST: postgres
+      POSTGRES_HOST: resortpro-postgres
       POSTGRES_USER: ${POSTGRES_USER:-resortpro}
       PGPASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-resortpro}
