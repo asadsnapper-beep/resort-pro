@@ -337,6 +337,15 @@ jobs:
         working-directory: apps/web
         run: pnpm exec vitest run
 
+      # Settings hands resorts a <script> tag and a plugin download. For as long
+      # as they were offered both were 404s, because nothing produced them. The
+      # web build does now; this fails CI if it ever stops.
+      - name: Embed widget and WordPress plugin were built
+        run: |
+          test -s apps/web/public/embed.js
+          test -s apps/web/public/resortpro-wp-plugin.zip
+          unzip -t apps/web/public/resortpro-wp-plugin.zip
+
   # ── Typecheck (advisory) ─────────────────────────────────────────────────────
   # eslint was never actually installed in this repo, so the old Lint job could
   # never pass. Replaced with tsc typecheck. Advisory (non-blocking) for now:

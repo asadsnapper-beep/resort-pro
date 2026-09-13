@@ -22,7 +22,10 @@ COPY . .
 # a large Chromium binary from GitHub's CDN — that download hung/reset
 # ("socket hang up") twice in a row and failed the whole build both times,
 # even though nothing about electron was ever needed to build the web app.
-RUN pnpm install --no-frozen-lockfile --filter "@resort-pro/web..."
+# @resort-pro/embed is not a dependency of web, but web's build bundles it into
+# public/embed.js (scripts/bundle-embed.mjs), so its vite toolchain has to be
+# installed too. Without it the build stops with a message saying exactly this.
+RUN pnpm install --no-frozen-lockfile --filter "@resort-pro/web..." --filter "@resort-pro/embed"
 
 # NEXT_PUBLIC_* vars bake into the client bundle at build time — must be
 # passed as build args, not just runtime env, or they silently stay unset.

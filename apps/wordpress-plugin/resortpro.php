@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 define( 'RESORTPRO_VERSION', '1.0.0' );
 define( 'RESORTPRO_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'RESORTPRO_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
-define( 'RESORTPRO_CDN_SCRIPT', 'https://cdn.resortpro.app/embed.js' );
+define( 'RESORTPRO_CDN_SCRIPT', 'https://resortpro.site/embed.js' );
 define( 'RESORTPRO_OPTION_KEY', 'resortpro_settings' );
 
 // ─── Includes ─────────────────────────────────────────────────────────────────

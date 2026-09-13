@@ -2018,7 +2018,9 @@ function EnterpriseTab() {
 function EmbedTab() {
   const { tenant } = useAuthStore()
   const slug = tenant?.slug || ''
-  const cdnBase = 'https://cdn.resortpro.site'
+  // Served from the web app's own public/ — see apps/web/scripts/bundle-embed.mjs.
+  // cdn.resortpro.site, which this used to name, has never served either file.
+  const cdnBase = 'https://resortpro.site'
   const [copied, setCopied] = useState<string | null>(null)
 
   const copy = async (text: string, key: string) => {

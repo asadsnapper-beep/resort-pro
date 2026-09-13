@@ -22,3 +22,7 @@ apps/api/uploads/
 
 # TypeScript incremental build cache — regenerated on every build
 *.tsbuildinfo
+
+# Written by apps/web/scripts/bundle-embed.mjs on every web build
+apps/web/public/embed.js
+apps/web/public/resortpro-wp-plugin.zip
