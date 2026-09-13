@@ -23,6 +23,10 @@ import { RoomsWidget }    from './widgets/RoomsWidget'
 import { CalendarWidget } from './widgets/CalendarWidget'
 import { MenuWidget }     from './widgets/MenuWidget'
 import { FloatingCta }    from './widgets/FloatingCta'
+import { injectCSS }      from './utils/dom'
+// ?inline makes Vite hand over the stylesheet as a string, so it travels inside
+// embed.js. A resort pastes one <script> tag; there is no second file to link.
+import widgetCss          from './styles/embed.css?inline'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -58,8 +62,21 @@ function getConfig(slug: string): Promise<EmbedConfig> {
 
 // ── Mount a single widget ─────────────────────────────────────────────────────
 
+// embed.css was written, and injectCSS was written, and nothing ever connected
+// them: the stylesheet was never imported and the helper never called. Every
+// widget would have rendered its markup with no styling at all — buttons,
+// cards and the date picker as bare browser defaults on the resort's own page.
+let stylesInjected = false
+
+function ensureStyles() {
+  if (stylesInjected) return
+  injectCSS(widgetCss)
+  stylesInjected = true
+}
+
 function mountWidget(opts: MountOptions) {
   const { el, type, config, colorOverride, currencyOverride, whatsapp } = opts
+  ensureStyles()
 
   // Merge per-element overrides on top of server config
   const mergedConfig: EmbedConfig = {
