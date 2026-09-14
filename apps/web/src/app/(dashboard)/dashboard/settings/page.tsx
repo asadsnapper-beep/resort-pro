@@ -2345,6 +2345,9 @@ function NotificationsTab() {
     notifBookingConfirm: true, notifPaymentReceived: true,
     notifCheckinReminder: true, notifCheckoutRemind: false,
     notifCancellation: true, notifInvoiceSent: false,
+    waNotifBookingConfirm: true, waNotifPaymentReceived: true,
+    waNotifCheckinReminder: true, waNotifCheckoutRemind: false,
+    waNotifCancellation: true, waNotifInvoiceSent: false,
     notifLanguage: 'en',
   });
 
@@ -2374,6 +2377,12 @@ function NotificationsTab() {
       notifCheckoutRemind: d.notifCheckoutRemind ?? false,
       notifCancellation: d.notifCancellation ?? true,
       notifInvoiceSent: d.notifInvoiceSent ?? false,
+      waNotifBookingConfirm: d.waNotifBookingConfirm ?? true,
+      waNotifPaymentReceived: d.waNotifPaymentReceived ?? true,
+      waNotifCheckinReminder: d.waNotifCheckinReminder ?? true,
+      waNotifCheckoutRemind: d.waNotifCheckoutRemind ?? false,
+      waNotifCancellation: d.waNotifCancellation ?? true,
+      waNotifInvoiceSent: d.waNotifInvoiceSent ?? false,
       notifLanguage: d.notifLanguage || 'en',
     });
   }, [data]);
@@ -2693,7 +2702,11 @@ function NotificationsTab() {
                   { key: 'notifCheckoutRemind',    label: 'Check-out Reminder',         emoji: '🛎️' },
                   { key: 'notifCancellation',      label: 'Booking Cancelled',          emoji: '❌' },
                   { key: 'notifInvoiceSent',       label: 'Invoice Sent',              emoji: '🧾' },
-                ].map(({ key, label, emoji }) => (
+                ].map(({ key, label, emoji }) => {
+                  // Each channel has its own field. Both columns used to read
+                  // and write `key`, so ticking SMS also ticked WhatsApp.
+                  const waKey = `wa${key[0].toUpperCase()}${key.slice(1)}`;
+                  return (
                   <tr key={key} className="hover:bg-gray-50">
                     <td className="px-5 py-3.5 font-medium text-gray-700">{emoji} {label}</td>
                     <td className="px-4 py-3.5 text-center">
@@ -2704,12 +2717,13 @@ function NotificationsTab() {
                     </td>
                     <td className="px-4 py-3.5 text-center">
                       <input aria-label={`WhatsApp — ${label}`} type="checkbox"
-                        checked={!!triggers[key as keyof typeof triggers]}
-                        onChange={e => setTriggers(p => ({ ...p, [key]: e.target.checked }))}
+                        checked={!!triggers[waKey as keyof typeof triggers]}
+                        onChange={e => setTriggers(p => ({ ...p, [waKey]: e.target.checked }))}
                         className="h-4 w-4 rounded accent-green-600" />
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

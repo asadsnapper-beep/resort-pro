@@ -391,6 +391,15 @@ model Tenant {
   notifCheckoutRemind     Boolean               @default(false)
   notifCancellation       Boolean               @default(true)
   notifInvoiceSent        Boolean               @default(false)
+  // WhatsApp's own switches. The six notif* fields above are SMS's; the
+  // Settings table used to draw both its columns from them, so ticking one
+  // ticked both (settings-deep-qa M-01).
+  waNotifBookingConfirm   Boolean               @default(true)
+  waNotifPaymentReceived  Boolean               @default(true)
+  waNotifCheckinReminder  Boolean               @default(true)
+  waNotifCheckoutRemind   Boolean               @default(false)
+  waNotifCancellation     Boolean               @default(true)
+  waNotifInvoiceSent      Boolean               @default(false)
   notifLanguage           String                @default("en") // "en" | "bn"
   // SMS quota & credits
   // When sms/wa usage was last rolled over to a new month. Null means never,

@@ -738,6 +738,9 @@ export async function tenantRoutes(app: FastifyInstance) {
           notifBookingConfirm: true, notifPaymentReceived: true,
           notifCheckinReminder: true, notifCheckoutRemind: true,
           notifCancellation: true, notifInvoiceSent: true,
+          waNotifBookingConfirm: true, waNotifPaymentReceived: true,
+          waNotifCheckinReminder: true, waNotifCheckoutRemind: true,
+          waNotifCancellation: true, waNotifInvoiceSent: true,
           notifLanguage: true,
           smsQuotaMonthly: true, smsUsedThisMonth: true, smsCredits: true,
           waQuotaMonthly: true,  waUsedThisMonth: true,  waCredits: true,
@@ -768,6 +771,9 @@ export async function tenantRoutes(app: FastifyInstance) {
         notifBookingConfirm?: boolean; notifPaymentReceived?: boolean;
         notifCheckinReminder?: boolean; notifCheckoutRemind?: boolean;
         notifCancellation?: boolean; notifInvoiceSent?: boolean;
+        waNotifBookingConfirm?: boolean; waNotifPaymentReceived?: boolean;
+        waNotifCheckinReminder?: boolean; waNotifCheckoutRemind?: boolean;
+        waNotifCancellation?: boolean; waNotifInvoiceSent?: boolean;
         notifLanguage?: string;
       };
       const updated = await db.tenant.update({
@@ -781,6 +787,12 @@ export async function tenantRoutes(app: FastifyInstance) {
           ...(body.notifCheckoutRemind   !== undefined && { notifCheckoutRemind:  body.notifCheckoutRemind }),
           ...(body.notifCancellation     !== undefined && { notifCancellation:    body.notifCancellation }),
           ...(body.notifInvoiceSent      !== undefined && { notifInvoiceSent:     body.notifInvoiceSent }),
+          ...(body.waNotifBookingConfirm  !== undefined && { waNotifBookingConfirm:  body.waNotifBookingConfirm }),
+          ...(body.waNotifPaymentReceived !== undefined && { waNotifPaymentReceived: body.waNotifPaymentReceived }),
+          ...(body.waNotifCheckinReminder !== undefined && { waNotifCheckinReminder: body.waNotifCheckinReminder }),
+          ...(body.waNotifCheckoutRemind  !== undefined && { waNotifCheckoutRemind:  body.waNotifCheckoutRemind }),
+          ...(body.waNotifCancellation    !== undefined && { waNotifCancellation:    body.waNotifCancellation }),
+          ...(body.waNotifInvoiceSent     !== undefined && { waNotifInvoiceSent:     body.waNotifInvoiceSent }),
           ...(body.notifLanguage         !== undefined && { notifLanguage:        body.notifLanguage }),
         },
         select: {
@@ -788,6 +800,9 @@ export async function tenantRoutes(app: FastifyInstance) {
           notifBookingConfirm: true, notifPaymentReceived: true,
           notifCheckinReminder: true, notifCheckoutRemind: true,
           notifCancellation: true, notifInvoiceSent: true,
+          waNotifBookingConfirm: true, waNotifPaymentReceived: true,
+          waNotifCheckinReminder: true, waNotifCheckoutRemind: true,
+          waNotifCancellation: true, waNotifInvoiceSent: true,
           notifLanguage: true,
         },
       });
