@@ -34,6 +34,10 @@ beforeAll(async () => {
   expect(reg.statusCode, reg.body).toBe(201);
   const tenantId = JSON.parse(reg.body).data.tenant.id;
   token = await verifyOwnerAndLogin(app, { tenantId, email: `owner-${slug}@test.com`, password, slug });
+  // A fresh registration is 'incomplete' until it pays, and the subscription
+  // guard answers every write with 402 until then — which is what the first run
+  // of this file hit. Activate it, as the other Settings tests do.
+  await prisma.tenant.update({ where: { id: tenantId }, data: { planStatus: 'active', plan: 'STARTER' } });
 }, 30000);
 
 afterAll(async () => {
