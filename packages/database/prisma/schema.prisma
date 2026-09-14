@@ -490,6 +490,7 @@ model Tenant {
   emailTemplates         EmailTemplate[]
   campaigns              Campaign[]
   emailSends             EmailSend[]
+  guestNotifications     GuestNotification[]
   sequences              Sequence[]
   sequenceEnrollments    SequenceEnrollment[]
   staffInvites           StaffInvite[]
@@ -853,6 +854,7 @@ model Booking {
   supportTickets      SupportTicket[]
   invoiceExtras       InvoiceExtra[]
   stayTimeGrants      StayTimeGrant[]
+  guestNotifications  GuestNotification[]
   bookingPackages     BookingPackage[]
   bookingOffers       BookingOffer[]
   invoice             Invoice?
@@ -3399,4 +3401,32 @@ model BillingAudit {
   @@index([tenantId, bookingId])
   @@index([tenantId, createdAt])
   @@map("billing_audits")
+}
+
+/// One SMS or WhatsApp message sent to a guest about a booking event.
+///
+/// The unique key is the point. A booking can be confirmed from more than one
+/// place — a payment's verify callback and its webhook both fire for the same
+/// payment — and each used to send its own confirmation. A row is claimed
+/// before sending, so the second trigger finds it and sends nothing. It also
+/// gives the resort a record of what went, what did not, and why.
+model GuestNotification {
+  id         String   @id @default(uuid())
+  tenantId   String
+  bookingId  String
+  event      String // "booking_confirmed"
+  channel    String // "sms" | "whatsapp"
+  status     String // "sending" | "sent" | "failed"
+  via        String? // "platform" | "own"
+  providerId String?
+  detail     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, event, channel])
+  @@index([tenantId, createdAt])
+  @@map("guest_notifications")
 }

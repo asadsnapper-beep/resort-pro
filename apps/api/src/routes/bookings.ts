@@ -25,6 +25,7 @@ import { createAdminNotification } from '../utils/notifications';
 import { nextDocumentNumber } from '../utils/sequence';
 import type { JwtPayload } from '@resort-pro/types';
 import { matchAllTerms } from '../utils/search-terms';
+import { notifyBookingConfirmed } from '../services/guest-notifications';
 
 /* ── Auto-create invoice when a booking is confirmed ────────────────────── */
 async function autoCreateInvoice(bookingId: string, tenantId: string) {
@@ -545,6 +546,9 @@ export async function bookingRoutes(app: FastifyInstance) {
       if (!body.skipEmail) {
         trackGuestEmail('confirmation', booking.id, tenantId, sendBookingConfirmation(booking.id));
       }
+      // SMS / WhatsApp, governed by the resort's own switches rather than
+      // skipEmail. Fire-and-forget: it never throws and must not delay the reply.
+      void notifyBookingConfirmed(booking.id);
 
       // Auto-generate invoice draft (fire-and-forget)
       autoCreateInvoice(booking.id, tenantId).catch(() => {});
