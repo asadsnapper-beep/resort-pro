@@ -308,6 +308,20 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
   country first. The payment registry nevertheless lists `stripe` among the
   BD gateways, which invites a Bangladeshi resort to try an account it may not
   be able to open.
+- **Guest SMS/WhatsApp is built and on staging (2026-09-14); nothing is
+  configured to send yet.** One shared sender (`services/messaging.ts`) with
+  honest reasons; the platform allowance reserved atomically before a send and
+  rolled over monthly by the worker (`services/messaging-quota.ts`); booking
+  confirmation to the guest, once per booking, logged in `guest_notifications`
+  (`services/guest-notifications.ts`). Platform mode needs
+  `SSL_WIRELESS_API_KEY` and `SSL_WIRELESS_SENDER_ID` on the api — see
+  `plan/fixes/sms-whatsapp-setup.md`. Own-account mode works without them.
+  The SSL Wireless acceptance check has never met a live response. WhatsApp
+  needs Meta templates before it can start a conversation. Only the
+  booking-confirmed event is wired; the other five switches are still unread.
+- **The confirmation email reaches a guest twice** after a gateway payment:
+  `payments.ts` calls `sendBookingConfirmation` from both the verify callback
+  and the webhook. The SMS path dedupes; the email path does not yet.
 - The general lesson, which has now cost real time twice: **a service in a
   compose file in git is not a service that is running.** Staging's whole file
   is sent to Portainer on each deploy, so git is truth there. Production's is
