@@ -393,6 +393,9 @@ model Tenant {
   notifInvoiceSent        Boolean               @default(false)
   notifLanguage           String                @default("en") // "en" | "bn"
   // SMS quota & credits
+  // When sms/wa usage was last rolled over to a new month. Null means never,
+  // which the daily reset job treats as due.
+  messagingUsageResetAt   DateTime?
   smsQuotaMonthly         Int                   @default(100)
   smsUsedThisMonth        Int                   @default(0)
   smsCredits              Int                   @default(0)

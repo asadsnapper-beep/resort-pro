@@ -39,8 +39,10 @@ export type SendResult =
        * not_configured — credentials are missing (who must add them depends on `via`)
        * unsupported_provider — offered in Settings, not implemented
        * rejected — the provider received it and refused; `detail` is its reason
+       * quota_exhausted — platform mode, this month's allowance is spent
+       *   (decided in messaging-quota.ts, before any provider is called)
        */
-      reason: 'not_configured' | 'unsupported_provider' | 'rejected';
+      reason: 'not_configured' | 'unsupported_provider' | 'rejected' | 'quota_exhausted';
       via: 'platform' | 'own';
       provider?: string;
       detail: string;
