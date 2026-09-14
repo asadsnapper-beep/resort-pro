@@ -543,12 +543,9 @@ export async function bookingRoutes(app: FastifyInstance) {
       }
 
       // Send confirmation email (skip for walk-in if opted out)
-      if (!body.skipEmail) {
-        trackGuestEmail('confirmation', booking.id, tenantId, sendBookingConfirmation(booking.id));
-      }
-      // SMS / WhatsApp, governed by the resort's own switches rather than
-      // skipEmail. Fire-and-forget: it never throws and must not delay the reply.
-      void notifyBookingConfirmed(booking.id);
+      // Email, SMS and WhatsApp, each at most once per booking. skipEmail only
+      // stops the email. Fire-and-forget: it never throws.
+      void notifyBookingConfirmed(booking.id, { email: !body.skipEmail });
 
       // Auto-generate invoice draft (fire-and-forget)
       autoCreateInvoice(booking.id, tenantId).catch(() => {});

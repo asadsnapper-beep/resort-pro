@@ -11,6 +11,10 @@ import { randomUUID } from 'node:crypto';
 import { prisma } from '@resort-pro/database';
 import { notifyBookingConfirmed } from '../../src/services/guest-notifications';
 
+// The email provider, stubbed so a call can be counted. Hoisted by vitest.
+const sendEmailMock = vi.hoisted(() => vi.fn());
+vi.mock('../../src/services/email', () => ({ sendEmail: sendEmailMock }));
+
 const slug = `guest-notif-${Date.now()}`;
 let tenantId: string;
 let roomId: string;
@@ -37,7 +41,8 @@ async function booking(opts: { status?: string; phone?: string | null } = {}) {
   return b.id;
 }
 const setTenant = (data: Record<string, unknown>) => prisma.tenant.update({ where: { id: tenantId }, data });
-const rows = (bookingId: string) => prisma.guestNotification.findMany({ where: { bookingId } });
+const rows = (bookingId: string, channel?: string) =>
+  prisma.guestNotification.findMany({ where: { bookingId, ...(channel && { channel }) } });
 
 beforeAll(async () => {
   const t = await prisma.tenant.create({ data: { name: 'Palm Resort', slug, planStatus: 'active', country: 'BD' } });
@@ -55,6 +60,11 @@ beforeEach(async () => {
     ? ok({ messages: [{ id: 'wamid.1' }] })
     : ok({ status: 'SUCCESS', status_code: 200, smsinfo: [{ reference_id: 'ref-1' }] }));
   vi.stubGlobal('fetch', fetchMock);
+  sendEmailMock.mockReset();
+  sendEmailMock.mockResolvedValue({ id: 're_test_1', error: null });
+  await prisma.emailSettings.upsert({
+    where: { tenantId }, create: { tenantId, sendConfirmation: true }, update: { sendConfirmation: true },
+  });
   // Own accounts, so no platform quota or server env is involved.
   await setTenant({
     smsEnabled: true, notifBookingConfirm: true, smsMode: 'own', smsProvider: 'ssl_wireless', smsApiKey: 'k',
@@ -74,7 +84,7 @@ describe('a confirmed booking', () => {
     expect(sent.msisdn).toBe('8801712345678');
     expect(sent.sms).toMatch(/^Palm Resort: booking GN-.* confirmed\. Check-in 14 Oct, 2 nights\.$/);
 
-    expect(await rows(id)).toMatchObject([{ channel: 'sms', status: 'sent', via: 'own', providerId: 'ref-1' }]);
+    expect(await rows(id, 'sms')).toMatchObject([{ channel: 'sms', status: 'sent', via: 'own', providerId: 'ref-1' }]);
   });
 
   it('is messaged once when the same payment confirms it twice at the same moment', async () => {
@@ -83,7 +93,7 @@ describe('a confirmed booking', () => {
     await Promise.all([notifyBookingConfirmed(id), notifyBookingConfirmed(id), notifyBookingConfirmed(id)]);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(await rows(id)).toHaveLength(1);
+    expect(await rows(id, 'sms')).toHaveLength(1);
   });
 
   it('is messaged once when confirmed again later', async () => {
@@ -99,7 +109,8 @@ describe('a confirmed booking', () => {
     await notifyBookingConfirmed(id);
 
     expect(hosts()).toEqual(['graph.facebook.com']);
-    expect(await rows(id)).toMatchObject([{ channel: 'whatsapp', status: 'sent' }]);
+    expect(await rows(id, 'whatsapp')).toMatchObject([{ channel: 'whatsapp', status: 'sent' }]);
+    expect(await rows(id, 'sms')).toHaveLength(0);
   });
 
   it('goes by both when both are on', async () => {
@@ -114,7 +125,7 @@ describe('a confirmed booking', () => {
     const id = await booking();
 
     await expect(notifyBookingConfirmed(id)).resolves.toBeUndefined();
-    expect(await rows(id)).toMatchObject([{ status: 'failed', detail: 'Invalid SID' }]);
+    expect(await rows(id, 'sms')).toMatchObject([{ status: 'failed', detail: 'Invalid SID' }]);
   });
 });
 
@@ -149,5 +160,62 @@ describe('nothing is sent', () => {
   it('for a booking that does not exist, without throwing', async () => {
     await expect(notifyBookingConfirmed(randomUUID())).resolves.toBeUndefined();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('the confirmation email', () => {
+  it('reaches the guest once when the verify callback and the webhook both confirm the payment', async () => {
+    // This is the bug: two confirmation emails after every gateway payment.
+    const id = await booking();
+    await Promise.all([notifyBookingConfirmed(id), notifyBookingConfirmed(id)]);
+
+    expect(sendEmailMock).toHaveBeenCalledTimes(1);
+    expect(await rows(id, 'email')).toMatchObject([{ status: 'sent', providerId: 're_test_1' }]);
+  });
+
+  it('is not sent again when the booking is confirmed a second time later', async () => {
+    const id = await booking();
+    await notifyBookingConfirmed(id);
+    await notifyBookingConfirmed(id);
+    expect(sendEmailMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('is left out when the desk opted out, without stopping the SMS', async () => {
+    const id = await booking();
+    await notifyBookingConfirmed(id, { email: false });
+
+    expect(sendEmailMock).not.toHaveBeenCalled();
+    expect(await rows(id, 'email')).toHaveLength(0);
+    expect(hosts()).toEqual(['globalsms.sslwireless.com']);
+  });
+
+  it('with confirmation emails switched off, sends nothing and remembers nothing', async () => {
+    // No claim is kept, so switching it back on lets a later trigger send.
+    await prisma.emailSettings.update({ where: { tenantId }, data: { sendConfirmation: false } });
+    const id = await booking();
+    await notifyBookingConfirmed(id);
+
+    expect(sendEmailMock).not.toHaveBeenCalled();
+    expect(await rows(id, 'email')).toHaveLength(0);
+  });
+
+  it('records the provider\'s refusal', async () => {
+    sendEmailMock.mockResolvedValue({ id: null, error: 'email_disabled' });
+    const id = await booking();
+    await notifyBookingConfirmed(id);
+    expect(await rows(id, 'email')).toMatchObject([{ status: 'failed', detail: 'email_disabled' }]);
+  });
+
+  it('is still sent to a guest who has no phone number', async () => {
+    const id = await booking({ phone: null });
+    await notifyBookingConfirmed(id);
+    expect(sendEmailMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('is not sent for a booking still waiting for payment', async () => {
+    const id = await booking({ status: 'PENDING' });
+    await notifyBookingConfirmed(id);
+    expect(sendEmailMock).not.toHaveBeenCalled();
   });
 });

@@ -28,7 +28,6 @@ import {
 }                               from '@resort-pro/payment-registry';
 import { requireAuth }          from '../middleware/auth';
 import type { JwtPayload }      from '@resort-pro/types';
-import { sendBookingConfirmation } from '../utils/guest-emails';
 import { notifyBookingConfirmed } from '../services/guest-notifications';
 
 const WEB_BASE = process.env.WEB_BASE_URL || 'http://localhost:3000';
@@ -365,10 +364,8 @@ export async function paymentRoutes(app: FastifyInstance) {
         result.gatewayPaymentId ?? paymentId,
         Number(payment.amount) * 100,
       );
-      // Fire-and-forget confirmation email after payment verified
-      sendBookingConfirmation(payment.bookingId).catch(() => {});
-      // The webhook below fires for this same payment; the notification's
-      // unique key makes sure the guest is messaged once, not twice.
+      // The webhook below fires for this same payment. Both call this, and the
+      // guest used to get two confirmation emails; now each channel goes once.
       void notifyBookingConfirmed(payment.bookingId);
     }
 
@@ -456,7 +453,6 @@ export async function paymentRoutes(app: FastifyInstance) {
           result.gatewayPaymentId ?? orderId,
           Number(payment.amount) * 100,
         );
-        sendBookingConfirmation(payment.bookingId).catch(() => {});
         void notifyBookingConfirmed(payment.bookingId);
       }
 

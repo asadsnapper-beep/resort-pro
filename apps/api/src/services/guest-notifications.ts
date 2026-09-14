@@ -18,11 +18,17 @@
  * webhook, and each calls this; the second finds the row and sends nothing, so
  * a guest is not messaged twice and ResortPro's allowance is not spent twice.
  *
+ * The confirmation email goes through the same claim. It was sent from the
+ * same places and reached the guest twice after every gateway payment, once
+ * from the verify callback and once from the webhook.
+ *
  * Never throws. Every caller is fire-and-forget after the booking has already
  * been saved, and a messaging problem must not surface as a failed booking.
  */
 import { prisma } from '@resort-pro/database';
 import { sendCountedMessage, type Channel } from './messaging-quota';
+import { sendBookingConfirmation } from '../utils/guest-emails';
+import { createAdminNotification } from '../utils/notifications';
 
 const CONFIRMED = new Set(['CONFIRMED', 'CHECKED_IN']);
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -63,7 +69,12 @@ export function bookingConfirmedText(
   return `${b.resortName}: booking ${b.confirmationNo} confirmed. Check-in ${day} ${MONTHS[month]}, ${nights} night${nights === 1 ? '' : 's'}.`;
 }
 
-export async function notifyBookingConfirmed(bookingId: string): Promise<void> {
+export async function notifyBookingConfirmed(
+  bookingId: string,
+  // Walk-ins can opt out of the email at the desk; that choice says nothing
+  // about SMS or WhatsApp, which follow the resort's own switches.
+  opts: { email?: boolean } = {},
+): Promise<void> {
   try {
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
@@ -81,7 +92,32 @@ export async function notifyBookingConfirmed(bookingId: string): Promise<void> {
         },
       },
     });
-    if (!booking || !CONFIRMED.has(booking.status) || !booking.guest?.phone) return;
+    if (!booking || !CONFIRMED.has(booking.status)) return;
+
+    if (opts.email !== false) {
+      await sendOnce(booking.tenantId, booking.id, 'email', async () => {
+        try {
+          const attempt = await sendBookingConfirmation(booking.id);
+          if (!attempt) return null; // switched off: nothing sent, nothing to remember
+          return attempt.id
+            ? { delivered: true, id: attempt.id }
+            : { delivered: false, detail: attempt.error ?? 'The email provider returned no id.' };
+        } catch (e) {
+          // What trackGuestEmail used to do for this call: a thrown send reaches
+          // the platform admin, not just the log.
+          await createAdminNotification({
+            type: 'guest_email_failed',
+            title: 'Guest email failed: confirmation',
+            message: `Booking ${booking.id} (tenant ${booking.tenantId}) — confirmation email failed to send: ${e instanceof Error ? e.message : String(e)}`,
+            metadata: { bookingId: booking.id, tenantId: booking.tenantId, kind: 'confirmation' },
+            linkPath: `/bookings/${booking.id}`,
+          }).catch(() => {});
+          throw e;
+        }
+      });
+    }
+
+    if (!booking.guest?.phone) return;
 
     const { tenant } = booking;
     const channels: Channel[] = [];
@@ -105,11 +141,17 @@ export async function notifyBookingConfirmed(bookingId: string): Promise<void> {
   }
 }
 
+type Outcome =
+  | { delivered: true; via?: string; id?: string | null }
+  | { delivered: false; via?: string; detail: string }
+  /** Nothing was attempted — release the claim so a later trigger may send. */
+  | null;
+
 async function sendOnce(
   tenantId: string,
   bookingId: string,
-  channel: Channel,
-  send: () => ReturnType<typeof sendCountedMessage>,
+  channel: Channel | 'email',
+  send: () => Promise<Outcome>,
 ) {
   const event = 'booking_confirmed';
   let rowId: string;
@@ -125,11 +167,21 @@ async function sendOnce(
     throw e;
   }
 
-  const result = await send();
+  let result: Outcome;
+  try {
+    result = await send();
+  } catch (e) {
+    result = { delivered: false, detail: e instanceof Error ? e.message : String(e) };
+  }
+
+  if (result === null) {
+    await prisma.guestNotification.delete({ where: { id: rowId } });
+    return;
+  }
   await prisma.guestNotification.update({
     where: { id: rowId },
     data: result.delivered
-      ? { status: 'sent', via: result.via, providerId: result.id ?? null }
-      : { status: 'failed', via: result.via, detail: result.detail },
+      ? { status: 'sent', via: result.via ?? null, providerId: result.id ?? null }
+      : { status: 'failed', via: result.via ?? null, detail: result.detail },
   });
 }
