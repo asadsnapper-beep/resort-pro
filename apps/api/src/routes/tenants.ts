@@ -8,10 +8,52 @@ import * as dns from 'dns/promises';
 import { FLAG_REGISTRY } from '../utils/feature-flags';
 import { resolveTenantEntitlement } from '../utils/entitlement';
 import { sendTestEmail } from '../utils/guest-emails';
-import { deliveryVerdict, notImplemented } from '../utils/delivery';
+import { deliveryVerdict } from '../utils/delivery';
 import crypto from 'crypto';
 import { ensureTenantReferralCode, referralRegistrationUrl } from '../utils/referral';
 import { createAdminNotification } from '../utils/notifications';
+import { sendSms, sendWhatsApp, type SendResult } from '../services/messaging';
+
+/** Only the columns messaging needs — never the whole tenant row. */
+const MESSAGING_SELECT = {
+  name: true,
+  smsMode: true, smsProvider: true, smsApiKey: true, smsApiSecret: true, smsSenderId: true,
+  waMode: true, waApiToken: true, waPhoneNumberId: true,
+} as const;
+
+/**
+ * One mapping from a send attempt to an HTTP answer, so the two test buttons
+ * cannot drift apart. Each failure gets a status that says whose move it is:
+ * 503 nobody has configured it yet, 501 the chosen provider is not built,
+ * 502 the provider was reached and refused (its reason is passed through).
+ *
+ * A platform-mode test is a real message on ResortPro's account, so it counts
+ * against the tenant's monthly quota exactly as a campaign message does.
+ */
+async function sendDeliveryResult(
+  reply: import('fastify').FastifyReply,
+  result: SendResult,
+  db: any,
+  tenantId: string,
+  channel: 'sms' | 'whatsapp',
+) {
+  if (result.delivered) {
+    if (result.via === 'platform') {
+      await db.tenant.update({
+        where: { id: tenantId },
+        data: channel === 'sms' ? { smsUsedThisMonth: { increment: 1 } } : { waUsedThisMonth: { increment: 1 } },
+      });
+    }
+    return reply.send({ success: true, data: { sent: true, id: result.id ?? null, via: result.via } });
+  }
+  const status = result.reason === 'not_configured' ? 503 : result.reason === 'unsupported_provider' ? 501 : 502;
+  const code = result.reason === 'not_configured' ? 'DELIVERY_NOT_CONFIGURED'
+    : result.reason === 'unsupported_provider' ? 'NOT_IMPLEMENTED' : 'DELIVERY_FAILED';
+  // "Nothing was sent" is kept on every refusal: it is the sentence the owner
+  // needs, and the one the old { sent: true } answer was hiding.
+  return reply.status(status).send({ success: false, error: `${result.detail} Nothing was sent.`, code, via: result.via });
+}
+
 
 /**
  * What a Settings response may contain.
@@ -821,13 +863,12 @@ export async function tenantRoutes(app: FastifyInstance) {
     handler: async (request, reply) => {
       const { to } = request.body as { to: string };
       if (!to) return reply.status(400).send({ success: false, error: 'Phone number required' });
-      // No SMS provider is wired up yet. This used to answer `{ sent: true }`
-      // with "coming soon" tucked into a message the UI never displayed, so the
-      // owner was told a test message had reached their phone.
-      const outcome = notImplemented('SMS delivery');
-      return reply.status(outcome.status).send({
-        success: false, error: outcome.error, code: outcome.code,
-      });
+      const { tenantId } = request.user as JwtPayload;
+      const tenant = await request.db.tenant.findUnique({ where: { id: tenantId }, select: MESSAGING_SELECT });
+      if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
+
+      const result = await sendSms(tenant, to, `Test message from ${tenant.name} via ResortPro. If you received this, SMS is working.`);
+      return sendDeliveryResult(reply, result, request.db, tenantId, 'sms');
     },
   });
 
@@ -838,10 +879,12 @@ export async function tenantRoutes(app: FastifyInstance) {
     handler: async (request, reply) => {
       const { to } = request.body as { to: string };
       if (!to) return reply.status(400).send({ success: false, error: 'Phone number required' });
-      const outcome = notImplemented('WhatsApp delivery');
-      return reply.status(outcome.status).send({
-        success: false, error: outcome.error, code: outcome.code,
-      });
+      const { tenantId } = request.user as JwtPayload;
+      const tenant = await request.db.tenant.findUnique({ where: { id: tenantId }, select: MESSAGING_SELECT });
+      if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
+
+      const result = await sendWhatsApp(tenant, to, `Test message from ${tenant.name} via ResortPro. If you received this, WhatsApp is working.`);
+      return sendDeliveryResult(reply, result, request.db, tenantId, 'whatsapp');
     },
   });
 
