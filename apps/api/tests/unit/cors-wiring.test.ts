@@ -64,6 +64,22 @@ describe('the same website reaching for a private route', () => {
 });
 
 describe('the dashboard', () => {
+  it('may send the X-Property-Id header the property switcher adds', async () => {
+    // The dashboard and the API are different origins, so a custom header
+    // triggers a preflight. Refused, every request would fail once a property
+    // is chosen.
+    const res = await app.inject({
+      method: 'OPTIONS', url: '/api/bookings',
+      headers: {
+        origin: 'https://app.resortpro.site',
+        'access-control-request-method': 'GET',
+        'access-control-request-headers': 'authorization,x-property-id',
+      },
+    });
+    expect(res.statusCode).toBeLessThan(300);
+    expect(String(res.headers['access-control-allow-headers']).toLowerCase()).toContain('x-property-id');
+  });
+
   it('still gets credentials on private routes', async () => {
     const res = await app.inject({
       method: 'GET', url: '/api/bookings', headers: { origin: 'https://app.resortpro.site' },

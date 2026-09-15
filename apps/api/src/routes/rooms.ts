@@ -4,6 +4,7 @@ import { requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams } from '../utils/response';
 import { checkRoomLimit } from '../utils/entitlement';
 import { matchAllTerms } from '../utils/search-terms';
+import { propertyScope } from '../utils/property-scope';
 
 const roomSchema = z.object({
   number:       z.string().min(1).max(10),
@@ -26,14 +27,16 @@ export async function roomRoutes(app: FastifyInstance) {
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request) => {
       const { db } = request;
+      // The property picked in the dashboard's top bar; none means all.
+      const scope = propertyScope(request);
 
       const [total, available, occupied, cleaning, maintenance, reserved] = await Promise.all([
-        db.room.count({ where: { isActive: true } }),
-        db.room.count({ where: { isActive: true, status: 'AVAILABLE' } }),
-        db.room.count({ where: { isActive: true, status: 'OCCUPIED' } }),
-        db.room.count({ where: { isActive: true, status: 'CLEANING' } }),
-        db.room.count({ where: { isActive: true, status: 'MAINTENANCE' } }),
-        db.room.count({ where: { isActive: true, status: 'RESERVED' } }),
+        db.room.count({ where: { isActive: true, ...scope } }),
+        db.room.count({ where: { isActive: true, status: 'AVAILABLE', ...scope } }),
+        db.room.count({ where: { isActive: true, status: 'OCCUPIED', ...scope } }),
+        db.room.count({ where: { isActive: true, status: 'CLEANING', ...scope } }),
+        db.room.count({ where: { isActive: true, status: 'MAINTENANCE', ...scope } }),
+        db.room.count({ where: { isActive: true, status: 'RESERVED', ...scope } }),
       ]);
 
       return ok({ total, available, occupied, cleaning, maintenance, reserved });
@@ -63,6 +66,7 @@ export async function roomRoutes(app: FastifyInstance) {
 
       const where: Record<string, unknown> = {
         isActive: true,
+        ...propertyScope(request),
         ...(q.status && { status: q.status }),
         ...(q.type   && { type:   q.type   }),
         // Per-term, so "Sea View Standard" matches rather than requiring the

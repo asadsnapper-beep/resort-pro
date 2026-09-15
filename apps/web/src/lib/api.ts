@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { selectedPropertyFor } from '@/store/property';
 
 declare module 'axios' {
   export interface AxiosRequestConfig {
@@ -41,8 +42,14 @@ function setAuthToken(token: string) {
 
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
-    const token = getAuthState()?.token;
+    const auth = getAuthState();
+    const token = auth?.token;
     if (token) config.headers.Authorization = `Bearer ${token}`;
+    // The property chosen in the top bar travels with every request, so a page
+    // narrows to it without each page having to remember to ask. The API
+    // treats a missing header as "all properties". See utils/property-scope.ts.
+    const propertyId = selectedPropertyFor(auth?.tenant?.id);
+    if (propertyId) config.headers['X-Property-Id'] = propertyId;
   }
   return config;
 });
