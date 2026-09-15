@@ -478,8 +478,8 @@ export function LandingPage({ isBn = false }: { isBn?: boolean }) {
           </h2>
           <p className="mt-4 text-lg" style={{ color: MUTED }}>
             {isBn
-              ? 'যখন প্রস্তুত, তখন মার্কেটিং, লয়্যালটি ও মাল্টি-প্রপার্টি টুলস যোগ করুন।'
-              : "Add marketing, loyalty and multi-property tools whenever you're ready."}
+              ? 'যখন প্রস্তুত, তখন মার্কেটিং, লয়্যালটি ও আরও প্রপার্টি যোগ করুন।'
+              : "Add marketing, loyalty and more properties whenever you're ready."}
           </p>
           <div className="mt-12 grid gap-5 sm:grid-cols-3">
             {pricingTiers.map((tier) => (

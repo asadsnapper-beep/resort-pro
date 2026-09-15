@@ -42,7 +42,10 @@ const PLANS = [
     id: 'PROFESSIONAL' as const,
     eyebrow: 'For resort groups',
     name: PLAN_PRICING.PROFESSIONAL.displayName,
-    title: 'One operating view across every property you run.',
+    // Was 'One operating view across every property you run.' There is no such
+    // view: every dashboard page shows all properties mixed together. Put the
+    // stronger claim back when a property switcher exists.
+    title: 'One account for every property you run.',
     price: PLAN_PRICING.PROFESSIONAL.monthlyUsd,
     annualPrice: PLAN_PRICING.PROFESSIONAL.annualUsd,
     capacity: `Up to ${PLAN_PRICING.PROFESSIONAL.propertyLimit} properties · ${PLAN_PRICING.PROFESSIONAL.roomLimit} rooms · ${PLAN_PRICING.PROFESSIONAL.staffLimit} staff`,
@@ -51,7 +54,7 @@ const PLANS = [
     cta: 'Start with Resort Group',
     features: [
       'Everything in Independent Resort',
-      'Multi-property owner view',
+      // 'Multi-property owner view' removed 2026-09-15: it does not exist yet.
       'OTA channel sync and corporate accounts',
       'Advanced reporting and AI chatbot',
       'Priority support',
@@ -103,7 +106,8 @@ const COMPARE_ROWS = [
   { label: 'Direct booking website', starter: true, pro: true, group: true },
   { label: 'Custom domain and loyalty', starter: false, pro: true, group: true },
   { label: 'Advanced analytics and reports', starter: false, pro: false, group: true },
-  { label: 'Multi-property reporting', starter: false, pro: false, group: true },
+  // 'Multi-property reporting' removed 2026-09-15: reports do not separate
+  // properties. Restore it when they do.
 ];
 
 function BrandMark() {
