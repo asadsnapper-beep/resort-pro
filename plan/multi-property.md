@@ -58,6 +58,29 @@ to the business.**
 **Currency and tax stay tenant-level.** Three resorts in one country share
 both. Revisit only if a customer crosses a border.
 
+## Why not a second dashboard, or separate accounts
+
+Both were considered on 2026-09-16.
+
+**A separate "group owner" dashboard** does not reduce the work. The hard part
+is the data, not the screens: rooms numbered 101 three times, separate prices,
+staff, expenses and websites are needed whichever dashboard shows them. A
+second console is this plan *plus* another surface to build and keep in step.
+
+**One account per resort, with a login that reaches all three** would make
+separation free — separate accounts are separate by definition. It is refused
+for one reason: tenant isolation is the strongest guarantee in this system,
+enforced by the tenant-scoped client and a CI guard, and a cross-tenant login
+puts a hole in it for every customer to serve one. It also gives up shared
+guests and loyalty, splits the bill three ways, and makes a later merge into
+one account a data migration nobody wants.
+
+**What the instinct behind it is right about:** a group owner does need a view
+of the three side by side. That is a *page*, not a login — with "All
+properties" selected the dashboard compares the resorts and the owner clicks
+into one. Same login, same bill, same guest list, and nearly free once the
+per-property reporting in step 6 exists. It is step 7 below.
+
 ## Data model changes
 
 ### 1. Every room belongs to a property
@@ -154,10 +177,15 @@ each depends on the one before.
 | 4 | Bookings, front desk, calendar, housekeeping, maintenance | a day at the Hill shows only the Hill |
 | 5 | Rate plans, packages, offers | each resort prices itself |
 | 6 | Expenses + reports per property, group and single | P&L per resort |
-| 7 | Menu, tables, minibar, inventory, purchase orders | each kitchen and store is its own |
+| 7 | Group view: the three resorts side by side under "All properties" | the owner compares occupancy, revenue, expenses, profit and clicks into one |
 | 8 | Website content per property, public page per resort | a guest books one resort |
 | 9 | Property check-in times and timezone honoured | a night is counted by the resort's clock |
 | 10 | Demo tenant with three properties | the feature can be seen without setup |
+| 11 | Menu, tables, minibar, inventory, purchase orders | each kitchen and store is its own |
+
+Step 11 is **after** the week, by the founder's answer: not every resort in a
+group has a restaurant, and the customer's do not need it yet. A website for
+each resort does have to be there, so step 8 stays inside the week.
 
 Then restore the two claims removed in 77e8451: "Multi-property owner view"
 and the "Multi-property reporting" row.
@@ -193,12 +221,14 @@ Plus, from step 3 on: a property the user is not assigned to → refused.
 - Per-property subscription limits — the plan's room limit stays per account.
 - Moving a booking between properties (moving a room is enough).
 
-## Decisions needed from the founder
+## Decisions
 
-1. Does this customer use the **restaurant / inventory** modules? If not,
-   step 7 moves after step 10 and the week gets easier.
-2. Do the three resorts need **three public booking pages** now, or is the
-   group page enough for launch? That decides whether step 8 is in the week.
-3. Do any staff work at **more than one** resort? If nobody does,
-   `UserProperty` can be a single column instead of a join table — simpler,
-   but harder to change later.
+1. ~~Restaurant / inventory?~~ **Answered 2026-09-16:** not every resort in a
+   group has a restaurant, and this customer does not need it yet — moved to
+   step 11, after the week.
+2. ~~Three public booking pages?~~ **Answered 2026-09-16:** yes, a website per
+   resort is required. Step 8 stays in the week.
+3. **Open:** do any staff work at more than one resort? If nobody does,
+   `UserProperty` could be a single column instead of a join table. The join
+   table is planned anyway — it costs almost nothing now and cannot be added
+   cheaply later.
