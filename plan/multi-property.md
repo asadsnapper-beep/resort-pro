@@ -8,6 +8,46 @@ reasons in "The wall" below.
 > "Manages two to five properties and needs one owner-level view."
 > — FOUNDER_CONTEXT.md
 
+## Two kinds of multi-resort owner — and only one of them belongs here
+
+Raised by the founder on 2026-09-16, and it is the distinction this file was
+missing.
+
+**Type 1 — one brand, several locations.** "Sea Pearl" at Cox's Bazar, Sylhet
+and Bandarban. One name, one company, one bank account, one set of
+shareholders, guests who should be recognised at all three. **This plan is for
+them.**
+
+**Type 2 — several brands, one owner, different shareholders.** Palm Retreat,
+Hill View Lodge and Blue Lagoon: different names, often different companies,
+different investors in each. **Putting them in one account would hurt them**,
+for reasons that are in the schema, not opinions:
+
+| | What breaks |
+|---|---|
+| `ShareholderProfile.ownershipPercent` | is a share **of the account**. A 40% owner of Blue Lagoon would see all three resorts' revenue, and their payout maths would be wrong. |
+| `Tenant.customDomain`, `brandLogoUrl`, `brandPrimaryColor` | one brand per account. Three names cannot share it. |
+| `bkashAppKey`, `sslStoreId` and the rest | one merchant account. Three resorts' money would land in one place. |
+| `taxRate`, invoice numbering | one tax rate and one invoice book, where separate companies need their own. |
+| Guests, loyalty, campaigns | shared across brands, which is a consent problem rather than a feature. |
+
+So the rule:
+
+> **An account is a brand, a company, a bank account and a shareholder list.
+> A property is another location of that same brand.**
+
+Type 2 gets **separate accounts** — which is what they already have today —
+plus an owner layer above them: one person, several accounts, one place to
+see them side by side. That is a separate plan
+(`plan/owner-portfolio.md`, not yet written), and it is safe to build because
+every request still belongs to exactly one account; the portfolio adds up
+answers that were each fetched under their own scope. No hole in tenant
+isolation.
+
+**Before onboarding any multi-resort customer, ask which type they are.** One
+brand and one bank account: this plan. Different brands or different
+shareholders per resort: separate accounts, and do not force them together.
+
 ## What the owner must be able to do
 
 1. One login and one bill for all three resorts.
