@@ -18,6 +18,7 @@ import { authRoutes } from './routes/auth';
 import { tenantRoutes } from './routes/tenants';
 import { roomRoutes } from './routes/rooms';
 import { propertyRoutes } from './routes/properties';
+import { resortGroupRoutes } from './routes/resortGroup';
 import { bookingRoutes } from './routes/bookings';
 import { guestRoutes } from './routes/guests';
 import { staffRoutes } from './routes/staff';
@@ -331,6 +332,7 @@ export async function buildApp() {
   await app.register(tenantRoutes, { prefix: '/api/tenant' });
   await app.register(roomRoutes, { prefix: '/api/rooms' });
   await app.register(propertyRoutes, { prefix: '/api/properties' });
+  await app.register(resortGroupRoutes, { prefix: '/api/resort-group' });
   await app.register(bookingRoutes, { prefix: '/api/bookings' });
   await app.register(guestRoutes,         { prefix: '/api/guests' });
   await app.register(guestDocumentRoutes, { prefix: '/api/guests' });
