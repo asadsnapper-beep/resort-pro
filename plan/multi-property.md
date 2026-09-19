@@ -1,5 +1,12 @@
 # Multi-property: one account, three resorts
 
+>  **SUPERSEDED — 2026-09-19.** The founder chose the opposite shape: every
+>  resort is its own ResortPro account, connected by a thin group layer, with a
+>  360 dashboard on top. Read **[multi-resort.md](multi-resort.md)** instead.
+>  This file is kept only for the analysis in "Two kinds of multi-resort
+>  owner", which the new plan builds on.
+
+
 Rewritten 2026-09-16, when the first customer turned out to run **three
 resorts**. The earlier version of this file planned a filter and nothing else;
 it would have shipped something that looks right and cannot be used, for the

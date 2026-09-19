@@ -322,18 +322,25 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
 - **The confirmation email reaches a guest twice** after a gateway payment:
   `payments.ts` calls `sendBookingConfirmation` from both the verify callback
   and the webhook. The SMS path dedupes; the email path does not yet.
-- **Multi-property is shallow, and the pricing page no longer pretends
-  otherwise (2026-09-15).** What exists: create up to `propertyLimit`
-  properties, assign a room to one (`RoomModal`), see room counts on the
-  Properties page. What does not: any property switcher or filter — Bookings,
-  Calendar, Front Desk, Dashboard and Reports all show every property mixed;
-  per-property check-in times and timezones are stored and never used;
-  `propertyId` is read nowhere outside `routes/properties.ts` and `RoomModal`.
-  The Resort Group plan was sold with "Multi-property owner view" and
-  "Multi-property reporting"; both were removed from `/plans`, and the title
-  softened to "One account for every property you run." Put them back when
-  the switcher and per-property reports exist. The demo tenant has no
-  properties at all.
+- **Several resorts is now an account-per-resort design, not a property
+  filter (2026-09-19).** The founder settled it after a long discussion: each
+  resort keeps its own ResortPro account and subscription and runs exactly as
+  today; a thin group layer connects them, with a dropdown to switch and a
+  "360 Resort Dashboard" showing every connected resort's numbers. Access to a
+  connected resort is Full or Numbers-only, chosen by that resort's owner when
+  approving and changeable later. Billing stays per resort, 10% off from the
+  second onward; one combined bill comes later and needs Stripe.
+  **The plan is [plan/multi-resort.md](../../plan/multi-resort.md);
+  plan/multi-property.md is superseded** — it argued for one account holding
+  many properties, which the founder rejected.
+- **In-account properties stay, and the switcher shipped (`da9a86f`).** The
+  top bar has a property picker (hidden below two active properties) and Rooms
+  narrows by `X-Property-Id`. It answers "which building on this site", while
+  the new resort dropdown answers "which account". Still mixed across
+  properties: Bookings, Calendar, Front Desk, Dashboard, Reports. Per-property
+  check-in times and timezones are stored and never used. The demo tenant has
+  no properties at all. The Resort Group plan's "Multi-property owner view"
+  and "Multi-property reporting" bullets are still removed from `/plans`.
 - The general lesson, which has now cost real time twice: **a service in a
   compose file in git is not a service that is running.** Staging's whole file
   is sent to Portainer on each deploy, so git is truth there. Production's is
