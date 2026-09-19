@@ -44,6 +44,39 @@ const approveSchema = z.object({
   access: z.enum(['FULL', 'NUMBERS_ONLY']),
 });
 
+/**
+ * The account a connection is used through, creating one if this resort has
+ * never made one for that person.
+ *
+ * Shared by approving a request and by raising an existing connection back to
+ * full access, so both produce the same thing: a real user of this resort, with
+ * a password nobody holds, reachable only by switching from the group that was
+ * granted it.
+ */
+async function accountForConnection(tenantId: string, person: {
+  email: string; firstName: string; lastName: string;
+}): Promise<{ linkedUserId: string; linkedUserCreated: boolean }> {
+  const existing = await prisma.user.findFirst({
+    where: { tenantId, email: { equals: person.email, mode: 'insensitive' } },
+    select: { id: true },
+  });
+  // Reused, and marked as not ours: this resort may have been using that
+  // account for its own reasons long before any of this, and revoking a
+  // connection must not switch it off.
+  if (existing) return { linkedUserId: existing.id, linkedUserCreated: false };
+
+  const unusable = await bcrypt.hash(randomBytes(32).toString('hex'), 12);
+  const created = await prisma.user.create({
+    data: {
+      tenantId, email: person.email, passwordHash: unusable,
+      firstName: person.firstName, lastName: person.lastName, role: 'OWNER',
+      emailVerifiedAt: new Date(),
+    },
+    select: { id: true },
+  });
+  return { linkedUserId: created.id, linkedUserCreated: true };
+}
+
 /** A request stands for a week, then the asking has to be done again. */
 const REQUEST_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 /** Re-asking faster than this is a stuck button, not a person. */
@@ -696,29 +729,7 @@ export async function resortGroupRoutes(app: FastifyInstance) {
       let linkedUserId: string | null = null;
       let linkedUserCreated = false;
       if (body.access === 'FULL') {
-        const existing = await prisma.user.findFirst({
-          where: { tenantId: user.tenantId, email: { equals: asker.email, mode: 'insensitive' } },
-          select: { id: true },
-        });
-        if (existing) {
-          linkedUserId = existing.id;
-        } else {
-          // A password nobody has and nobody can use. This account exists to be
-          // switched into from the group that was granted access, and hashing a
-          // random secret keeps bcrypt.compare answering a plain no rather than
-          // meeting a malformed hash.
-          const unusable = await bcrypt.hash(randomBytes(32).toString('hex'), 12);
-          const created = await prisma.user.create({
-            data: {
-              tenantId: user.tenantId, email: asker.email, passwordHash: unusable,
-              firstName: asker.firstName, lastName: asker.lastName, role: 'OWNER',
-              emailVerifiedAt: new Date(),
-            },
-            select: { id: true },
-          });
-          linkedUserId = created.id;
-          linkedUserCreated = true;
-        }
+        ({ linkedUserId, linkedUserCreated } = await accountForConnection(user.tenantId, asker));
       }
 
       await prisma.$transaction([
@@ -825,6 +836,164 @@ export async function resortGroupRoutes(app: FastifyInstance) {
       }
 
       return ok(null, 'Request declined.');
+    },
+  });
+
+  /* ── PATCH /api/resort-group/members/:tenantId ───────────────────────────
+   * Change what an existing connection gives.
+   *
+   * Only this resort's own owner may do it — never the person who asked for
+   * access. If the asking side could raise its own level, the choice made when
+   * the request was approved would have been theatre.
+   *
+   * Dropping to figures only switches off the account this connection uses, so
+   * the change takes effect on the very next request rather than whenever a
+   * token happens to expire. An account this resort was already using for its
+   * own reasons is left alone; it simply stops being reachable by switching.
+   */
+  app.patch('/members/:tenantId', {
+    schema: {
+      tags: ['resort-group'],
+      summary: 'Change how much a connection gives',
+      security: [{ bearerAuth: [] }],
+      body: { type: 'object', required: ['access'], properties: { access: { type: 'string' } } },
+    },
+    preHandler: requireRole('OWNER'),
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+      const { tenantId } = request.params as { tenantId: string };
+      const body = validate(approveSchema, request.body, reply);
+      if (!body) return;
+
+      const member = await prisma.resortGroupTenant.findUnique({
+        where: { tenantId },
+        include: { group: { select: { id: true, ownerUserId: true } } },
+      });
+      if (!member) {
+        return reply.status(404).send({
+          success: false, error: 'That resort is not connected.', code: 'RESORT_NOT_FOUND',
+        });
+      }
+      if (member.tenantId !== user.tenantId) {
+        return reply.status(403).send({
+          success: false,
+          error: 'Only this resort\'s own owner can change what a connection gives.',
+          code: 'NOT_RESORT_OWNER',
+        });
+      }
+      if (member.access === body.access) {
+        return ok({ access: member.access }, 'Nothing changed.');
+      }
+
+      let linkedUserId = member.linkedUserId;
+      let linkedUserCreated = member.linkedUserCreated;
+
+      if (body.access === 'NUMBERS_ONLY') {
+        if (member.linkedUserCreated && member.linkedUserId) {
+          await prisma.$transaction([
+            prisma.user.update({ where: { id: member.linkedUserId }, data: { isActive: false } }),
+            prisma.refreshToken.deleteMany({ where: { userId: member.linkedUserId } }),
+          ]);
+        }
+      } else {
+        const owner = await prisma.user.findUnique({
+          where: { id: member.group.ownerUserId },
+          select: { email: true, firstName: true, lastName: true },
+        });
+        if (!owner) {
+          return reply.status(410).send({
+            success: false, error: 'Whoever this was shared with no longer has an account.',
+            code: 'GROUP_OWNER_GONE',
+          });
+        }
+        if (linkedUserCreated && linkedUserId) {
+          // The same account as before, switched back on — not a second one.
+          await prisma.user.update({ where: { id: linkedUserId }, data: { isActive: true } });
+        } else if (!linkedUserId) {
+          ({ linkedUserId, linkedUserCreated } = await accountForConnection(tenantId, owner));
+        }
+      }
+
+      await prisma.$transaction([
+        prisma.resortGroupTenant.update({
+          where: { id: member.id },
+          data: { access: body.access, linkedUserId, linkedUserCreated },
+        }),
+        prisma.resortGroupEvent.create({
+          data: {
+            groupId: member.group.id, tenantId, actorUserId: user.sub, action: 'access_changed',
+            metadata: { from: member.access, to: body.access },
+          },
+        }),
+      ]);
+      clearResortOverviewCache();
+
+      return ok({ access: body.access }, 'Access updated.');
+    },
+  });
+
+  /* ── GET /api/resort-group/events ────────────────────────────────────────
+   * Who did what, and when.
+   *
+   * Two people are owed this and they are owed different slices of it. The
+   * person who built the group sees all of it. The owner of a connected resort
+   * sees what happened to *their* resort — which is the answer to "who gave
+   * that account access to my books, and when?", a question nobody should have
+   * to ask support.
+   */
+  app.get('/events', {
+    schema: {
+      tags: ['resort-group'],
+      summary: 'What has happened to these connections',
+      security: [{ bearerAuth: [] }],
+    },
+    preHandler: requireRole('OWNER'),
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+
+      const myGroup = await prisma.resortGroup.findFirst({
+        where: { ownerUserId: user.sub }, select: { id: true },
+      });
+      const membership = await prisma.resortGroupTenant.findUnique({
+        where: { tenantId: user.tenantId }, select: { groupId: true },
+      });
+
+      const where = myGroup
+        ? { groupId: myGroup.id }
+        : membership
+          ? { groupId: membership.groupId, tenantId: user.tenantId }
+          : null;
+      if (!where) {
+        return reply.status(404).send({
+          success: false, error: 'There is nothing connected to this resort.',
+          code: 'NO_RESORT_GROUP',
+        });
+      }
+
+      const events = await prisma.resortGroupEvent.findMany({
+        where, orderBy: { createdAt: 'desc' }, take: 50,
+      });
+      const tenantIds = Array.from(new Set(events.map((e) => e.tenantId).filter((id): id is string => !!id)));
+      const actorIds = Array.from(new Set(events.map((e) => e.actorUserId).filter((id): id is string => !!id)));
+      const [tenants, actors] = await Promise.all([
+        prisma.tenant.findMany({ where: { id: { in: tenantIds } }, select: { id: true, name: true } }),
+        prisma.user.findMany({
+          where: { id: { in: actorIds } },
+          select: { id: true, firstName: true, lastName: true },
+        }),
+      ]);
+      const tenantName = new Map(tenants.map((t) => [t.id, t.name]));
+      const actorName = new Map(actors.map((a) => [a.id, `${a.firstName} ${a.lastName}`.trim()]));
+
+      return ok(events.map((e) => ({
+        id: e.id,
+        action: e.action,
+        tenantId: e.tenantId,
+        resortName: e.tenantId ? tenantName.get(e.tenantId) ?? null : null,
+        actorName: e.actorUserId ? actorName.get(e.actorUserId) ?? null : null,
+        metadata: e.metadata,
+        createdAt: e.createdAt,
+      })));
     },
   });
 }
