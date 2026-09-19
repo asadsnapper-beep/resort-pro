@@ -43,6 +43,25 @@ Each price has an id starting `price_…`. Copy all six.
 
 Enterprise is sold by hand, never through checkout — no Stripe price for it.
 
+### 1a-2. One coupon, for owners with several resorts
+
+Product → Coupons → New.
+
+| Field | Value |
+|---|---|
+| Discount | **Percentage**, `10` |
+| Duration | **Forever** |
+| Name | Group price |
+
+Copy its id into **`STRIPE_COUPON_GROUP10`** alongside the prices.
+
+This is the 10% every resort after an owner's first one pays — see
+[../multi-resort.md](../multi-resort.md) §9. bKash already applies it by
+arithmetic and needs nothing set up. Until this coupon exists, a card checkout
+for a discounted resort still goes through, but at **full price**, and the API
+logs `Group discount is due but STRIPE_COUPON_GROUP10 is unset`. Grep for that
+line if an owner says they were overcharged.
+
 ### 1b. The webhook
 
 Developers → Webhooks → Add endpoint.
@@ -88,6 +107,7 @@ STRIPE_PRICE_STARTER=price_…
 STRIPE_PRICE_STARTER_ANNUAL=price_…
 STRIPE_PRICE_PRO=price_…
 STRIPE_PRICE_PRO_ANNUAL=price_…
+STRIPE_COUPON_GROUP10=…
 ```
 
 ---

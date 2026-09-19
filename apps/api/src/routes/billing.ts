@@ -5,6 +5,9 @@ import { PLAN_ORDER, PLAN_PRICING, PUBLIC_PLAN_ORDER, type PlanKey } from '@reso
 import { createAdminNotification } from '../utils/notifications';
 import { applyPlanFlagsToTenant, resolveTenantEntitlement, getPlanConfigs } from '../utils/entitlement';
 import { bkashGrantToken, bkashCreatePayment, bkashExecutePayment, type BkashConfig } from '../services/bkash';
+import {
+  GROUP_DISCOUNT_RATE, groupDiscountApplies, discounted, discountedPrices,
+} from '../utils/group-discount';
 
 // ── Stripe client ──────────────────────────────────────────────────────────
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
@@ -195,6 +198,7 @@ export async function billingRoutes(app: FastifyInstance) {
       resolveTenantEntitlement(tenantId),
       getPlanConfigs(),
     ]);
+    const groupPrice = await groupDiscountApplies(tenantId);
 
     return reply.send({
       success: true,
@@ -215,7 +219,10 @@ export async function billingRoutes(app: FastifyInstance) {
         hasStripeCustomer: !!tenant.stripeCustomerId,
         hasSubscription: !!tenant.stripeSubscriptionId,
         bkashEnabled: !!getPlatformBkash(),
-        bkashPricesBdt: BKASH_PLAN_BDT,
+        // Already discounted. Showing the list price beside a cheaper charge —
+        // or the reverse — is the one thing a billing screen must never do.
+        bkashPricesBdt: discountedPrices(BKASH_PLAN_BDT, groupPrice),
+        groupDiscount: { applies: groupPrice, rate: GROUP_DISCOUNT_RATE },
         entitlement: {
           propertyLimit: entitlement.propertyLimit,
           roomLimit: entitlement.roomLimit,
@@ -290,11 +297,27 @@ export async function billingRoutes(app: FastifyInstance) {
           : `${appUrl}/onboarding?success=1&plan=${planKey}&interval=${interval}`
         : `${appUrl}/dashboard/billing?success=1&plan=${planKey}&interval=${interval}`;
 
+      // The card half of the group price is a Stripe coupon, because Stripe
+      // owns the recurring charge and a one-off discount here would be
+      // forgotten at the first renewal. If the discount is due and no coupon
+      // id is configured, the session is still created — refusing checkout
+      // over a missing coupon would be worse — but it is logged loudly, since
+      // the owner is then being charged full price for a discounted resort.
+      const groupPrice = await groupDiscountApplies(tenantId);
+      const groupCoupon = process.env.STRIPE_COUPON_GROUP10;
+      if (groupPrice && !groupCoupon) {
+        request.log.error(
+          { tenantId },
+          'Group discount is due but STRIPE_COUPON_GROUP10 is unset — charging full price',
+        );
+      }
+
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
         mode: 'subscription',
         payment_method_types: ['card'],
         line_items: [{ price: priceId, quantity: 1 }],
+        ...(groupPrice && groupCoupon && { discounts: [{ coupon: groupCoupon }] }),
         success_url: successUrl,
         cancel_url: `${appUrl}/dashboard/billing?canceled=1`,
         subscription_data: {
@@ -363,7 +386,8 @@ export async function billingRoutes(app: FastifyInstance) {
         return reply.status(503).send({ success: false, error: 'bKash payments are not available yet. Please contact support.' });
       }
 
-      const amountNum = interval === 'year' ? BKASH_PLAN_ANNUAL_BDT[planKey] : BKASH_PLAN_BDT[planKey];
+      const listPrice = interval === 'year' ? BKASH_PLAN_ANNUAL_BDT[planKey] : BKASH_PLAN_BDT[planKey];
+      const amountNum = discounted(listPrice, await groupDiscountApplies(tenantId));
       const amount = amountNum.toFixed(2);
 
       // Same class of bug as file uploads: APP_URL/API_BASE_URL are often unset
@@ -414,9 +438,13 @@ export async function billingRoutes(app: FastifyInstance) {
         if (exec.transactionStatus !== 'Completed') return fail('payment_incomplete');
 
         // Re-verify the paid amount against what we expected (guards tampered callback params)
-        const expected = interval === 'year'
+        // Through the same helper as the charge itself. Verifying against the
+        // list price would reject every group resort's payment *after* their
+        // money had moved — they would have paid and been told it was wrong.
+        const listPrice = interval === 'year'
           ? BKASH_PLAN_ANNUAL_BDT[planKey]
           : BKASH_PLAN_BDT[planKey];
+        const expected = discounted(listPrice, await groupDiscountApplies(tenantId));
         if (expected && Math.abs(Number(exec.amount) - expected) > 0.5) return fail('amount_mismatch');
 
         const plan = planKey;
