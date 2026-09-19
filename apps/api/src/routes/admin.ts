@@ -342,7 +342,57 @@ export async function adminRoutes(app: FastifyInstance) {
 
       if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
 
-      return reply.send({ success: true, data: tenant });
+      /**
+       * Which other account can see this resort, and which resorts it can see.
+       *
+       * Support gets asked "why is somebody else's name on my staff list?" and
+       * "who can see my revenue?", and until this was here the only way to
+       * answer was to read four tables by hand. Read-only on purpose: a
+       * connection is between two owners, and an admin unpicking it from the
+       * outside would be a decision neither of them made.
+       */
+      const membership = await prisma.resortGroupTenant.findUnique({
+        where: { tenantId: tenant.id },
+        include: { group: { select: { id: true, name: true, ownerUserId: true } } },
+      });
+
+      let resortGroup = null;
+      if (membership) {
+        const [owner, siblings] = await Promise.all([
+          prisma.user.findUnique({
+            where: { id: membership.group.ownerUserId },
+            select: {
+              firstName: true, lastName: true, email: true,
+              tenant: { select: { id: true, name: true } },
+            },
+          }),
+          prisma.resortGroupTenant.findMany({
+            where: { groupId: membership.group.id, tenantId: { not: tenant.id } },
+            orderBy: { createdAt: 'asc' },
+            include: { tenant: { select: { id: true, name: true, slug: true } } },
+          }),
+        ]);
+        resortGroup = {
+          name: membership.group.name,
+          access: membership.access,
+          since: membership.approvedAt,
+          linkedUserCreated: membership.linkedUserCreated,
+          owner: owner && {
+            name: `${owner.firstName} ${owner.lastName}`.trim(),
+            email: owner.email,
+            resortId: owner.tenant?.id ?? null,
+            resortName: owner.tenant?.name ?? null,
+          },
+          siblings: siblings.map((m) => ({
+            tenantId: m.tenant.id,
+            name: m.tenant.name,
+            slug: m.tenant.slug,
+            access: m.access,
+          })),
+        };
+      }
+
+      return reply.send({ success: true, data: { ...tenant, resortGroup } });
     }
   );
 
