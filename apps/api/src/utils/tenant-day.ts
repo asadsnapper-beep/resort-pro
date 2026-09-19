@@ -70,3 +70,46 @@ export function tenantWallMinutes(instant: Date, timezone = 'Asia/Dhaka'): numbe
   // en-GB renders midnight as 24:00 in some ICU versions; normalise it to 0.
   return (part('hour') % 24) * 60 + part('minute');
 }
+
+/**
+ * Minutes `timezone` is ahead of UTC at `instant`. Dhaka is +360.
+ *
+ * Derived from how the zone renders that instant rather than from a table, so
+ * it is right across a DST change without pulling in a timezone database.
+ */
+export function tenantOffsetMinutes(instant: Date, timezone = 'Asia/Dhaka'): number {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(instant);
+  const part = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  // Some ICU versions render midnight as hour 24 of the previous day.
+  const hour = part('hour') % 24;
+  const asUtc = Date.UTC(part('year'), part('month') - 1, part('day'), hour, part('minute'));
+  return Math.round((asUtc - instant.getTime()) / 60_000);
+}
+
+/**
+ * The first of the resort's current month, as midnight UTC of that date.
+ *
+ * For `@db.Date` columns — `Expense.date` stores a calendar date with no time,
+ * and Postgres hands it back as midnight UTC, so this is what it compares
+ * against.
+ */
+export function tenantMonthStartDate(timezone = 'Asia/Dhaka'): Date {
+  const today = tenantToday(timezone);
+  return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+}
+
+/**
+ * The instant the resort's current month began — local midnight on the 1st.
+ *
+ * For timestamp columns. `Payment.processedAt` is a real point in time, and
+ * midnight UTC on the 1st is six hours late in Dhaka: every taka taken on the
+ * first evening of the month would fall outside "this month".
+ */
+export function tenantMonthStartInstant(timezone = 'Asia/Dhaka'): Date {
+  const first = tenantMonthStartDate(timezone);
+  return new Date(first.getTime() - tenantOffsetMinutes(first, timezone) * 60_000);
+}

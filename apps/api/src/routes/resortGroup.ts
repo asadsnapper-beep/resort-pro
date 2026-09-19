@@ -27,6 +27,7 @@ import { prisma } from '@resort-pro/database';
 import type { JwtPayload } from '@resort-pro/types';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { ok, validate } from '../utils/response';
+import { resortOverview, clearResortOverviewCache } from '../services/resort-overview';
 
 /** A group of more than this many resorts would make the 360 page a 40-query load. */
 const MAX_RESORTS_PER_GROUP = 20;
@@ -271,6 +272,7 @@ export async function resortGroupRoutes(app: FastifyInstance) {
         });
       });
 
+      clearResortOverviewCache();
       return ok(await loadGroupForOwner(me.id, me.tenantId), `${target.name} is connected.`);
     },
   });
@@ -338,7 +340,42 @@ export async function resortGroupRoutes(app: FastifyInstance) {
         }
       });
 
+      // The 360 page caches for a minute. A resort that has just been
+      // disconnected must not keep appearing on it for the rest of that minute.
+      clearResortOverviewCache();
       return ok(await loadGroupForOwner(user.sub, user.tenantId), 'Resort disconnected.');
+    },
+  });
+
+  /* ── GET /api/resort-group/overview ──────────────────────────────────────
+   * Every connected resort's figures, side by side.
+   *
+   * Only the person who built the group may ask. A resort being a member of it
+   * gives that resort's staff nothing — they never learn the group exists.
+   *
+   * It takes no parameters, on purpose. Half of these resorts may be shared as
+   * figures only, and the cheapest way to keep that promise is to have nothing
+   * here that could be asked to return more than a total.
+   */
+  app.get('/overview', {
+    schema: {
+      tags: ['resort-group'],
+      summary: 'Figures for every connected resort',
+      security: [{ bearerAuth: [] }],
+    },
+    preHandler: requireAuth,
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+      const group = await prisma.resortGroup.findFirst({
+        where: { ownerUserId: user.sub },
+        select: { id: true, name: true },
+      });
+      if (!group) {
+        return reply.status(404).send({
+          success: false, error: 'You have no connected resorts.', code: 'NO_RESORT_GROUP',
+        });
+      }
+      return ok(await resortOverview(group));
     },
   });
 }
