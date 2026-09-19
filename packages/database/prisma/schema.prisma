@@ -3478,16 +3478,23 @@ model ResortGroup {
 /// `tenantId` is unique, so a resort belongs to at most one group. Without that
 /// two owners could each connect the same resort and neither would know.
 model ResortGroupTenant {
-  id           String       @id @default(uuid())
-  groupId      String
-  tenantId     String       @unique
-  access       ResortAccess @default(FULL)
+  id                String       @id @default(uuid())
+  groupId           String
+  tenantId          String       @unique
+  access            ResortAccess @default(FULL)
   /// The User row created inside that tenant for FULL access. Switching issues
   /// a token for this real user — nothing in this design impersonates anyone.
-  linkedUserId String?      @unique
-  approvedById String? // who approved; null when both accounts share one verified email
-  approvedAt   DateTime     @default(now())
-  createdAt    DateTime     @default(now())
+  linkedUserId      String?      @unique
+  /// Whether that user row exists only because of this connection.
+  ///
+  /// It decides what disconnecting does. A same-email link reuses the owner's
+  /// own login on the other resort, and deactivating that would lock a person
+  /// out of an account that is entirely theirs; a user created by an approval
+  /// has no other purpose and must stop working the moment access is revoked.
+  linkedUserCreated Boolean      @default(false)
+  approvedById      String? // who approved; null when both accounts share one verified email
+  approvedAt        DateTime     @default(now())
+  createdAt         DateTime     @default(now())
 
   group  ResortGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   tenant Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
