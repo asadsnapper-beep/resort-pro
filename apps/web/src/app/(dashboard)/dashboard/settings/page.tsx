@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useId } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { tenantApi, api } from '@/lib/api';
+import { tenantApi, api, resortGroupApi } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,10 +12,12 @@ import {
   Building2, Globe, Phone, Mail, MapPin, Clock, Banknote, Save, Info,
   ExternalLink, CheckCircle, XCircle, AlertTriangle, Copy, RefreshCw, Trash2, ShieldCheck, Star,
   FileText, Palette, Lock, CheckCircle2, Circle, Loader2, Shield, Send, ToggleLeft, ToggleRight,
-  CreditCard, Eye, EyeOff, ChevronDown, ChevronRight, Bell, LayoutGrid,
+  CreditCard, Eye, EyeOff, ChevronDown, ChevronRight, Bell, LayoutGrid, Link2,
 } from 'lucide-react'
 import { PageShell, PageHeader } from '@/components/patterns';
 import { ModalShell } from '@/components/ui/modal-shell';
+import { ConnectedResortsTab } from '@/components/dashboard/ConnectedResortsTab';
+import { useResortGroup } from '@/hooks/use-resort-group';
 import { paymentGatewayApi } from '@/lib/api';
 import { RoomTypeSettings } from '@/components/settings/RoomTypeSettings';
 
@@ -64,7 +66,8 @@ type TabId =
   | 'general' | 'contact' | 'operations' | 'modules'
   | 'email' | 'notifications'
   | 'payments' | 'embed' | 'discovery'
-  | 'domain' | 'gdpr' | 'enterprise';
+  | 'domain' | 'gdpr' | 'enterprise'
+  | 'connections';
 
 type Tab = TabId;
 
@@ -106,6 +109,8 @@ const TAB_GROUPS: Array<{ group: string; items: TabItem[] }> = [
       { id: 'domain',     label: 'Custom Domain',   icon: Globe },
       { id: 'gdpr',       label: 'Privacy & GDPR',  icon: ShieldCheck },
       { id: 'enterprise', label: 'Enterprise',      icon: Star },
+      // Hidden unless something is actually connected — see visibleGroups below.
+      { id: 'connections', label: 'Connected Resorts', icon: Link2 },
     ],
   },
 ];
@@ -113,10 +118,32 @@ const TAB_GROUPS: Array<{ group: string; items: TabItem[] }> = [
 // Flat list for easy lookup
 const TABS = TAB_GROUPS.flatMap(g => g.items);
 
+/**
+ * Connections are a tab only for the owners who have one.
+ *
+ * Nearly every resort is a single account with nothing attached to it, and an
+ * empty section about accounts that can see your books is worse than no
+ * section — it invites the question it cannot answer.
+ */
+function useConnectionTabVisible() {
+  const { data: group } = useResortGroup();
+  const { data: connection } = useQuery({
+    queryKey: ['resort-connection'],
+    queryFn: () => resortGroupApi.connection().then(r => r.data?.data ?? null),
+    retry: false,
+  });
+  return (group?.resorts.length ?? 0) > 1 || !!connection;
+}
+
 export default function SettingsPage() {
   const queryClient = useQueryClient();
   const { tenant, token, user } = useAuthStore();
   const [tab, setTab] = useState<Tab>('general');
+  const connectionsVisible = useConnectionTabVisible();
+  const visibleGroups = TAB_GROUPS.map(g => ({
+    ...g,
+    items: g.items.filter(i => i.id !== 'connections' || connectionsVisible),
+  })).filter(g => g.items.length > 0);
   const [form, setForm] = useState<TenantSettings>({
     name: '',
     email: '',
@@ -402,7 +429,7 @@ export default function SettingsPage() {
 
         {/* ── Left sidebar nav ───────────────────────────────────────────── */}
         <aside className="hidden md:flex flex-col gap-5 w-48 flex-shrink-0 sticky top-4">
-          {TAB_GROUPS.map(({ group, items }) => (
+          {visibleGroups.map(({ group, items }) => (
             <div key={group}>
               <p className="mb-1.5 px-3 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">
                 {group}
@@ -434,7 +461,7 @@ export default function SettingsPage() {
             onChange={e => setTab(e.target.value as Tab)}
             className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-2 text-[13px] font-medium focus:outline-none focus:ring-1 focus:ring-resort-600/20"
           >
-            {TAB_GROUPS.map(({ group, items }) => (
+            {visibleGroups.map(({ group, items }) => (
               <optgroup key={group} label={group}>
                 {items.map(({ id, label }) => (
                   <option key={id} value={id}>{label}</option>
@@ -1026,6 +1053,10 @@ export default function SettingsPage() {
             </Card>
           )}
         </div>
+      )}
+
+      {tab === 'connections' && (
+        <ConnectedResortsTab />
       )}
 
       {tab === 'modules' && (

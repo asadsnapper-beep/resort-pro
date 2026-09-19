@@ -996,4 +996,52 @@ export async function resortGroupRoutes(app: FastifyInstance) {
       })));
     },
   });
+
+  /* ── GET /api/resort-group/connection ────────────────────────────────────
+   * Who can see *this* resort, from outside it.
+   *
+   * The mirror image of GET /. That one answers "which resorts can I see"; this
+   * one answers the question the other owner has, which is the one that
+   * actually matters for trust: somebody else's account is attached to my
+   * books — whose, at what level, and since when.
+   *
+   * A resort in its own owner's group answers null. That is the same person on
+   * both sides, and presenting it as an outside party watching them would be a
+   * small lie that makes the screen frightening for no reason.
+   */
+  app.get('/connection', {
+    schema: {
+      tags: ['resort-group'],
+      summary: 'The outside account this resort is connected to, if any',
+      security: [{ bearerAuth: [] }],
+    },
+    preHandler: requireRole('OWNER'),
+    handler: async (request) => {
+      const user = request.user as JwtPayload;
+      const member = await prisma.resortGroupTenant.findUnique({
+        where: { tenantId: user.tenantId },
+        include: { group: { select: { id: true, name: true, ownerUserId: true } } },
+      });
+      if (!member) return ok(null);
+
+      const [owner, me] = await Promise.all([
+        prisma.user.findUnique({
+          where: { id: member.group.ownerUserId },
+          select: { email: true, firstName: true, lastName: true, tenant: { select: { name: true } } },
+        }),
+        prisma.user.findUnique({ where: { id: user.sub }, select: { email: true } }),
+      ]);
+      if (!owner) return ok(null);
+      if (me && owner.email.toLowerCase() === me.email.toLowerCase()) return ok(null);
+
+      return ok({
+        groupName: member.group.name,
+        ownerName: `${owner.firstName} ${owner.lastName}`.trim(),
+        ownerEmail: owner.email,
+        ownerResort: owner.tenant?.name ?? null,
+        access: member.access,
+        since: member.approvedAt,
+      });
+    },
+  });
 }

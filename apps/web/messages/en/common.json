@@ -163,5 +163,28 @@
     "wrongAccountTitle": "This link is not for this account",
     "wrongAccountBody": "Sign in as the owner of the resort the request is about, then open the link again.",
     "backToDashboard": "Back to the dashboard"
+  },
+  "connections": {
+    "mineTitle": "Resorts you can see",
+    "mineBody": "Connected to this account. Disconnecting stops their figures appearing on your overview.",
+    "levelFull": "Full access",
+    "levelNumbers": "Figures only",
+    "disconnect": "Disconnect",
+    "theirsTitle": "Who can see this resort",
+    "theirsBody": "You chose this when you approved the request, and you can change it here at any time.",
+    "hasFull": "Can do everything you can in this resort, including its billing.",
+    "hasNumbers": "Sees occupancy and totals only. Cannot open this resort or see a guest.",
+    "dropToNumbers": "Reduce to figures only",
+    "raiseToFull": "Give full access",
+    "revoke": "End this connection",
+    "failed": "That did not go through. Try again.",
+    "historyTitle": "History",
+    "evRequested": "Access requested",
+    "evApproved": "Connected",
+    "evDeclined": "Request declined",
+    "evChanged": "Access level changed",
+    "evUnlinked": "Disconnected",
+    "evSwitched": "Opened from another account",
+    "evAdded": "Resort added"
   }
 }

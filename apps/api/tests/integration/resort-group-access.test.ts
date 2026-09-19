@@ -44,6 +44,9 @@ const switchTo = (tenantId: string, bearer = token) => app.inject({
   method: 'POST', url: '/api/auth/switch-resort',
   headers: { Authorization: `Bearer ${bearer}` }, payload: { tenantId },
 });
+const connection = (bearer: string) => app.inject({
+  method: 'GET', url: '/api/resort-group/connection', headers: { Authorization: `Bearer ${bearer}` },
+});
 const events = (bearer: string) => app.inject({
   method: 'GET', url: '/api/resort-group/events', headers: { Authorization: `Bearer ${bearer}` },
 });
@@ -249,5 +252,37 @@ describe('the history', () => {
 
   it('has nothing to show a resort that is connected to nobody', async () => {
     expect((await events(theirToken)).statusCode).toBe(404);
+  });
+});
+
+describe('what the connected resort is told', () => {
+  it('names the account that can see it, and at what level', async () => {
+    await connectAt('NUMBERS_ONLY');
+
+    const data = JSON.parse((await connection(theirToken)).body).data;
+    expect(data).toMatchObject({
+      ownerName: 'Asha Rahman', ownerEmail: myEmail, ownerResort: 'Sea Pearl',
+      access: 'NUMBERS_ONLY',
+    });
+  });
+
+  it('tells the group\'s own resort nothing, because that is the same person', async () => {
+    await connectAt('FULL');
+    // Sea Pearl is in Sea Pearl's own group. Calling that an outside party
+    // watching them would be a small lie.
+    expect(JSON.parse((await connection(token)).body).data).toBeNull();
+  });
+
+  it('answers null for a resort nobody is connected to', async () => {
+    expect(JSON.parse((await connection(theirToken)).body).data).toBeNull();
+  });
+
+  it('stops naming anyone once the connection is removed', async () => {
+    await connectAt('FULL');
+    await app.inject({
+      method: 'DELETE', url: `/api/resort-group/members/${hillId}`,
+      headers: { Authorization: `Bearer ${theirToken}` },
+    });
+    expect(JSON.parse((await connection(theirToken)).body).data).toBeNull();
   });
 });

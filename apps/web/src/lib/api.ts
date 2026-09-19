@@ -612,6 +612,11 @@ export const resortGroupApi = {
   approve:    (id: string, access: 'FULL' | 'NUMBERS_ONLY') =>
     api.post(`/resort-group/requests/${id}/approve`, { access }),
   decline:    (id: string) => api.post(`/resort-group/requests/${id}/decline`),
+  // The mirror of `get`: which outside account can see THIS resort.
+  connection: () => api.get('/resort-group/connection', { suppressUpgradeRedirect: true }),
+  events:     () => api.get('/resort-group/events', { suppressUpgradeRedirect: true }),
+  setAccess:  (tenantId: string, access: 'FULL' | 'NUMBERS_ONLY') =>
+    api.patch(`/resort-group/members/${tenantId}`, { access }),
   link:       (slug: string) => api.post('/resort-group/links', { slug }),
   disconnect: (tenantId: string) => api.delete(`/resort-group/members/${tenantId}`),
 };
