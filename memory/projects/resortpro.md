@@ -333,17 +333,20 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
   **The plan is [plan/multi-resort.md](../../plan/multi-resort.md);
   plan/multi-property.md is superseded** — it argued for one account holding
   many properties, which the founder rejected.
-- **Phases 1-7 of that plan are built and on the branch (not pushed).** Four
-  tables (`resort_groups`, `resort_group_tenants`, `resort_link_requests`,
-  `resort_group_events`, migration `20260919000000_resort_groups`, pure
-  CREATE); `GET/POST/DELETE /api/resort-group` for reading, same-email
-  connecting and disconnecting; `POST /api/auth/switch-resort`;
-  `GET /api/resort-group/overview`; the sidebar dropdown; and
-  `/dashboard/resorts`. **The owner with three resorts is unblocked here.**
-  Still to come: the approval flow for a resort held under a different email
-  (phase 8), changing access after the fact (9), adding a new resort from
-  inside with the 10% group discount (10), one combined bill (11), admin and
-  QA (12).
+- **Phases 1-10 and 12 are built and on the branch (not pushed).** Four tables
+  plus one column (`20260919000000_resort_groups`,
+  `20260920000000_resort_link_created_user`, both pure additions); the
+  `/api/resort-group` routes for reading, connecting, disconnecting, the
+  request/approve flow, changing access, the history, the 360 figures and
+  opening a new resort; `POST /api/auth/switch-resort`; the sidebar dropdown;
+  `/dashboard/resorts`; `/resort-link/[token]` and its dashboard banner;
+  Settings → Your Resorts; the 10% group price in both checkout paths and the
+  bKash callback; and the read-only admin view. **The owner with three resorts
+  is unblocked.** Left: phase 11 (one combined bill — needs a Stripe account),
+  the staging walkthrough
+  (`plan/fixes/verify-multi-resort-staging.md`), the `STRIPE_COUPON_GROUP10`
+  coupon, and a UI field for connecting an *existing* resort (the API is
+  there; nothing calls it yet).
 - Two defects found while building it, both filed and **not** fixed:
   `/api/auth/login` answers 500 when the same user logs in twice inside one
   second (the refresh token is signed with no nonce, and `RefreshToken.token`

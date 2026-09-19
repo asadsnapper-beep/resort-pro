@@ -13,6 +13,30 @@ through it, and chose the model below. Where the two disagree, this file wins.
 The first customer runs **three resorts**. Nothing here is speculative
 product work; it is what that customer needs in order to use ResortPro at all.
 
+## Status — 2026-09-20
+
+**Built and on `claude/walkin-returning-guest`, not pushed.** Phases 1-10 and
+12, in order: the four tables, reading a group, same-email connecting and
+disconnecting, switching, the dropdown, the 360 figures, the 360 page, the
+request-and-approve flow with its screens, changing access afterwards, the 10%
+group price, opening a resort from inside, and the read-only admin view.
+
+**The owner with three resorts is unblocked.** Everything they need works.
+
+Still to do:
+
+- **Phase 11, one combined bill.** Waiting on a Stripe account; the bKash half
+  is small and can ship whenever it is wanted.
+- **Staging verification.** The paste-able prompt is
+  [fixes/verify-multi-resort-staging.md](fixes/verify-multi-resort-staging.md).
+- **The Stripe coupon.** `STRIPE_COUPON_GROUP10`, see
+  [fixes/stripe-card-billing-setup.md](fixes/stripe-card-billing-setup.md).
+  Until it exists a card checkout for a discounted resort charges full price
+  and logs that it did. bKash needs nothing.
+- **Connecting an existing resort has no button yet.** The whole flow works
+  through `POST /api/resort-group/links`; what is missing is a field in
+  Settings → Your Resorts to type the other resort's address into.
+
 ---
 
 ## 1. The shape, in one paragraph

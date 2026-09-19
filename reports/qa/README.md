@@ -31,6 +31,24 @@ Everything else below is, as far as anyone has checked, still open. In
 particular the Settings audit's "not production-ready" verdict has not been
 retested.
 
+## Shipped since the last report, and never QA'd
+
+No report in this directory has looked at any of these. They have unit and
+integration tests and mutation-tested guards, which is not the same thing as
+somebody using them.
+
+| Surface | Where |
+|---|---|
+| Resort dropdown in the sidebar and the phone's More sheet | `ResortSwitcher` |
+| 360 view of every connected resort | `/dashboard/resorts` |
+| Answering a request to connect this resort | `/resort-link/[token]`, and the dashboard banner |
+| Connections: change the level, end it, read the history | Settings → Your Resorts |
+| Opening another resort, and the 10% group price | Settings → Your Resorts → Open another resort |
+| Who else can see a resort | Admin → Tenants → (one tenant) |
+
+Staging walkthrough to run first:
+[../../plan/fixes/verify-multi-resort-staging.md](../../plan/fixes/verify-multi-resort-staging.md).
+
 ## Severity scale
 
 | Severity | Meaning |
