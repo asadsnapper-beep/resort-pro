@@ -123,6 +123,10 @@ const loginSchema = z.object({
   slug: z.string().min(1),
 });
 
+const switchResortSchema = z.object({
+  tenantId: z.string().uuid(),
+});
+
 export async function authRoutes(app: FastifyInstance) {
   // POST /api/auth/register
   app.post('/register', {
@@ -522,6 +526,149 @@ export async function authRoutes(app: FastifyInstance) {
       return ok({
         token,
         user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role },
+        tenant: {
+          id: tenant.id,
+          name: tenant.name,
+          slug: tenant.slug,
+          plan: tenant.plan,
+          planStatus: tenant.planStatus,
+          trialEndsAt: tenant.trialEndsAt,
+          isActive: tenant.isActive,
+          onboardingStep: tenant.onboardingStep,
+          onboardingCompletedAt: tenant.onboardingCompletedAt,
+        },
+      });
+    },
+  });
+
+  // ── POST /api/auth/switch-resort ──────────────────────────────────────────
+  // Move to another resort in your group without typing a password again.
+  //
+  // What comes back is an ordinary login for a **real user row** in that
+  // resort, the one recorded on the connection. Nothing here impersonates
+  // anybody: if that row is deactivated, this stops working on the next
+  // request, like any other account.
+  //
+  // The guard is written out by hand rather than using `requireAuth`, for one
+  // reason: that middleware answers 402 to every write from a resort whose
+  // subscription has lapsed. Applied here it would trap an owner inside the
+  // unpaid resort with no way to reach the others — the exact moment they most
+  // need to get to the one that can pay.
+  app.post('/switch-resort', {
+    config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+    schema: {
+      tags: ['auth'],
+      summary: 'Switch to another resort in your group',
+      security: [{ bearerAuth: [] }],
+      body: { type: 'object', required: ['tenantId'], properties: { tenantId: { type: 'string' } } },
+    },
+    handler: async (request, reply) => {
+      try {
+        await request.jwtVerify();
+      } catch {
+        return reply.status(401).send({ success: false, error: 'Unauthorized' });
+      }
+      const body = validate(switchResortSchema, request.body, reply);
+      if (!body) return;
+
+      const claims = request.user as JwtPayload;
+      const caller = await prisma.user.findUnique({
+        where: { id: claims.sub },
+        select: { id: true, isActive: true, emailVerifiedAt: true, tenantId: true },
+      });
+      if (!caller || !caller.isActive || !caller.emailVerifiedAt || caller.tenantId !== claims.tenantId) {
+        return reply.status(401).send({ success: false, error: 'Unauthorized' });
+      }
+
+      // Membership is not what allows this — owning the group is. A resort can
+      // sit in somebody else's group without its staff gaining anything.
+      const group = await prisma.resortGroup.findFirst({
+        where: { ownerUserId: caller.id },
+        select: { id: true },
+      });
+      const member = group
+        ? await prisma.resortGroupTenant.findFirst({
+          where: { groupId: group.id, tenantId: body.tenantId },
+          select: { access: true, linkedUserId: true },
+        })
+        : null;
+      if (!group || !member) {
+        return reply.status(403).send({
+          success: false, error: 'That resort is not connected to your account.',
+          code: 'RESORT_NOT_CONNECTED',
+        });
+      }
+      if (member.access !== 'FULL' || !member.linkedUserId) {
+        return reply.status(403).send({
+          success: false,
+          error: 'You can see this resort\'s figures, but not open it.',
+          code: 'ACCESS_NUMBERS_ONLY',
+        });
+      }
+
+      const target = await prisma.user.findUnique({
+        where: { id: member.linkedUserId },
+        select: {
+          id: true, email: true, firstName: true, lastName: true, role: true,
+          isActive: true, emailVerifiedAt: true, tenantId: true,
+        },
+      });
+      const tenant = await prisma.tenant.findUnique({ where: { id: body.tenantId } });
+      if (
+        !target || !target.isActive || !target.emailVerifiedAt || target.tenantId !== body.tenantId
+        || !tenant || !tenant.isActive || tenant.deletedAt
+      ) {
+        return reply.status(403).send({
+          success: false, error: 'That resort cannot be opened right now.',
+          code: 'RESORT_NOT_CONNECTED',
+        });
+      }
+
+      // The browser holds one session at a time, so the refresh token that
+      // brought us here is finished with. Leaving it alive would let a stale
+      // tab silently resurrect the previous resort.
+      const previousRefresh = getRefreshToken(request);
+      if (previousRefresh) {
+        await prisma.refreshToken.deleteMany({ where: { token: previousRefresh } });
+      }
+
+      const payload: Omit<JwtPayload, 'iat' | 'exp'> = {
+        sub: target.id,
+        email: target.email,
+        role: target.role as JwtPayload['role'],
+        tenantId: tenant.id,
+      };
+      const token = app.jwt.sign(payload);
+      // `jti` is what keeps two switches in the same second from signing byte
+      // for byte the same refresh token and colliding on its unique index —
+      // a double-clicked resort dropdown would otherwise answer 500.
+      const refreshToken = app.jwt.sign(
+        { sub: target.id, type: 'refresh', jti: randomBytes(16).toString('hex') },
+        { expiresIn: '7d' },
+      );
+
+      await prisma.$transaction([
+        prisma.refreshToken.create({
+          data: {
+            userId: target.id, token: refreshToken,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          },
+        }),
+        prisma.user.update({ where: { id: target.id }, data: { lastLoginAt: new Date() } }),
+        prisma.resortGroupEvent.create({
+          data: {
+            groupId: group.id, tenantId: tenant.id, actorUserId: caller.id, action: 'switched',
+          },
+        }),
+      ]);
+
+      setRefreshCookie(reply, refreshToken);
+      return ok({
+        token,
+        user: {
+          id: target.id, email: target.email, firstName: target.firstName,
+          lastName: target.lastName, role: target.role,
+        },
         tenant: {
           id: tenant.id,
           name: tenant.name,
