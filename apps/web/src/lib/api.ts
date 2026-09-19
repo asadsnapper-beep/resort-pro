@@ -104,6 +104,8 @@ export const authApi = {
   resendVerification: (data: { email: string; slug: string }) => api.post('/auth/resend-verification', data),
   login: (data: { email: string; password: string; slug: string }) =>
     api.post('/auth/login', data),
+  /** Move to another resort in the same group — see components/dashboard/ResortSwitcher. */
+  switchResort: (tenantId: string) => api.post('/auth/switch-resort', { tenantId }),
   me: () => api.get('/auth/me'),
   logout: () => api.post('/auth/logout', {}),
   updateProfile: (data: { firstName?: string; lastName?: string; phone?: string | null; avatarUrl?: string | null }) =>
@@ -595,6 +597,15 @@ export const propertyApi = {
   update: (id: string, data: Partial<Parameters<typeof propertyApi.create>[0]>) => api.patch(`/properties/${id}`, data),
   delete: (id: string) => api.delete(`/properties/${id}`),
   getRooms: (id: string) => api.get(`/properties/${id}/rooms`),
+};
+
+// ── Connected resorts ─────────────────────────────────────────────────────────
+// An owner whose resorts are separate accounts. `get` answers null for
+// everyone else, which is nearly everyone. See plan/multi-resort.md.
+export const resortGroupApi = {
+  get:        () => api.get('/resort-group'),
+  link:       (slug: string) => api.post('/resort-group/links', { slug }),
+  disconnect: (tenantId: string) => api.delete(`/resort-group/members/${tenantId}`),
 };
 
 // ── Billing ───────────────────────────────────────────────────────────────────

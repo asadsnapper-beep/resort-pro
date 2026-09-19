@@ -14,6 +14,8 @@ import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
 import { authApi, tenantApi, dashboardApi } from '@/lib/api';
 import { useAiStatus } from '@/hooks/use-ai-status';
+import { useResortGroup } from '@/hooks/use-resort-group';
+import { ResortSwitcher } from './ResortSwitcher';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -239,6 +241,8 @@ export function Sidebar() {
   const t = useTranslations('common') as (key: string, ...args: any[]) => string;
   const locale = useLocale() as Locale;
   const role = (user?.role ?? 'STAFF') as Role;
+  const { data: resortGroup } = useResortGroup();
+  const manyResorts = (resortGroup?.resorts.length ?? 0) > 1;
 
   useEffect(() => {
     try {
@@ -282,9 +286,15 @@ export function Sidebar() {
           <span className="h-[11px] w-[11px] rounded-full border-[1.5px] border-gold-500" />
         </span>
         <div className="min-w-0">
-          <p className="truncate font-display text-[14px] font-medium text-[#ece7df]">
-            {tenant?.name || 'ResortPro'}
-          </p>
+          {/* An owner with several connected resorts picks one here; everyone
+              else sees the name exactly as before. */}
+          {manyResorts ? (
+            <ResortSwitcher />
+          ) : (
+            <p className="truncate font-display text-[14px] font-medium text-[#ece7df]">
+              {tenant?.name || 'ResortPro'}
+            </p>
+          )}
           <p className="text-[10.5px] text-[#698599] capitalize">
             {role === 'OWNER' ? `${tenant?.plan?.toLowerCase() || 'free'} plan` : roleConfig.label}
           </p>

@@ -101,5 +101,11 @@
   "language": {
     "switchTo": "বাংলা",
     "current": "English"
+  },
+  "resortSwitcher": {
+    "label": "Resort",
+    "figuresOnly": "figures only",
+    "switching": "Switching…",
+    "failed": "Could not switch resort. Try again."
   }
 }

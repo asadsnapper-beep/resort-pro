@@ -8,6 +8,8 @@ import { X, LogOut } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { authApi } from '@/lib/api';
 import { groupItems, useEntitledNavItems, type Role } from '@/components/dashboard/sidebar';
+import { useResortGroup } from '@/hooks/use-resort-group';
+import { ResortSwitcher } from './ResortSwitcher';
 
 /**
  * Mobile "More" menu — a bottom sheet listing EVERY dashboard page the
@@ -27,6 +29,8 @@ export function MobileMoreSheet({ open, onClose }: { open: boolean; onClose: () 
   // This sheet used to filter by role alone, which is how a phone came to
   // offer modules the tenant had not enabled.
   const items = useEntitledNavItems(role);
+  const { data: resortGroup } = useResortGroup();
+  const manyResorts = (resortGroup?.resorts.length ?? 0) > 1;
 
   useEffect(() => {
     if (!open) return;
@@ -78,7 +82,13 @@ export function MobileMoreSheet({ open, onClose }: { open: boolean; onClose: () 
         <div className="flex items-center justify-between px-5 pb-2 pt-3">
           <div>
             <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-black/15 dark:bg-white/20" />
-            <p className="text-[15px] font-bold text-[#183153] dark:text-[#f8fafc]">{tenant?.name ?? 'Menu'}</p>
+            {/* Same choice as the sidebar's, for a phone. Renders nothing
+                unless several resorts are connected. */}
+            {manyResorts ? (
+              <ResortSwitcher className="text-[15px] font-bold [&_select]:text-[#183153] dark:[&_select]:text-[#f8fafc]" />
+            ) : (
+              <p className="text-[15px] font-bold text-[#183153] dark:text-[#f8fafc]">{tenant?.name ?? 'Menu'}</p>
+            )}
             <p className="text-[11.5px] text-[#64748b]">{user?.firstName} {user?.lastName} · {user?.role?.toLowerCase()}</p>
           </div>
           <button onClick={onClose} aria-label="Close menu"

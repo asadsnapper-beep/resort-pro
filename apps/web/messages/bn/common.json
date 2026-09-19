@@ -101,5 +101,11 @@
   "language": {
     "switchTo": "English",
     "current": "বাংলা"
+  },
+  "resortSwitcher": {
+    "label": "রিসোর্ট",
+    "figuresOnly": "শুধু সংখ্যা",
+    "switching": "বদলানো হচ্ছে…",
+    "failed": "রিসোর্ট বদলানো যায়নি। আবার চেষ্টা করুন।"
   }
 }
