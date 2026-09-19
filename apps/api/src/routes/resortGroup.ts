@@ -22,10 +22,18 @@
  * Design: plan/multi-resort.md
  */
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { prisma } from '@resort-pro/database';
 import type { JwtPayload } from '@resort-pro/types';
-import { requireAuth } from '../middleware/auth';
-import { ok } from '../utils/response';
+import { requireAuth, requireRole } from '../middleware/auth';
+import { ok, validate } from '../utils/response';
+
+/** A group of more than this many resorts would make the 360 page a 40-query load. */
+const MAX_RESORTS_PER_GROUP = 20;
+
+const linkSchema = z.object({
+  slug: z.string().min(2).max(50).regex(/^[a-z0-9-]+$/),
+});
 
 /** One resort as the dropdown and the 360 page need it. */
 export interface GroupResort {
@@ -122,6 +130,215 @@ export async function resortGroupRoutes(app: FastifyInstance) {
     handler: async (request) => {
       const user = request.user as JwtPayload;
       return ok(await loadGroupForOwner(user.sub, user.tenantId));
+    },
+  });
+
+  /* ── POST /api/resort-group/links ────────────────────────────────────────
+   * Connect a resort you already own — the one-click path.
+   *
+   * It only fires when the same **verified** email is an active owner of both
+   * accounts. That is not a convenience shortcut around the approval step: an
+   * address can only be an owner's login on either account after that address
+   * received and clicked a verification link, so matching them proves the same
+   * person holds both. Any other case has to be asked for, and that is phase 8.
+   *
+   * The order of the checks below is deliberate. Everything that could tell a
+   * stranger whether a slug exists answers the same 404 as a slug that does
+   * not exist; only once ownership is proven do the more specific refusals
+   * appear.
+   */
+  app.post('/links', {
+    schema: {
+      tags: ['resort-group'],
+      summary: 'Connect a resort registered to the same email',
+      security: [{ bearerAuth: [] }],
+      body: { type: 'object', required: ['slug'], properties: { slug: { type: 'string' } } },
+    },
+    preHandler: requireRole('OWNER'),
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+      const body = validate(linkSchema, request.body, reply);
+      if (!body) return;
+
+      const me = await prisma.user.findUniqueOrThrow({
+        where: { id: user.sub },
+        select: { id: true, email: true, tenantId: true },
+      });
+
+      const target = await prisma.tenant.findUnique({
+        where: { slug: body.slug },
+        select: { id: true, name: true, isActive: true, isDemo: true, deletedAt: true },
+      });
+      const notFound = () => reply.status(404).send({
+        success: false, error: 'No resort of yours is registered with that address.',
+        code: 'RESORT_NOT_FOUND',
+      });
+      if (!target) return notFound();
+
+      if (target.id === me.tenantId) {
+        return reply.status(400).send({
+          success: false, error: 'This is the resort you are already in.',
+          code: 'SAME_RESORT',
+        });
+      }
+
+      // Case-insensitively, because the two accounts were registered
+      // separately and nothing forced the same spelling of the address.
+      const owner = await prisma.user.findFirst({
+        where: {
+          tenantId: target.id,
+          email: { equals: me.email, mode: 'insensitive' },
+          role: 'OWNER',
+          isActive: true,
+          emailVerifiedAt: { not: null },
+        },
+        select: { id: true },
+      });
+      if (!owner) return notFound();
+
+      if (target.isDemo || !target.isActive || target.deletedAt) {
+        return reply.status(400).send({
+          success: false, error: 'That resort cannot be connected right now.',
+          code: 'RESORT_NOT_CONNECTABLE',
+        });
+      }
+
+      const [targetMembership, myMembership] = await Promise.all([
+        prisma.resortGroupTenant.findUnique({ where: { tenantId: target.id }, select: { groupId: true } }),
+        prisma.resortGroupTenant.findUnique({ where: { tenantId: me.tenantId }, select: { groupId: true } }),
+      ]);
+      const myGroup = await prisma.resortGroup.findFirst({
+        where: { ownerUserId: me.id },
+        select: { id: true },
+      });
+
+      if (targetMembership && targetMembership.groupId !== myGroup?.id) {
+        return reply.status(409).send({
+          success: false, error: 'That resort is already connected to another account.',
+          code: 'RESORT_ALREADY_CONNECTED',
+        });
+      }
+      if (targetMembership) {
+        return reply.status(409).send({
+          success: false, error: 'That resort is already in your group.',
+          code: 'RESORT_ALREADY_CONNECTED',
+        });
+      }
+      // The resort you are standing in has to join the group as well, so the
+      // dropdown always contains where you are. If it belongs to someone
+      // else's group that is not possible, and saying so is the whole point.
+      if (myMembership && myMembership.groupId !== myGroup?.id) {
+        return reply.status(409).send({
+          success: false, error: 'This resort is already connected to another account.',
+          code: 'RESORT_ALREADY_CONNECTED',
+        });
+      }
+
+      const currentCount = myGroup
+        ? await prisma.resortGroupTenant.count({ where: { groupId: myGroup.id } })
+        : 0;
+      const joining = (myMembership ? 0 : 1) + 1;
+      if (currentCount + joining > MAX_RESORTS_PER_GROUP) {
+        return reply.status(400).send({
+          success: false,
+          error: `A group can hold ${MAX_RESORTS_PER_GROUP} resorts. Contact support if you need more.`,
+          code: 'GROUP_LIMIT_REACHED',
+        });
+      }
+
+      const home = await prisma.tenant.findUniqueOrThrow({
+        where: { id: me.tenantId }, select: { name: true },
+      });
+
+      await prisma.$transaction(async (tx) => {
+        const groupId = myGroup?.id ?? (await tx.resortGroup.create({
+          data: { name: `${home.name} Group`, ownerUserId: me.id },
+        })).id;
+
+        if (!myMembership) {
+          await tx.resortGroupTenant.create({
+            data: { groupId, tenantId: me.tenantId, access: 'FULL', linkedUserId: me.id },
+          });
+        }
+        await tx.resortGroupTenant.create({
+          data: { groupId, tenantId: target.id, access: 'FULL', linkedUserId: owner.id },
+        });
+        await tx.resortGroupEvent.create({
+          data: {
+            groupId, tenantId: target.id, actorUserId: me.id, action: 'link_approved',
+            metadata: { reason: 'same_verified_email', resortName: target.name },
+          },
+        });
+      });
+
+      return ok(await loadGroupForOwner(me.id, me.tenantId), `${target.name} is connected.`);
+    },
+  });
+
+  /* ── DELETE /api/resort-group/members/:tenantId ──────────────────────────
+   * Disconnect a resort. Either side may do it: the person who built the
+   * group, or the owner of the resort that is in it. Nobody should need to ask
+   * permission to stop sharing their own numbers.
+   *
+   * Nothing is done to any user account here, and that is correct for every
+   * connection this phase can create: a same-email link reuses the owner's own
+   * login on the other resort, so deactivating it would lock a person out of an
+   * account that is entirely theirs. Phase 8 introduces links that create a
+   * user, and will record that it did so and deactivate exactly those.
+   */
+  app.delete('/members/:tenantId', {
+    schema: {
+      tags: ['resort-group'],
+      summary: 'Disconnect a resort from its group',
+      security: [{ bearerAuth: [] }],
+    },
+    preHandler: requireRole('OWNER'),
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+      const { tenantId } = request.params as { tenantId: string };
+
+      const member = await prisma.resortGroupTenant.findUnique({
+        where: { tenantId },
+        include: { group: { select: { id: true, ownerUserId: true } } },
+      });
+      if (!member) {
+        return reply.status(404).send({
+          success: false, error: 'That resort is not connected.', code: 'RESORT_NOT_FOUND',
+        });
+      }
+
+      const isGroupOwner = member.group.ownerUserId === user.sub;
+      const isOwnResort = member.tenantId === user.tenantId;
+      if (!isGroupOwner && !isOwnResort) {
+        return reply.status(403).send({
+          success: false, error: 'Only this resort\'s owner can disconnect it.',
+          code: 'NOT_RESORT_OWNER',
+        });
+      }
+
+      const groupId = member.group.id;
+      await prisma.$transaction(async (tx) => {
+        await tx.resortGroupTenant.delete({ where: { id: member.id } });
+        await tx.resortGroupEvent.create({
+          data: { groupId, tenantId, actorUserId: user.sub, action: 'unlinked' },
+        });
+
+        // A group of one resort is the same thing as no group at all. Clearing
+        // it away means GET /api/resort-group goes back to answering null, and
+        // the dashboard goes back to looking exactly as it did before any of
+        // this existed. A group still waiting on an answer is left alone.
+        const [remaining, waiting] = await Promise.all([
+          tx.resortGroupTenant.count({ where: { groupId } }),
+          tx.resortLinkRequest.count({
+            where: { groupId, approvedAt: null, declinedAt: null, expiresAt: { gt: new Date() } },
+          }),
+        ]);
+        if (remaining < 2 && waiting === 0) {
+          await tx.resortGroup.delete({ where: { id: groupId } });
+        }
+      });
+
+      return ok(await loadGroupForOwner(user.sub, user.tenantId), 'Resort disconnected.');
     },
   });
 }
