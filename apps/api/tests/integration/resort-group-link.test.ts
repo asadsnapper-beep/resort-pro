@@ -100,6 +100,12 @@ beforeAll(async () => {
   await makeResort('suspended', { isActive: false });         // mine, suspended
   await makeResort('taken');                                  // mine, but in another group
   await makeResort('staffonly', { role: 'MANAGER' });         // my email, but not an owner there
+  await prisma.user.create({                                  // …it has its own owner
+    data: {
+      tenantId: tenants.staffonly, email: strangerEmail, passwordHash,
+      firstName: 'Real', lastName: 'Owner', role: 'OWNER', emailVerifiedAt: new Date(),
+    },
+  });
   await makeResort('shouty', { email: myEmail.toUpperCase() }); // mine, registered in capitals
 }, 30000);
 
@@ -126,8 +132,9 @@ describe('connecting a resort registered to the same email', () => {
     expect(res.statusCode, res.body).toBe(200);
 
     const data = JSON.parse(res.body).data;
-    expect(data.resorts.map((r: { slug: string }) => r.slug)).toEqual([run, `${run}-hill`]);
-    expect(data.resorts.every((r: { access: string }) => r.access === 'FULL')).toBe(true);
+    expect(data.status).toBe('connected');
+    expect(data.group.resorts.map((r: { slug: string }) => r.slug)).toEqual([run, `${run}-hill`]);
+    expect(data.group.resorts.every((r: { access: string }) => r.access === 'FULL')).toBe(true);
   });
 
   it('connects an account registered with the same address in capitals', async () => {
@@ -135,7 +142,7 @@ describe('connecting a resort registered to the same email', () => {
     // spell their own address the same way twice.
     const res = await link(`${run}-shouty`);
     expect(res.statusCode, res.body).toBe(200);
-    expect(JSON.parse(res.body).data.resorts).toHaveLength(2);
+    expect(JSON.parse(res.body).data.group.resorts).toHaveLength(2);
   });
 
   it('names the group after the resort it was built from', async () => {
@@ -163,23 +170,31 @@ describe('connecting a resort registered to the same email', () => {
 });
 
 describe('refusing to connect', () => {
-  it('answers the same for a resort that is not mine as for one that does not exist', async () => {
-    const theirs = await link(`${run}-theirs`);
-    const nowhere = await link(`${run}-no-such-resort`);
-
-    expect(theirs.statusCode).toBe(404);
-    expect(nowhere.statusCode).toBe(404);
-    expect(theirs.body).toBe(nowhere.body);
-  });
-
-  it('refuses an account whose email was never verified', async () => {
-    const res = await link(`${run}-unverified`);
+  it('refuses a slug nobody has registered', async () => {
+    const res = await link(`${run}-no-such-resort`);
     expect(res.statusCode).toBe(404);
     expect(JSON.parse(res.body).code).toBe('RESORT_NOT_FOUND');
   });
 
-  it('refuses an account where my email is staff rather than the owner', async () => {
-    expect((await link(`${run}-staffonly`)).statusCode).toBe(404);
+  it('asks rather than connects when the resort is somebody else\'s', async () => {
+    const res = await link(`${run}-theirs`);
+    expect(res.statusCode, res.body).toBe(200);
+    expect(JSON.parse(res.body).data.status).toBe('requested');
+    // Asked, not taken.
+    expect(await prisma.resortGroupTenant.count({ where: { tenantId: tenants.theirs } })).toBe(0);
+  });
+
+  it('asks rather than connects when my email is staff there, not the owner', async () => {
+    const res = await link(`${run}-staffonly`);
+    expect(JSON.parse(res.body).data.status).toBe('requested');
+    expect(await prisma.resortGroupTenant.count({ where: { tenantId: tenants.staffonly } })).toBe(0);
+  });
+
+  it('will not connect an account whose owner never verified their email', async () => {
+    // Nobody there can be asked, so there is no request to make either.
+    const res = await link(`${run}-unverified`);
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).code).toBe('RESORT_HAS_NO_OWNER');
   });
 
   it('refuses the resort you are already in', async () => {

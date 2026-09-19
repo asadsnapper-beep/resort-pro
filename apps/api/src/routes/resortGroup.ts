@@ -23,11 +23,15 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import bcrypt from 'bcryptjs';
+import { createHash, randomBytes } from 'crypto';
 import { prisma } from '@resort-pro/database';
 import type { JwtPayload } from '@resort-pro/types';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { ok, validate } from '../utils/response';
 import { resortOverview, clearResortOverviewCache } from '../services/resort-overview';
+import { sendEmail } from '../services/email';
+import { webAppUrl } from '../utils/web-url';
 
 /** A group of more than this many resorts would make the 360 page a 40-query load. */
 const MAX_RESORTS_PER_GROUP = 20;
@@ -35,6 +39,33 @@ const MAX_RESORTS_PER_GROUP = 20;
 const linkSchema = z.object({
   slug: z.string().min(2).max(50).regex(/^[a-z0-9-]+$/),
 });
+
+const approveSchema = z.object({
+  access: z.enum(['FULL', 'NUMBERS_ONLY']),
+});
+
+/** A request stands for a week, then the asking has to be done again. */
+const REQUEST_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/** Re-asking faster than this is a stuck button, not a person. */
+const RESEND_COOLDOWN_MS = 60 * 1000;
+
+function hashToken(token: string) {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+/**
+ * The owner a request should be sent to.
+ *
+ * The oldest verified, active owner — a resort can have more than one, and the
+ * first one is the account's original owner.
+ */
+function resortOwner(tenantId: string) {
+  return prisma.user.findFirst({
+    where: { tenantId, role: 'OWNER', isActive: true, emailVerifiedAt: { not: null } },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true, email: true, firstName: true },
+  });
+}
 
 /** One resort as the dropdown and the 360 page need it. */
 export interface GroupResort {
@@ -170,11 +201,11 @@ export async function resortGroupRoutes(app: FastifyInstance) {
         where: { slug: body.slug },
         select: { id: true, name: true, isActive: true, isDemo: true, deletedAt: true },
       });
-      const notFound = () => reply.status(404).send({
-        success: false, error: 'No resort of yours is registered with that address.',
-        code: 'RESORT_NOT_FOUND',
-      });
-      if (!target) return notFound();
+      if (!target) {
+        return reply.status(404).send({
+          success: false, error: 'No resort has that address.', code: 'RESORT_NOT_FOUND',
+        });
+      }
 
       if (target.id === me.tenantId) {
         return reply.status(400).send({
@@ -183,8 +214,23 @@ export async function resortGroupRoutes(app: FastifyInstance) {
         });
       }
 
+      if (target.isDemo || !target.isActive || target.deletedAt) {
+        return reply.status(400).send({
+          success: false, error: 'That resort cannot be connected right now.',
+          code: 'RESORT_NOT_CONNECTABLE',
+        });
+      }
+
       // Case-insensitively, because the two accounts were registered
       // separately and nothing forced the same spelling of the address.
+      //
+      // Finding nothing here is not a refusal any more — it means the resort
+      // belongs to somebody else, and the answer is to ask them. Until phase 8
+      // this returned the same 404 as an unknown slug, to stop the endpoint
+      // being used to enumerate resorts. That protection was worth nothing in
+      // the end: every resort's slug is already public on its booking site and
+      // on the discovery map. What is private is who owns one, and no reply
+      // below reveals that.
       const owner = await prisma.user.findFirst({
         where: {
           tenantId: target.id,
@@ -195,14 +241,6 @@ export async function resortGroupRoutes(app: FastifyInstance) {
         },
         select: { id: true },
       });
-      if (!owner) return notFound();
-
-      if (target.isDemo || !target.isActive || target.deletedAt) {
-        return reply.status(400).send({
-          success: false, error: 'That resort cannot be connected right now.',
-          code: 'RESORT_NOT_CONNECTABLE',
-        });
-      }
 
       const [targetMembership, myMembership] = await Promise.all([
         prisma.resortGroupTenant.findUnique({ where: { tenantId: target.id }, select: { groupId: true } }),
@@ -248,32 +286,122 @@ export async function resortGroupRoutes(app: FastifyInstance) {
       }
 
       const home = await prisma.tenant.findUniqueOrThrow({
-        where: { id: me.tenantId }, select: { name: true },
+        where: { id: me.tenantId },
+        select: { name: true },
+      });
+      const meFull = await prisma.user.findUniqueOrThrow({
+        where: { id: me.id }, select: { firstName: true, lastName: true },
       });
 
-      await prisma.$transaction(async (tx) => {
-        const groupId = myGroup?.id ?? (await tx.resortGroup.create({
-          data: { name: `${home.name} Group`, ownerUserId: me.id },
-        })).id;
-
-        if (!myMembership) {
-          await tx.resortGroupTenant.create({
-            data: { groupId, tenantId: me.tenantId, access: 'FULL', linkedUserId: me.id },
-          });
-        }
-        await tx.resortGroupTenant.create({
-          data: { groupId, tenantId: target.id, access: 'FULL', linkedUserId: owner.id },
+      // The group has to exist before a request can point at it, so it is
+      // created either way — with this resort inside it, which is why the
+      // dropdown and the 360 entry both wait for a *second* resort rather than
+      // for a group.
+      const groupId = myGroup?.id ?? (await prisma.resortGroup.create({
+        data: { name: `${home.name} Group`, ownerUserId: me.id },
+      })).id;
+      if (!myMembership) {
+        await prisma.resortGroupTenant.create({
+          data: { groupId, tenantId: me.tenantId, access: 'FULL', linkedUserId: me.id },
         });
-        await tx.resortGroupEvent.create({
+      }
+
+      if (owner) {
+        await prisma.$transaction([
+          prisma.resortGroupTenant.create({
+            data: { groupId, tenantId: target.id, access: 'FULL', linkedUserId: owner.id },
+          }),
+          prisma.resortGroupEvent.create({
+            data: {
+              groupId, tenantId: target.id, actorUserId: me.id, action: 'link_approved',
+              metadata: { reason: 'same_verified_email', resortName: target.name },
+            },
+          }),
+        ]);
+        clearResortOverviewCache();
+        return ok(
+          { status: 'connected', group: await loadGroupForOwner(me.id, me.tenantId) },
+          `${target.name} is connected.`,
+        );
+      }
+
+      // ── Somebody else's resort: ask them ──────────────────────────────────
+      const targetOwner = await resortOwner(target.id);
+      if (!targetOwner) {
+        return reply.status(400).send({
+          success: false,
+          error: 'That resort has no verified owner to ask.',
+          code: 'RESORT_HAS_NO_OWNER',
+        });
+      }
+
+      const pending = await prisma.resortLinkRequest.findFirst({
+        where: { groupId, tenantId: target.id, approvedAt: null, declinedAt: null },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (pending && Date.now() - pending.createdAt.getTime() < RESEND_COOLDOWN_MS) {
+        return reply.status(429).send({
+          success: false,
+          error: 'That request was just sent. Give them a minute before asking again.',
+          code: 'REQUEST_TOO_SOON',
+        });
+      }
+
+      // Asking again replaces the old token rather than leaving two live: the
+      // owner should not have to work out which of two emails is the real one.
+      const token = randomBytes(32).toString('hex');
+      await prisma.$transaction([
+        prisma.resortLinkRequest.deleteMany({
+          where: { groupId, tenantId: target.id, approvedAt: null, declinedAt: null },
+        }),
+        prisma.resortLinkRequest.create({
           data: {
-            groupId, tenantId: target.id, actorUserId: me.id, action: 'link_approved',
-            metadata: { reason: 'same_verified_email', resortName: target.name },
+            groupId, tenantId: target.id, requestedById: me.id,
+            tokenHash: hashToken(token),
+            expiresAt: new Date(Date.now() + REQUEST_TTL_MS),
           },
-        });
+        }),
+        prisma.resortGroupEvent.create({
+          data: {
+            groupId, tenantId: target.id, actorUserId: me.id, action: 'link_requested',
+            metadata: { resortName: target.name },
+          },
+        }),
+      ]);
+
+      const asker = `${meFull.firstName} ${meFull.lastName}`.trim();
+      const link = `${webAppUrl()}/resort-link/${token}`;
+      await sendEmail({
+        to: targetOwner.email,
+        subject: `${asker} would like to connect ${target.name} to their account`,
+        html: `
+          <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+            <h2 style="color:#1a6b5e">A request about ${target.name}</h2>
+            <p>Hi ${targetOwner.firstName},</p>
+            <p>
+              <strong>${asker}</strong> (${me.email}) runs <strong>${home.name}</strong> on
+              ResortPro and would like to see ${target.name} alongside it.
+            </p>
+            <p>Nothing has changed yet. You decide how much this gives them:</p>
+            <ul>
+              <li><strong>Full access</strong> — everything you can do in ${target.name}, including its billing.</li>
+              <li><strong>Figures only</strong> — occupancy and totals on their overview. They cannot open ${target.name}.</li>
+            </ul>
+            <p style="margin:24px 0">
+              <a href="${link}" style="background:#1a6b5e;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600">
+                Review this request
+              </a>
+            </p>
+            <p>Or copy this link: <a href="${link}">${link}</a></p>
+            <p>You will be asked to sign in to ${target.name} first. The link expires in 7 days, and ignoring it refuses the request.</p>
+          </div>
+        `,
       });
 
-      clearResortOverviewCache();
-      return ok(await loadGroupForOwner(me.id, me.tenantId), `${target.name} is connected.`);
+      return ok(
+        { status: 'requested', group: await loadGroupForOwner(me.id, me.tenantId) },
+        `We have asked the owner of ${target.name}.`,
+      );
     },
   });
 
@@ -321,6 +449,16 @@ export async function resortGroupRoutes(app: FastifyInstance) {
       const groupId = member.group.id;
       await prisma.$transaction(async (tx) => {
         await tx.resortGroupTenant.delete({ where: { id: member.id } });
+
+        // A user that exists only because of this connection has no other
+        // purpose, so it stops working now rather than whenever its token
+        // happens to expire — middleware/auth.ts re-reads isActive on every
+        // request. A same-email link is left alone: that login is the person's
+        // own account on their own resort.
+        if (member.linkedUserCreated && member.linkedUserId) {
+          await tx.user.update({ where: { id: member.linkedUserId }, data: { isActive: false } });
+          await tx.refreshToken.deleteMany({ where: { userId: member.linkedUserId } });
+        }
         await tx.resortGroupEvent.create({
           data: { groupId, tenantId, actorUserId: user.sub, action: 'unlinked' },
         });
@@ -376,6 +514,317 @@ export async function resortGroupRoutes(app: FastifyInstance) {
         });
       }
       return ok(await resortOverview(group));
+    },
+  });
+
+  /* ── GET /api/resort-group/requests/incoming ─────────────────────────────
+   * Requests waiting on *this* resort. The banner in the dashboard reads this,
+   * so approving never depends on an email having arrived.
+   */
+  app.get('/requests/incoming', {
+    schema: {
+      tags: ['resort-group'],
+      summary: 'Requests waiting for this resort\'s owner',
+      security: [{ bearerAuth: [] }],
+    },
+    preHandler: requireRole('OWNER'),
+    handler: async (request) => {
+      const user = request.user as JwtPayload;
+      const rows = await prisma.resortLinkRequest.findMany({
+        where: {
+          tenantId: user.tenantId, approvedAt: null, declinedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          group: { select: { name: true } },
+          // Who is asking, and from which resort — an owner cannot decide this
+          // without both.
+        },
+      });
+
+      const askers = await prisma.user.findMany({
+        where: { id: { in: rows.map((r) => r.requestedById) } },
+        select: { id: true, firstName: true, lastName: true, email: true, tenant: { select: { name: true } } },
+      });
+      const byId = new Map(askers.map((a) => [a.id, a]));
+
+      return ok(rows.map((r) => {
+        const asker = byId.get(r.requestedById);
+        return {
+          id: r.id,
+          groupName: r.group.name,
+          askerName: asker ? `${asker.firstName} ${asker.lastName}`.trim() : 'Another owner',
+          askerEmail: asker?.email ?? null,
+          askerResort: asker?.tenant.name ?? null,
+          createdAt: r.createdAt,
+          expiresAt: r.expiresAt,
+        };
+      }));
+    },
+  });
+
+  /* ── GET /api/resort-group/requests/by-token/:token ──────────────────────
+   * Resolve the link in the email to the request it stands for.
+   *
+   * The token is only a lookup key. Authority comes from being signed in as
+   * this resort's owner, which is checked here and again on approve — so a
+   * forwarded email gives the reader nothing.
+   */
+  app.get('/requests/by-token/:token', {
+    schema: {
+      tags: ['resort-group'],
+      summary: 'The request an emailed link refers to',
+      security: [{ bearerAuth: [] }],
+    },
+    preHandler: requireRole('OWNER'),
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+      const { token } = request.params as { token: string };
+
+      const found = await prisma.resortLinkRequest.findUnique({
+        where: { tokenHash: hashToken(token) },
+        include: { group: { select: { name: true } }, tenant: { select: { id: true, name: true } } },
+      });
+      // A request for somebody else's resort answers exactly as an unknown
+      // token does. Whoever is reading the email is not owed the difference.
+      if (!found || found.tenantId !== user.tenantId) {
+        return reply.status(404).send({
+          success: false, error: 'This link is not valid.', code: 'REQUEST_NOT_FOUND',
+        });
+      }
+      if (found.approvedAt || found.declinedAt) {
+        return reply.status(410).send({
+          success: false, error: 'This request has already been answered.',
+          code: 'LINK_REQUEST_USED',
+        });
+      }
+      if (found.expiresAt < new Date()) {
+        return reply.status(410).send({
+          success: false, error: 'This request has expired. Ask them to send it again.',
+          code: 'LINK_REQUEST_EXPIRED',
+        });
+      }
+
+      const asker = await prisma.user.findUnique({
+        where: { id: found.requestedById },
+        select: { firstName: true, lastName: true, email: true, tenant: { select: { name: true } } },
+      });
+
+      return ok({
+        id: found.id,
+        resortName: found.tenant.name,
+        groupName: found.group.name,
+        askerName: asker ? `${asker.firstName} ${asker.lastName}`.trim() : 'Another owner',
+        askerEmail: asker?.email ?? null,
+        askerResort: asker?.tenant.name ?? null,
+        expiresAt: found.expiresAt,
+      });
+    },
+  });
+
+  /* ── POST /api/resort-group/requests/:id/approve ─────────────────────────
+   * Say yes, and say how much.
+   *
+   * Full access means a real user row inside this resort, created here and
+   * recorded as created, so that revoking it later can switch exactly that
+   * account off. It carries a password nobody holds: it is reachable only by
+   * switching from the group that was granted it.
+   *
+   * Figures only creates no user at all. There is nothing to sign in as, which
+   * is a stronger guarantee than a permission check.
+   */
+  app.post('/requests/:id/approve', {
+    schema: {
+      tags: ['resort-group'],
+      summary: 'Approve a request to connect this resort',
+      security: [{ bearerAuth: [] }],
+      body: { type: 'object', required: ['access'], properties: { access: { type: 'string' } } },
+    },
+    preHandler: requireRole('OWNER'),
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+      const { id } = request.params as { id: string };
+      const body = validate(approveSchema, request.body, reply);
+      if (!body) return;
+
+      const found = await prisma.resortLinkRequest.findUnique({
+        where: { id },
+        include: { group: { select: { id: true, name: true, ownerUserId: true } } },
+      });
+      if (!found || found.tenantId !== user.tenantId) {
+        return reply.status(404).send({
+          success: false, error: 'This request does not exist.', code: 'REQUEST_NOT_FOUND',
+        });
+      }
+      if (found.approvedAt || found.declinedAt) {
+        return reply.status(410).send({
+          success: false, error: 'This request has already been answered.',
+          code: 'LINK_REQUEST_USED',
+        });
+      }
+      if (found.expiresAt < new Date()) {
+        return reply.status(410).send({
+          success: false, error: 'This request has expired.', code: 'LINK_REQUEST_EXPIRED',
+        });
+      }
+      if (await prisma.resortGroupTenant.findUnique({ where: { tenantId: user.tenantId } })) {
+        return reply.status(409).send({
+          success: false, error: 'This resort is already connected to an account.',
+          code: 'RESORT_ALREADY_CONNECTED',
+        });
+      }
+      const members = await prisma.resortGroupTenant.count({ where: { groupId: found.group.id } });
+      if (members + 1 > MAX_RESORTS_PER_GROUP) {
+        return reply.status(400).send({
+          success: false, error: 'That account already holds as many resorts as it can.',
+          code: 'GROUP_LIMIT_REACHED',
+        });
+      }
+
+      const asker = await prisma.user.findUnique({
+        where: { id: found.requestedById },
+        select: { id: true, email: true, firstName: true, lastName: true },
+      });
+      if (!asker) {
+        return reply.status(410).send({
+          success: false, error: 'Whoever asked for this no longer has an account.',
+          code: 'LINK_REQUEST_USED',
+        });
+      }
+
+      let linkedUserId: string | null = null;
+      let linkedUserCreated = false;
+      if (body.access === 'FULL') {
+        const existing = await prisma.user.findFirst({
+          where: { tenantId: user.tenantId, email: { equals: asker.email, mode: 'insensitive' } },
+          select: { id: true },
+        });
+        if (existing) {
+          linkedUserId = existing.id;
+        } else {
+          // A password nobody has and nobody can use. This account exists to be
+          // switched into from the group that was granted access, and hashing a
+          // random secret keeps bcrypt.compare answering a plain no rather than
+          // meeting a malformed hash.
+          const unusable = await bcrypt.hash(randomBytes(32).toString('hex'), 12);
+          const created = await prisma.user.create({
+            data: {
+              tenantId: user.tenantId, email: asker.email, passwordHash: unusable,
+              firstName: asker.firstName, lastName: asker.lastName, role: 'OWNER',
+              emailVerifiedAt: new Date(),
+            },
+            select: { id: true },
+          });
+          linkedUserId = created.id;
+          linkedUserCreated = true;
+        }
+      }
+
+      await prisma.$transaction([
+        prisma.resortGroupTenant.create({
+          data: {
+            groupId: found.group.id, tenantId: user.tenantId, access: body.access,
+            linkedUserId, linkedUserCreated, approvedById: user.sub,
+          },
+        }),
+        prisma.resortLinkRequest.update({ where: { id }, data: { approvedAt: new Date() } }),
+        prisma.resortGroupEvent.create({
+          data: {
+            groupId: found.group.id, tenantId: user.tenantId, actorUserId: user.sub,
+            action: 'link_approved', metadata: { access: body.access },
+          },
+        }),
+      ]);
+      clearResortOverviewCache();
+
+      const resort = await prisma.tenant.findUniqueOrThrow({
+        where: { id: user.tenantId }, select: { name: true },
+      });
+      await sendEmail({
+        to: asker.email,
+        subject: `${resort.name} is now connected to your account`,
+        html: `
+          <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+            <h2 style="color:#1a6b5e">${resort.name} is connected</h2>
+            <p>Hi ${asker.firstName},</p>
+            <p>
+              ${body.access === 'FULL'
+                ? `You can now open ${resort.name} from the resort menu in your dashboard.`
+                : `${resort.name}'s figures now appear on your all-resorts page. You cannot open the resort itself.`}
+            </p>
+            <p style="margin:24px 0">
+              <a href="${webAppUrl()}/dashboard/resorts" style="background:#1a6b5e;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600">
+                See all your resorts
+              </a>
+            </p>
+          </div>
+        `,
+      });
+
+      return ok({ access: body.access }, `${resort.name} is connected.`);
+    },
+  });
+
+  /* ── POST /api/resort-group/requests/:id/decline ─────────────────────────
+   * Say no. Declining twice is the same as declining once, because the second
+   * click is somebody wondering whether the first one worked.
+   */
+  app.post('/requests/:id/decline', {
+    schema: {
+      tags: ['resort-group'],
+      summary: 'Decline a request to connect this resort',
+      security: [{ bearerAuth: [] }],
+    },
+    preHandler: requireRole('OWNER'),
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+      const { id } = request.params as { id: string };
+
+      const found = await prisma.resortLinkRequest.findUnique({ where: { id } });
+      if (!found || found.tenantId !== user.tenantId) {
+        return reply.status(404).send({
+          success: false, error: 'This request does not exist.', code: 'REQUEST_NOT_FOUND',
+        });
+      }
+      if (found.approvedAt) {
+        return reply.status(410).send({
+          success: false, error: 'This request was already approved.',
+          code: 'LINK_REQUEST_USED',
+        });
+      }
+      if (found.declinedAt) return ok(null, 'Already declined.');
+
+      await prisma.$transaction([
+        prisma.resortLinkRequest.update({ where: { id }, data: { declinedAt: new Date() } }),
+        prisma.resortGroupEvent.create({
+          data: {
+            groupId: found.groupId, tenantId: user.tenantId, actorUserId: user.sub,
+            action: 'link_declined',
+          },
+        }),
+      ]);
+
+      const asker = await prisma.user.findUnique({
+        where: { id: found.requestedById }, select: { email: true, firstName: true },
+      });
+      const resort = await prisma.tenant.findUniqueOrThrow({
+        where: { id: user.tenantId }, select: { name: true },
+      });
+      if (asker) {
+        await sendEmail({
+          to: asker.email,
+          subject: `Your request about ${resort.name}`,
+          html: `
+            <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+              <p>Hi ${asker.firstName},</p>
+              <p>${resort.name}'s owner has declined your request to connect it to your account.</p>
+            </div>
+          `,
+        });
+      }
+
+      return ok(null, 'Request declined.');
     },
   });
 }

@@ -9,6 +9,7 @@ import { ok, validate } from '../utils/response';
 import { sendEmail } from '../services/email';
 import { createAdminNotification } from '../utils/notifications';
 import { generateReferralCode } from '../utils/referral';
+import { webAppUrl } from '../utils/web-url';
 import type { JwtPayload } from '@resort-pro/types';
 
 const REFRESH_COOKIE = 'rp_refresh';
@@ -18,15 +19,6 @@ const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 
 function hashToken(token: string) {
   return createHash('sha256').update(token).digest('hex');
-}
-
-function webAppUrl() {
-  return (
-    process.env.WEB_URL
-    || process.env.NEXT_PUBLIC_APP_URL
-    || process.env.CORS_ORIGIN?.split(',')[0]
-    || 'http://localhost:3000'
-  ).replace(/\/$/, '');
 }
 
 async function sendVerificationEmail(input: {
