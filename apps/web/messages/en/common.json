@@ -38,7 +38,8 @@
     "vehicles": "Vehicle Rental",
     "assets": "Assets",
     "shareholders": "Shareholders",
-    "myShares": "My Shares"
+    "myShares": "My Shares",
+    "allResorts": "All Resorts"
   },
   "groups": {
     "overview": "Overview",
@@ -107,5 +108,32 @@
     "figuresOnly": "figures only",
     "switching": "Switching…",
     "failed": "Could not switch resort. Try again."
+  },
+  "resorts360": {
+    "title": "All resorts",
+    "subtitle": "Every resort connected to this account",
+    "emptyTitle": "No other resorts are connected yet",
+    "emptyBody": "Connect a resort you own and its figures will appear here beside this one.",
+    "errorTitle": "These figures could not be loaded",
+    "errorBody": "Reload the page to try again.",
+    "loading": "Loading…",
+    "rooms": "Rooms",
+    "occupied": "occupied",
+    "occupancy": "Occupancy",
+    "arrivals": "Arrivals",
+    "departures": "Departures",
+    "revenue": "Revenue",
+    "revenueMonth": "Revenue this month",
+    "profit": "Profit",
+    "profitMonth": "Profit this month",
+    "beforeTax": "Before tax and salary",
+    "outstanding": "Owed",
+    "totalIn": "Total in",
+    "suspended": "Suspended",
+    "pastDue": "Payment due",
+    "figuresOnly": "Figures only",
+    "cannotOpen": "This resort’s owner shares its figures, not the resort itself.",
+    "unreadable": "These figures could not be loaded just now.",
+    "switchFailed": "Could not open that resort. Try again."
   }
 }

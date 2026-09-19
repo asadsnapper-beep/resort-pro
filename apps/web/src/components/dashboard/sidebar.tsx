@@ -60,11 +60,15 @@ export type NavItem = {
   featureFlag?: string;
   aiFeature?: 'ai_content' | 'ai_chatbot' | 'ai_business_insights'; // hide unless this AI feature is live
   daily?: boolean; // always-visible top tier — the owner's everyday-use items
+  /** Only for an owner whose account is connected to other resorts. */
+  multiResortOnly?: boolean;
 };
 
 export const NAV_ITEMS: NavItem[] = [
   // ── Overview ──────────────────────────────────────────────
   { href: '/dashboard',            labelKey: 'nav.dashboard',    labelFallback: 'Dashboard',       icon: LayoutDashboard, group: 'Overview',         groupKey: 'groups.overview', daily: true },
+  { href: '/dashboard/resorts',    labelKey: 'nav.allResorts',   labelFallback: 'All Resorts',     icon: Building2,       group: 'Overview',         groupKey: 'groups.overview',
+    roles: ['OWNER'], multiResortOnly: true },
   { href: '/dashboard/analytics',  labelKey: 'nav.analytics',    labelFallback: 'Analytics',       icon: BarChart2,       group: 'Overview',         groupKey: 'groups.overview',
     roles: ['OWNER', 'MANAGER', 'SHAREHOLDER', 'MARKETER'] },
   { href: '/dashboard/invoices',   labelKey: 'nav.invoices',     labelFallback: 'Invoices',        icon: FileText,        group: 'Overview',         groupKey: 'groups.overview',
@@ -210,6 +214,10 @@ export function useEntitledNavItems(role: Role): NavItem[] {
   });
 
   const { status: aiStatus } = useAiStatus(canReadAiStatus);
+  // The 360 view is meaningless with one resort, so its entry does not exist
+  // until a second is connected.
+  const { data: resortGroup } = useResortGroup();
+  const hasConnectedResorts = (resortGroup?.resorts.length ?? 0) > 1;
 
   const enabledModules: Record<string, boolean> = Object.fromEntries(
     ((modulesRes?.data?.data ?? []) as { flag: string; enabled: boolean }[])
@@ -222,6 +230,7 @@ export function useEntitledNavItems(role: Role): NavItem[] {
     if (item.featureFlag && !hasFeature(item.featureFlag)) return false;
     // AI nav items hide unless that AI feature is live (master switch + tenant flag)
     if (item.aiFeature && !aiStatus[item.aiFeature]) return false;
+    if (item.multiResortOnly && !hasConnectedResorts) return false;
     return true;
   });
 }

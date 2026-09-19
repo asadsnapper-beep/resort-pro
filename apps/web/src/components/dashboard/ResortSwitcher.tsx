@@ -1,12 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import { authApi } from '@/lib/api';
-import { useAuthStore } from '@/store/auth';
-import { useResortGroup } from '@/hooks/use-resort-group';
+import { useResortGroup, useSwitchResort } from '@/hooks/use-resort-group';
 
 /**
  * Which resort you are looking at.
@@ -24,12 +19,8 @@ import { useResortGroup } from '@/hooks/use-resort-group';
  */
 export function ResortSwitcher({ className = '' }: { className?: string }) {
   const t = useTranslations('common') as (key: string) => string;
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const setAuth = useAuthStore((s) => s.setAuth);
   const { data: group } = useResortGroup();
-  const [switching, setSwitching] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const { switchTo, switching, failed } = useSwitchResort();
 
   const say = (key: string, fallback: string) => {
     const value = t(`resortSwitcher.${key}`);
@@ -42,24 +33,7 @@ export function ResortSwitcher({ className = '' }: { className?: string }) {
 
   const change = async (tenantId: string) => {
     if (!tenantId || tenantId === current?.tenantId) return;
-    setSwitching(true);
-    setFailed(false);
-    try {
-      const { data } = await authApi.switchResort(tenantId);
-      const { token, user, tenant } = data.data;
-      // The store first: every request after this one — including the reset
-      // refetches below — has to carry the new resort's token.
-      setAuth(user, tenant, token);
-      // Reset, not invalidate. Invalidating leaves the previous resort's
-      // figures on screen until each refetch lands, and an owner reading them
-      // under the new resort's name is the one outcome this must never have.
-      await queryClient.resetQueries();
-      router.push('/dashboard');
-    } catch {
-      setFailed(true);
-    } finally {
-      setSwitching(false);
-    }
+    await switchTo(tenantId);
   };
 
   return (

@@ -604,6 +604,7 @@ export const propertyApi = {
 // everyone else, which is nearly everyone. See plan/multi-resort.md.
 export const resortGroupApi = {
   get:        () => api.get('/resort-group'),
+  overview:   () => api.get('/resort-group/overview', { suppressUpgradeRedirect: true }),
   link:       (slug: string) => api.post('/resort-group/links', { slug }),
   disconnect: (tenantId: string) => api.delete(`/resort-group/members/${tenantId}`),
 };
