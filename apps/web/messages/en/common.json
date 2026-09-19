@@ -135,5 +135,33 @@
     "cannotOpen": "This resort’s owner shares its figures, not the resort itself.",
     "unreadable": "These figures could not be loaded just now.",
     "switchFailed": "Could not open that resort. Try again."
+  },
+  "resortLink": {
+    "bannerAsk": "would like to connect this resort to their account.",
+    "review": "Review",
+    "modalTitle": "A request about this resort",
+    "partOf": "They run",
+    "title": "A request about",
+    "runs": "runs",
+    "wants": "would like to see this resort alongside their own.",
+    "fullTitle": "Give full access",
+    "fullBody": "They will be able to do everything you can in this resort, including its billing.",
+    "numbersTitle": "Share the figures only",
+    "numbersBody": "Occupancy and totals appear on their overview. They cannot open this resort or see a single guest.",
+    "decline": "Decline",
+    "changeable": "You can change or undo this at any time.",
+    "failed": "That did not go through. Try again.",
+    "declined": "Declined. Nothing was shared.",
+    "gaveFull": "Done — they can now open this resort.",
+    "gaveNumbers": "Done — they can see this resort’s figures only.",
+    "signInTitle": "Sign in to answer this",
+    "signInBody": "Only this resort’s owner can answer a request about it. Sign in and it will be waiting on your dashboard.",
+    "signIn": "Sign in",
+    "loading": "Loading…",
+    "goneTitle": "This request is closed",
+    "goneBody": "It has either been answered already or expired. Ask them to send it again.",
+    "wrongAccountTitle": "This link is not for this account",
+    "wrongAccountBody": "Sign in as the owner of the resort the request is about, then open the link again.",
+    "backToDashboard": "Back to the dashboard"
   }
 }

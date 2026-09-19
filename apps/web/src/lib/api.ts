@@ -605,6 +605,13 @@ export const propertyApi = {
 export const resortGroupApi = {
   get:        () => api.get('/resort-group'),
   overview:   () => api.get('/resort-group/overview', { suppressUpgradeRedirect: true }),
+  // Requests to connect THIS resort to somebody else's account.
+  incoming:   () => api.get('/resort-group/requests/incoming', { suppressUpgradeRedirect: true }),
+  byToken:    (token: string) =>
+    api.get(`/resort-group/requests/by-token/${encodeURIComponent(token)}`, { suppressUpgradeRedirect: true }),
+  approve:    (id: string, access: 'FULL' | 'NUMBERS_ONLY') =>
+    api.post(`/resort-group/requests/${id}/approve`, { access }),
+  decline:    (id: string) => api.post(`/resort-group/requests/${id}/decline`),
   link:       (slug: string) => api.post('/resort-group/links', { slug }),
   disconnect: (tenantId: string) => api.delete(`/resort-group/members/${tenantId}`),
 };
