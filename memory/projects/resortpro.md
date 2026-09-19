@@ -333,6 +333,23 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
   **The plan is [plan/multi-resort.md](../../plan/multi-resort.md);
   plan/multi-property.md is superseded** — it argued for one account holding
   many properties, which the founder rejected.
+- **Phases 1-7 of that plan are built and on the branch (not pushed).** Four
+  tables (`resort_groups`, `resort_group_tenants`, `resort_link_requests`,
+  `resort_group_events`, migration `20260919000000_resort_groups`, pure
+  CREATE); `GET/POST/DELETE /api/resort-group` for reading, same-email
+  connecting and disconnecting; `POST /api/auth/switch-resort`;
+  `GET /api/resort-group/overview`; the sidebar dropdown; and
+  `/dashboard/resorts`. **The owner with three resorts is unblocked here.**
+  Still to come: the approval flow for a resort held under a different email
+  (phase 8), changing access after the fact (9), adding a new resort from
+  inside with the 10% group discount (10), one combined bill (11), admin and
+  QA (12).
+- Two defects found while building it, both filed and **not** fixed:
+  `/api/auth/login` answers 500 when the same user logs in twice inside one
+  second (the refresh token is signed with no nonce, and `RefreshToken.token`
+  is unique — `switch-resort` has the `jti` fix, login does not), and
+  `tests/unit/messaging.test.ts` leaks `META_WA_TOKEN` into every later test
+  file, which is the one red test in an otherwise green API suite.
 - **In-account properties stay, and the switcher shipped (`da9a86f`).** The
   top bar has a property picker (hidden below two active properties) and Rooms
   narrows by `X-Property-Id`. It answers "which building on this site", while
