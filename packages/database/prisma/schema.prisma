@@ -542,6 +542,9 @@ model Tenant {
   deletionRequests       TenantDeletionRequest[]
   stayTimePolicy         StayTimePolicy?
   stayTimeGrants         StayTimeGrant[]
+  // Connecting this resort to another owner's group — see plan/multi-resort.md
+  groupMembership        ResortGroupTenant?
+  linkRequests           ResortLinkRequest[]
 
   @@map("tenants")
 }
@@ -3429,4 +3432,111 @@ model GuestNotification {
   @@unique([bookingId, event, channel])
   @@index([tenantId, createdAt])
   @@map("guest_notifications")
+}
+
+// ─── Connected resorts ────────────────────────────────────────────────────────
+//
+// An owner with four resorts buys four ResortPro accounts, and each one runs
+// exactly as a single-resort account does. These four tables are the only thing
+// that knows the four belong together: they let that owner switch between them
+// from the top bar and see every resort's numbers on one page.
+//
+// They deliberately hold no business data. Delete every row here and each
+// resort still works, untouched — which is what makes the group layer safe to
+// add to a system that is already live.
+//
+// Full design, including why one account with many properties was rejected:
+// plan/multi-resort.md
+
+enum ResortAccess {
+  FULL // can switch into this resort and work inside it
+  NUMBERS_ONLY // appears in the 360 view as figures only; cannot be opened
+}
+
+/// One person's collection of resorts.
+///
+/// Created the first time somebody connects a second resort; an owner with one
+/// resort never has a row here, and sees no new UI anywhere.
+model ResortGroup {
+  id            String   @id @default(uuid())
+  name          String // defaults to "<first resort> Group", editable
+  ownerUserId   String // the person who switches resorts and sees the 360 view
+  payerTenantId String? // combined billing, later — null until then
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  members  ResortGroupTenant[]
+  requests ResortLinkRequest[]
+  events   ResortGroupEvent[]
+
+  @@index([ownerUserId])
+  @@map("resort_groups")
+}
+
+/// A resort inside a group.
+///
+/// `tenantId` is unique, so a resort belongs to at most one group. Without that
+/// two owners could each connect the same resort and neither would know.
+model ResortGroupTenant {
+  id           String       @id @default(uuid())
+  groupId      String
+  tenantId     String       @unique
+  access       ResortAccess @default(FULL)
+  /// The User row created inside that tenant for FULL access. Switching issues
+  /// a token for this real user — nothing in this design impersonates anyone.
+  linkedUserId String?      @unique
+  approvedById String? // who approved; null when both accounts share one verified email
+  approvedAt   DateTime     @default(now())
+  createdAt    DateTime     @default(now())
+
+  group  ResortGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  tenant Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+  @@map("resort_group_tenants")
+}
+
+/// A pending "please let me connect your resort" request.
+///
+/// The emailed token is stored hashed, like PasswordResetToken and unlike
+/// StaffInvite: this one asks for access to somebody else's resort, and the
+/// approval screen additionally requires being signed in as that resort's
+/// owner, so a forwarded email grants nothing on its own.
+model ResortLinkRequest {
+  id            String    @id @default(uuid())
+  groupId       String
+  tenantId      String // the resort being asked for
+  requestedById String // the user who asked
+  tokenHash     String    @unique
+  expiresAt     DateTime
+  approvedAt    DateTime?
+  declinedAt    DateTime?
+  createdAt     DateTime  @default(now())
+
+  group  ResortGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  tenant Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([groupId])
+  @@map("resort_link_requests")
+}
+
+/// Every consequential thing that happened to a group.
+///
+/// Both sides can read the rows for their own resort, so "who gave that person
+/// access to my resort, and when?" always has an answer.
+model ResortGroupEvent {
+  id          String   @id @default(uuid())
+  groupId     String
+  tenantId    String?
+  actorUserId String?
+  action      String // link_requested | link_approved | link_declined | access_changed | unlinked | switched | resort_added
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  group ResortGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+  @@index([tenantId])
+  @@map("resort_group_events")
 }
