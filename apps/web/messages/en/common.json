@@ -185,6 +185,19 @@
     "evChanged": "Access level changed",
     "evUnlinked": "Disconnected",
     "evSwitched": "Opened from another account",
-    "evAdded": "Resort added"
+    "evAdded": "Resort added",
+    "add": "Open another resort",
+    "addBlurb": "Run more than one resort? Each is its own account, and every one after the first costs 10% less."
+  },
+  "addResort": {
+    "title": "Open another resort",
+    "subtitle": "A separate account, with its own rooms, staff and books.",
+    "name": "Resort name",
+    "slug": "Web address",
+    "cost": "This is a separate subscription — you will choose its plan next. Every resort after your first costs 10% less.",
+    "create": "Create it",
+    "cancel": "Cancel",
+    "slugTaken": "That web address is already taken. Try another.",
+    "failed": "Could not open the resort. Try again."
   }
 }

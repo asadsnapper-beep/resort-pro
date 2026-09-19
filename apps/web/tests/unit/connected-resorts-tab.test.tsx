@@ -31,6 +31,7 @@ const getConnection = vi.fn();
 const getEvents = vi.fn();
 const setAccess = vi.fn();
 const disconnect = vi.fn();
+const newResort = vi.fn();
 
 vi.mock('@/lib/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/api')>()),
@@ -40,10 +41,15 @@ vi.mock('@/lib/api', async (importOriginal) => ({
     events: () => getEvents(),
     setAccess: (id: string, access: string) => setAccess(id, access),
     disconnect: (id: string) => disconnect(id),
+    newResort: (d: unknown) => newResort(d),
   },
+  // The "Open another resort" button on this tab switches into the new resort
+  // once it exists, so the router and that call have to exist here too.
+  authApi: { switchResort: vi.fn() },
 }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('@/store/auth', () => ({
-  useAuthStore: (select: (s: unknown) => unknown) => select({ tenant: { id: 't1' } }),
+  useAuthStore: (select: (s: unknown) => unknown) => select({ tenant: { id: 't1' }, setAuth: vi.fn() }),
 }));
 vi.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }));
 
@@ -71,6 +77,7 @@ beforeEach(() => {
   getEvents.mockReset();
   setAccess.mockReset();
   disconnect.mockReset();
+  newResort.mockReset();
   getEvents.mockResolvedValue({ data: { data: [] } });
   getConnection.mockResolvedValue({ data: { data: null } });
   group(null);

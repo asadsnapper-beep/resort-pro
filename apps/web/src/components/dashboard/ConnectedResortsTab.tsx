@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { resortGroupApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { useResortGroup, type GroupResort } from '@/hooks/use-resort-group';
+import { AddResortModal } from './AddResortModal';
 
 /**
  * Connections, from both sides.
@@ -49,6 +50,7 @@ export function ConnectedResortsTab() {
   const tenantId = useAuthStore((s) => s.tenant?.id);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   const { data: group } = useResortGroup();
   const { data: connection } = useQuery({
@@ -89,6 +91,20 @@ export function ConnectedResortsTab() {
 
   return (
     <div className="space-y-8">
+      <section className="flex flex-wrap items-center justify-between gap-3 rounded-rp-card border border-rp-border bg-rp-surface p-4">
+        <p className="text-rp-body text-rp-muted">
+          {say('addBlurb', 'Run more than one resort? Each is its own account, and every one after the first costs 10% less.')}
+        </p>
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="shrink-0 rounded-rp-btn bg-rp-brand px-4 py-2 text-rp-body font-semibold text-white"
+        >
+          {say('add', 'Open another resort')}
+        </button>
+      </section>
+      <AddResortModal open={adding} onClose={() => setAdding(false)} />
+
       {mine.length > 0 && (
         <section className="space-y-3">
           <div>

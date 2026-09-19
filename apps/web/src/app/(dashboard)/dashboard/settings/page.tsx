@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useId } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { tenantApi, api, resortGroupApi } from '@/lib/api';
+import { tenantApi, api } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +17,6 @@ import {
 import { PageShell, PageHeader } from '@/components/patterns';
 import { ModalShell } from '@/components/ui/modal-shell';
 import { ConnectedResortsTab } from '@/components/dashboard/ConnectedResortsTab';
-import { useResortGroup } from '@/hooks/use-resort-group';
 import { paymentGatewayApi } from '@/lib/api';
 import { RoomTypeSettings } from '@/components/settings/RoomTypeSettings';
 
@@ -109,8 +108,7 @@ const TAB_GROUPS: Array<{ group: string; items: TabItem[] }> = [
       { id: 'domain',     label: 'Custom Domain',   icon: Globe },
       { id: 'gdpr',       label: 'Privacy & GDPR',  icon: ShieldCheck },
       { id: 'enterprise', label: 'Enterprise',      icon: Star },
-      // Hidden unless something is actually connected — see visibleGroups below.
-      { id: 'connections', label: 'Connected Resorts', icon: Link2 },
+      { id: 'connections', label: 'Your Resorts',    icon: Link2 },
     ],
   },
 ];
@@ -119,20 +117,17 @@ const TAB_GROUPS: Array<{ group: string; items: TabItem[] }> = [
 const TABS = TAB_GROUPS.flatMap(g => g.items);
 
 /**
- * Connections are a tab only for the owners who have one.
+ * Every owner gets this tab; staff never do.
  *
- * Nearly every resort is a single account with nothing attached to it, and an
- * empty section about accounts that can see your books is worse than no
- * section — it invites the question it cannot answer.
+ * It was going to appear only once something was connected, on the grounds
+ * that an empty section about accounts that can see your books invites the
+ * question it cannot answer. Opening another resort lives here now, which is
+ * the thing a single-resort owner would come looking for — so the tab has a
+ * reason to exist before anything is connected, and the sections about
+ * connections still keep themselves hidden until there are any.
  */
 function useConnectionTabVisible() {
-  const { data: group } = useResortGroup();
-  const { data: connection } = useQuery({
-    queryKey: ['resort-connection'],
-    queryFn: () => resortGroupApi.connection().then(r => r.data?.data ?? null),
-    retry: false,
-  });
-  return (group?.resorts.length ?? 0) > 1 || !!connection;
+  return useAuthStore((state) => state.user?.role) === 'OWNER';
 }
 
 export default function SettingsPage() {

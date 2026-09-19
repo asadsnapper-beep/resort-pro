@@ -617,6 +617,7 @@ export const resortGroupApi = {
   events:     () => api.get('/resort-group/events', { suppressUpgradeRedirect: true }),
   setAccess:  (tenantId: string, access: 'FULL' | 'NUMBERS_ONLY') =>
     api.patch(`/resort-group/members/${tenantId}`, { access }),
+  newResort:  (data: { name: string; slug: string }) => api.post('/resort-group/new-resort', data),
   link:       (slug: string) => api.post('/resort-group/links', { slug }),
   disconnect: (tenantId: string) => api.delete(`/resort-group/members/${tenantId}`),
 };

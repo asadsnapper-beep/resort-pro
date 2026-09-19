@@ -32,6 +32,7 @@ import { ok, validate } from '../utils/response';
 import { resortOverview, clearResortOverviewCache } from '../services/resort-overview';
 import { sendEmail } from '../services/email';
 import { webAppUrl } from '../utils/web-url';
+import { generateReferralCode } from '../utils/referral';
 
 /** A group of more than this many resorts would make the 360 page a 40-query load. */
 const MAX_RESORTS_PER_GROUP = 20;
@@ -42,6 +43,11 @@ const linkSchema = z.object({
 
 const approveSchema = z.object({
   access: z.enum(['FULL', 'NUMBERS_ONLY']),
+});
+
+const newResortSchema = z.object({
+  name: z.string().min(2).max(100),
+  slug: z.string().min(2).max(50).regex(/^[a-z0-9-]+$/),
 });
 
 /**
@@ -1042,6 +1048,137 @@ export async function resortGroupRoutes(app: FastifyInstance) {
         access: member.access,
         since: member.approvedAt,
       });
+    },
+  });
+
+  /* ── POST /api/resort-group/new-resort ───────────────────────────────────
+   * Open another resort, on the same login.
+   *
+   * This is not /api/auth/register with fields filled in, and the differences
+   * are deliberate rather than an incomplete copy:
+   *
+   *  - **No email verification.** The address is already verified on the
+   *    account making the request. Asking the same person to prove the same
+   *    address twice would be ceremony, not security.
+   *  - **No signup promotion.** Those windows exist to win new customers. This
+   *    person is already one.
+   *  - **No referral credit.** Referring yourself is not a referral, and
+   *    without this an owner could mint reward after reward by opening resorts.
+   *  - **Connected straight away**, so the new resort is in the group — and so
+   *    priced as one of several — before its first bill.
+   *
+   * It starts `incomplete`, exactly as a public signup does: the resort exists,
+   * is read-only, and becomes writable when it is paid for.
+   */
+  app.post('/new-resort', {
+    schema: {
+      tags: ['resort-group'],
+      summary: 'Open another resort on this login',
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object', required: ['name', 'slug'],
+        properties: { name: { type: 'string' }, slug: { type: 'string' } },
+      },
+    },
+    preHandler: requireRole('OWNER'),
+    handler: async (request, reply) => {
+      const user = request.user as JwtPayload;
+      const body = validate(newResortSchema, request.body, reply);
+      if (!body) return;
+
+      const me = await prisma.user.findUniqueOrThrow({
+        where: { id: user.sub },
+        select: { id: true, email: true, firstName: true, lastName: true, passwordHash: true },
+      });
+      const home = await prisma.tenant.findUniqueOrThrow({
+        where: { id: user.tenantId },
+        select: { name: true, country: true, currency: true, timezone: true },
+      });
+
+      if (await prisma.tenant.findUnique({ where: { slug: body.slug }, select: { id: true } })) {
+        return reply.status(409).send({
+          success: false, error: 'That web address is already taken.', code: 'SLUG_TAKEN',
+        });
+      }
+
+      const myGroup = await prisma.resortGroup.findFirst({
+        where: { ownerUserId: me.id }, select: { id: true },
+      });
+      const myMembership = await prisma.resortGroupTenant.findUnique({
+        where: { tenantId: user.tenantId }, select: { groupId: true },
+      });
+      if (myMembership && myMembership.groupId !== myGroup?.id) {
+        return reply.status(409).send({
+          success: false, error: 'This resort is connected to another account.',
+          code: 'RESORT_ALREADY_CONNECTED',
+        });
+      }
+      const existingCount = myGroup
+        ? await prisma.resortGroupTenant.count({ where: { groupId: myGroup.id } })
+        : 1;
+      if (existingCount + 1 > MAX_RESORTS_PER_GROUP) {
+        return reply.status(400).send({
+          success: false,
+          error: `A group can hold ${MAX_RESORTS_PER_GROUP} resorts. Contact support if you need more.`,
+          code: 'GROUP_LIMIT_REACHED',
+        });
+      }
+
+      let referralCode = generateReferralCode(body.slug);
+      if (await prisma.tenant.findUnique({ where: { referralCode }, select: { id: true } })) {
+        referralCode = generateReferralCode(body.slug + Date.now());
+      }
+
+      const created = await prisma.$transaction(async (tx) => {
+        const tenant = await tx.tenant.create({
+          data: {
+            name: body.name,
+            slug: body.slug,
+            country: home.country,
+            currency: home.currency,
+            timezone: home.timezone,
+            planStatus: 'incomplete',
+            referralCode,
+          },
+          select: { id: true, slug: true, name: true },
+        });
+        // The same login, because it is the same person and the same verified
+        // address. They can sign in to this resort directly, or reach it from
+        // the resort menu without signing in again.
+        const owner = await tx.user.create({
+          data: {
+            tenantId: tenant.id, email: me.email, passwordHash: me.passwordHash,
+            firstName: me.firstName, lastName: me.lastName, role: 'OWNER',
+            emailVerifiedAt: new Date(),
+          },
+          select: { id: true },
+        });
+
+        const groupId = myGroup?.id ?? (await tx.resortGroup.create({
+          data: { name: `${home.name} Group`, ownerUserId: me.id },
+        })).id;
+        if (!myMembership) {
+          await tx.resortGroupTenant.create({
+            data: { groupId, tenantId: user.tenantId, access: 'FULL', linkedUserId: me.id },
+          });
+        }
+        await tx.resortGroupTenant.create({
+          data: { groupId, tenantId: tenant.id, access: 'FULL', linkedUserId: owner.id },
+        });
+        await tx.resortGroupEvent.create({
+          data: {
+            groupId, tenantId: tenant.id, actorUserId: me.id, action: 'resort_added',
+            metadata: { resortName: tenant.name },
+          },
+        });
+        return tenant;
+      });
+
+      clearResortOverviewCache();
+      return reply.status(201).send(ok(
+        { tenantId: created.id, slug: created.slug, name: created.name },
+        `${created.name} is ready. Choose a plan to open it.`,
+      ));
     },
   });
 }
