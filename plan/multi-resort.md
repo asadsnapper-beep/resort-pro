@@ -33,9 +33,9 @@ Still to do:
   [fixes/stripe-card-billing-setup.md](fixes/stripe-card-billing-setup.md).
   Until it exists a card checkout for a discounted resort charges full price
   and logs that it did. bKash needs nothing.
-- **Connecting an existing resort has no button yet.** The whole flow works
-  through `POST /api/resort-group/links`; what is missing is a field in
-  Settings → Your Resorts to type the other resort's address into.
+- ~~Connecting an existing resort has no button yet.~~ Done 2026-09-22:
+  Settings → Your Resorts takes the other resort's address, and says which of
+  the two things happened — connected, or its owner asked.
 
 ---
 

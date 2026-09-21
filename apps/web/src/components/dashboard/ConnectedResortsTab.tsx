@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl';
 import { resortGroupApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { useResortGroup, type GroupResort } from '@/hooks/use-resort-group';
-import { AddResortModal } from './AddResortModal';
+import { AddResortModal, slugify } from './AddResortModal';
 
 /**
  * Connections, from both sides.
@@ -51,6 +51,10 @@ export function ConnectedResortsTab() {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [connectSlug, setConnectSlug] = useState('');
+  const [connectResult, setConnectResult] = useState<
+    { kind: 'connected' | 'requested' | 'error'; message: string } | null
+  >(null);
 
   const { data: group } = useResortGroup();
   const { data: connection } = useQuery({
@@ -74,6 +78,52 @@ export function ConnectedResortsTab() {
       await queryClient.invalidateQueries();
     } catch {
       setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * Connect a resort that already exists.
+   *
+   * Two quite different things can happen and the screen has to say which. If
+   * the same verified email owns both accounts it connects on the spot; if not,
+   * its owner is asked and nothing happens until they answer. Reporting the
+   * second as though it were the first would leave an owner staring at an
+   * overview waiting for numbers that are not coming.
+   */
+  const connect = async () => {
+    const slug = slugify(connectSlug);
+    if (slug.length < 2) return;
+    setBusy(true);
+    setConnectResult(null);
+    try {
+      const { data } = await resortGroupApi.link(slug);
+      if (data.data?.status === 'connected') {
+        setConnectResult({ kind: 'connected', message: say('connected', 'Connected.') });
+      } else {
+        setConnectResult({
+          kind: 'requested',
+          message: say('requested', 'We have asked its owner. It will appear here once they agree.'),
+        });
+      }
+      setConnectSlug('');
+      await queryClient.invalidateQueries();
+    } catch (err) {
+      const code = (err as { response?: { data?: { code?: string } } })?.response?.data?.code;
+      const messages: Record<string, string> = {
+        RESORT_NOT_FOUND: say('errNotFound', 'No resort has that address.'),
+        SAME_RESORT: say('errSameResort', 'That is the resort you are in.'),
+        RESORT_NOT_CONNECTABLE: say('errNotConnectable', 'That resort cannot be connected right now.'),
+        RESORT_ALREADY_CONNECTED: say('errAlreadyConnected', 'That resort is already connected to an account.'),
+        RESORT_HAS_NO_OWNER: say('errNoOwner', 'That resort has no verified owner to ask.'),
+        GROUP_LIMIT_REACHED: say('errLimit', 'You have as many resorts connected as one account can hold.'),
+        REQUEST_TOO_SOON: say('errTooSoon', 'That was just asked. Give them a minute.'),
+      };
+      setConnectResult({
+        kind: 'error',
+        message: messages[code ?? ''] ?? say('errGeneric', 'That did not go through. Try again.'),
+      });
     } finally {
       setBusy(false);
     }
@@ -104,6 +154,49 @@ export function ConnectedResortsTab() {
         </button>
       </section>
       <AddResortModal open={adding} onClose={() => setAdding(false)} />
+
+      <section className="space-y-3 rounded-rp-card border border-rp-border bg-rp-surface p-4">
+        <div>
+          <h2 className="text-rp-heading font-semibold text-rp-text">
+            {say('connectTitle', 'Connect a resort you already run')}
+          </h2>
+          <p className="text-rp-body text-rp-muted">
+            {say('connectBody', 'If it uses this same email you will be connected straight away. If it belongs to somebody else, they are asked first.')}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="min-w-0 flex-1">
+            <span className="block text-rp-label font-medium text-rp-text">
+              {say('connectLabel', 'Its web address')}
+              <span className="ml-2 font-normal text-rp-micro text-rp-muted">your-resort.resortpro.site</span>
+            </span>
+            <input
+              value={connectSlug}
+              onChange={(e) => setConnectSlug(e.target.value)}
+              placeholder="palm-paradise-resort"
+              className="mt-1 w-full rounded-rp-ctrl border border-rp-border-md bg-rp-surface px-3 py-2 font-mono text-rp-body text-rp-text"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={busy || slugify(connectSlug).length < 2}
+            onClick={() => void connect()}
+            className="rounded-rp-btn border border-rp-border-md px-4 py-2 text-rp-body font-semibold text-rp-text disabled:opacity-60"
+          >
+            {say('connectAction', 'Connect')}
+          </button>
+        </div>
+
+        {connectResult && (
+          <p
+            role={connectResult.kind === 'error' ? 'alert' : 'status'}
+            className={connectResult.kind === 'error' ? 'text-rp-meta text-rp-danger' : 'text-rp-meta text-rp-text'}
+          >
+            {connectResult.message}
+          </p>
+        )}
+      </section>
 
       {mine.length > 0 && (
         <section className="space-y-3">

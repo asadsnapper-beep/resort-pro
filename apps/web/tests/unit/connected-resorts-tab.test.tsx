@@ -32,6 +32,7 @@ const getEvents = vi.fn();
 const setAccess = vi.fn();
 const disconnect = vi.fn();
 const newResort = vi.fn();
+const link = vi.fn();
 
 vi.mock('@/lib/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/api')>()),
@@ -42,6 +43,7 @@ vi.mock('@/lib/api', async (importOriginal) => ({
     setAccess: (id: string, access: string) => setAccess(id, access),
     disconnect: (id: string) => disconnect(id),
     newResort: (d: unknown) => newResort(d),
+    link: (slug: string) => link(slug),
   },
   // The "Open another resort" button on this tab switches into the new resort
   // once it exists, so the router and that call have to exist here too.
@@ -78,6 +80,7 @@ beforeEach(() => {
   setAccess.mockReset();
   disconnect.mockReset();
   newResort.mockReset();
+  link.mockReset();
   getEvents.mockResolvedValue({ data: { data: [] } });
   getConnection.mockResolvedValue({ data: { data: null } });
   group(null);
@@ -176,5 +179,74 @@ describe('the history', () => {
 
     expect(await screen.findByText('Access level changed')).toBeTruthy();
     expect(screen.queryByText('access_changed')).toBeNull();
+  });
+});
+
+describe('connecting a resort that already exists', () => {
+  const type = (value: string) =>
+    fireEvent.change(screen.getByLabelText(/Its web address/), { target: { value } });
+
+  it('sends the address as a slug, however it was typed', async () => {
+    link.mockResolvedValue({ data: { data: { status: 'connected' } } });
+    mount();
+
+    type('Palm Paradise Resort');
+    fireEvent.click(screen.getByText('Connect'));
+
+    await waitFor(() => expect(link).toHaveBeenCalledWith('palm-paradise-resort'));
+  });
+
+  it('says it is connected when it is', async () => {
+    link.mockResolvedValue({ data: { data: { status: 'connected' } } });
+    mount();
+
+    type('hill-view');
+    fireEvent.click(screen.getByText('Connect'));
+
+    expect(await screen.findByText('Connected.')).toBeTruthy();
+  });
+
+  it('does not pretend a request is a connection', async () => {
+    // The dangerous confusion: reporting "asked" as "connected" leaves an owner
+    // waiting for numbers that are not coming.
+    link.mockResolvedValue({ data: { data: { status: 'requested' } } });
+    mount();
+
+    type('hill-view');
+    fireEvent.click(screen.getByText('Connect'));
+
+    expect(await screen.findByText(/asked its owner/)).toBeTruthy();
+    expect(screen.queryByText('Connected.')).toBeNull();
+  });
+
+  it('says which address was wrong rather than a generic failure', async () => {
+    const err = new Error('404') as Error & { response: { data: { code: string } } };
+    err.response = { data: { code: 'RESORT_NOT_FOUND' } };
+    link.mockRejectedValue(err);
+    mount();
+
+    type('nowhere');
+    fireEvent.click(screen.getByText('Connect'));
+
+    expect(await screen.findByRole('alert'))
+      .toHaveProperty('textContent', expect.stringContaining('No resort has that address'));
+  });
+
+  it('explains a resort that is already connected elsewhere', async () => {
+    const err = new Error('409') as Error & { response: { data: { code: string } } };
+    err.response = { data: { code: 'RESORT_ALREADY_CONNECTED' } };
+    link.mockRejectedValue(err);
+    mount();
+
+    type('taken');
+    fireEvent.click(screen.getByText('Connect'));
+
+    expect(await screen.findByRole('alert'))
+      .toHaveProperty('textContent', expect.stringContaining('already connected'));
+  });
+
+  it('will not send an empty address', () => {
+    mount();
+    expect((screen.getByText('Connect') as HTMLButtonElement).disabled).toBe(true);
   });
 });

@@ -344,9 +344,7 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
   bKash callback; and the read-only admin view. **The owner with three resorts
   is unblocked.** Left: phase 11 (one combined bill — needs a Stripe account),
   the staging walkthrough
-  (`plan/fixes/verify-multi-resort-staging.md`), the `STRIPE_COUPON_GROUP10`
-  coupon, and a UI field for connecting an *existing* resort (the API is
-  there; nothing calls it yet).
+  (`plan/fixes/verify-multi-resort-staging.md`), and the `STRIPE_COUPON_GROUP10` coupon.
 - Two defects found while building it, both filed and **not** fixed:
   `/api/auth/login` answers 500 when the same user logs in twice inside one
   second (the refresh token is signed with no nonce, and `RefreshToken.token`

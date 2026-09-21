@@ -187,7 +187,21 @@
     "evSwitched": "Opened from another account",
     "evAdded": "Resort added",
     "add": "Open another resort",
-    "addBlurb": "Run more than one resort? Each is its own account, and every one after the first costs 10% less."
+    "addBlurb": "Run more than one resort? Each is its own account, and every one after the first costs 10% less.",
+    "connectTitle": "Connect a resort you already run",
+    "connectBody": "If it uses this same email you will be connected straight away. If it belongs to somebody else, they are asked first.",
+    "connectLabel": "Its web address",
+    "connectAction": "Connect",
+    "connected": "Connected.",
+    "requested": "We have asked its owner. It will appear here once they agree.",
+    "errNotFound": "No resort has that address.",
+    "errSameResort": "That is the resort you are in.",
+    "errNotConnectable": "That resort cannot be connected right now.",
+    "errAlreadyConnected": "That resort is already connected to an account.",
+    "errNoOwner": "That resort has no verified owner to ask.",
+    "errLimit": "You have as many resorts connected as one account can hold.",
+    "errTooSoon": "That was just asked. Give them a minute.",
+    "errGeneric": "That did not go through. Try again."
   },
   "addResort": {
     "title": "Open another resort",
