@@ -14,6 +14,7 @@
  * calls the Stripe API.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { keepEnv } from '../helpers/env';
 import Stripe from 'stripe';
 import { randomUUID } from 'node:crypto';
 import { buildApp } from '../../src/app';
@@ -63,6 +64,9 @@ function deliver(event: object, signature?: string) {
     payload,
   });
 }
+
+// Registered first, so the snapshot is taken before the line below changes it.
+keepEnv('STRIPE_WEBHOOK_SECRET');
 
 beforeAll(async () => {
   // Read at request time by the route, so setting it here is enough.

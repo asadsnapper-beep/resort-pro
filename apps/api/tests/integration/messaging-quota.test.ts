@@ -6,6 +6,7 @@
  * Providers are stubbed at fetch; nothing here sends a message.
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { keepEnv } from '../helpers/env';
 import { prisma } from '@resort-pro/database';
 import {
   reservePlatformMessage, releasePlatformMessage, sendCountedMessage, resetMonthlyMessagingUsage,
@@ -33,6 +34,8 @@ beforeAll(async () => {
 afterAll(async () => {
   await prisma.tenant.deleteMany({ where: { slug } });
 });
+
+keepEnv('SSL_WIRELESS_API_KEY');
 
 beforeEach(async () => {
   delete process.env.SSL_WIRELESS_API_KEY;

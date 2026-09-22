@@ -9,6 +9,11 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { sendSms, sendWhatsApp } from '../../src/services/messaging';
+import { keepEnv } from '../helpers/env';
+
+// These four are set and unset all through this file. Every test file shares
+// one process, so without this they stay changed for whatever runs next.
+keepEnv('SSL_WIRELESS_API_KEY', 'SSL_WIRELESS_SENDER_ID', 'META_WA_TOKEN', 'META_WA_PHONE_NUMBER_ID');
 
 const fetchMock = vi.fn();
 const reply = (status: number, body: unknown) =>

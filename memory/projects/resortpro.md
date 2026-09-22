@@ -345,12 +345,14 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
   is unblocked.** Left: phase 11 (one combined bill — needs a Stripe account),
   the staging walkthrough
   (`plan/fixes/verify-multi-resort-staging.md`), and the `STRIPE_COUPON_GROUP10` coupon.
-- Two defects found while building it, both filed and **not** fixed:
-  `/api/auth/login` answers 500 when the same user logs in twice inside one
-  second (the refresh token is signed with no nonce, and `RefreshToken.token`
-  is unique — `switch-resort` has the `jti` fix, login does not), and
-  `tests/unit/messaging.test.ts` leaks `META_WA_TOKEN` into every later test
-  file, which is the one red test in an otherwise green API suite.
+- Two defects found while building it, **both fixed 2026-09-22**. Signing in
+  twice inside one second answered 500 — a refresh token was signed with no
+  nonce and `RefreshToken.token` is unique, so a double-clicked Sign in button
+  collided with itself; all five signing sites now share
+  `utils/refresh-token.ts`. And three test files leaked env vars into every
+  later file (one process, single fork), which is why `no-false-success` failed
+  in the suite and passed alone; `tests/helpers/env.ts` restores them per file.
+  **The API suite is 646/646 green.**
 - **In-account properties stay, and the switcher shipped (`da9a86f`).** The
   top bar has a property picker (hidden below two active properties) and Rooms
   narrows by `X-Property-Id`. It answers "which building on this site", while
