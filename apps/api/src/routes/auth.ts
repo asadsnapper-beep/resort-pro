@@ -10,6 +10,7 @@ import { sendEmail } from '../services/email';
 import { createAdminNotification } from '../utils/notifications';
 import { generateReferralCode } from '../utils/referral';
 import { webAppUrl } from '../utils/web-url';
+import { refreshTokenPayload } from '../utils/refresh-token';
 import type { JwtPayload } from '@resort-pro/types';
 
 const REFRESH_COOKIE = 'rp_refresh';
@@ -364,7 +365,7 @@ export async function authRoutes(app: FastifyInstance) {
         tenantId: tenant.id,
       };
       const token = app.jwt.sign(payload);
-      const refreshToken = app.jwt.sign({ sub: user.id, type: 'refresh' }, { expiresIn: '7d' });
+      const refreshToken = app.jwt.sign(refreshTokenPayload(user.id), { expiresIn: '7d' });
 
       const claimed = await prisma.$transaction(async (tx) => {
         const used = await tx.emailVerificationToken.updateMany({
@@ -504,7 +505,7 @@ export async function authRoutes(app: FastifyInstance) {
       };
 
       const token = app.jwt.sign(payload);
-      const refreshToken = app.jwt.sign({ sub: user.id, type: 'refresh' }, { expiresIn: '7d' });
+      const refreshToken = app.jwt.sign(refreshTokenPayload(user.id), { expiresIn: '7d' });
 
       await prisma.refreshToken.create({
         data: {
@@ -631,13 +632,7 @@ export async function authRoutes(app: FastifyInstance) {
         tenantId: tenant.id,
       };
       const token = app.jwt.sign(payload);
-      // `jti` is what keeps two switches in the same second from signing byte
-      // for byte the same refresh token and colliding on its unique index —
-      // a double-clicked resort dropdown would otherwise answer 500.
-      const refreshToken = app.jwt.sign(
-        { sub: target.id, type: 'refresh', jti: randomBytes(16).toString('hex') },
-        { expiresIn: '7d' },
-      );
+      const refreshToken = app.jwt.sign(refreshTokenPayload(target.id), { expiresIn: '7d' });
 
       await prisma.$transaction([
         prisma.refreshToken.create({
@@ -714,7 +709,7 @@ export async function authRoutes(app: FastifyInstance) {
       };
 
       const newToken = app.jwt.sign(payload);
-      const newRefreshToken = app.jwt.sign({ sub: user.id, type: 'refresh' }, { expiresIn: '7d' });
+      const newRefreshToken = app.jwt.sign(refreshTokenPayload(user.id), { expiresIn: '7d' });
 
       await prisma.refreshToken.create({
         data: { userId: user.id, token: newRefreshToken, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
@@ -957,7 +952,7 @@ export async function authRoutes(app: FastifyInstance) {
         tenantId: user.tenantId,
       };
       const token = app.jwt.sign(payload);
-      const refreshToken = app.jwt.sign({ sub: user.id, type: 'refresh' }, { expiresIn: '7d' });
+      const refreshToken = app.jwt.sign(refreshTokenPayload(user.id), { expiresIn: '7d' });
       await prisma.refreshToken.create({
         data: { userId: user.id, token: refreshToken, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
       });

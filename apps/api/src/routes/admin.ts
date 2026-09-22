@@ -9,6 +9,7 @@
 import type { FastifyInstance } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { prisma, Prisma } from '@resort-pro/database';
+import { refreshTokenPayload } from '../utils/refresh-token';
 import { PLAN_PRICING } from '@resort-pro/types';
 import { ok } from '../utils/response';
 
@@ -631,7 +632,7 @@ export async function adminRoutes(app: FastifyInstance) {
       );
 
       // Also create a refresh token so the impersonated session works
-      const refreshToken = app.jwt.sign({ sub: owner.id, type: 'refresh' }, { expiresIn: '2h' });
+      const refreshToken = app.jwt.sign(refreshTokenPayload(owner.id), { expiresIn: '2h' });
       await prisma.refreshToken.create({
         data: {
           userId: owner.id,
