@@ -213,5 +213,17 @@
     "cancel": "Cancel",
     "slugTaken": "That web address is already taken. Try another.",
     "failed": "Could not open the resort. Try again."
+  },
+  "groupBill": {
+    "title": "Pay for all your resorts at once",
+    "subtitle": "One bKash payment instead of one for each.",
+    "interval": "Billing period",
+    "monthly": "Monthly",
+    "yearly": "Yearly",
+    "total": "Total",
+    "pay": "Pay with bKash",
+    "starting": "Opening bKash…",
+    "failed": "Could not start the payment. Try again.",
+    "enterprise": "One of your resorts is on a negotiated plan, so these cannot be billed together yet. Contact support and we will sort it out."
   }
 }

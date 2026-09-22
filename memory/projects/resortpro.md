@@ -342,7 +342,11 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
   `/dashboard/resorts`; `/resort-link/[token]` and its dashboard banner;
   Settings → Your Resorts; the 10% group price in both checkout paths and the
   bKash callback; and the read-only admin view. **The owner with three resorts
-  is unblocked.** Left: phase 11 (one combined bill — needs a Stripe account),
+  is unblocked.** Phase 11's bKash half is in too (`/api/billing/group`,
+  `/checkout/bkash-group`, `/bkash/group-callback`): one payment for all the
+  resorts, priced per resort, periods extended from whichever is later — now or
+  what was already bought (`utils/billing-period.ts`). Left: phase 11's card
+  half (needs a Stripe account),
   the staging walkthrough
   (`plan/fixes/verify-multi-resort-staging.md`), and the `STRIPE_COUPON_GROUP10` coupon.
 - Two defects found while building it, **both fixed 2026-09-22**. Signing in

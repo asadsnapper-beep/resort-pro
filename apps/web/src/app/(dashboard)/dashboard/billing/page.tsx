@@ -9,6 +9,7 @@ import {
   Building2, ExternalLink, Receipt, Loader2, Star, ArrowRight, MessageCircle,
 } from 'lucide-react';
 import { PageShell, PageHeader } from '@/components/patterns';
+import { GroupBillPanel } from '@/components/dashboard/GroupBillPanel';
 import { PLAN_PRICING, PUBLIC_PLAN_ORDER, type PlanKey } from '@resort-pro/types';
 
 type PlanConfig = {
@@ -206,6 +207,8 @@ export default function BillingPage() {
         title="Billing & Subscription"
         subtitle="Manage your plan and payment details"
       />
+
+      <GroupBillPanel />
 
       {/* Current plan card */}
       <div className="rounded-rp-card border border-rp-border bg-rp-surface p-6 shadow-rp-card">

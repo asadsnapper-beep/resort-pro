@@ -627,6 +627,11 @@ export const billingApi = {
   getStatus: () => api.get('/billing/status'),
   getInvoices: () => api.get('/billing/invoices'),
   createCheckout: (planKey: string) => api.post('/billing/checkout', { planKey }),
+  // One bKash payment covering every resort in the owner's group.
+  group: (interval: 'month' | 'year' = 'month') =>
+    api.get('/billing/group', { params: { interval }, suppressUpgradeRedirect: true }),
+  createBkashGroupCheckout: (interval: 'month' | 'year' = 'month') =>
+    api.post('/billing/checkout/bkash-group', { interval }),
   createBkashCheckout: (planKey: string, interval: 'month' | 'year' = 'month') =>
     api.post('/billing/checkout/bkash', { planKey, interval }),
   createPortal: () => api.post('/billing/portal'),

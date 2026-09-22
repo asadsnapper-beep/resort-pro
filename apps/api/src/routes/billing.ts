@@ -8,6 +8,7 @@ import { bkashGrantToken, bkashCreatePayment, bkashExecutePayment, type BkashCon
 import {
   GROUP_DISCOUNT_RATE, groupDiscountApplies, discounted, discountedPrices,
 } from '../utils/group-discount';
+import { extendPeriod } from '../utils/billing-period';
 
 // ── Stripe client ──────────────────────────────────────────────────────────
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
@@ -99,6 +100,90 @@ export function getPlatformBkash(): BkashConfig | null {
   const { BKASH_APP_KEY, BKASH_APP_SECRET, BKASH_USERNAME, BKASH_PASSWORD } = process.env;
   if (!BKASH_APP_KEY || !BKASH_APP_SECRET || !BKASH_USERNAME || !BKASH_PASSWORD) return null;
   return { appKey: BKASH_APP_KEY, appSecret: BKASH_APP_SECRET, username: BKASH_USERNAME, password: BKASH_PASSWORD };
+}
+
+
+// ── One bill for several resorts (bKash) ─────────────────────────────────────
+//
+// bKash has no subscriptions — every payment is a one-off that pushes a
+// resort's period out. So "one combined bill" here means exactly one thing:
+// one payment for the sum of what each resort owes, instead of four payments.
+// Each resort keeps its own plan and its own price, discount included.
+//
+// Card is the other half, and it waits for a Stripe account: there the
+// recurring charge belongs to Stripe, so combining means one subscription with
+// a line per resort rather than a single summed payment. See
+// plan/multi-resort.md §9.
+
+interface GroupBillLine {
+  tenantId: string;
+  name: string;
+  slug: string;
+  plan: PlanKey;
+  listPrice: number;
+  /** What this resort actually owes — the list price less any group discount. */
+  amount: number;
+  currentPeriodEnd: Date | null;
+}
+
+/**
+ * What one combined payment would cover.
+ *
+ * Suspended and deleted resorts are left out: charging for a resort nobody can
+ * open would be taking money for nothing.
+ */
+async function groupBill(groupId: string, interval: 'month' | 'year'): Promise<
+  { ok: true; lines: GroupBillLine[]; total: number } | { ok: false; code: string; error: string }
+> {
+  const members = await prisma.resortGroupTenant.findMany({
+    where: { groupId },
+    orderBy: { tenant: { createdAt: 'asc' } },
+    include: {
+      tenant: {
+        select: {
+          id: true, name: true, slug: true, plan: true,
+          isActive: true, deletedAt: true, currentPeriodEnd: true,
+        },
+      },
+    },
+  });
+  const payable = members.filter((m) => m.tenant.isActive && !m.tenant.deletedAt);
+  if (payable.length < 2) {
+    return { ok: false, code: 'NOTHING_TO_COMBINE', error: 'There is only one resort to pay for.' };
+  }
+  // Enterprise is negotiated by hand and has no self-serve price. Quietly
+  // charging it the list figure would invent a number nobody agreed to.
+  const enterprise = payable.find((m) => !isSelfServePlanKey(m.tenant.plan));
+  if (enterprise) {
+    return {
+      ok: false, code: 'ENTERPRISE_IN_GROUP',
+      error: `${enterprise.tenant.name} is on a negotiated plan. Please contact support to bill these together.`,
+    };
+  }
+
+  const lines = await Promise.all(payable.map(async (m) => {
+    const plan = m.tenant.plan as PlanKey;
+    const listPrice = interval === 'year' ? BKASH_PLAN_ANNUAL_BDT[plan] : BKASH_PLAN_BDT[plan];
+    return {
+      tenantId: m.tenant.id,
+      name: m.tenant.name,
+      slug: m.tenant.slug,
+      plan,
+      listPrice,
+      amount: discounted(listPrice, await groupDiscountApplies(m.tenant.id)),
+      currentPeriodEnd: m.tenant.currentPeriodEnd,
+    };
+  }));
+
+  return { ok: true, lines, total: lines.reduce((sum, l) => sum + l.amount, 0) };
+}
+
+/** The group this user owns, or null. Owning it is what allows paying for it. */
+function ownedGroup(userId: string) {
+  return prisma.resortGroup.findFirst({
+    where: { ownerUserId: userId },
+    select: { id: true, name: true, payerTenantId: true },
+  });
 }
 
 // ── Auth helper ────────────────────────────────────────────────────────────
@@ -488,6 +573,178 @@ export async function billingRoutes(app: FastifyInstance) {
         return fail('execute_failed');
       }
     }
+  );
+
+
+  // ── GET /billing/group — what one combined payment would cover ────────────
+  app.get<{ Querystring: { interval?: 'month' | 'year' } }>(
+    '/group',
+    async (request, reply) => {
+      await requireAuth(request, reply, { ownerOnly: true });
+      if (reply.sent) return;
+      const { sub } = request.user as any;
+      const interval = request.query.interval === 'year' ? 'year' : 'month';
+
+      const group = await ownedGroup(sub);
+      if (!group) return reply.send({ success: true, data: null });
+
+      const bill = await groupBill(group.id, interval);
+      if (!bill.ok) {
+        return reply.send({
+          success: true,
+          data: { groupName: group.name, payerTenantId: group.payerTenantId, available: false, reason: bill.code },
+        });
+      }
+
+      return reply.send({
+        success: true,
+        data: {
+          groupName: group.name,
+          payerTenantId: group.payerTenantId,
+          available: !!getPlatformBkash(),
+          interval,
+          currency: 'BDT',
+          lines: bill.lines,
+          total: bill.total,
+        },
+      });
+    },
+  );
+
+  // ── POST /billing/checkout/bkash-group — pay for every resort at once ─────
+  app.post<{ Body: { interval?: 'month' | 'year' } }>(
+    '/checkout/bkash-group',
+    async (request, reply) => {
+      await requireAuth(request, reply, { ownerOnly: true });
+      if (reply.sent) return;
+      const { sub, tenantId } = request.user as any;
+      const interval = request.body?.interval === 'year' ? 'year' : 'month';
+
+      const group = await ownedGroup(sub);
+      if (!group) {
+        return reply.status(404).send({
+          success: false, error: 'You have no connected resorts.', code: 'NO_RESORT_GROUP',
+        });
+      }
+      // Paying from a resort that is not in the group would leave the receipt
+      // attached to an account the payment has nothing to do with.
+      const inGroup = await prisma.resortGroupTenant.findFirst({
+        where: { groupId: group.id, tenantId }, select: { id: true },
+      });
+      if (!inGroup) {
+        return reply.status(403).send({
+          success: false, error: 'Pay from one of the resorts in the group.',
+          code: 'RESORT_NOT_CONNECTED',
+        });
+      }
+
+      const bill = await groupBill(group.id, interval);
+      if (!bill.ok) {
+        return reply.status(400).send({ success: false, error: bill.error, code: bill.code });
+      }
+
+      const cfg = getPlatformBkash();
+      if (!cfg) {
+        return reply.status(503).send({ success: false, error: 'bKash payments are not available yet. Please contact support.' });
+      }
+
+      const apiUrl = process.env.API_BASE_URL || process.env.APP_URL || process.env.API_URL
+        || `${request.protocol}://${request.hostname}`;
+      const invoice = `GRP${Date.now().toString(36).toUpperCase()}`;
+      // Only the group and the interval travel on the callback. The amount is
+      // worked out again on the way back from the same helper, so a tampered
+      // parameter cannot buy a year of four resorts for the price of a month.
+      const callbackURL =
+        `${apiUrl}/api/billing/bkash/group-callback` +
+        `?groupId=${encodeURIComponent(group.id)}&interval=${interval}&payerTenantId=${encodeURIComponent(tenantId)}`;
+
+      try {
+        const idToken = await bkashGrantToken(cfg);
+        const created = await bkashCreatePayment(cfg, idToken, {
+          amount: bill.total.toFixed(2),
+          currency: 'BDT',
+          merchantInvoiceNumber: invoice,
+          callbackURL,
+        });
+        return reply.send({
+          success: true,
+          data: { url: created.bkashURL, paymentID: created.paymentID, total: bill.total, resorts: bill.lines.length },
+        });
+      } catch (err: any) {
+        request.log.error({ err }, 'bKash group subscription create failed');
+        return reply.status(502).send({ success: false, error: 'Could not start bKash payment. Please try again.' });
+      }
+    },
+  );
+
+  // ── GET /billing/bkash/group-callback ─────────────────────────────────────
+  // bKash redirects here. No auth: the payment id is the proof, and it is
+  // executed and re-priced against the group before anything is written.
+  app.get<{ Querystring: { paymentID?: string; status?: string; groupId?: string; interval?: string; payerTenantId?: string } }>(
+    '/bkash/group-callback',
+    async (request, reply) => {
+      const appUrl = process.env.WEB_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const { paymentID, status, groupId, payerTenantId } = request.query;
+      const interval = request.query.interval === 'year' ? 'year' : 'month';
+      const fail = (reason: string) =>
+        reply.redirect(`${appUrl}/dashboard/billing?canceled=1&reason=${encodeURIComponent(reason)}`);
+
+      if (!paymentID || status !== 'success' || !groupId) return fail('cancelled');
+
+      const cfg = getPlatformBkash();
+      if (!cfg) return fail('not_configured');
+
+      try {
+        const idToken = await bkashGrantToken(cfg);
+        const exec = await bkashExecutePayment(cfg, idToken, paymentID);
+        if (exec.transactionStatus !== 'Completed') return fail('payment_incomplete');
+
+        const bill = await groupBill(groupId, interval);
+        if (!bill.ok) return fail('amount_mismatch');
+        if (Math.abs(Number(exec.amount) - bill.total) > 0.5) return fail('amount_mismatch');
+
+        const days = interval === 'year' ? 365 : 30;
+        const now = Date.now();
+        // Each resort is extended from whichever is later: now, or the end of
+        // the period it has already paid for. Starting every one at "now" would
+        // quietly take back days a resort had already bought.
+        await prisma.$transaction(bill.lines.map((line) => prisma.tenant.update({
+          where: { id: line.tenantId },
+          data: {
+            planStatus: 'active',
+            currentPeriodEnd: extendPeriod(line.currentPeriodEnd, days, new Date(now)),
+            priceProtectedUntil: new Date(now + 365 * 24 * 60 * 60 * 1000),
+          },
+        })));
+        for (const line of bill.lines) {
+          await applyPlanFlagsToTenant(line.tenantId, line.plan);
+        }
+        if (payerTenantId) {
+          await prisma.resortGroup.update({
+            where: { id: groupId }, data: { payerTenantId },
+          }).catch(() => { /* the payment stands even if this bookkeeping does not */ });
+        }
+        await prisma.resortGroupEvent.create({
+          data: {
+            groupId, tenantId: payerTenantId ?? null, action: 'billed_together',
+            metadata: { interval, total: bill.total, trxID: exec.trxID, resorts: bill.lines.length },
+          },
+        });
+
+        await createAdminNotification({
+          type: 'subscription_paid',
+          title: 'Subscription paid (bKash, several resorts)',
+          message: `৳${exec.amount} paid for ${bill.lines.length} resorts (${interval}) via bKash: ${bill.lines.map((l) => l.name).join(', ')}. trxID ${exec.trxID}.`,
+          metadata: { groupId, interval, trxID: exec.trxID, amount: exec.amount, method: 'bkash', tenantIds: bill.lines.map((l) => l.tenantId) },
+          linkPath: '/admin/billing',
+        });
+
+        return reply.redirect(`${appUrl}/dashboard/billing?success=1&method=bkash&resorts=${bill.lines.length}`);
+      } catch (err: any) {
+        request.log.error({ err }, 'bKash group subscription callback failed');
+        return fail('execute_failed');
+      }
+    },
   );
 
   // GET /billing/invoices — list recent invoices

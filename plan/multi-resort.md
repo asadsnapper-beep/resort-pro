@@ -25,8 +25,11 @@ group price, opening a resort from inside, and the read-only admin view.
 
 Still to do:
 
-- **Phase 11, one combined bill.** Waiting on a Stripe account; the bKash half
-  is small and can ship whenever it is wanted.
+- **Phase 11's card half.** The bKash half shipped 2026-09-22: one payment for
+  the sum of what each resort owes, each keeping its own plan and discount, and
+  each period extended from whichever is later — now, or the end of what it had
+  already paid for. The card half waits on a Stripe account, where combining
+  means one subscription with a line per resort rather than a summed payment.
 - **Staging verification.** The paste-able prompt is
   [fixes/verify-multi-resort-staging.md](fixes/verify-multi-resort-staging.md).
 - **The Stripe coupon.** `STRIPE_COUPON_GROUP10`, see
