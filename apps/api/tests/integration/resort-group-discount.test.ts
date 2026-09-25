@@ -15,7 +15,12 @@ import { PLAN_PRICING } from '@resort-pro/types';
 import { verifyOwnerAndLogin } from '../helpers/auth';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { groupDiscountApplies, discounted } from '../../src/utils/group-discount';
+import { groupDiscountApplies, discounted, discountedUsd } from '../../src/utils/group-discount';
+import { keepEnv } from '../helpers/env';
+
+// The card price shown depends on whether the coupon exists, so this file
+// decides that for itself rather than inheriting whatever the server has.
+keepEnv('STRIPE_COUPON_GROUP10');
 import type { FastifyInstance } from 'fastify';
 
 let app: FastifyInstance;
@@ -209,5 +214,66 @@ describe('the charge and the check agree', () => {
     const callback = between("'/bkash/callback'", "// GET /billing/invoices");
     expect(callback).toContain('const expected = discounted(');
     expect(callback).toContain('groupDiscountApplies(');
+  });
+});
+
+describe('the price on the page', () => {
+  /**
+   * Staging showed $19 beside a bKash amount that was 10% lower. Both came from
+   * the same account and only one of them was going to be charged.
+   *
+   * The rule is that the page shows what will actually be taken — which for a
+   * card means the discount only appears once the Stripe coupon exists, because
+   * Stripe owns that charge.
+   */
+  beforeEach(async () => {
+    await connect('hill');
+  });
+
+  it('shows the dollar price the card will really take, once the coupon exists', async () => {
+    process.env.STRIPE_COUPON_GROUP10 = 'promo_test';
+    const hillToken = await verifyOwnerAndLogin(app, {
+      tenantId: tenants.hill, email: myEmail, password, slug: `${run}-hill`,
+    });
+
+    const data = JSON.parse((await status(hillToken)).body).data;
+    expect(data.groupDiscount).toMatchObject({ applies: true, cardReady: true });
+
+    const starter = data.planConfigs.find((p: { key: string }) => p.key === 'STARTER');
+    expect(starter.price).toBe(discountedUsd(starter.listPrice, true));
+    expect(starter.price).toBeLessThan(starter.listPrice);
+  });
+
+  it('keeps the dollar price whole while the coupon is missing, because that is what is taken', async () => {
+    delete process.env.STRIPE_COUPON_GROUP10;
+    const hillToken = await verifyOwnerAndLogin(app, {
+      tenantId: tenants.hill, email: myEmail, password, slug: `${run}-hill`,
+    });
+
+    const data = JSON.parse((await status(hillToken)).body).data;
+    expect(data.groupDiscount).toMatchObject({ applies: true, cardReady: false });
+
+    const starter = data.planConfigs.find((p: { key: string }) => p.key === 'STARTER');
+    expect(starter.price).toBe(starter.listPrice);
+    // …while bKash, which is charged by us, is discounted either way.
+    expect(data.bkashPricesBdt.STARTER).toBe(Math.round(LIST_PRICE * 0.9));
+  });
+
+  it('leaves a resort with no group at the list price, coupon or not', async () => {
+    process.env.STRIPE_COUPON_GROUP10 = 'promo_test';
+    await clearGroups();
+
+    const data = JSON.parse((await status()).body).data;
+    const starter = data.planConfigs.find((p: { key: string }) => p.key === 'STARTER');
+    expect(data.groupDiscount.applies).toBe(false);
+    expect(starter.price).toBe(starter.listPrice);
+  });
+});
+
+describe('rounding', () => {
+  it('keeps cents on a card price and whole taka on a bKash one', () => {
+    // $19 with a 10% Stripe coupon is $17.10, not $17.
+    expect(discountedUsd(19, true)).toBe(17.1);
+    expect(discounted(1999, true)).toBe(1799);
   });
 });

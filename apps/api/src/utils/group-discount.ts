@@ -52,6 +52,18 @@ export function discounted(amount: number, applies: boolean): number {
   return applies ? Math.round(amount * (1 - GROUP_DISCOUNT_RATE)) : amount;
 }
 
+/**
+ * The same discount on a price carried in dollars.
+ *
+ * Kept apart from `discounted` because the rounding has to differ: bKash is
+ * charged a whole number of taka, while Stripe applies a percentage coupon and
+ * will take $17.10 for a $19 plan. Rounding that to $17 on the page would be
+ * the same lie in the other direction.
+ */
+export function discountedUsd(amount: number, applies: boolean): number {
+  return applies ? Math.round(amount * (1 - GROUP_DISCOUNT_RATE) * 100) / 100 : amount;
+}
+
 /** Every plan's price for this resort, discount included. */
 export function discountedPrices<T extends Record<string, number>>(prices: T, applies: boolean): T {
   if (!applies) return prices;

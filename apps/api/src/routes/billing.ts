@@ -6,7 +6,7 @@ import { createAdminNotification } from '../utils/notifications';
 import { applyPlanFlagsToTenant, resolveTenantEntitlement, getPlanConfigs } from '../utils/entitlement';
 import { bkashGrantToken, bkashCreatePayment, bkashExecutePayment, type BkashConfig } from '../services/bkash';
 import {
-  GROUP_DISCOUNT_RATE, groupDiscountApplies, discounted, discountedPrices,
+  GROUP_DISCOUNT_RATE, groupDiscountApplies, discounted, discountedUsd, discountedPrices,
 } from '../utils/group-discount';
 import { extendPeriod } from '../utils/billing-period';
 
@@ -297,6 +297,10 @@ export async function billingRoutes(app: FastifyInstance) {
       getPlanConfigs(),
     ]);
     const groupPrice = await groupDiscountApplies(tenantId);
+    // A card is only really discounted once the coupon exists, because Stripe
+    // owns that charge. Showing a cheaper dollar price than the one about to be
+    // taken is the same failure as showing a dearer one.
+    const cardReady = !!process.env.STRIPE_COUPON_GROUP10;
 
     return reply.send({
       success: true,
@@ -320,7 +324,7 @@ export async function billingRoutes(app: FastifyInstance) {
         // Already discounted. Showing the list price beside a cheaper charge —
         // or the reverse — is the one thing a billing screen must never do.
         bkashPricesBdt: discountedPrices(BKASH_PLAN_BDT, groupPrice),
-        groupDiscount: { applies: groupPrice, rate: GROUP_DISCOUNT_RATE },
+        groupDiscount: { applies: groupPrice, rate: GROUP_DISCOUNT_RATE, cardReady },
         entitlement: {
           propertyLimit: entitlement.propertyLimit,
           roomLimit: entitlement.roomLimit,
@@ -330,7 +334,18 @@ export async function billingRoutes(app: FastifyInstance) {
         },
         // The dashboard only receives plans that an owner can choose without
         // speaking to us. Legacy/custom Enterprise stays out of self-serve UI.
-        planConfigs: planConfigs.filter((plan) => isSelfServePlanKey(plan.key)),
+        // Priced here rather than on the page, so one answer covers the card
+        // price, the bKash price and whatever is actually charged.
+        planConfigs: planConfigs
+          .filter((plan) => isSelfServePlanKey(plan.key))
+          .map((plan) => (groupPrice && cardReady
+            ? {
+              ...plan,
+              price: discountedUsd(plan.price, true),
+              ...(plan.annualPrice !== undefined && { annualPrice: discountedUsd(plan.annualPrice, true) }),
+              listPrice: plan.price,
+            }
+            : { ...plan, listPrice: plan.price })),
       },
     });
   });
