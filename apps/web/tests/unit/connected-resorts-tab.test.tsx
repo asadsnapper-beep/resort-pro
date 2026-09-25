@@ -54,6 +54,8 @@ vi.mock('@/store/auth', () => ({
   useAuthStore: (select: (s: unknown) => unknown) => select({ tenant: { id: 't1' }, setAuth: vi.fn() }),
 }));
 vi.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }));
+const toast = vi.fn();
+vi.mock('@/hooks/use-toast', () => ({ toast: (arg: unknown) => toast(arg) }));
 
 import { ConnectedResortsTab } from '@/components/dashboard/ConnectedResortsTab';
 
@@ -81,6 +83,7 @@ beforeEach(() => {
   disconnect.mockReset();
   newResort.mockReset();
   link.mockReset();
+  toast.mockReset();
   getEvents.mockResolvedValue({ data: { data: [] } });
   getConnection.mockResolvedValue({ data: { data: null } });
   group(null);
@@ -248,5 +251,40 @@ describe('connecting a resort that already exists', () => {
   it('will not send an empty address', () => {
     mount();
     expect((screen.getByText('Connect') as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+
+describe('the ways a person actually submits it', () => {
+  const type = (value: string) =>
+    fireEvent.change(screen.getByLabelText(/Its web address/), { target: { value } });
+
+  it('connects when the address field is submitted with Enter', async () => {
+    // Staging clicked four times and saw nothing: the field sat outside a form,
+    // so Enter — the natural thing to press after typing an address — did
+    // literally nothing. No request, no error, no toast.
+    link.mockResolvedValue({ data: { data: { status: 'connected' } } });
+    mount();
+
+    type('hill-view');
+    fireEvent.submit(screen.getByLabelText(/Its web address/).closest('form')!);
+
+    await waitFor(() => expect(link).toHaveBeenCalledWith('hill-view'));
+  });
+
+  it('says what to do instead of leaving a dead button', async () => {
+    mount();
+    expect(await screen.findByText(/Type the other resort/)).toBeTruthy();
+    expect((screen.getByText('Connect') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('announces the outcome where it cannot be scrolled past', async () => {
+    link.mockResolvedValue({ data: { data: { status: 'requested' } } });
+    mount();
+
+    type('hill-view');
+    fireEvent.click(screen.getByText('Connect'));
+
+    await waitFor(() => expect(toast).toHaveBeenCalled());
+    expect(toast.mock.calls[0][0].title).toMatch(/asked its owner/);
   });
 });

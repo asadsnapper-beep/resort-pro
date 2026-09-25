@@ -201,7 +201,8 @@
     "errNoOwner": "That resort has no verified owner to ask.",
     "errLimit": "You have as many resorts connected as one account can hold.",
     "errTooSoon": "That was just asked. Give them a minute.",
-    "errGeneric": "That did not go through. Try again."
+    "errGeneric": "That did not go through. Try again.",
+    "connectHint": "Type the other resort’s address to connect it."
   },
   "addResort": {
     "title": "Open another resort",

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { resortGroupApi } from '@/lib/api';
+import { toast } from '@/hooks/use-toast';
 import { useAuthStore } from '@/store/auth';
 import { useResortGroup, type GroupResort } from '@/hooks/use-resort-group';
 import { AddResortModal, slugify } from './AddResortModal';
@@ -99,14 +100,14 @@ export function ConnectedResortsTab() {
     setConnectResult(null);
     try {
       const { data } = await resortGroupApi.link(slug);
-      if (data.data?.status === 'connected') {
-        setConnectResult({ kind: 'connected', message: say('connected', 'Connected.') });
-      } else {
-        setConnectResult({
-          kind: 'requested',
+      const outcome = data.data?.status === 'connected'
+        ? { kind: 'connected' as const, message: say('connected', 'Connected.') }
+        : {
+          kind: 'requested' as const,
           message: say('requested', 'We have asked its owner. It will appear here once they agree.'),
-        });
-      }
+        };
+      setConnectResult(outcome);
+      toast({ title: outcome.message });
       setConnectSlug('');
       await queryClient.invalidateQueries();
     } catch (err) {
@@ -120,10 +121,9 @@ export function ConnectedResortsTab() {
         GROUP_LIMIT_REACHED: say('errLimit', 'You have as many resorts connected as one account can hold.'),
         REQUEST_TOO_SOON: say('errTooSoon', 'That was just asked. Give them a minute.'),
       };
-      setConnectResult({
-        kind: 'error',
-        message: messages[code ?? ''] ?? say('errGeneric', 'That did not go through. Try again.'),
-      });
+      const message = messages[code ?? ''] ?? say('errGeneric', 'That did not go through. Try again.');
+      setConnectResult({ kind: 'error', message });
+      toast({ title: message, variant: 'destructive' });
     } finally {
       setBusy(false);
     }
@@ -165,7 +165,10 @@ export function ConnectedResortsTab() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-end gap-2">
+        <form
+          className="flex flex-wrap items-end gap-2"
+          onSubmit={(e) => { e.preventDefault(); void connect(); }}
+        >
           <label className="min-w-0 flex-1">
             <span className="block text-rp-label font-medium text-rp-text">
               {say('connectLabel', 'Its web address')}
@@ -179,14 +182,19 @@ export function ConnectedResortsTab() {
             />
           </label>
           <button
-            type="button"
+            type="submit"
             disabled={busy || slugify(connectSlug).length < 2}
-            onClick={() => void connect()}
             className="rounded-rp-btn border border-rp-border-md px-4 py-2 text-rp-body font-semibold text-rp-text disabled:opacity-60"
           >
             {say('connectAction', 'Connect')}
           </button>
-        </div>
+        </form>
+
+        {slugify(connectSlug).length < 2 && (
+          <p className="text-rp-micro text-rp-muted">
+            {say('connectHint', 'Type the other resort\u2019s address to connect it.')}
+          </p>
+        )}
 
         {connectResult && (
           <p
