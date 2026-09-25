@@ -133,6 +133,49 @@ export interface GroupView {
   }[];
 }
 
+
+/**
+ * The group this person belongs to, seen from wherever they are standing.
+ *
+ * Owning a group is recorded against one `User` row — the one in the resort the
+ * group was built from. But a person switching into a connected resort arrives
+ * as a *different* user row there, so looking the group up by the current
+ * token's `sub` alone finds nothing: the dropdown disappears, the 360 view
+ * 404s, and there is no way back. Staging found this by walking into the second
+ * resort, which no test had done.
+ *
+ * So there are two ways to reach the same group, and both mean the same human:
+ * owning it, or being the account a membership of the resort you are in was
+ * granted to.
+ *
+ * The second is deliberately scoped to the current tenant. A linked account
+ * unlocks the group only from inside the resort it belongs to, never by
+ * claiming one from somewhere else.
+ */
+async function groupIdFor(userId: string, tenantId: string): Promise<string | null> {
+  const owned = await prisma.resortGroup.findFirst({
+    where: { ownerUserId: userId },
+    select: { id: true },
+  });
+  if (owned) return owned.id;
+
+  const asMember = await prisma.resortGroupTenant.findFirst({
+    where: { tenantId, linkedUserId: userId },
+    select: { groupId: true },
+  });
+  return asMember?.groupId ?? null;
+}
+
+/** The same group, with the fields most callers want. */
+async function groupFor(userId: string, tenantId: string) {
+  const id = await groupIdFor(userId, tenantId);
+  if (!id) return null;
+  return prisma.resortGroup.findUnique({
+    where: { id },
+    select: { id: true, name: true, ownerUserId: true, payerTenantId: true },
+  });
+}
+
 /**
  * The group this user owns, or null.
  *
@@ -141,11 +184,14 @@ export interface GroupView {
  * second resort has a row to find.
  */
 export async function loadGroupForOwner(
-  ownerUserId: string,
+  userId: string,
   currentTenantId: string,
 ): Promise<GroupView | null> {
-  const group = await prisma.resortGroup.findFirst({
-    where: { ownerUserId },
+  const groupId = await groupIdFor(userId, currentTenantId);
+  if (!groupId) return null;
+
+  const group = await prisma.resortGroup.findUnique({
+    where: { id: groupId },
     include: {
       members: {
         orderBy: { createdAt: 'asc' },
@@ -285,10 +331,7 @@ export async function resortGroupRoutes(app: FastifyInstance) {
         prisma.resortGroupTenant.findUnique({ where: { tenantId: target.id }, select: { groupId: true } }),
         prisma.resortGroupTenant.findUnique({ where: { tenantId: me.tenantId }, select: { groupId: true } }),
       ]);
-      const myGroup = await prisma.resortGroup.findFirst({
-        where: { ownerUserId: me.id },
-        select: { id: true },
-      });
+      const myGroup = await groupFor(me.id, me.tenantId);
 
       if (targetMembership && targetMembership.groupId !== myGroup?.id) {
         return reply.status(409).send({
@@ -476,7 +519,9 @@ export async function resortGroupRoutes(app: FastifyInstance) {
         });
       }
 
-      const isGroupOwner = member.group.ownerUserId === user.sub;
+      // From wherever they are standing: disconnecting from inside a connected
+      // resort is the same person doing the same thing.
+      const isGroupOwner = await groupIdFor(user.sub, user.tenantId) === member.group.id;
       const isOwnResort = member.tenantId === user.tenantId;
       if (!isGroupOwner && !isOwnResort) {
         return reply.status(403).send({
@@ -543,10 +588,7 @@ export async function resortGroupRoutes(app: FastifyInstance) {
     preHandler: requireAuth,
     handler: async (request, reply) => {
       const user = request.user as JwtPayload;
-      const group = await prisma.resortGroup.findFirst({
-        where: { ownerUserId: user.sub },
-        select: { id: true, name: true },
-      });
+      const group = await groupFor(user.sub, user.tenantId);
       if (!group) {
         return reply.status(404).send({
           success: false, error: 'You have no connected resorts.', code: 'NO_RESORT_GROUP',
@@ -957,15 +999,13 @@ export async function resortGroupRoutes(app: FastifyInstance) {
     handler: async (request, reply) => {
       const user = request.user as JwtPayload;
 
-      const myGroup = await prisma.resortGroup.findFirst({
-        where: { ownerUserId: user.sub }, select: { id: true },
-      });
+      const myGroupId = await groupIdFor(user.sub, user.tenantId);
       const membership = await prisma.resortGroupTenant.findUnique({
         where: { tenantId: user.tenantId }, select: { groupId: true },
       });
 
-      const where = myGroup
-        ? { groupId: myGroup.id }
+      const where = myGroupId
+        ? { groupId: myGroupId }
         : membership
           ? { groupId: membership.groupId, tenantId: user.tenantId }
           : null;

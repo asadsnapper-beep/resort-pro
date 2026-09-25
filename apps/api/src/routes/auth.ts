@@ -575,10 +575,18 @@ export async function authRoutes(app: FastifyInstance) {
 
       // Membership is not what allows this — owning the group is. A resort can
       // sit in somebody else's group without its staff gaining anything.
-      const group = await prisma.resortGroup.findFirst({
-        where: { ownerUserId: caller.id },
-        select: { id: true },
+      // Resolved from where the caller is standing, not from the token's user id
+      // alone: after one switch they are a different user row, and looking only
+      // for a group they *own* strands them in the resort they moved to.
+      const owned = await prisma.resortGroup.findFirst({
+        where: { ownerUserId: caller.id }, select: { id: true },
       });
+      const viaMembership = owned ? null : await prisma.resortGroupTenant.findFirst({
+        where: { tenantId: caller.tenantId, linkedUserId: caller.id },
+        select: { groupId: true },
+      });
+      const groupId = owned?.id ?? viaMembership?.groupId ?? null;
+      const group = groupId ? { id: groupId } : null;
       const member = group
         ? await prisma.resortGroupTenant.findFirst({
           where: { groupId: group.id, tenantId: body.tenantId },

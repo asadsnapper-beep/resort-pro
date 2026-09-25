@@ -178,12 +178,25 @@ async function groupBill(groupId: string, interval: 'month' | 'year'): Promise<
   return { ok: true, lines, total: lines.reduce((sum, l) => sum + l.amount, 0) };
 }
 
-/** The group this user owns, or null. Owning it is what allows paying for it. */
-function ownedGroup(userId: string) {
-  return prisma.resortGroup.findFirst({
+/**
+ * The group this person belongs to, from whichever resort they are in.
+ *
+ * Owning it is recorded against one user row, but the same person arrives in a
+ * connected resort as a different row — and a combined bill that vanishes the
+ * moment you switch resorts is worse than no combined bill.
+ */
+async function ownedGroup(userId: string, tenantId: string) {
+  const owned = await prisma.resortGroup.findFirst({
     where: { ownerUserId: userId },
     select: { id: true, name: true, payerTenantId: true },
   });
+  if (owned) return owned;
+
+  const asMember = await prisma.resortGroupTenant.findFirst({
+    where: { tenantId, linkedUserId: userId },
+    select: { group: { select: { id: true, name: true, payerTenantId: true } } },
+  });
+  return asMember?.group ?? null;
 }
 
 // ── Auth helper ────────────────────────────────────────────────────────────
@@ -582,10 +595,10 @@ export async function billingRoutes(app: FastifyInstance) {
     async (request, reply) => {
       await requireAuth(request, reply, { ownerOnly: true });
       if (reply.sent) return;
-      const { sub } = request.user as any;
+      const { sub, tenantId } = request.user as any;
       const interval = request.query.interval === 'year' ? 'year' : 'month';
 
-      const group = await ownedGroup(sub);
+      const group = await ownedGroup(sub, tenantId);
       if (!group) return reply.send({ success: true, data: null });
 
       const bill = await groupBill(group.id, interval);
@@ -620,7 +633,7 @@ export async function billingRoutes(app: FastifyInstance) {
       const { sub, tenantId } = request.user as any;
       const interval = request.body?.interval === 'year' ? 'year' : 'month';
 
-      const group = await ownedGroup(sub);
+      const group = await ownedGroup(sub, tenantId);
       if (!group) {
         return reply.status(404).send({
           success: false, error: 'You have no connected resorts.', code: 'NO_RESORT_GROUP',
