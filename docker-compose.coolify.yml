@@ -99,6 +99,20 @@ services:
       STRIPE_PRICE_PRO_ANNUAL: ${STRIPE_PRICE_PRO_ANNUAL:-}
       STRIPE_PRICE_ENTERPRISE: ${STRIPE_PRICE_ENTERPRISE:-}
       STRIPE_PRICE_ENTERPRISE_ANNUAL: ${STRIPE_PRICE_ENTERPRISE_ANNUAL:-}
+      # ResortPro's own bKash merchant account — what subscription payments are
+      # taken through. getPlatformBkash() needs all four; with any of them unset
+      # /billing/checkout/bkash answers 503 and the "Pay with bKash" button is
+      # not rendered at all, so no customer can subscribe.
+      #
+      # These were missing everywhere on 2026-09-27: not in this file, not in
+      # Coolify's variable list, not in Coolify's stored compose. Remember that
+      # Coolify keeps its own copy of this compose in its database and the
+      # deploy only rewrites the image tags in it — adding lines here does not
+      # put them on production. They have to be typed into Coolify as well.
+      BKASH_APP_KEY: ${BKASH_APP_KEY:-}
+      BKASH_APP_SECRET: ${BKASH_APP_SECRET:-}
+      BKASH_USERNAME: ${BKASH_USERNAME:-}
+      BKASH_PASSWORD: ${BKASH_PASSWORD:-}
       BKASH_PRICE_FREE: ${BKASH_PRICE_FREE:-}
       BKASH_PRICE_FREE_ANNUAL: ${BKASH_PRICE_FREE_ANNUAL:-}
       LAUNCH_PROMOTION_ENABLED: ${LAUNCH_PROMOTION_ENABLED:-false}

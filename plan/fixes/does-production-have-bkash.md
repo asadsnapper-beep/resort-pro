@@ -104,8 +104,11 @@ From anywhere, with no login needed, confirm the API is the build you think it
 is and is answering:
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" https://resortpro.site/api/health
+curl -s -o /dev/null -w "%{http_code}\n" https://api.resortpro.site/health
 ```
+
+(`https://resortpro.site/api/health` is a 404 — that path is not routed to the
+API on production. Corrected after the first run of this file.)
 
 Then, if you have an owner login on production, the honest end-to-end check is
 simply whether the **"Pay with bKash" button appears** on

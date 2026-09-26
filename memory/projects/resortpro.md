@@ -403,6 +403,20 @@ Do not re-discover these; do not claim any of them is done without checking.
   August were lost this way and cannot be recovered. The `uploads_data` volume
   and `STORAGE_LOCAL_DIR` are now in Coolify's compose, verified the only way
   that counts: upload a file, count it, redeploy, count again — 1 and 1.
+- **Production cannot take a payment (verified 2026-09-27).** All four of
+  `BKASH_APP_KEY`, `BKASH_APP_SECRET`, `BKASH_USERNAME`, `BKASH_PASSWORD` are
+  missing from the running api container, from Coolify's variable list, and
+  from Coolify's stored compose — they were never added anywhere. So
+  `getPlatformBkash()` is null, `/billing/checkout/bkash` answers 503 and the
+  "Pay with bKash" button never renders. **This is the single thing standing
+  between the product and a paying customer.** Fixing it needs the merchant
+  credentials from bKash plus two hand-edits in Coolify (the variables *and*
+  the four pass-through lines in its stored compose — git's copy is not live).
+  `RESEND_API_KEY` and `WEB_URL` are set, so email works; `EMAIL_FROM` and
+  `APP_URL` are unset but harmless, the code defaults both. Production's health
+  path is `https://api.resortpro.site/health` — `resortpro.site/api/health`
+  is a 404. Check with
+  [plan/fixes/does-production-have-bkash.md](../../plan/fixes/does-production-have-bkash.md).
 - **Production has both a backup and a worker** — see "Backups" above.
   Coolify's own scheduled-backup feature does not apply, because production's
   postgres lives inside the service compose rather than being a standalone
