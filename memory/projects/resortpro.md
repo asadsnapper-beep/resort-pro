@@ -475,6 +475,13 @@ Do not re-discover these; do not claim any of them is done without checking.
 - Restaurant billing remainder: COMPLIMENTARY/CORPORATE settlement, the QR
   token flow, and reporting.
 
+## The handover list
+
+**[plan/handover-checklist.md](../../plan/handover-checklist.md) is the one
+list** of what stands between the product and a resort owner using it, who owns
+each item, and what has been deliberately deferred. Start there when the
+question is "what is left" rather than "how does this work".
+
 ## Always read for a task
 
 | Task type | Read first |
