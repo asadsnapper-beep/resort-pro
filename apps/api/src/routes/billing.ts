@@ -199,6 +199,37 @@ async function ownedGroup(userId: string, tenantId: string) {
   return asMember?.group ?? null;
 }
 
+
+/**
+ * A payment that was captured but could not be applied.
+ *
+ * Once bKash has taken the money, nothing that happens afterwards may end with
+ * the payer being told their payment failed — they would go looking for a
+ * refund of something the screen says never happened. So every path after
+ * capture lands here instead: the payment is recorded loudly for support and
+ * the payer is told the truth, which is that we have their money and are
+ * sorting it out.
+ */
+async function paymentHeldForReview(input: {
+  appUrl: string;
+  trxID?: string;
+  amount?: string | number;
+  reason: string;
+  detail: Record<string, unknown>;
+}) {
+  await createAdminNotification({
+    type: 'subscription_paid',
+    title: 'bKash payment received but NOT applied',
+    message: `৳${input.amount ?? '?'} was captured (trxID ${input.trxID ?? 'unknown'}) and could not be applied: ${input.reason}. Apply it by hand or refund it.`,
+    metadata: { ...input.detail, trxID: input.trxID, amount: input.amount, reason: input.reason, method: 'bkash' },
+    linkPath: '/admin/billing',
+  }).catch(() => { /* the alert failing must not hide the payment as well */ });
+
+  return `${input.appUrl}/dashboard/billing?paid=1&applied=0`
+    + `&ref=${encodeURIComponent(String(input.trxID ?? ''))}`
+    + `&reason=${encodeURIComponent(input.reason)}`;
+}
+
 // ── Auth helper ────────────────────────────────────────────────────────────
 /**
  * `ownerOnly` guards everything that can spend the resort's money or expose
@@ -562,12 +593,17 @@ export async function billingRoutes(app: FastifyInstance) {
 
         const plan = planKey;
         const days = interval === 'year' ? 365 : 30;
-        const periodEnd = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
         // Same "first activation → onboarding wizard, later upgrade → billing
         // page" distinction as the Stripe /checkout path — captured before
         // the update below flips planStatus to 'active'.
-        const before = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { planStatus: true, onboardingCompletedAt: true } });
+        const before = await prisma.tenant.findUnique({
+          where: { id: tenantId },
+          select: { planStatus: true, onboardingCompletedAt: true, currentPeriodEnd: true },
+        });
+        // Through the same helper the combined bill uses. Renewing a week early
+        // used to start the new period today and throw that week away.
+        const periodEnd = extendPeriod(before?.currentPeriodEnd, days);
         const isFirstActivation = before?.planStatus === 'incomplete';
 
         await prisma.tenant.update({
@@ -722,17 +758,41 @@ export async function billingRoutes(app: FastifyInstance) {
       const cfg = getPlatformBkash();
       if (!cfg) return fail('not_configured');
 
+      // ── Before the money moves ────────────────────────────────────────────
+      // Everything here may still answer "cancelled": nothing has been taken.
+      let exec: Awaited<ReturnType<typeof bkashExecutePayment>>;
       try {
         const idToken = await bkashGrantToken(cfg);
-        const exec = await bkashExecutePayment(cfg, idToken, paymentID);
-        if (exec.transactionStatus !== 'Completed') return fail('payment_incomplete');
+        exec = await bkashExecutePayment(cfg, idToken, paymentID);
+      } catch (err: any) {
+        request.log.error({ err }, 'bKash group payment could not be executed');
+        return fail('execute_failed');
+      }
+      if (exec.transactionStatus !== 'Completed') return fail('payment_incomplete');
 
-        const bill = await groupBill(groupId, interval);
-        if (!bill.ok) return fail('amount_mismatch');
-        if (Math.abs(Number(exec.amount) - bill.total) > 0.5) return fail('amount_mismatch');
+      // ── The money is ours now ─────────────────────────────────────────────
+      // From this line on the payer has paid. No branch below may redirect to
+      // "cancelled": whatever goes wrong, they are owed either the service or
+      // an honest "we have it, we are looking".
+      const held = (reason: string, detail: Record<string, unknown> = {}) =>
+        paymentHeldForReview({
+          appUrl, trxID: exec.trxID, amount: exec.amount, reason,
+          detail: { groupId, interval, payerTenantId, ...detail },
+        }).then((url) => reply.redirect(url));
 
-        const days = interval === 'year' ? 365 : 30;
-        const now = Date.now();
+      const bill = await groupBill(groupId, interval).catch(() => null);
+      if (!bill || !bill.ok) {
+        // The group changed between checkout and coming back — a resort was
+        // suspended, disconnected, or moved to a negotiated plan.
+        return held('the group could no longer be priced');
+      }
+      if (Math.abs(Number(exec.amount) - bill.total) > 0.5) {
+        return held('the amount paid no longer matches the group', { expected: bill.total });
+      }
+
+      const days = interval === 'year' ? 365 : 30;
+      const now = Date.now();
+      try {
         // Each resort is extended from whichever is later: now, or the end of
         // the period it has already paid for. Starting every one at "now" would
         // quietly take back days a resort had already bought.
@@ -744,13 +804,21 @@ export async function billingRoutes(app: FastifyInstance) {
             priceProtectedUntil: new Date(now + 365 * 24 * 60 * 60 * 1000),
           },
         })));
+      } catch (err: any) {
+        request.log.error({ err }, 'bKash group payment captured but periods not extended');
+        return held('the resorts could not be extended');
+      }
+
+      // ── Bookkeeping ───────────────────────────────────────────────────────
+      // Flags, the audit row, the payer, the admin note. The payer has their
+      // service; none of this may turn a paid subscription into a failure
+      // message on their screen.
+      try {
         for (const line of bill.lines) {
           await applyPlanFlagsToTenant(line.tenantId, line.plan);
         }
         if (payerTenantId) {
-          await prisma.resortGroup.update({
-            where: { id: groupId }, data: { payerTenantId },
-          }).catch(() => { /* the payment stands even if this bookkeeping does not */ });
+          await prisma.resortGroup.update({ where: { id: groupId }, data: { payerTenantId } });
         }
         await prisma.resortGroupEvent.create({
           data: {
@@ -758,7 +826,6 @@ export async function billingRoutes(app: FastifyInstance) {
             metadata: { interval, total: bill.total, trxID: exec.trxID, resorts: bill.lines.length },
           },
         });
-
         await createAdminNotification({
           type: 'subscription_paid',
           title: 'Subscription paid (bKash, several resorts)',
@@ -766,12 +833,11 @@ export async function billingRoutes(app: FastifyInstance) {
           metadata: { groupId, interval, trxID: exec.trxID, amount: exec.amount, method: 'bkash', tenantIds: bill.lines.map((l) => l.tenantId) },
           linkPath: '/admin/billing',
         });
-
-        return reply.redirect(`${appUrl}/dashboard/billing?success=1&method=bkash&resorts=${bill.lines.length}`);
       } catch (err: any) {
-        request.log.error({ err }, 'bKash group subscription callback failed');
-        return fail('execute_failed');
+        request.log.error({ err, trxID: exec.trxID }, 'bKash group payment applied, bookkeeping failed');
       }
+
+      return reply.redirect(`${appUrl}/dashboard/billing?success=1&method=bkash&resorts=${bill.lines.length}`);
     },
   );
 

@@ -263,3 +263,59 @@ describe('the charge and the check agree', () => {
     expect(callback).toContain('extendPeriod(line.currentPeriodEnd');
   });
 });
+
+describe('once the money has moved', () => {
+  /**
+   * bKash cannot be driven from a test, so the callback is read rather than
+   * run — the same approach as the pricing guard above.
+   *
+   * What it holds in place is a single rule: after `bkashExecutePayment`
+   * captures, no path may tell the payer their payment failed. They would go
+   * looking for a refund of something the screen says never happened. Every
+   * branch after capture must either give them the service or say, honestly,
+   * that we have their money and are looking into it.
+   */
+  const source = readFileSync(join(__dirname, '../../src/routes/billing.ts'), 'utf8');
+  const callback = source.slice(
+    source.indexOf("'/bkash/group-callback'"),
+    source.indexOf('// GET /billing/invoices'),
+  );
+  const afterCapture = callback.slice(callback.indexOf('The money is ours now'));
+
+  it('captures before it decides anything, and never calls that a cancellation', () => {
+    expect(callback).toContain('The money is ours now');
+    // `fail()` redirects to ?canceled=1 — it may only be used before capture.
+    expect(afterCapture).not.toMatch(/\bfail\(/);
+  });
+
+  it('holds a payment it cannot price, instead of keeping it quietly', () => {
+    expect(afterCapture).toContain("held('the group could no longer be priced')");
+    expect(afterCapture).toContain('the amount paid no longer matches the group');
+  });
+
+  it('holds a payment whose resorts could not be extended', () => {
+    expect(afterCapture).toContain("held('the resorts could not be extended')");
+  });
+
+  it('lets bookkeeping fail without turning a paid subscription into an error', () => {
+    const bookkeeping = afterCapture.slice(afterCapture.indexOf('Bookkeeping'));
+    expect(bookkeeping).toContain('applyPlanFlagsToTenant');
+    expect(bookkeeping).toContain('bookkeeping failed');
+    // It ends in success regardless.
+    expect(bookkeeping).toContain('success=1&method=bkash');
+  });
+
+  it('tells support in a way that names the transaction', () => {
+    expect(source).toContain('bKash payment received but NOT applied');
+    expect(source).toContain('Apply it by hand or refund it');
+  });
+
+  it('extends a single resort through the same helper, keeping days it bought', () => {
+    const single = source.slice(
+      source.indexOf("'/bkash/callback'"),
+      source.indexOf("'/bkash/group-callback'"),
+    );
+    expect(single).toContain('extendPeriod(before?.currentPeriodEnd, days)');
+    expect(single).not.toContain('new Date(Date.now() + days *');
+  });
+});

@@ -154,6 +154,13 @@ export default function BillingPage() {
     if (searchParams.get('canceled') === '1') toast({ title: 'Checkout cancelled', description: 'No changes were made.', variant: 'destructive' });
   }, [searchParams]);
 
+  // Money arrived but could not be applied. Saying "cancelled" here would send
+  // an owner looking for a refund of something the screen claims never
+  // happened, so it says what is true and stays on the page.
+  const heldPayment = searchParams.get('paid') === '1' && searchParams.get('applied') === '0'
+    ? { ref: searchParams.get('ref') ?? '', reason: searchParams.get('reason') ?? '' }
+    : null;
+
   useEffect(() => {
     Promise.all([billingApi.getStatus(), billingApi.getInvoices()])
       .then(([statusRes, invoicesRes]) => {
@@ -222,6 +229,25 @@ export default function BillingPage() {
         title="Billing & Subscription"
         subtitle="Manage your plan and payment details"
       />
+
+      {heldPayment && (
+        <div role="alert" className="rounded-rp-card border border-rp-border bg-rp-amber-bg p-4">
+          <p className="text-rp-body font-semibold text-rp-text">
+            We have your payment — it is not on your account yet
+          </p>
+          <p className="mt-1 text-rp-body text-rp-text">
+            The payment went through, but something changed while it was being made, so we
+            have not applied it automatically. Our team has been told and will sort it out.
+            Please do not pay again.
+          </p>
+          {heldPayment.ref && (
+            <p className="mt-2 text-rp-meta text-rp-muted">
+              Reference <span className="font-mono">{heldPayment.ref}</span>
+              {heldPayment.reason ? ` · ${heldPayment.reason}` : ''}
+            </p>
+          )}
+        </div>
+      )}
 
       <GroupBillPanel />
 
