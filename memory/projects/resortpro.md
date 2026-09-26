@@ -426,7 +426,13 @@ Do not re-discover these; do not claim any of them is done without checking.
   guarded to refuse any tenant that is not both slug `demo` and `isDemo`.
   Nothing detects this drift today; a deploy-time comparison that fails on
   divergence would close the whole class.
-- **Deleting a guest does not delete their ID photograph.** `GuestDocument`
+- ~~Deleting a guest does not delete their ID photograph.~~ **Closed
+  2026-09-26.** `utils/guest-documents.ts` purges the files, and all four paths
+  use it: deleting a guest, GDPR erasure (which never touched them at all — an
+  "anonymised" resort kept every passport readable), the admin hard delete, and
+  staging's nightly demo refresh. Files go before rows, so a failure leaves
+  something to retry. The four orphans already on staging predate this and
+  still need sweeping by hand. Original note: `GuestDocument`
   cascades from both `Guest` and `Tenant`, so the rows go; the file on disk is
   only ever removed by the explicit `DELETE /guests/:id/documents/:docId`
   route. Every other path — deleting a guest, deleting a tenant, staging's

@@ -10,6 +10,7 @@ import type { FastifyInstance } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { prisma, Prisma } from '@resort-pro/database';
 import { refreshTokenPayload } from '../utils/refresh-token';
+import { purgeGuestDocumentFiles } from '../utils/guest-documents';
 import { PLAN_PRICING } from '@resort-pro/types';
 import { ok } from '../utils/response';
 
@@ -466,6 +467,11 @@ export async function adminRoutes(app: FastifyInstance) {
       metadata: { plan: tenant.plan, planStatus: tenant.planStatus, slug: tenant.slug, ...extraMetadata },
       ipAddress,
     });
+
+    // The rows cascade; the passport and NID photographs they name do not.
+    // Deleting the tenant without this leaves its guests' identity documents
+    // on disk with nothing left that knows they exist.
+    await purgeGuestDocumentFiles({ tenantId: tenant.id });
 
     await prisma.tenant.delete({ where: { id: tenant.id } });
 

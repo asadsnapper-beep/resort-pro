@@ -12,6 +12,7 @@ import {
   VehicleType, VehicleAvailability, RentalStatus,
 } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { purgeGuestDocumentFiles } from '../utils/guest-documents';
 
 const prisma = new PrismaClient();
 
@@ -201,6 +202,9 @@ export async function seedDemo(opts: { refresh?: boolean } = {}) {
     // Relations cascade from Tenant (migration 20260809000000_tenant_delete_cascade_relations),
     // so this clears operational data, config rows and users in one step —
     // everything below recreates them.
+    // Staging is left holding orphaned ID scans otherwise — it already had
+    // four against zero guest_documents rows.
+    await purgeGuestDocumentFiles({ tenantId: existing.id });
     await prisma.tenant.delete({ where: { id: existing.id } });
     console.log('♻️  Refresh: previous demo tenant removed, rebuilding with today\'s dates…');
   } else if (existing) {
