@@ -322,6 +322,11 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
 - **The confirmation email reaches a guest twice** after a gateway payment:
   `payments.ts` calls `sendBookingConfirmation` from both the verify callback
   and the webhook. The SMS path dedupes; the email path does not yet.
+- **A failed guest notification is retried now (2026-09-26).** The dedupe row
+  used to be kept on failure, so the unique key turned every later trigger into
+  a silent no-op — one flaky minute at the provider and the guest was never
+  told at all. `claimMessage` reclaims a `failed` row, or a `sending` one
+  abandoned for ten minutes; a delivered one is never repeated.
 - **Several resorts is now an account-per-resort design, not a property
   filter (2026-09-19).** The founder settled it after a long discussion: each
   resort keeps its own ResortPro account and subscription and runs exactly as

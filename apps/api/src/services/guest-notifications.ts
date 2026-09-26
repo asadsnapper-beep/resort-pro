@@ -147,6 +147,68 @@ type Outcome =
   /** Nothing was attempted — release the claim so a later trigger may send. */
   | null;
 
+/**
+ * How long a message may sit half-sent before another trigger may take it on.
+ *
+ * A claim is marked `sending` and then updated when the provider answers. If
+ * the process dies in between — a deploy, a crash — the row stays `sending`
+ * forever and blocks every later attempt. Sends take seconds, so ten minutes
+ * is far past any honest one and safely short of never.
+ */
+const STALE_CLAIM_MS = 10 * 60 * 1000;
+
+/**
+ * Take ownership of this message, or find that somebody else has it.
+ *
+ * The row exists to stop a guest being told twice when two payment callbacks
+ * fire for the same booking. It was stopping rather more than that: a *failed*
+ * attempt kept the row, so the unique key turned every later trigger into a
+ * silent no-op and the guest was never contacted at all. One flaky minute at
+ * the provider meant a confirmation that never arrived, and the webhook that
+ * used to cover for the verify callback could no longer do so.
+ *
+ * So a delivered message is never repeated, an in-flight one is left alone,
+ * and a failed or abandoned one is fair game. The conditional update is what
+ * makes that safe against two triggers racing — the same shape as
+ * reservePlatformMessage.
+ */
+async function claimMessage(
+  tenantId: string,
+  bookingId: string,
+  event: string,
+  channel: Channel | 'email',
+): Promise<string | null> {
+  try {
+    const row = await prisma.guestNotification.create({
+      data: { tenantId, bookingId, event, channel, status: 'sending' },
+      select: { id: true },
+    });
+    return row.id;
+  } catch (e) {
+    if ((e as { code?: string }).code !== 'P2002') throw e;
+  }
+
+  const { count } = await prisma.guestNotification.updateMany({
+    where: {
+      bookingId,
+      event,
+      channel,
+      OR: [
+        { status: 'failed' },
+        { status: 'sending', updatedAt: { lt: new Date(Date.now() - STALE_CLAIM_MS) } },
+      ],
+    },
+    data: { status: 'sending', via: null, providerId: null, detail: null },
+  });
+  if (count === 0) return null;
+
+  const row = await prisma.guestNotification.findUnique({
+    where: { bookingId_event_channel: { bookingId, event, channel } },
+    select: { id: true },
+  });
+  return row?.id ?? null;
+}
+
 async function sendOnce(
   tenantId: string,
   bookingId: string,
@@ -154,18 +216,9 @@ async function sendOnce(
   send: () => Promise<Outcome>,
 ) {
   const event = 'booking_confirmed';
-  let rowId: string;
-  try {
-    const row = await prisma.guestNotification.create({
-      data: { tenantId, bookingId, event, channel, status: 'sending' },
-      select: { id: true },
-    });
-    rowId = row.id;
-  } catch (e) {
-    // Another trigger for the same booking already claimed this message.
-    if ((e as { code?: string }).code === 'P2002') return;
-    throw e;
-  }
+  const rowId = await claimMessage(tenantId, bookingId, event, channel);
+  // Somebody else is sending it, or it already went.
+  if (!rowId) return;
 
   let result: Outcome;
   try {

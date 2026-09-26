@@ -219,3 +219,63 @@ describe('the confirmation email', () => {
     expect(sendEmailMock).not.toHaveBeenCalled();
   });
 });
+
+describe('when the provider has a bad minute', () => {
+  /**
+   * The claim row exists to stop a guest being told twice. It was stopping
+   * rather more than that: a failed attempt kept the row, so every later
+   * trigger hit the unique key and returned silently. One flaky minute at the
+   * provider meant the confirmation never arrived at all — and the webhook
+   * that used to cover for the verify callback could no longer do so.
+   */
+  it('lets the next trigger try again, and the guest is told', async () => {
+    const id = await booking();
+
+    fetchMock.mockReturnValue(Promise.resolve(new Response('upstream down', { status: 502 })));
+    await notifyBookingConfirmed(id);
+    expect(await rows(id, 'sms')).toMatchObject([{ status: 'failed' }]);
+
+    // The webhook arrives a moment after the verify callback.
+    fetchMock.mockReturnValue(ok({ status: 'SUCCESS', status_code: 200, smsinfo: [{ reference_id: 'ref-2' }] }));
+    await notifyBookingConfirmed(id);
+
+    expect(await rows(id, 'sms')).toMatchObject([{ status: 'sent', providerId: 'ref-2' }]);
+    expect(await rows(id, 'sms')).toHaveLength(1);
+  });
+
+  it('still never tells the guest twice once it has worked', async () => {
+    const id = await booking();
+    await notifyBookingConfirmed(id);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await notifyBookingConfirmed(id);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves a message another trigger is in the middle of sending', async () => {
+    const id = await booking();
+    await prisma.guestNotification.create({
+      data: { tenantId, bookingId: id, event: 'booking_confirmed', channel: 'sms', status: 'sending' },
+    });
+
+    await notifyBookingConfirmed(id);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await rows(id, 'sms')).toMatchObject([{ status: 'sending' }]);
+  });
+
+  it('takes over one that was abandoned half-sent', async () => {
+    // A deploy or a crash between claiming and answering leaves the row
+    // `sending` forever, which would block the guest's message for good.
+    const id = await booking();
+    const stale = await prisma.guestNotification.create({
+      data: { tenantId, bookingId: id, event: 'booking_confirmed', channel: 'sms', status: 'sending' },
+    });
+    await prisma.$executeRaw`UPDATE guest_notifications SET "updatedAt" = NOW() - INTERVAL '30 minutes' WHERE id = ${stale.id}`;
+
+    await notifyBookingConfirmed(id);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(await rows(id, 'sms')).toMatchObject([{ status: 'sent' }]);
+  });
+});
