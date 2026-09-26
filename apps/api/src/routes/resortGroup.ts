@@ -375,20 +375,30 @@ export async function resortGroupRoutes(app: FastifyInstance) {
         where: { id: me.id }, select: { firstName: true, lastName: true },
       });
 
-      // The group has to exist before a request can point at it, so it is
-      // created either way — with this resort inside it, which is why the
-      // dropdown and the 360 entry both wait for a *second* resort rather than
-      // for a group.
-      const groupId = myGroup?.id ?? (await prisma.resortGroup.create({
-        data: { name: `${home.name} Group`, ownerUserId: me.id },
-      })).id;
-      if (!myMembership) {
-        await prisma.resortGroupTenant.create({
-          data: { groupId, tenantId: me.tenantId, access: 'FULL', linkedUserId: me.id },
-        });
-      }
+      /**
+       * Bring the group into being — but only once nothing can still refuse.
+       *
+       * This used to run before the remaining checks, so a request that was
+       * then turned away for having no owner to ask, or for being a second
+       * attempt inside a minute, left a one-resort group behind. That group is
+       * not harmless: the resort now counts as connected, which blocks it from
+       * ever being approved into somebody else's group, and no screen offers a
+       * way to take it back out.
+       */
+      const ensureGroup = async () => {
+        const id = myGroup?.id ?? (await prisma.resortGroup.create({
+          data: { name: `${home.name} Group`, ownerUserId: me.id },
+        })).id;
+        if (!myMembership) {
+          await prisma.resortGroupTenant.create({
+            data: { groupId: id, tenantId: me.tenantId, access: 'FULL', linkedUserId: me.id },
+          });
+        }
+        return id;
+      };
 
       if (owner) {
+        const groupId = await ensureGroup();
         await prisma.$transaction([
           prisma.resortGroupTenant.create({
             data: { groupId, tenantId: target.id, access: 'FULL', linkedUserId: owner.id },
@@ -408,6 +418,7 @@ export async function resortGroupRoutes(app: FastifyInstance) {
       }
 
       // ── Somebody else's resort: ask them ──────────────────────────────────
+      // Both refusals below come before anything is written.
       const targetOwner = await resortOwner(target.id);
       if (!targetOwner) {
         return reply.status(400).send({
@@ -417,10 +428,10 @@ export async function resortGroupRoutes(app: FastifyInstance) {
         });
       }
 
-      const pending = await prisma.resortLinkRequest.findFirst({
-        where: { groupId, tenantId: target.id, approvedAt: null, declinedAt: null },
+      const pending = myGroup ? await prisma.resortLinkRequest.findFirst({
+        where: { groupId: myGroup.id, tenantId: target.id, approvedAt: null, declinedAt: null },
         orderBy: { createdAt: 'desc' },
-      });
+      }) : null;
       if (pending && Date.now() - pending.createdAt.getTime() < RESEND_COOLDOWN_MS) {
         return reply.status(429).send({
           success: false,
@@ -428,6 +439,8 @@ export async function resortGroupRoutes(app: FastifyInstance) {
           code: 'REQUEST_TOO_SOON',
         });
       }
+
+      const groupId = await ensureGroup();
 
       // Asking again replaces the old token rather than leaving two live: the
       // owner should not have to work out which of two emails is the real one.
@@ -1004,21 +1017,25 @@ export async function resortGroupRoutes(app: FastifyInstance) {
         where: { tenantId: user.tenantId }, select: { groupId: true },
       });
 
+      // With no group at all, a resort still gets its own history. Connections
+      // end, and "who had access to my books last month" is a fair question
+      // after the fact — arguably the most important time to be able to ask it.
       const where = myGroupId
         ? { groupId: myGroupId }
         : membership
           ? { groupId: membership.groupId, tenantId: user.tenantId }
-          : null;
-      if (!where) {
+          : { tenantId: user.tenantId };
+
+      const events = await prisma.resortGroupEvent.findMany({
+        where, orderBy: { createdAt: 'desc' }, take: 50,
+      });
+      if (!myGroupId && !membership && events.length === 0) {
         return reply.status(404).send({
           success: false, error: 'There is nothing connected to this resort.',
           code: 'NO_RESORT_GROUP',
         });
       }
 
-      const events = await prisma.resortGroupEvent.findMany({
-        where, orderBy: { createdAt: 'desc' }, take: 50,
-      });
       const tenantIds = Array.from(new Set(events.map((e) => e.tenantId).filter((id): id is string => !!id)));
       const actorIds = Array.from(new Set(events.map((e) => e.actorUserId).filter((id): id is string => !!id)));
       const [tenants, actors] = await Promise.all([
@@ -1141,9 +1158,10 @@ export async function resortGroupRoutes(app: FastifyInstance) {
         });
       }
 
-      const myGroup = await prisma.resortGroup.findFirst({
-        where: { ownerUserId: me.id }, select: { id: true },
-      });
+      // Through the same resolver as everywhere else. Reading ownerUserId
+      // directly is what stranded a switched-in owner: their group went
+      // unfound, so opening a resort answered "already connected".
+      const myGroup = await groupFor(me.id, user.tenantId);
       const myMembership = await prisma.resortGroupTenant.findUnique({
         where: { tenantId: user.tenantId }, select: { groupId: true },
       });

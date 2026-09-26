@@ -147,6 +147,20 @@ describe('after switching into a connected resort', () => {
     expect(res.statusCode, res.body).toBe(200);
   });
 
+  it('can open another resort from in here', async () => {
+    // Reading ownerUserId directly left this answering "already connected" —
+    // the same blind spot as the rest, in the one place the fix missed.
+    const res = await app.inject({
+      method: 'POST', url: '/api/resort-group/new-resort',
+      headers: { Authorization: `Bearer ${insideToken}` },
+      payload: { name: 'From Inside', slug: `${run}-from-inside` },
+    });
+    expect(res.statusCode, res.body).toBe(201);
+
+    const group = JSON.parse((await get('/api/resort-group', insideToken)).body).data;
+    expect(group.resorts.map((r: { slug: string }) => r.slug)).toContain(`${run}-from-inside`);
+  });
+
   it('can disconnect a resort from in here', async () => {
     const res = await app.inject({
       method: 'DELETE', url: `/api/resort-group/members/${lagoonId}`,

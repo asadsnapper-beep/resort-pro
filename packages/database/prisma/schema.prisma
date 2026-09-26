@@ -3534,14 +3534,21 @@ model ResortLinkRequest {
 /// access to my resort, and when?" always has an answer.
 model ResortGroupEvent {
   id          String   @id @default(uuid())
-  groupId     String
+  /// Null once the group it belonged to is gone.
+  ///
+  /// It used to cascade, which quietly erased the whole audit trail the moment
+  /// a group dropped below two resorts — including the "unlinked" row written
+  /// a line earlier. "Who had access to my resort, and when?" is exactly the
+  /// question this table exists to answer, and it is asked most often after a
+  /// connection ends.
+  groupId     String?
   tenantId    String?
   actorUserId String?
   action      String // link_requested | link_approved | link_declined | access_changed | unlinked | switched | resort_added
   metadata    Json?
   createdAt   DateTime @default(now())
 
-  group ResortGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  group ResortGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
 
   @@index([groupId])
   @@index([tenantId])
