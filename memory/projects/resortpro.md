@@ -417,6 +417,14 @@ Do not re-discover these; do not claim any of them is done without checking.
   path is `https://api.resortpro.site/health` — `resortpro.site/api/health`
   is a 404. Check with
   [plan/fixes/does-production-have-bkash.md](../../plan/fixes/does-production-have-bkash.md).
+- **Payment-gateway credentials are stored in plain text, and the schema says
+  otherwise.** `TenantPaymentConfig` carries the comment "credentials encrypted
+  in production via AES-256"; there is no `createCipheriv`, key or encryption
+  of any kind in `apps/api/src`. Every resort's bKash and SSLCommerz secrets
+  are readable in the database. The comment is what made this look handled (QA
+  M-03). It becomes a precondition rather than a nice-to-have the moment a
+  third party is asked to store *their* credentials — see
+  [plan/marketplace.md](../../plan/marketplace.md) §14.
 - **Production has both a backup and a worker** — see "Backups" above.
   Coolify's own scheduled-backup feature does not apply, because production's
   postgres lives inside the service compose rather than being a standalone

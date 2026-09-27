@@ -37,12 +37,12 @@ that never opens the Shop sees one extra sidebar entry and nothing else.
 
 **Still open — these need a yes or a different answer before phase 3:**
 
-1. **Who holds the money.** Recommended: **the platform collects, and pays each
-   shop out monthly.** The alternative — the buyer pays the shop directly and we
-   invoice commission — means we never learn what was really sold, and chasing
-   an invoice across a border is worse than sending one payment. The cost of the
-   recommendation is that somebody has to actually send those payouts, by bank
-   transfer for a South African shop, because bKash does not leave Bangladesh.
+1. ~~Who holds the money.~~ **Settled 2026-09-27, and the founder's answer is
+   better than the one this plan first recommended: a shop adds its own payment
+   gateway, exactly as a resort owner already does.** See §7 — it removes the
+   cross-border payout problem, removes the platform's Stripe dependency, and
+   turns the monthly transfer around so the shop owes us rather than us owing
+   them. It has one precondition, in §14, and it is not a small one.
 2. **Personalised products.** Recommended: **yes, from the start.** A 3D printed
    sign for a resort is nearly always "with my resort's name on it", and
    retro-fitting per-order text into an order line is more work than designing
@@ -115,7 +115,8 @@ model Shop {
   members  ShopUser[]
   products ShopProduct[]
   orders   ShopOrder[]
-  payouts  ShopPayout[]
+  invoices ShopCommissionInvoice[]
+  payment  ShopPaymentConfig?
 
   @@index([status])
   @@map("shops")
@@ -212,7 +213,7 @@ model ShopOrder {
   totalMinor       Int
   commissionPct    Float
   commissionMinor  Int
-  /// total − commission. What the shop is owed.
+  /// total − commission. What the shop keeps, having been paid directly.
   shopEarnsMinor   Int
 
   // Where it goes. Copied from the resort, editable per order.
@@ -231,14 +232,14 @@ model ShopOrder {
   shippedAt      DateTime?
   deliveredAt    DateTime?
 
-  payoutId  String?
+  invoiceId String?
   buyerNote String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   shop   Shop            @relation(fields: [shopId], references: [id])
   tenant Tenant?         @relation(fields: [tenantId], references: [id], onDelete: SetNull)
-  payout ShopPayout?     @relation(fields: [payoutId], references: [id], onDelete: SetNull)
+  invoice ShopCommissionInvoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
   lines  ShopOrderLine[]
   events ShopOrderEvent[]
 
@@ -280,8 +281,27 @@ model ShopOrderEvent {
   @@map("shop_order_events")
 }
 
-/// One month's money owed to one shop. Paid off-platform; recorded here.
-model ShopPayout {
+/// A shop's own payment gateway, exactly as TenantPaymentConfig is a resort's.
+///
+/// The buyer pays the shop, through our checkout, with these credentials — so
+/// the money never touches the platform and we still see whether it arrived.
+/// Read §14 before building this: the equivalent table for resorts says in a
+/// comment that it is encrypted and is not.
+model ShopPaymentConfig {
+  id            String @id @default(uuid())
+  shopId        String @unique
+  activeGateway String @default("manual") // 'bkash'|'sslcommerz'|'stripe'|'payfast'|'manual'
+  /// Shape mirrors TenantPaymentConfig.credentials.
+  credentials   Json   @default("{}")
+  updatedAt     DateTime @updatedAt
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@map("shop_payment_configs")
+}
+
+/// One month's commission a shop owes the platform. Settled off-platform.
+model ShopCommissionInvoice {
   id           String    @id @default(uuid())
   shopId       String
   periodStart  DateTime
@@ -301,7 +321,7 @@ model ShopPayout {
   orders ShopOrder[]
 
   @@index([shopId, status])
-  @@map("shop_payouts")
+  @@map("shop_commission_invoices")
 }
 ```
 
@@ -334,41 +354,54 @@ charged in it. Nothing is summed across currencies anywhere — the same rule th
 360 dashboard already follows, for the same reason: we have no honest exchange
 rate.
 
-**Payment depends on the buyer's country**, and this is the hard dependency:
-
-| Buyer | Gateway | State today |
-|---|---|---|
-| Bangladesh | platform bKash | **Works** — `getPlatformBkash()`, used by theme purchases |
-| Anywhere else | card | **Does not exist.** No Stripe account is configured |
-
-So a South African shop cannot sell to a South African resort until card
-payment exists. That is not a shop problem to solve here; it is
-[fixes/stripe-card-billing-setup.md](fixes/stripe-card-billing-setup.md), and
-it gates phase 5.
+**Payment is the shop's own gateway**, so a shop can sell wherever it can be
+paid — see §7. The platform's own bKash is used for exactly one shop, the
+founder's, because that is the account he already has. No shop is limited by
+what gateway *the platform* has.
 
 ---
 
 ## 7. The money
 
-**The platform collects, and pays each shop out monthly.** The buyer pays
-ResortPro; the order records what the shop earns; once a month those orders are
-gathered into a `ShopPayout` and somebody sends it.
+**Each shop adds its own payment gateway, the way a resort owner already does.**
+`TenantPaymentConfig` has held a resort's own bKash, SSLCommerz, Stripe or
+Razorpay credentials for a long time: a guest pays through ResortPro's checkout
+code, using the *resort's* credentials, and the money lands in the resort's
+account. A shop works the same way — `ShopPaymentConfig`, same shape, same idea.
 
-Why not let the shop take the money directly: we would never learn what was
-sold, the commission would be self-reported, and an unpaid invoice across a
-border has no remedy worth the name.
+This is better than the platform collecting, and not by a little:
+
+- **The cross-border payout disappears.** A South African shop takes rand into
+  its own account. Nobody sends an international transfer every month.
+- **The platform's missing Stripe account stops mattering.** A shop that can be
+  paid can sell, whatever gateway it brings. Phase 9 is no longer blocked by
+  something the founder has not set up.
+- **We still know exactly what sold.** The payment is *initiated by our code*
+  with the shop's credentials, and our callback sees the result, so the order's
+  paid state is ours — not something the shop reports to us.
+- **The founder never holds other people's money**, which is a different kind of
+  business with a different set of obligations.
+
+**So the commission runs the other way: the shop owes the platform.** Monthly,
+the orders a shop was paid for are gathered and it is invoiced its commission.
+That is easier to enforce than an unpaid payout is to chase — an invoice that
+goes unpaid suspends the shop, and a suspended shop sells nothing.
 
 - **Commission is frozen on the order.** `commissionPct` is copied at the moment
-  of purchase. Raising a shop's rate must never change what it earned last
-  month. (This is the opposite of the group discount, which is recomputed every
-  time — because a discount is a current price and a commission is history.)
-- **A payout is a record, not a transfer.** No money moves through code. An
-  admin marks it paid with a method and a reference. Bank details live wherever
-  the founder keeps them, deliberately not in this database.
-- **Refunds** reduce the payout of the period they are made in, not the one the
-  order belongs to, so a settled month is never reopened.
+  of purchase. Raising a shop's rate must never change what it owed last month.
+  (The opposite of the group discount, which is recomputed every time — a
+  discount is a current price, a commission is history.)
+- **A shop with no gateway cannot leave `DRAFT`.** There is nothing to sell
+  through.
+- **Refunds are the shop's**, since the money is theirs. A refunded order is
+  excluded from the commission of the period the refund falls in.
+- **The founder's own shop** uses the platform bKash credentials, which already
+  exist in code as `getPlatformBkash()`. It is a shop like any other; it simply
+  owes itself nothing, so its invoices are zero-rated.
 
----
+`ShopPayout` is therefore misnamed for this model — it becomes
+**`ShopCommissionInvoice`**, same fields, opposite direction: `grossMinor` what
+the shop took, `commissionMinor` what it owes, `status` due/paid.
 
 ## 8. The order's life
 
@@ -413,10 +446,11 @@ Three audiences, three prefixes.
 | `POST /auth/login` | a separate login; a shop user has no tenant |
 | `GET/POST/PATCH /products` | its own catalogue only |
 | `GET /orders`, `PATCH /orders/:id/status` | its own orders only |
-| `GET /payouts` | what it has been paid and what is due |
+| `GET /payment-config`, `PUT /payment-config` | its own gateway credentials |
+| `GET /invoices` | what commission it owes, and what it has settled |
 
 **The platform** — `/api/admin/shops`, super-admin only: create a shop, set its
-reach, its commission, suspend it, generate and mark payouts.
+reach, its commission, suspend it, raise and settle commission invoices.
 
 ---
 
@@ -428,7 +462,7 @@ reach, its commission, suspend it, generate and mark payouts.
 - **Shop owner:** a small separate area at `/shop` — products, orders, payouts.
   Deliberately plain. It is not the resort dashboard and should not pretend to
   be.
-- **Platform:** shops, commission, payouts inside the existing admin panel.
+- **Platform:** shops, commission and invoices inside the existing admin panel.
 
 The sidebar entry is visible to `OWNER` and `MANAGER`. It does **not** depend on
 a plan or a feature flag: a marketplace nobody can see earns nothing.
@@ -445,15 +479,16 @@ Each ships on its own and is verified before the next.
 | 2 | Admin: create a shop, set reach and commission | — |
 | 3 | Products and options, admin-managed | decision (2) |
 | 4 | Owner-facing catalogue + the reach rule, no buying yet | — |
-| 5 | Checkout with bKash, Bangladesh only | decision (1) |
+| 5 | Checkout through the shop's own gateway; the founder's shop on platform bKash | **encrypted credentials — see §14** |
 | 6 | Orders: the shop's screen, statuses, tracking | — |
-| 7 | Payouts: monthly gathering, mark as paid | — |
+| 7 | Commission: monthly gathering, invoice, mark settled | — |
 | 8 | Shop login and the shop's own area | — |
-| 9 | Card payment, and shops outside Bangladesh | **Stripe account** |
+| 9 | A shop adds its own gateway from that area | phase 8 |
 
 **Phases 1–7 give the founder a working shop selling 3D prints to Bangladeshi
-resorts.** Phase 8 lets a South African partner run their own. Phase 9 lets
-them sell.
+resorts.** Phases 8–9 let a South African partner run their own and be paid
+into their own account — with no Stripe account needed by the platform, which
+is the whole gain from the founder's answer in §7.
 
 ---
 
@@ -468,9 +503,9 @@ them sell.
 | Commission changed | Same. Frozen at purchase. |
 | Reach narrowed after an order | The order stands. Reach governs buying, not history. |
 | Buyer's country not covered by any shop | An honest empty state, not an empty grid. |
-| A tenant is deleted | Orders survive with `tenantId` null — the shop is still owed for them, and the payout must not silently shrink. |
-| Two currencies | Never summed. Payouts are per shop, so per currency by construction. |
-| A refund after a payout was paid | Deducted from the next period; a settled month is not reopened. |
+| A tenant is deleted | Orders survive with `tenantId` null — the shop was paid for them, and the commission owed must not silently shrink. |
+| Two currencies | Never summed. Invoices are per shop, so per currency by construction. |
+| A refund after an invoice was settled | Deducted from the next period; a settled month is not reopened. |
 | An unpaid order | Expires in 24 hours. |
 | A shop user with no resort | Expected — that is the whole point of `ShopUser`. They must never reach a tenant route. |
 | The same email as a resort owner | Allowed. Different table, different login, no link between them. |
@@ -482,8 +517,8 @@ them sell.
 Stated so nobody builds it by accident.
 
 - **Not a fulfilment system.** No labels, no rates, no courier APIs.
-- **Not a payment processor.** Money is collected by the platform's existing
-  gateway and paid out by hand.
+- **Not a payment processor.** Each shop is paid into its own account through
+  its own gateway; the platform initiates the payment and reads the result.
 - **Not a public storefront.** Only signed-in resort owners see it; there is no
   SEO surface and no guest checkout.
 - **Not connected to the resort's own inventory**, purchase orders or `Vendor`
@@ -494,12 +529,31 @@ Stated so nobody builds it by accident.
 
 ## 14. What it depends on
 
+### The one that is not optional
+
+**Gateway credentials are not encrypted, and the schema says they are.**
+`TenantPaymentConfig` carries the comment *"credentials encrypted in production
+via AES-256"*, and there is no encryption anywhere in `apps/api/src` — no
+`createCipheriv`, no key, nothing. Every resort's bKash and SSLCommerz secrets
+sit in the database as plain text today. (This is the QA finding recorded as
+M-03; the comment is what made it look handled.)
+
+That is already bad. Asking a **third party in another country** to paste their
+merchant credentials into the same store makes it materially worse: their
+money, their liability, and a promise in a code comment that nothing keeps.
+
+So **encryption at rest for gateway credentials is a precondition of phase 5**,
+not a later hardening pass — for the existing tenant table as well as the new
+shop one, since they would share the implementation.
+
+### Everything else
+
 | | |
 |---|---|
-| Phases 1–8 | Nothing that does not already exist |
-| Phase 9 | A **Stripe account** — the same one billing needs |
-| Selling in South Africa | Phase 9, plus a way to send a South African payout |
-| Any of it | The founder's decisions in §2 |
+| Phases 1–4, 6–9 | Nothing that does not already exist |
+| Phase 5 | Encrypted credentials, above |
+| Selling outside Bangladesh | Nothing further — the shop brings its own gateway |
+| Any of it | The founder's remaining decisions in §2 |
 
 And the honest one: **this does not help hand the PMS to resort owners this
 month.** See [handover-checklist.md](handover-checklist.md) for what does.
