@@ -11,7 +11,7 @@
  * the secret is not in it. Everything else is about not breaking the resorts
  * whose credentials were written before this existed.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest';
 import { buildApp } from '../../src/app';
 import { prisma } from '@resort-pro/database';
 import { verifyOwnerAndLogin } from '../helpers/auth';
@@ -155,5 +155,75 @@ describe('with no key configured', () => {
     const res = await save({ bkash: { appSecret: APP_SECRET } });
     expect(res.statusCode).toBeGreaterThanOrEqual(500);
     expect(await rawColumn()).toBeUndefined();
+  });
+});
+
+describe('the credentials on the tenant row', () => {
+  /**
+   * The same problem, in a different shape: a resort's SMS key and WhatsApp
+   * token are plain columns on `Tenant`, written by the Settings screen and
+   * read at the moment a message is sent.
+   */
+  const setSms = (body: Record<string, string>) => app.inject({
+    method: 'PATCH', url: '/api/tenant/sms-credentials',
+    headers: { Authorization: `Bearer ${token}` },
+    payload: { smsMode: 'own', smsProvider: 'ssl_wireless', ...body },
+  });
+  const readSettings = () => app.inject({
+    method: 'GET', url: '/api/tenant/sms-settings',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const rawTenant = () => prisma.tenant.findUniqueOrThrow({
+    where: { id: tenantId }, select: { smsApiKey: true, smsApiSecret: true },
+  });
+
+  it('does not leave the SMS key readable in the row', async () => {
+    const res = await setSms({ smsApiKey: 'ssl_live_key_7788' });
+    expect(res.statusCode, res.body).toBe(200);
+
+    const row = await rawTenant();
+    expect(row.smsApiKey).not.toContain('ssl_live_key_7788');
+    expect(isEncrypted(row.smsApiKey)).toBe(true);
+  });
+
+  it('still shows the owner the last four characters of what they pasted', async () => {
+    await setSms({ smsApiKey: 'ssl_live_key_7788' });
+
+    const settings = JSON.parse((await readSettings()).body).data;
+    // The tail of the real key, not the tail of a ciphertext.
+    expect(settings.smsApiKey).toBe('••••••••7788');
+  });
+
+  it('sends with the real key, not the stored one', async () => {
+    await setSms({ smsApiKey: 'ssl_live_key_7788' });
+    const tenant = await prisma.tenant.findUniqueOrThrow({
+      where: { id: tenantId },
+      select: { smsMode: true, smsProvider: true, smsApiKey: true, smsApiSecret: true, smsSenderId: true },
+    });
+
+    const calls: string[] = [];
+    const fetchMock = async (_url: string, init: { body: string }) => {
+      calls.push(init.body);
+      return new Response(JSON.stringify({ status: 'SUCCESS', status_code: 200, smsinfo: [{ reference_id: 'r' }] }), { status: 200 });
+    };
+    vi.stubGlobal('fetch', fetchMock);
+    const { sendSms } = await import('../../src/services/messaging');
+    const result = await sendSms(tenant, '+8801712345678', 'hello');
+    vi.unstubAllGlobals();
+
+    expect(result).toMatchObject({ delivered: true, via: 'own' });
+    // The provider must receive the key the owner typed.
+    expect(calls[0]).toContain('ssl_live_key_7788');
+    expect(calls[0]).not.toContain('enc:v1:');
+  });
+
+  it('reads back a key saved before any of this', async () => {
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: { smsApiKey: 'legacy_plain_key_4321', smsMode: 'own', smsProvider: 'ssl_wireless' },
+    });
+
+    const settings = JSON.parse((await readSettings()).body).data;
+    expect(settings.smsApiKey).toBe('••••••••4321');
   });
 });

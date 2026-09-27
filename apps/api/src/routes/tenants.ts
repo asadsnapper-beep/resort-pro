@@ -14,6 +14,7 @@ import { ensureTenantReferralCode, referralRegistrationUrl } from '../utils/refe
 import { createAdminNotification } from '../utils/notifications';
 import { type SendResult } from '../services/messaging';
 import { sendCountedMessage } from '../services/messaging-quota';
+import { encryptOrNull, decryptOrNull } from '../utils/secret-box';
 
 /** Only the columns messaging needs — never the whole tenant row. */
 const MESSAGING_SELECT = {
@@ -749,7 +750,13 @@ export async function tenantRoutes(app: FastifyInstance) {
       if (!tenant) return { success: false, error: 'Tenant not found' };
 
       // Mask API keys — only show last 4 chars if set
-      const mask = (v?: string | null) => v ? '••••••••' + v.slice(-4) : null;
+      // Decrypted only to be masked again. Masking the stored value directly
+      // would show the tail of a ciphertext, which tells the owner nothing
+      // about which key they pasted.
+      const mask = (v?: string | null) => {
+        const plain = decryptOrNull(v);
+        return plain ? '••••••••' + plain.slice(-4) : null;
+      };
       return ok({
         ...tenant,
         smsApiKey:    mask(tenant.smsApiKey),
@@ -830,8 +837,8 @@ export async function tenantRoutes(app: FastifyInstance) {
         if (body.smsProvider) data.smsProvider = body.smsProvider;
         if (body.smsSenderId) data.smsSenderId = body.smsSenderId;
         // Only update keys if new value provided (not the masked placeholder)
-        if (body.smsApiKey    && !body.smsApiKey.startsWith('••••'))    data.smsApiKey    = body.smsApiKey;
-        if (body.smsApiSecret && !body.smsApiSecret.startsWith('••••')) data.smsApiSecret = body.smsApiSecret;
+        if (body.smsApiKey    && !body.smsApiKey.startsWith('••••'))    data.smsApiKey    = encryptOrNull(body.smsApiKey);
+        if (body.smsApiSecret && !body.smsApiSecret.startsWith('••••')) data.smsApiSecret = encryptOrNull(body.smsApiSecret);
       }
 
       await db.tenant.update({ where: { id: tenantId }, data });
@@ -857,7 +864,7 @@ export async function tenantRoutes(app: FastifyInstance) {
       if (body.waMode === 'own') {
         if (body.waPhoneNumberId) data.waPhoneNumberId = body.waPhoneNumberId;
         if (body.waBusinessAccId) data.waBusinessAccId = body.waBusinessAccId;
-        if (body.waApiToken && !body.waApiToken.startsWith('••••')) data.waApiToken = body.waApiToken;
+        if (body.waApiToken && !body.waApiToken.startsWith('••••')) data.waApiToken = encryptOrNull(body.waApiToken);
       }
 
       await db.tenant.update({ where: { id: tenantId }, data });

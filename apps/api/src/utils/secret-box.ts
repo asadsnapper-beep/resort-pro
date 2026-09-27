@@ -141,3 +141,21 @@ export function decryptRecord<T = Record<string, unknown>>(stored: unknown): T {
   // Never encrypted — the shape every row has today.
   return (stored ?? {}) as T;
 }
+
+/**
+ * The nullable-column versions.
+ *
+ * Most secrets on `Tenant` are optional columns, and the two shapes that show
+ * up everywhere are "encrypt this if the owner typed one" and "decrypt this if
+ * there is one". Writing those out at each of the dozen call sites is how one
+ * of them ends up forgotten.
+ */
+export function encryptOrNull(value: string | null | undefined): string | null {
+  if (value === null || value === undefined || value === '') return value ?? null;
+  return encryptSecret(value);
+}
+
+export function decryptOrNull(value: string | null | undefined): string | null {
+  if (value === null || value === undefined || value === '') return value ?? null;
+  return decryptSecret(value);
+}

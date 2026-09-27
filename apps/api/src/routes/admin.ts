@@ -11,6 +11,7 @@ import bcrypt from 'bcryptjs';
 import { prisma, Prisma } from '@resort-pro/database';
 import { refreshTokenPayload } from '../utils/refresh-token';
 import { purgeGuestDocumentFiles } from '../utils/guest-documents';
+import { encryptOrNull } from '../utils/secret-box';
 import { PLAN_PRICING } from '@resort-pro/types';
 import { ok } from '../utils/response';
 
@@ -3177,7 +3178,8 @@ Rules:
           ...(body.ssoEnabled !== undefined && { ssoEnabled: body.ssoEnabled }),
           ...(body.ssoProvider !== undefined && { ssoProvider: body.ssoProvider }),
           ...(body.ssoClientId !== undefined && { ssoClientId: body.ssoClientId }),
-          ...(body.ssoClientSecret !== undefined && { ssoClientSecret: body.ssoClientSecret }),
+          ...(body.ssoClientSecret !== undefined
+            && { ssoClientSecret: encryptOrNull(body.ssoClientSecret) }),
           ...(body.ssoConfig !== undefined && { ssoConfig: body.ssoConfig as any }),
         },
       });

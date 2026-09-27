@@ -11,6 +11,7 @@ import cron from 'node-cron';
 import { prisma } from '@resort-pro/database';
 import { buildReport } from '../services/reporting/build-report';
 import { localDateToday, resolveReportPeriod } from '../services/reporting/period';
+import { decryptOrNull } from '../utils/secret-box';
 
 // ── Telegram ──────────────────────────────────────────────────────────────────
 async function sendTelegram(botToken: string, chatId: string, text: string): Promise<boolean> {
@@ -37,8 +38,9 @@ async function sendWhatsAppReport(
   let token: string | null = null;
   let phoneNumberId: string | null = null;
 
-  if (tenant.waMode === 'own' && tenant.waApiToken && tenant.waPhoneNumberId) {
-    token = tenant.waApiToken;
+  const ownWaToken = decryptOrNull(tenant.waApiToken);
+  if (tenant.waMode === 'own' && ownWaToken && tenant.waPhoneNumberId) {
+    token = ownWaToken;
     phoneNumberId = tenant.waPhoneNumberId;
   } else {
     token = process.env.META_WA_TOKEN ?? null;
@@ -191,7 +193,9 @@ export function startReportDispatchJob() {
 
         if (setting.telegramEnabled && setting.telegramBotToken && setting.telegramChatId) {
           const text = buildReportText(report);
-          tgSent = await sendTelegram(setting.telegramBotToken, setting.telegramChatId, text);
+          tgSent = await sendTelegram(
+            decryptOrNull(setting.telegramBotToken)!, setting.telegramChatId, text,
+          );
         }
 
         if (setting.whatsappEnabled && setting.whatsappPhone) {

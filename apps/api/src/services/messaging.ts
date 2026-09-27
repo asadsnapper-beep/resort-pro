@@ -20,6 +20,8 @@
  * ResortPro's bill and counted against nobody's quota.
  */
 
+import { decryptOrNull } from '../utils/secret-box';
+
 export interface MessagingTenant {
   smsMode?: string | null;
   smsProvider?: string | null;
@@ -63,15 +65,19 @@ export async function sendSms(tenant: MessagingTenant, phone: string, message: s
           : 'No SMS provider is selected.',
       };
     }
-    if (!tenant.smsApiKey || (provider === 'twilio' && !tenant.smsApiSecret)) {
+    // Encrypted at rest. Decrypted here, at the one point of use, rather than
+    // wherever a tenant row happens to be read.
+    const ownKey = decryptOrNull(tenant.smsApiKey);
+    const ownSecret = decryptOrNull(tenant.smsApiSecret);
+    if (!ownKey || (provider === 'twilio' && !ownSecret)) {
       return {
         delivered: false, reason: 'not_configured', via: 'own', provider,
         detail: 'Your own SMS account is selected, but its credentials are incomplete.',
       };
     }
     const answer = provider === 'ssl_wireless'
-      ? await sslWirelessSend(tenant.smsApiKey, tenant.smsSenderId || 'RESORT', phone, message)
-      : await twilioSend(tenant.smsApiKey, tenant.smsApiSecret!, tenant.smsSenderId ?? '', phone, message);
+      ? await sslWirelessSend(ownKey, tenant.smsSenderId || 'RESORT', phone, message)
+      : await twilioSend(ownKey, ownSecret!, tenant.smsSenderId ?? '', phone, message);
     return toResult(answer, 'own', provider);
   }
 
@@ -90,13 +96,14 @@ export async function sendSms(tenant: MessagingTenant, phone: string, message: s
 
 export async function sendWhatsApp(tenant: MessagingTenant, phone: string, message: string): Promise<SendResult> {
   if (tenant.waMode === 'own') {
-    if (!tenant.waApiToken || !tenant.waPhoneNumberId) {
+    const ownToken = decryptOrNull(tenant.waApiToken);
+    if (!ownToken || !tenant.waPhoneNumberId) {
       return {
         delivered: false, reason: 'not_configured', via: 'own', provider: 'meta',
         detail: 'Your own WhatsApp Business account is selected, but its token or phone number ID is missing.',
       };
     }
-    return toResult(await metaWaSend(tenant.waApiToken, tenant.waPhoneNumberId, phone, message), 'own', 'meta');
+    return toResult(await metaWaSend(ownToken, tenant.waPhoneNumberId, phone, message), 'own', 'meta');
   }
 
   const token = process.env.META_WA_TOKEN;
