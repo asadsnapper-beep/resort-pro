@@ -79,6 +79,7 @@ Written down so they stop taking up room.
 | Android sync gaps | A rejected change vanishes silently; an offline restart logs the housekeeper out. |
 | Settings "not production-ready" QA verdict | From 2026-09-09 and never retested. Most of its findings are fixed; the verdict is not. |
 | Review management, dynamic pricing, Booking.com / Airbnb | Never promised for this month. |
+| The Shop / marketplace ([marketplace.md](marketplace.md)) | A new product, planned 2026-09-27 and not started. Its phase 9 needs the same Stripe account. It earns nothing until resorts are using the PMS. |
 
 ---
 
