@@ -29,6 +29,7 @@ import {
 import { requireAuth }          from '../middleware/auth';
 import type { JwtPayload }      from '@resort-pro/types';
 import { notifyBookingConfirmed } from '../services/guest-notifications';
+import { encryptRecord, decryptRecord } from '../utils/secret-box';
 
 const WEB_BASE = process.env.WEB_BASE_URL || 'http://localhost:3000';
 const API_BASE = process.env.API_BASE_URL || 'http://localhost:4000';
@@ -49,12 +50,13 @@ async function getTenantCredentials(
 
   if (!config) throw new Error('Payment not configured for this tenant');
 
-  const creds = config.credentials as Record<string, Record<string, string>>;
+  // Encrypted at rest since 2026-09-28. A bag written before that comes back
+  // as it is, which is what lets the two coexist while rows are converted.
+  const creds = decryptRecord<Record<string, Record<string, string>>>(config.credentials);
   const gatewayCreds = creds[gateway];
 
   if (!gatewayCreds) throw new Error(`Gateway "${gateway}" credentials not found`);
 
-  // TODO: decrypt in production (AES-256)
   return gatewayCreds;
 }
 
@@ -482,7 +484,9 @@ export async function paymentRoutes(app: FastifyInstance) {
     // Mask secret credential values for display
     const safeCredentials: Record<string, Record<string, string>> = {};
     if (config?.credentials) {
-      const raw = config.credentials as Record<string, Record<string, string>>;
+      // Decrypted only to be masked again. The last four characters are what
+      // let an owner recognise which key they pasted; the rest never leaves.
+      const raw = decryptRecord<Record<string, Record<string, string>>>(config.credentials);
       for (const [gwId, gwCreds] of Object.entries(raw)) {
         safeCredentials[gwId] = {};
         for (const [key, value] of Object.entries(gwCreds)) {
@@ -541,7 +545,7 @@ export async function paymentRoutes(app: FastifyInstance) {
     const existing = await db.tenantPaymentConfig.findUnique({
       where: { tenantId }, select: { credentials: true },
     });
-    const merged = (existing?.credentials ?? {}) as Record<string, Record<string, string>>;
+    const merged = decryptRecord<Record<string, Record<string, string>>>(existing?.credentials);
 
     if (credentials) {
       for (const [gwId, gwCreds] of Object.entries(credentials)) {
@@ -560,14 +564,17 @@ export async function paymentRoutes(app: FastifyInstance) {
         enabledMethods: enabledMethods ?? ['manual'],
         manualInstructions,
         testMode: testMode ?? true,
-        credentials: merged,
+        // Encrypted as one blob rather than field by field, which also hides
+        // which gateways a resort has configured. With no CREDENTIALS_KEY this
+        // throws — saving is refused rather than stored in the clear.
+        credentials: encryptRecord(merged),
       },
       update: {
         activeGateway,
         ...(enabledMethods              ? { enabledMethods }     : {}),
         ...(manualInstructions !== undefined ? { manualInstructions } : {}),
         ...(testMode           !== undefined ? { testMode }       : {}),
-        credentials: merged,
+        credentials: encryptRecord(merged),
       },
     });
 

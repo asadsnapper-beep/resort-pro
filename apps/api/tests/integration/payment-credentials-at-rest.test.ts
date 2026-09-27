@@ -1,0 +1,159 @@
+/**
+ * A resort's gateway credentials, in the database.
+ *
+ * `schema.prisma` claimed for months that these were encrypted with AES-256 and
+ * `payments.ts` carried a `// TODO: decrypt in production` next to the code
+ * that read them straight out. So every resort's bKash app secret and
+ * SSLCommerz store password sat in the table in plain text, and in every backup
+ * of it.
+ *
+ * The test that matters is the first one: it reads the raw column and asserts
+ * the secret is not in it. Everything else is about not breaking the resorts
+ * whose credentials were written before this existed.
+ */
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
+import { buildApp } from '../../src/app';
+import { prisma } from '@resort-pro/database';
+import { verifyOwnerAndLogin } from '../helpers/auth';
+import { keepEnv } from '../helpers/env';
+import { isEncrypted } from '../../src/utils/secret-box';
+import type { FastifyInstance } from 'fastify';
+
+keepEnv('CREDENTIALS_KEY');
+
+let app: FastifyInstance;
+const run = `pay-creds-${Date.now()}`;
+const password = 'TestPass123!';
+const email = `owner-${run}@test.com`;
+let token: string;
+let tenantId: string;
+
+const APP_SECRET = 'bkash_secret_ABCD1234';
+const KEY = Buffer.alloc(32, 11).toString('base64');
+
+const save = (credentials: Record<string, Record<string, string>>) => app.inject({
+  method: 'PUT', url: '/api/payments/config',
+  headers: { Authorization: `Bearer ${token}` },
+  payload: { activeGateway: 'bkash', credentials },
+});
+const readConfig = () => app.inject({
+  method: 'GET', url: '/api/payments/config',
+  headers: { Authorization: `Bearer ${token}` },
+});
+const rawColumn = async () => (await prisma.tenantPaymentConfig.findUnique({
+  where: { tenantId }, select: { credentials: true },
+}))?.credentials as Record<string, unknown> | undefined;
+
+beforeAll(async () => {
+  app = await buildApp();
+  await app.ready();
+  const reg = await app.inject({
+    method: 'POST', url: '/api/auth/register',
+    payload: { resortName: 'Creds', slug: run, firstName: 'Owner', lastName: 'Test', email, password },
+  });
+  expect(reg.statusCode, reg.body).toBe(201);
+  tenantId = JSON.parse(reg.body).data.tenant.id;
+  token = await verifyOwnerAndLogin(app, { tenantId, email, password, slug: run });
+  await prisma.tenant.update({ where: { id: tenantId }, data: { planStatus: 'active' } });
+}, 30000);
+
+beforeEach(async () => {
+  process.env.CREDENTIALS_KEY = KEY;
+  await prisma.tenantPaymentConfig.deleteMany({ where: { tenantId } });
+});
+
+afterAll(async () => {
+  await prisma.tenant.deleteMany({ where: { slug: run } });
+  await app.close();
+});
+
+describe('what lands in the table', () => {
+  it('does not contain the secret in any form', async () => {
+    const res = await save({ bkash: { appKey: 'pubkey', appSecret: APP_SECRET } });
+    expect(res.statusCode, res.body).toBe(200);
+
+    const stored = await rawColumn();
+    expect(JSON.stringify(stored)).not.toContain(APP_SECRET);
+    expect(isEncrypted((stored as { enc: string }).enc)).toBe(true);
+  });
+
+  it('hides which gateways the resort configured, not only the values', async () => {
+    await save({ bkash: { appSecret: APP_SECRET }, sslcommerz: { storePassword: 'p' } });
+    const raw = JSON.stringify(await rawColumn());
+
+    expect(raw).not.toContain('bkash');
+    expect(raw).not.toContain('sslcommerz');
+    expect(raw).not.toContain('storePassword');
+  });
+});
+
+describe("the owner's own screen", () => {
+  it('still shows the last four characters, so they know which key it is', async () => {
+    await save({ bkash: { username: 'merchant01', appSecret: APP_SECRET } });
+
+    const config = JSON.parse((await readConfig()).body).data;
+    expect(config.credentials.bkash.appSecret).toBe('••••••••1234');
+    // A username is not a secret, so it is shown. Note that `appKey` *is*
+    // masked — the existing rule matches /secret|password|key/i, and "appKey"
+    // contains "key". That is the screen's behaviour, not something encryption
+    // changed.
+    expect(config.credentials.bkash.username).toBe('merchant01');
+  });
+
+  it('keeps a value the owner did not retype', async () => {
+    const first = await save({ bkash: { username: 'merchant01', appSecret: APP_SECRET } });
+    expect(first.statusCode, first.body).toBe(200);
+    // The screen sends back the mask for fields it did not touch.
+    const second = await save({ bkash: { username: 'merchant02', appSecret: '••••••••1234' } });
+    expect(second.statusCode, second.body).toBe(200);
+
+    const config = JSON.parse((await readConfig()).body).data;
+    expect(config.credentials.bkash.username).toBe('merchant02');
+    expect(config.credentials.bkash.appSecret).toBe('••••••••1234');
+  });
+});
+
+describe('resorts whose credentials were written before this', () => {
+  it('reads their plain rows back unchanged', async () => {
+    // Exactly the shape every row has in production today.
+    await prisma.tenantPaymentConfig.create({
+      data: {
+        tenantId, activeGateway: 'bkash',
+        credentials: { bkash: { appKey: 'legacykey', appSecret: 'legacy_secret_9999' } },
+      },
+    });
+
+    const config = JSON.parse((await readConfig()).body).data;
+    expect(config.credentials.bkash.appSecret).toBe('••••••••9999');
+  });
+
+  it('encrypts them on the next save, without losing the untouched fields', async () => {
+    await prisma.tenantPaymentConfig.create({
+      data: {
+        tenantId, activeGateway: 'bkash',
+        credentials: { bkash: { username: 'legacyuser', appSecret: 'legacy_secret_9999' } },
+      },
+    });
+
+    const res = await save({ bkash: { username: 'newuser' } });
+    expect(res.statusCode, res.body).toBe(200);
+
+    const raw = JSON.stringify(await rawColumn());
+    expect(raw).not.toContain('legacy_secret_9999');
+    expect(raw).not.toContain('legacyuser');
+
+    const config = JSON.parse((await readConfig()).body).data;
+    expect(config.credentials.bkash.username).toBe('newuser');
+    expect(config.credentials.bkash.appSecret).toBe('••••••••9999');
+  });
+});
+
+describe('with no key configured', () => {
+  it('refuses to save rather than storing it in the clear', async () => {
+    delete process.env.CREDENTIALS_KEY;
+
+    const res = await save({ bkash: { appSecret: APP_SECRET } });
+    expect(res.statusCode).toBeGreaterThanOrEqual(500);
+    expect(await rawColumn()).toBeUndefined();
+  });
+});
