@@ -79,6 +79,7 @@ Written down so they stop taking up room.
 | Android sync gaps | A rejected change vanishes silently; an offline restart logs the housekeeper out. |
 | Settings "not production-ready" QA verdict | From 2026-09-09 and never retested. Most of its findings are fixed; the verdict is not. |
 | Review management, dynamic pricing, Booking.com / Airbnb | Never promised for this month. |
+| Gateway credentials are stored unencrypted | `TenantPaymentConfig` says in a comment that it uses AES-256 and nothing does. Every resort's bKash and SSLCommerz secrets are plain text in the database. Not new and not what blocks payment, so it does not block handover — but it is real, it grows with every customer onboarded, and it becomes a precondition the moment a third-party shop is asked to store theirs ([marketplace.md](marketplace.md) §14). |
 | The Shop / marketplace ([marketplace.md](marketplace.md)) | A new product, planned 2026-09-27 and not started. Its phase 9 needs the same Stripe account. It earns nothing until resorts are using the PMS. |
 
 ---
