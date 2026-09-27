@@ -127,20 +127,42 @@ function createTenantPrisma(tenantId: string) {
           return query(args);
         },
 
-        // ── findUnique: can't add tenantId to unique lookup directly,
-        //    but we verify after fetch to prevent cross-tenant reads. ──────
+        // ── findUnique: tenantId cannot be added to a unique lookup, so the
+        //    row is fetched and then checked. ────────────────────────────────
+        //
+        // The check reads `result.tenantId`, which means a caller's `select`
+        // that does not ask for `tenantId` used to compare `undefined` against
+        // it and return null for a row that exists. It failed safe, so it was
+        // never a leak — it was worse to find: `db.ratePlan.findUnique({ where,
+        // select: { id: true } })` answered "not found" for a rate plan sitting
+        // in the table, and the same for loyalty accounts, training sessions,
+        // purchase orders and a resort's saved payment credentials, where it
+        // quietly broke the merge that protects unretyped secrets.
+        //
+        // So tenantId is added to the select when the caller left it out, and
+        // removed again before the row is handed back — the guard keeps its
+        // field and the caller still gets exactly what it asked for.
         async findUnique({ model, args, query }) {
-          const result = await query(args);
-          if (model !== 'Tenant' && result && (result as { tenantId?: string }).tenantId !== tenantId) {
-            return null;
-          }
+          if (model === 'Tenant') return query(args);
+          const select = (args as { select?: Record<string, unknown> }).select;
+          const borrowed = !!select && !select.tenantId;
+          if (borrowed && select) select.tenantId = true;
+
+          const result = await query(args) as { tenantId?: string } | null;
+          if (!result) return result;
+          if (result.tenantId !== tenantId) return null;
+          if (borrowed) delete result.tenantId;
           return result;
         },
         async findUniqueOrThrow({ model, args, query }) {
-          const result = await query(args);
-          if (model !== 'Tenant' && (result as { tenantId?: string }).tenantId !== tenantId) {
-            throw new Error('Record not found');
-          }
+          if (model === 'Tenant') return query(args);
+          const select = (args as { select?: Record<string, unknown> }).select;
+          const borrowed = !!select && !select.tenantId;
+          if (borrowed && select) select.tenantId = true;
+
+          const result = await query(args) as { tenantId?: string };
+          if (result.tenantId !== tenantId) throw new Error('Record not found');
+          if (borrowed) delete result.tenantId;
           return result;
         },
       },
