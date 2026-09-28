@@ -4,7 +4,7 @@ The one list. Everything else in `plan/` describes how something works or was
 meant to work; this says what is left before a real resort owner is using the
 product, and who has to do it.
 
-Last checked: **2026-09-27.**
+Last checked: **2026-09-29.**
 
 ---
 
@@ -48,16 +48,57 @@ Re-run [fixes/does-production-have-bkash.md](fixes/does-production-have-bkash.md
 All four must read "set", and the button must appear on
 `/dashboard/billing`.
 
-### 4. Push `dev` → `main` — **founder decides, Claude runs it**
+### 4. Set `CREDENTIALS_KEY` — **founder**, three places
 
-`dev` is around 65 commits ahead of production, which last deployed on
-12 September. Everything since — multi-resort, guest SMS/WhatsApp, the embed
-widget, the group bill, the review fixes, the privacy fix — is on staging only.
+New as of 2026-09-29. The cipher exists now and every writer uses it, but it
+needs a key, and there is none anywhere yet. Without one the API still runs and
+still reads the credentials it already has — it simply cannot encrypt, so every
+credential a resort pastes stays plain text exactly as before.
+
+A different value in each of the three:
+
+- Coolify (production) · Portainer (staging) · `apps/api/.env` (local)
+
+```bash
+openssl rand -base64 32
+```
+
+Keep the keys somewhere the database backups are **not**. A backup and the key
+that opens it in the same place is the same as no encryption at all. If a key is
+lost after the conversion below, every resort has to paste their credentials in
+again — there is no recovery.
+
+Then convert what is already stored, production last and only after a backup.
+Inside the API container, which ships `dist/` and has no `tsx`:
+
+```bash
+docker exec -it <api-container> node dist/scripts/encrypt-credentials.js
+docker exec -it <api-container> node dist/scripts/encrypt-credentials.js --apply
+```
+
+Locally, from `apps/api`, it is `pnpm encrypt:credentials` and
+`pnpm encrypt:credentials -- --apply`.
+
+The first form changes nothing and prints how many values it would convert —
+read that before the second. It refuses to start without a key, skips anything
+already encrypted so running it twice is safe, and prints counts and column
+names only, never a value.
+
+This does not block a payment, so it is not what stops a customer paying. It is
+here because every resort onboarded before it is done adds more plain text to
+the database, and the pilot resorts are about to be onboarded by hand.
+
+### 5. Push `dev` → `main` — **founder decides, Claude runs it**
+
+`dev` is 76 commits ahead of `main`, whose newest commit is from 13 September.
+Everything since — multi-resort, guest SMS/WhatsApp, the embed widget, the group
+bill, the review fixes, the privacy fix, credential encryption — is on staging
+only.
 
 A green deploy does not mean the new image is running. Check the running tag
 afterwards; see `memory/projects/resortpro.md`, "Delivery and operations".
 
-### 5. Hand-onboard the first resorts — **founder**
+### 6. Hand-onboard the first resorts — **founder**
 
 The agreed strategy is pilot-first: two or three resorts set up by hand, not
 self-serve. The customer with three resorts is the obvious first.
@@ -79,8 +120,8 @@ Written down so they stop taking up room.
 | Android sync gaps | A rejected change vanishes silently; an offline restart logs the housekeeper out. |
 | Settings "not production-ready" QA verdict | From 2026-09-09 and never retested. Most of its findings are fixed; the verdict is not. |
 | Review management, dynamic pricing, Booking.com / Airbnb | Never promised for this month. |
-| Gateway credentials are stored unencrypted | `TenantPaymentConfig` says in a comment that it uses AES-256 and nothing does. Every resort's bKash and SSLCommerz secrets are plain text in the database. Not new and not what blocks payment, so it does not block handover — but it is real, it grows with every customer onboarded, and it becomes a precondition the moment a third-party shop is asked to store theirs ([marketplace.md](marketplace.md) §14). |
-| The Shop / marketplace ([marketplace.md](marketplace.md)) | A new product, planned 2026-09-27 and not started. Its phase 9 needs the same Stripe account. It earns nothing until resorts are using the PMS. |
+| The Shop / marketplace ([marketplace.md](marketplace.md)) | A new product, planned 2026-09-27 and not started. Its phase 9 needs the same Stripe account. It earns nothing until resorts are using the PMS. Its §14 precondition — a third-party shop's own gateway credentials being encrypted — is met now; the key in item 4 is the rest of it. |
+| Clearing the dead `bkash*` / `ssl*` columns on `Tenant` | Nothing in the API reads them; the live path is `TenantPaymentConfig.credentials`. They are encrypted rather than emptied, because "nothing reads them" is not "nothing is in them" and dropping a column cannot be undone. Worth a look when someone has time to see what is actually in them. |
 
 ---
 
@@ -97,4 +138,9 @@ So the size of what is left stays honest.
 - A captured bKash payment is never reported to the payer as a failure.
 - A guest notification that failed is tried again.
 - Signing in twice in one second no longer answers 500.
-- API suite 695 passing; web 107; staging running `dev-97e75eb`.
+- Credentials are encrypted at rest: the AES-256-GCM cipher `schema.prisma` had
+  been claiming for months, wired into both stores — the gateway credential bag
+  and the eleven secret columns on `Tenant` — plus a script to convert the rows
+  written before it. **Dormant until item 4 sets a key.**
+- API suite 735 passing; web 107; staging deployed `dev-d676f81` on 2026-09-29
+  (the deploy job is green; the running tag on the host was not re-checked).
