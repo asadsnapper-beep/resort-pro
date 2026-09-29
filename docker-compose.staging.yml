@@ -62,6 +62,11 @@ services:
       APP_IP: ${APP_IP:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       SUPER_ADMIN_EMAILS: ${SUPER_ADMIN_EMAILS:-asadsnapper@gmail.com}
+      # No default on purpose. Without it the seeder refuses to create the
+      # account rather than inventing a password — see seed-admin.ts. The email
+      # above does have a default, which is why staging was the deployment most
+      # exposed by the old built-in password.
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       STRIPE_PRICE_STARTER: ${STRIPE_PRICE_STARTER:-}
