@@ -2722,12 +2722,37 @@ model AdminUser {
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime?
   invitedBy    String? // email of admin who created this account
+  // Second factor (RFC 6238). The secret is encrypted with CREDENTIALS_KEY —
+  // see utils/secret-box.ts — because a plaintext TOTP secret in a database
+  // dump is the second factor, not a hint about it.
+  mfaSecret    String?
+  mfaEnabledAt DateTime? // null = enrolled but not confirmed, or not enrolled
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+
+  recoveryCodes AdminRecoveryCode[]
 
   @@index([role])
   @@index([isActive])
   @@map("admin_users")
+}
+
+// The day the phone is lost.
+//
+// There is one admin account and one person holding it, so "use your other
+// device" is not an answer available here. Hashed like a password and marked
+// used rather than replayable, so a dump of this table is not a way in.
+model AdminRecoveryCode {
+  id          String    @id @default(cuid())
+  adminUserId String
+  codeHash    String
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([adminUserId])
+  @@map("admin_recovery_codes")
 }
 
 // ─── External Calendar Sync ───────────────────────────────────────────────────

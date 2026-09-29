@@ -12,6 +12,9 @@ import { prisma, Prisma } from '@resort-pro/database';
 import { refreshTokenPayload } from '../utils/refresh-token';
 import { purgeGuestDocumentFiles } from '../utils/guest-documents';
 import { encryptOrNull, decryptOrNull } from '../utils/secret-box';
+import {
+  generateSecret, verifyTotp, otpauthUri, generateRecoveryCodes, normaliseRecoveryCode,
+} from '../utils/totp';
 import { PLAN_PRICING } from '@resort-pro/types';
 import { ok } from '../utils/response';
 
@@ -142,10 +145,49 @@ async function logAdminAction({
   }
 }
 
+// ── Second factor ─────────────────────────────────────────────────────────────
+/**
+ * Accept a TOTP code, or spend a recovery code.
+ *
+ * Recovery codes are tried only when the input is not six digits, so a mistyped
+ * authenticator code never burns one. A spent code is marked used rather than
+ * deleted: "this code was used at 03:14" is worth keeping.
+ */
+async function consumeSecondFactor(
+  adminUserId: string,
+  storedSecret: string | null,
+  input: string,
+): Promise<boolean> {
+  const given = input.trim();
+
+  if (/^\d{6}$/.test(given.replace(/\s/g, ''))) {
+    const secret = decryptOrNull(storedSecret);
+    return !!secret && verifyTotp(secret, given);
+  }
+
+  const candidate = normaliseRecoveryCode(given);
+  if (candidate.length < 8) return false;
+
+  const codes = await prisma.adminRecoveryCode.findMany({
+    where: { adminUserId, usedAt: null },
+    select: { id: true, codeHash: true },
+  });
+  for (const code of codes) {
+    if (await bcrypt.compare(candidate, code.codeHash)) {
+      await prisma.adminRecoveryCode.update({
+        where: { id: code.id },
+        data: { usedAt: new Date() },
+      });
+      return true;
+    }
+  }
+  return false;
+}
+
 export async function adminRoutes(app: FastifyInstance) {
   // ── POST /api/admin/login ──────────────────────────────────────────────
   // DB-based admin auth — queries AdminUser table, not tenant users
-  app.post<{ Body: { email: string; password: string } }>('/login', {
+  app.post<{ Body: { email: string; password: string; code?: string } }>('/login', {
     // Admin login is a single high-value target — cap brute-force attempts.
     config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
   }, async (request, reply) => {
@@ -165,6 +207,35 @@ export async function adminRoutes(app: FastifyInstance) {
     const valid = await bcrypt.compare(password, adminUser.passwordHash);
     if (!valid) {
       return reply.status(401).send({ success: false, error: 'Invalid admin credentials' });
+    }
+
+    // Second factor, when the account has one. A password alone stops here —
+    // no token is signed, so a stolen password is not a session.
+    if (adminUser.mfaEnabledAt) {
+      const { code } = (request.body ?? {}) as { code?: string };
+      if (!code) {
+        return reply.status(401).send({
+          success: false,
+          error: 'Enter the six-digit code from your authenticator app.',
+          code: 'MFA_REQUIRED',
+        });
+      }
+
+      const accepted = await consumeSecondFactor(adminUser.id, adminUser.mfaSecret, code);
+      if (!accepted) {
+        await logAdminAction({
+          adminEmail: adminUser.email,
+          action: 'admin_mfa_failed',
+          targetType: 'admin_user',
+          targetId: adminUser.id,
+          ipAddress: request.ip,
+        });
+        return reply.status(401).send({
+          success: false,
+          error: 'That code is not right. Check the app, or use a recovery code.',
+          code: 'MFA_INVALID',
+        });
+      }
     }
 
     // Update lastLoginAt
@@ -197,6 +268,149 @@ export async function adminRoutes(app: FastifyInstance) {
       },
     });
   });
+
+  // ── GET /api/admin/mfa ─────────────────────────────────────────────────
+  // Whether this account has a second factor, and how many recovery codes are
+  // left. Never the secret.
+  app.get('/mfa', { preHandler: requireAdminRole() }, async (request, reply) => {
+    const me = request.user as any;
+    const admin = await prisma.adminUser.findUnique({
+      where: { id: me.sub },
+      select: { mfaEnabledAt: true, mfaSecret: true },
+    });
+    const remaining = await prisma.adminRecoveryCode.count({
+      where: { adminUserId: me.sub, usedAt: null },
+    });
+    return reply.send(ok({
+      enabled: !!admin?.mfaEnabledAt,
+      enrolmentStarted: !!admin?.mfaSecret && !admin?.mfaEnabledAt,
+      recoveryCodesRemaining: remaining,
+    }));
+  });
+
+  // ── POST /api/admin/mfa/setup ──────────────────────────────────────────
+  // Start enrolment: a new secret and the URI an authenticator reads. It is not
+  // in force until /mfa/enable proves a code can be read from the app — so a
+  // half-finished enrolment cannot lock anybody out.
+  app.post('/mfa/setup', { preHandler: requireAdminRole() }, async (request, reply) => {
+    const me = request.user as any;
+    const admin = await prisma.adminUser.findUnique({
+      where: { id: me.sub }, select: { email: true, mfaEnabledAt: true },
+    });
+    if (!admin) return reply.status(404).send({ success: false, error: 'Admin not found' });
+    if (admin.mfaEnabledAt) {
+      return reply.status(400).send({
+        success: false,
+        error: 'Two-factor is already on. Turn it off before setting it up again.',
+      });
+    }
+
+    const secret = generateSecret();
+    await prisma.adminUser.update({
+      where: { id: me.sub },
+      data: { mfaSecret: encryptOrNull(secret), mfaEnabledAt: null },
+    });
+
+    // The secret is returned exactly once, to the person enrolling. There is no
+    // way to read it back afterwards; losing it means starting setup again.
+    return reply.send(ok({ secret, otpauthUri: otpauthUri(secret, admin.email) }));
+  });
+
+  // ── POST /api/admin/mfa/enable ─────────────────────────────────────────
+  app.post<{ Body: { code: string } }>(
+    '/mfa/enable',
+    { preHandler: requireAdminRole() },
+    async (request, reply) => {
+      const me = request.user as any;
+      const admin = await prisma.adminUser.findUnique({
+        where: { id: me.sub }, select: { email: true, mfaSecret: true, mfaEnabledAt: true },
+      });
+      if (!admin?.mfaSecret) {
+        return reply.status(400).send({ success: false, error: 'Start with /mfa/setup.' });
+      }
+      if (admin.mfaEnabledAt) {
+        return reply.status(400).send({ success: false, error: 'Two-factor is already on.' });
+      }
+
+      const secret = decryptOrNull(admin.mfaSecret);
+      if (!secret || !verifyTotp(secret, String(request.body?.code ?? ''))) {
+        return reply.status(400).send({
+          success: false,
+          error: 'That code is not right. Check the app and try the next one.',
+        });
+      }
+
+      // Codes are shown once and stored hashed, so this replaces any left over
+      // from an earlier enrolment rather than adding to them.
+      const codes = generateRecoveryCodes();
+      await prisma.$transaction([
+        prisma.adminRecoveryCode.deleteMany({ where: { adminUserId: me.sub } }),
+        prisma.adminRecoveryCode.createMany({
+          data: await Promise.all(codes.map(async (code) => ({
+            adminUserId: me.sub,
+            codeHash: await bcrypt.hash(normaliseRecoveryCode(code), 12),
+          }))),
+        }),
+        prisma.adminUser.update({
+          where: { id: me.sub }, data: { mfaEnabledAt: new Date() },
+        }),
+      ]);
+
+      await logAdminAction({
+        adminEmail: admin.email,
+        action: 'admin_mfa_enabled',
+        targetType: 'admin_user',
+        targetId: me.sub,
+        ipAddress: request.ip,
+      });
+
+      return reply.send(ok(
+        { recoveryCodes: codes },
+        'Two-factor is on. Save these recovery codes — they are shown once.',
+      ));
+    },
+  );
+
+  // ── POST /api/admin/mfa/disable ────────────────────────────────────────
+  // Needs the password again. Turning off a second factor is exactly the action
+  // a stolen session would want, and a session alone should not be enough.
+  app.post<{ Body: { password: string; code?: string } }>(
+    '/mfa/disable',
+    { preHandler: requireAdminRole() },
+    async (request, reply) => {
+      const me = request.user as any;
+      const admin = await prisma.adminUser.findUnique({ where: { id: me.sub } });
+      if (!admin?.mfaEnabledAt) {
+        return reply.status(400).send({ success: false, error: 'Two-factor is not on.' });
+      }
+
+      const password = String(request.body?.password ?? '');
+      if (!password || !(await bcrypt.compare(password, admin.passwordHash))) {
+        return reply.status(401).send({ success: false, error: 'Password is not right.' });
+      }
+      const code = String(request.body?.code ?? '');
+      if (!code || !(await consumeSecondFactor(admin.id, admin.mfaSecret, code))) {
+        return reply.status(401).send({ success: false, error: 'That code is not right.' });
+      }
+
+      await prisma.$transaction([
+        prisma.adminRecoveryCode.deleteMany({ where: { adminUserId: me.sub } }),
+        prisma.adminUser.update({
+          where: { id: me.sub }, data: { mfaSecret: null, mfaEnabledAt: null },
+        }),
+      ]);
+
+      await logAdminAction({
+        adminEmail: admin.email,
+        action: 'admin_mfa_disabled',
+        targetType: 'admin_user',
+        targetId: me.sub,
+        ipAddress: request.ip,
+      });
+
+      return reply.send(ok(null, 'Two-factor is off.'));
+    },
+  );
 
   // ── GET /api/admin/stats ───────────────────────────────────────────────
   app.get('/stats', { preHandler: requireAdminRole() }, async (_req, reply) => {
