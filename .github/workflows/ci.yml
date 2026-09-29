@@ -293,7 +293,11 @@ jobs:
 
       - name: Run E2E role tests
         working-directory: apps/web
-        run: pnpm exec playwright test tests/e2e/roles.spec.ts --reporter=github
+        # landing.spec.ts is here too now. It was excluded while its assertions
+        # described copy that had been replaced, so it failed on every run and
+        # nobody could have told a real break from the rot. Rewritten against
+        # the page that is served, so it can hold the gate again.
+        run: pnpm exec playwright test tests/e2e/roles.spec.ts tests/e2e/landing.spec.ts --reporter=github
 
       - name: Upload Playwright report on failure
         if: failure()
