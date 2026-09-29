@@ -22,6 +22,7 @@ import { randomBytes } from 'crypto';
 import { join } from 'path';
 import { mkdirSync, writeFileSync, unlinkSync } from 'fs';
 import { prisma } from '@resort-pro/database';
+import { decryptOrNull } from '../utils/secret-box';
 
 // ─── StorageConfig shape (stored in PlatformSettings.storageConfig) ───────────
 export interface StorageConfig {
@@ -46,7 +47,14 @@ export async function getStorageConfig(): Promise<StorageConfig> {
   try {
     const settings = await prisma.platformSettings.findUnique({ where: { id: 'singleton' } });
     if (settings?.storageConfig) {
-      _cachedConfig = settings.storageConfig as unknown as StorageConfig;
+      const stored = settings.storageConfig as unknown as StorageConfig;
+      // The two credentials are encrypted at rest; everything else in the
+      // object is plain, and a config saved before that read back unchanged.
+      _cachedConfig = {
+        ...stored,
+        accessKey: decryptOrNull(stored.accessKey) ?? undefined,
+        secretKey: decryptOrNull(stored.secretKey) ?? undefined,
+      };
       _cacheTime = now;
       return _cachedConfig;
     }

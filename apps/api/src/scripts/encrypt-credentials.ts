@@ -3,9 +3,10 @@
  *
  * Every secret a resort handed us before this shipped is sitting in the table
  * as plain text — payment gateway keys, SMS and WhatsApp credentials, the
- * Telegram bot token, the SSO client secret. New writes are encrypted now;
- * this is the rest, the rows written while `schema.prisma` only *claimed* they
- * were encrypted.
+ * Telegram bot token, the SSO client secret — and so are the platform's own:
+ * the AI API key and the object-storage credentials. New writes are encrypted
+ * now; this is the rest, the rows written while `schema.prisma` only *claimed*
+ * they were encrypted.
  *
  * Run it in this order:
  *
@@ -121,6 +122,56 @@ async function convertPaymentConfigs(apply: boolean) {
   return { tally, rows: configs.length };
 }
 
+/**
+ * The platform's own credentials, as opposed to a resort's: the AI API key that
+ * bills us, and the object-storage access/secret pair. One row, and the two
+ * storage values live inside a JSON object beside fields that are not secret
+ * and stay readable.
+ */
+async function convertPlatformSettings(apply: boolean) {
+  const ai = blank();
+  const storage = blank();
+
+  const settings = await prisma.platformSettings.findUnique({
+    where: { id: 'singleton' },
+    select: { aiApiKey: true, storageConfig: true },
+  });
+
+  if (!settings) return { ai, storage, rows: 0 };
+
+  const data: { aiApiKey?: string; storageConfig?: unknown } = {};
+
+  if (!settings.aiApiKey) ai.empty += 1;
+  else if (isEncrypted(settings.aiApiKey)) ai.alreadyDone += 1;
+  else {
+    ai.converted += 1;
+    if (apply) data.aiApiKey = encryptSecret(settings.aiApiKey);
+  }
+
+  const cfg = settings.storageConfig as Record<string, unknown> | null;
+  const secretFields = ['accessKey', 'secretKey'] as const;
+  const plain = secretFields.filter((f) => typeof cfg?.[f] === 'string' && cfg[f] !== ''
+    && !isEncrypted(cfg[f] as string));
+  const done = secretFields.filter((f) => isEncrypted(cfg?.[f] as string | undefined));
+
+  storage.converted += plain.length;
+  storage.alreadyDone += done.length;
+  storage.empty += secretFields.length - plain.length - done.length;
+
+  if (apply && plain.length > 0 && cfg) {
+    data.storageConfig = {
+      ...cfg,
+      ...Object.fromEntries(plain.map((f) => [f, encryptSecret(cfg[f] as string)])),
+    };
+  }
+
+  if (apply && Object.keys(data).length > 0) {
+    await prisma.platformSettings.update({ where: { id: 'singleton' }, data: data as never });
+  }
+
+  return { ai, storage, rows: 1 };
+}
+
 function line(name: string, tally: Tally, apply: boolean): string {
   return `  ${name.padEnd(18)}`
     + `${String(tally.converted).padStart(4)} ${apply ? 'encrypted' : 'to encrypt'}`
@@ -159,6 +210,12 @@ async function main() {
   total += configs.tally.converted;
   console.log(`\nPayment config rows read: ${configs.rows}`);
   console.log(line('credentials', configs.tally, apply));
+
+  const platform = await convertPlatformSettings(apply);
+  total += platform.ai.converted + platform.storage.converted;
+  console.log(`\nPlatform settings rows read: ${platform.rows}`);
+  console.log(line('aiApiKey', platform.ai, apply));
+  console.log(line('storage keys', platform.storage, apply));
 
   const plural = total === 1 ? '' : 's';
   if (apply) {

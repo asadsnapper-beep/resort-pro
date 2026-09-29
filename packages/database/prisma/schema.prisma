@@ -1744,6 +1744,9 @@ model AiKeys {
   id           String   @id @default(uuid())
   tenantId     String   @unique
   mode         String   @default("platform") // "platform" | "byok"
+  // Nothing writes these yet — BYOK has a reader and no save endpoint. When one
+  // is added it must encrypt, the way every other credential writer now does;
+  // the reader already decrypts and passes older plaintext through.
   dashboardKey String? // encrypted (AES-256-GCM) — BYOK dashboard/owner key
   guestKey     String? // encrypted — BYOK guest chatbot key (optional)
   updatedAt    DateTime @updatedAt
@@ -2474,8 +2477,11 @@ model PlatformSettings {
   id              String   @id @default("singleton")
   trialDays       Int      @default(14)
   plans           Json // Array of { key, name, price, features, roomLimit }
-  storageConfig   Json? // { driver, endpoint, region, bucket, publicUrl, accessKey, secretKey }
-  aiApiKey        String? // Encrypted API key for AI theme generation (Claude/GPT)
+  // { driver, endpoint, region, bucket, publicUrl, accessKey, secretKey }.
+  // accessKey and secretKey are encrypted (see utils/secret-box.ts); the rest
+  // is plain, because it is shown in the admin screen and is not secret.
+  storageConfig   Json?
+  aiApiKey        String? // encrypted — API key for AI theme generation (Claude/GPT)
   aiProvider      String? // "claude" | "gpt-4" — default provider
   aiEnabledGlobal Boolean  @default(false) // Master switch — all AI features off until super-admin flips this. See plan/ai/ROLLOUT-STRATEGY.md
   updatedAt       DateTime @updatedAt

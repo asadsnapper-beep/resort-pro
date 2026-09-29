@@ -11,7 +11,7 @@ import bcrypt from 'bcryptjs';
 import { prisma, Prisma } from '@resort-pro/database';
 import { refreshTokenPayload } from '../utils/refresh-token';
 import { purgeGuestDocumentFiles } from '../utils/guest-documents';
-import { encryptOrNull } from '../utils/secret-box';
+import { encryptOrNull, decryptOrNull } from '../utils/secret-box';
 import { PLAN_PRICING } from '@resort-pro/types';
 import { ok } from '../utils/response';
 
@@ -1566,7 +1566,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
       // Get stored AI API key from settings
       const settings = await getOrCreateSettings();
-      const apiKey = (settings as any).aiApiKey as string | undefined;
+      const apiKey = decryptOrNull((settings as any).aiApiKey as string | undefined) ?? undefined;
       if (!apiKey) {
         return reply.status(400).send({ success: false, error: 'AI API key not configured. Go to Admin → Settings → AI Integration.' });
       }
@@ -1800,10 +1800,13 @@ Rules:
       if (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length < 10) {
         return reply.status(400).send({ success: false, error: 'API key is required (min 10 chars)' });
       }
+      // One key for the whole platform, and it bills us. `schema.prisma` has
+      // called this column "Encrypted API key" since it was added; now it is.
+      const stored = encryptOrNull(apiKey.trim());
       await prisma.platformSettings.upsert({
         where:  { id: 'singleton' },
-        update: { aiApiKey: apiKey.trim(), aiProvider: provider },
-        create: { id: 'singleton', trialDays: 14, plans: DEFAULT_PLAN_CONFIGS as unknown as Prisma.InputJsonValue, aiApiKey: apiKey.trim(), aiProvider: provider },
+        update: { aiApiKey: stored, aiProvider: provider },
+        create: { id: 'singleton', trialDays: 14, plans: DEFAULT_PLAN_CONFIGS as unknown as Prisma.InputJsonValue, aiApiKey: stored, aiProvider: provider },
       });
       const adminUser = request.user as any;
       await logAdminAction({
@@ -3318,10 +3321,20 @@ Rules:
           : existing.secretKey,
       };
 
+      // Only the two credentials are encrypted, not the whole object: the
+      // bucket, endpoint and public URL are shown in this screen and are not
+      // secret, and keeping them readable keeps the row diagnosable. The
+      // matching decrypt is in getStorageConfig(), which is the only reader.
+      const atRest = {
+        ...updated,
+        accessKey: encryptOrNull(updated.accessKey) ?? undefined,
+        secretKey: encryptOrNull(updated.secretKey) ?? undefined,
+      };
+
       await prisma.platformSettings.upsert({
         where:  { id: 'singleton' },
-        create: { id: 'singleton', plans: [], storageConfig: updated as any },
-        update: { storageConfig: updated as any },
+        create: { id: 'singleton', plans: [], storageConfig: atRest as any },
+        update: { storageConfig: atRest as any },
       });
 
       invalidateStorageCache();

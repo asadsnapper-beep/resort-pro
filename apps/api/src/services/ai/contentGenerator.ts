@@ -7,6 +7,7 @@
  */
 import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '@resort-pro/database';
+import { decryptOrNull } from '../../utils/secret-box';
 
 // Cheap model for content generation (cost control — see README cost model).
 const MODEL = 'claude-haiku-4-5-20251001';
@@ -38,13 +39,16 @@ async function resolveApiKey(tenantId: string): Promise<string> {
     where: { tenantId },
     select: { mode: true, dashboardKey: true },
   });
-  if (keys?.mode === 'byok' && keys.dashboardKey) return keys.dashboardKey;
+  if (keys?.mode === 'byok' && keys.dashboardKey) {
+    return decryptOrNull(keys.dashboardKey) ?? keys.dashboardKey;
+  }
 
   const settings = await prisma.platformSettings.findUnique({
     where: { id: 'singleton' },
     select: { aiApiKey: true },
   });
-  if (settings?.aiApiKey) return settings.aiApiKey;
+  const platformKey = decryptOrNull(settings?.aiApiKey);
+  if (platformKey) return platformKey;
 
   throw new AiNotConfiguredError();
 }
