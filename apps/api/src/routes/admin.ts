@@ -87,6 +87,27 @@ function requireAdminRole(roles: AdminRole[] = ['SUPER_ADMIN', 'SUPPORT', 'FINAN
 const requireSuperAdmin = requireAdminRole(['SUPER_ADMIN']);
 
 // ── Audit Log Helper ──────────────────────────────────────────────────────────
+/**
+ * Record a privileged admin action.
+ *
+ * The failure path used to be an empty `catch` with a comment saying logging
+ * must never break the main operation. That half is still true — the mutation
+ * has already happened by the time this runs, so throwing here would report a
+ * failure for work that succeeded. What was wrong is that it said nothing at
+ * all: the moment the audit store is unhealthy is exactly the moment privileged
+ * actions stop being recorded, and nothing anywhere would have shown it
+ * (release-readiness review M-02).
+ *
+ * So it stays non-fatal and becomes loud, and it returns whether the row was
+ * written so a caller can decide for itself.
+ *
+ * What this is not: the audit row is still written after the mutation and
+ * outside its transaction, so a crash in between still loses it. Making the
+ * highest-risk actions atomic with their audit entry means moving both into one
+ * transaction, at each site, and is its own piece of work.
+ *
+ * @returns true if the audit row was written.
+ */
 async function logAdminAction({
   adminEmail,
   action,
@@ -108,8 +129,16 @@ async function logAdminAction({
     await prisma.auditLog.create({
       data: { adminEmail, action, targetType, targetId, targetName, metadata: (metadata ?? undefined) as any, ipAddress },
     });
-  } catch {
-    // Never let logging failure break the main operation
+    return true;
+  } catch (err) {
+    // Deliberately without the metadata, which carries whatever the call site
+    // passed — including, at some sites, the values being changed.
+    console.error(
+      `AUDIT WRITE FAILED — "${action}" on ${targetType}`
+      + `${targetId ? ` ${targetId}` : ''} by ${adminEmail} was carried out but`
+      + ` not recorded: ${err instanceof Error ? err.message : 'unknown error'}`,
+    );
+    return false;
   }
 }
 
@@ -1895,6 +1924,19 @@ Rules:
       },
     });
 
+    // This route moves money — account credit, or a paid plan granted free.
+    // `rewardedBy` on the referral row says who, but only for as long as nobody
+    // rewards it again; the audit log is the record that does not get rewritten.
+    await logAdminAction({
+      adminEmail: admin.email,
+      action: 'referral_reward',
+      targetType: 'tenant',
+      targetId: referral.referrerId,
+      targetName: referral.referrer.name,
+      metadata: { referralId: id, type, amount, plan, months, note },
+      ipAddress: request.ip,
+    });
+
     // Notify referrer
     if (type !== 'NONE') {
       const rewardText = type === 'CREDIT'
@@ -2847,6 +2889,18 @@ Rules:
         })
       );
 
+      // Which flags, not just how many: a feature flag decides whether a resort
+      // can reach a paid module, and "someone changed some flags" is not an
+      // answer to who turned this one on.
+      await logAdminAction({
+        adminEmail: adminUser.email,
+        action: 'feature_flags_update',
+        targetType: 'tenant',
+        targetId: id,
+        metadata: { flags },
+        ipAddress: request.ip,
+      });
+
       return reply.send(ok({ updated: Object.keys(flags).length }));
     }
   );
@@ -2959,6 +3013,18 @@ Rules:
         },
         select: { id: true, customDomain: true, sslStatus: true, sslProvisionedAt: true, sslExpiresAt: true },
       });
+
+      const adminUser = request.user as any;
+      await logAdminAction({
+        adminEmail: adminUser.email,
+        action: 'ssl_status_update',
+        targetType: 'tenant',
+        targetId: id,
+        targetName: updated.customDomain ?? undefined,
+        metadata: { sslStatus, sslExpiresAt, sslError },
+        ipAddress: request.ip,
+      });
+
       return reply.send(ok(updated, 'SSL status updated'));
     }
   );
