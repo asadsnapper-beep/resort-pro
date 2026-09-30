@@ -15,6 +15,9 @@ import { encryptOrNull, decryptOrNull } from '../utils/secret-box';
 import {
   generateSecret, verifyTotp, otpauthUri, generateRecoveryCodes, normaliseRecoveryCode,
 } from '../utils/totp';
+import {
+  isNewLocation, alertNewSignInLocation, alertTwoFactorDisabled,
+} from '../services/admin-alerts';
 import { PLAN_PRICING } from '@resort-pro/types';
 import { ok } from '../utils/response';
 
@@ -351,6 +354,20 @@ export async function adminRoutes(app: FastifyInstance) {
       select: { id: true },
     });
 
+    // Told about, not waited for. A sign-in does not fail because an email did,
+    // and the person signing in should not watch a spinner for it.
+    isNewLocation(adminUser.id, request.ip, session.id)
+      .then((isNew) => {
+        if (!isNew) return undefined;
+        return alertNewSignInLocation({
+          adminUserId: adminUser.id,
+          email: adminUser.email,
+          ipAddress: request.ip,
+          userAgent: request.headers['user-agent']?.toString(),
+        });
+      })
+      .catch((err) => console.error('[admin-alerts] new sign-in check failed:', err?.message));
+
     const token = app.jwt.sign(
       {
         sub: adminUser.id,
@@ -630,6 +647,15 @@ export async function adminRoutes(app: FastifyInstance) {
         targetId: me.sub,
         ipAddress: request.ip,
       });
+
+      // The audit log records it for whoever goes looking. This is for the
+      // person whose account it is, who would otherwise find out by noticing
+      // that nothing asks for a code any more.
+      alertTwoFactorDisabled({
+        adminUserId: me.sub,
+        email: admin.email,
+        ipAddress: request.ip,
+      }).catch((err) => console.error('[admin-alerts] two-factor-off email failed:', err?.message));
 
       return reply.send(ok(null, 'Two-factor is off.'));
     },
