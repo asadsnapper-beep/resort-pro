@@ -194,8 +194,15 @@ jobs:
           # below, which reads the stack back and can actually tell. Anything
           # else non-2xx is a real refusal — a name conflict, a bad token — and
           # still stops here.
+          # The whole 52x family, not just 524. The first run after this was
+          # written came back 520 — Cloudflare's "origin returned something I
+          # could not read", which is what a connection dropped mid-request
+          # looks like from the proxy's side — and failed for exactly the reason
+          # the change was meant to end. 52x is Cloudflare talking about the
+          # origin; Portainer's own errors are 4xx and 500, so nothing real is
+          # swallowed by taking the class rather than the one code.
           case "$HTTP_STATUS" in
-            524|504|502|000)
+            52?|504|502|000)
               echo "::warning::Portainer did not answer in time (HTTP $HTTP_STATUS). The update may still have gone through — the next step checks."
               ;;
             2??)
