@@ -18,7 +18,7 @@
 import {
   LayoutDashboard, Building2, Users, CreditCard, Settings, Palette, ClipboardList,
   Download, Gift, UserCog, Megaphone, ShieldCheck, Activity, Star, Globe, HardDrive,
-  Sparkles, Mail, type LucideIcon,
+  Sparkles, Mail, Lock, type LucideIcon,
 } from 'lucide-react';
 import type { AdminRole } from '@/store/admin';
 
@@ -64,6 +64,9 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { href: '/admin/health',          label: 'Health',           icon: Activity,        roles: EVERY_ADMIN },
   { href: '/admin/storage',         label: 'Storage',          icon: HardDrive,       roles: OWNER_ONLY },
   { href: '/admin/settings',        label: 'Settings',         icon: Settings,        roles: OWNER_ONLY },
+  // Every role, unlike the rest of this list: it manages your own sign-in, not
+  // the platform's. A Viewer still needs somewhere to turn on two-factor.
+  { href: '/admin/security',        label: 'Security',         icon: Lock,            roles: EVERY_ADMIN },
 ];
 
 /**

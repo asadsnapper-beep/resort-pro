@@ -16,11 +16,17 @@ adminApi.interceptors.request.use((config) => {
   return config;
 });
 
-// Auto-logout on 401
+// Auto-logout on 401 — except on the login call itself.
+//
+// Signing in with two-factor on answers 401 with MFA_REQUIRED to ask for the
+// code. Treating that as an expired session would clear the token and reload
+// the page in the middle of signing in, so the second factor could never be
+// entered. A 401 from /login is an answer, not an expiry.
 adminApi.interceptors.response.use(
   (r) => r,
   (err) => {
-    if (err.response?.status === 401 && typeof window !== 'undefined') {
+    const fromLogin = (err.config?.url ?? '').includes('/login');
+    if (err.response?.status === 401 && !fromLogin && typeof window !== 'undefined') {
       localStorage.removeItem('admin_token');
       window.location.href = '/admin/login';
     }
@@ -29,9 +35,22 @@ adminApi.interceptors.response.use(
 );
 
 export const adminEndpoints = {
-  login: (email: string, password: string) =>
-    adminApi.post('/login', { email, password }),
+  // `code` is the authenticator code, or a recovery code, when the account has
+  // two-factor on. Left out entirely when it has not.
+  login: (email: string, password: string, code?: string) =>
+    adminApi.post('/login', code ? { email, password, code } : { email, password }),
   me: () => adminApi.get('/me'),
+  // Two-factor
+  mfaStatus: () => adminApi.get('/mfa'),
+  mfaSetup: () => adminApi.post('/mfa/setup'),
+  mfaEnable: (code: string) => adminApi.post('/mfa/enable', { code }),
+  mfaDisable: (password: string, code: string) =>
+    adminApi.post('/mfa/disable', { password, code }),
+  // Sessions
+  sessions: () => adminApi.get('/sessions'),
+  revokeSession: (sessionId: string) => adminApi.post('/sessions/revoke', { sessionId }),
+  revokeOtherSessions: () => adminApi.post('/sessions/revoke', { others: true }),
+  logout: () => adminApi.post('/logout'),
   stats: () => adminApi.get('/stats'),
   // Tenants
   tenants: (params?: Record<string, string>) =>

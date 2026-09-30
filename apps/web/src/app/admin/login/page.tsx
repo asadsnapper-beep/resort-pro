@@ -18,6 +18,10 @@ export default function AdminLoginPage() {
   }, [isAdminAuthenticated, router]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  // Asked for only once the server says this account has a second factor, so
+  // an account without one never sees a field it cannot fill.
+  const [needsCode, setNeedsCode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -26,12 +30,22 @@ export default function AdminLoginPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await adminEndpoints.login(email, password);
+      const res = await adminEndpoints.login(email, password, needsCode ? code : undefined);
       const { token, admin } = res.data.data;
       setAdmin(admin, token);
       router.push('/admin/dashboard');
     } catch (err: any) {
-      setError(err?.response?.data?.error || 'Login failed');
+      const body = err?.response?.data;
+      if (body?.code === 'MFA_REQUIRED') {
+        setNeedsCode(true);
+        setError('');
+      } else {
+        // A wrong code leaves the field open; a wrong password sends it back to
+        // the start, because the password is what has to be right first.
+        if (body?.code !== 'MFA_INVALID') setNeedsCode(false);
+        setCode('');
+        setError(body?.error || 'Login failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -74,6 +88,27 @@ export default function AdminLoginPage() {
                 className="w-full h-10 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white placeholder:text-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
+            {needsCode && (
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                  Authenticator code
+                </label>
+                <input
+                  type="text"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder="123456"
+                  autoFocus
+                  autoComplete="one-time-code"
+                  inputMode="text"
+                  required
+                  className="w-full h-10 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white placeholder:text-gray-500 text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <p className="text-xs text-gray-500 mt-1.5">
+                  Six digits from your authenticator app, or one of your recovery codes.
+                </p>
+              </div>
+            )}
             {error && (
               <p className="text-sm text-red-400 text-center py-2 bg-red-500/10 rounded-lg">{error}</p>
             )}

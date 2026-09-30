@@ -59,7 +59,13 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await prisma.auditLog.deleteMany({ where: { adminEmail: email } });
-  await prisma.adminUser.deleteMany({ where: { email } });
+  // Both the admin this file signs in as and the second one it makes to prove
+  // revocation cannot cross accounts. Cleaning up at the end of that test body
+  // is not enough: when it fails — which it does under mutation, by design —
+  // the line never runs and the row outlives the run.
+  await prisma.adminUser.deleteMany({
+    where: { email: { in: [email, `other-${run}@test.com`] } },
+  });
   await app.close();
 });
 
