@@ -38,6 +38,11 @@ export async function signAdmin(app: FastifyInstance, opts: {
     data: {
       adminUserId: adminUser.id,
       expiresAt: opts.expiresAt ?? new Date(Date.now() + 8 * 60 * 60 * 1000),
+      // As if the password had just been typed, which is what signing in means.
+      // Without it the destructive and credential-writing routes answer 403
+      // REAUTH_REQUIRED, and a test that is not about re-authentication fails
+      // for a reason that has nothing to do with what it is testing.
+      reauthAt: new Date(),
     },
     select: { id: true },
   });

@@ -16,6 +16,30 @@ adminApi.interceptors.request.use((config) => {
   return config;
 });
 
+/**
+ * The bridge between a 403 REAUTH_REQUIRED and the prompt that answers it.
+ *
+ * The interceptor cannot render anything, and the prompt cannot see requests.
+ * This is the one place they meet: the prompt registers a listener, the
+ * interceptor asks it, and the answer decides whether the original request is
+ * sent again.
+ */
+type ReauthAsk = (resolve: (confirmed: boolean) => void) => void;
+let reauthListener: ReauthAsk | null = null;
+
+export function onReauthNeeded(listener: ReauthAsk): () => void {
+  reauthListener = listener;
+  return () => { if (reauthListener === listener) reauthListener = null; };
+}
+
+function askForReauth(): Promise<boolean> {
+  // No prompt mounted — outside the admin panel, or during a server render.
+  // Refusing is the safe answer: it surfaces the API's own error rather than
+  // silently retrying a request that will fail again.
+  if (!reauthListener) return Promise.resolve(false);
+  return new Promise((resolve) => reauthListener!(resolve));
+}
+
 // Auto-logout on 401 — except on the login call itself.
 //
 // Signing in with two-factor on answers 401 with MFA_REQUIRED to ask for the
@@ -24,12 +48,32 @@ adminApi.interceptors.request.use((config) => {
 // entered. A 401 from /login is an answer, not an expiry.
 adminApi.interceptors.response.use(
   (r) => r,
-  (err) => {
+  async (err) => {
     const fromLogin = (err.config?.url ?? '').includes('/login');
     if (err.response?.status === 401 && !fromLogin && typeof window !== 'undefined') {
       localStorage.removeItem('admin_token');
       window.location.href = '/admin/login';
+      return Promise.reject(err);
     }
+
+    // An action that cannot be undone wants the password typed again. Ask, and
+    // if they confirm, send the same request once more — so the screen that
+    // made it never has to know this happened. Marked so a second 403 on the
+    // retry surfaces instead of asking again in a loop.
+    const config = err.config ?? {};
+    if (
+      err.response?.status === 403
+      && err.response?.data?.code === 'REAUTH_REQUIRED'
+      && !config.__reauthRetried
+      && typeof window !== 'undefined'
+    ) {
+      const confirmed = await askForReauth();
+      if (confirmed) {
+        config.__reauthRetried = true;
+        return adminApi.request(config);
+      }
+    }
+
     return Promise.reject(err);
   }
 );

@@ -2750,6 +2750,11 @@ model AdminSession {
   createdAt   DateTime  @default(now())
   lastSeenAt  DateTime  @default(now())
   expiresAt   DateTime
+  // When the password was last actually typed on this session. Signing in sets
+  // it; so does /admin/reauth. Destructive and credential-touching routes want
+  // it to be recent, so that a session someone walked away from cannot delete a
+  // resort on its own.
+  reauthAt    DateTime?
   revokedAt   DateTime?
   revokedBy   String? // email, when someone else ended it
   ipAddress   String?

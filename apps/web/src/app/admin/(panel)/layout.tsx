@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { useAdminStore } from '@/store/admin';
 import { LogOut, ChevronRight, Loader2, Lock, Menu, X } from 'lucide-react';
 import NotificationBell from '@/components/admin/NotificationBell';
+import ReauthPrompt from '@/components/admin/ReauthPrompt';
 import { cn } from '@/lib/utils';
 import { navFor, canOpen, ADMIN_ROLE_LABEL } from '@/lib/admin-nav';
 
@@ -56,6 +57,9 @@ export default function AdminPanelLayout({ children }: { children: React.ReactNo
 
   return (
     <div className="admin-shell flex h-screen overflow-hidden bg-rp-surface-2 text-rp-text">
+      {/* Mounted once so every screen gets the password prompt, including
+          the ones written before it existed. */}
+      <ReauthPrompt />
       {/* On a phone the sidebar is 240px of a 390px screen, which left the
           panel itself about 150px wide — every table and form in it unusable
           (release-readiness review M-04). Below md it slides in over the page

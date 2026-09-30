@@ -101,6 +101,46 @@ async function liveSession(sessionId: string): Promise<{ ok: boolean; reason?: s
   return { ok: true };
 }
 
+/**
+ * How recently the password must have been typed for a destructive action.
+ *
+ * Long enough to do a piece of work without being asked twice; short enough
+ * that a session left open on an unlocked laptop is not a delete button.
+ */
+const REAUTH_WINDOW_MS = 10 * 60 * 1000;
+
+/**
+ * Guard for actions that cannot be undone, or that write credentials.
+ *
+ * An admin token is eight hours long. Revoking it is possible now, but
+ * revocation is a reaction — it needs someone to notice. This is the other
+ * half: for the small set of actions where being wrong is permanent, having the
+ * session is not enough, the password has to have been typed recently.
+ *
+ * Goes after requireAdminRole in the preHandler list, so role is still decided
+ * first and this only ever adds a condition.
+ */
+async function requireRecentAuth(request: any, reply: any) {
+  const sessionId = request.user?.sid as string | undefined;
+  if (!sessionId) {
+    return reply.status(401).send({ success: false, error: 'Sign in again.', code: 'SESSION_REQUIRED' });
+  }
+
+  const session = await prisma.adminSession.findUnique({
+    where: { id: sessionId },
+    select: { reauthAt: true },
+  });
+
+  const lastTyped = session?.reauthAt?.getTime() ?? 0;
+  if (Date.now() - lastTyped > REAUTH_WINDOW_MS) {
+    return reply.status(403).send({
+      success: false,
+      error: 'Confirm your password to continue — this action cannot be undone.',
+      code: 'REAUTH_REQUIRED',
+    });
+  }
+}
+
 /** Verify JWT and check role. Pass no roles arg to require any valid admin. */
 function requireAdminRole(roles: AdminRole[] = ['SUPER_ADMIN', 'SUPPORT', 'FINANCE', 'VIEWER']) {
   return async (request: any, reply: any) => {
@@ -301,6 +341,8 @@ export async function adminRoutes(app: FastifyInstance) {
       data: {
         adminUserId: adminUser.id,
         expiresAt: new Date(Date.now() + ADMIN_SESSION_HOURS * 60 * 60 * 1000),
+        // Signing in is typing the password, so the window starts open.
+        reauthAt: new Date(),
         ipAddress: request.ip,
         // Truncated: a user-agent is for telling two sign-ins apart, not for
         // keeping a full fingerprint of the person's browser.
@@ -334,6 +376,52 @@ export async function adminRoutes(app: FastifyInstance) {
       },
     });
   });
+
+  // ── POST /api/admin/reauth ─────────────────────────────────────────────
+  // Type the password again, without signing out and back in. Opens the window
+  // that requireRecentAuth checks.
+  app.post<{ Body: { password: string; code?: string } }>(
+    '/reauth',
+    {
+      preHandler: requireAdminRole(),
+      // The same cap as signing in: this takes a password, so it is another
+      // door to try one against.
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    },
+    async (request, reply) => {
+      const me = request.user as any;
+      const admin = await prisma.adminUser.findUnique({ where: { id: me.sub } });
+      if (!admin || !admin.isActive) {
+        return reply.status(401).send({ success: false, error: 'Unauthorized' });
+      }
+
+      const password = String(request.body?.password ?? '');
+      if (!password || !(await bcrypt.compare(password, admin.passwordHash))) {
+        return reply.status(401).send({ success: false, error: 'Password is not right.' });
+      }
+
+      // With two-factor on it is asked for here too. Confirming an irreversible
+      // action with one of the two factors would make the second one optional
+      // exactly where it matters most.
+      if (admin.mfaEnabledAt) {
+        const code = String(request.body?.code ?? '');
+        if (!code || !(await consumeSecondFactor(admin.id, admin.mfaSecret, code))) {
+          return reply.status(401).send({
+            success: false,
+            error: 'That code is not right.',
+            code: 'MFA_INVALID',
+          });
+        }
+      }
+
+      await prisma.adminSession.update({
+        where: { id: me.sid },
+        data: { reauthAt: new Date() },
+      });
+
+      return reply.send(ok({ minutes: Math.round(REAUTH_WINDOW_MS / 60000) }, 'Confirmed.'));
+    },
+  );
 
   // ── POST /api/admin/logout ─────────────────────────────────────────────
   // Signing out now means something on the server, not just a cleared
@@ -872,7 +960,7 @@ export async function adminRoutes(app: FastifyInstance) {
   // name — cheap insurance against a stray click or a scripted mistake.
   app.delete<{ Params: { id: string }; Body: { confirmName?: string } }>(
     '/tenants/:id',
-    { preHandler: requireSuperAdmin },
+    { preHandler: [requireSuperAdmin, requireRecentAuth] },
     async (request, reply) => {
       const tenant = await prisma.tenant.findUnique({
         where: { id: request.params.id },
@@ -920,7 +1008,7 @@ export async function adminRoutes(app: FastifyInstance) {
   // POST /api/admin/tenant-deletion-requests/:id/approve — approve + hard-delete
   app.post<{ Params: { id: string } }>(
     '/tenant-deletion-requests/:id/approve',
-    { preHandler: requireSuperAdmin },
+    { preHandler: [requireSuperAdmin, requireRecentAuth] },
     async (request, reply) => {
       const deletionRequest = await prisma.tenantDeletionRequest.findUnique({
         where: { id: request.params.id },
@@ -2143,7 +2231,7 @@ Rules:
   // ── PUT /api/admin/settings/ai — save AI API key ──────────────────────────
   app.put<{ Body: { apiKey: string; provider?: string } }>(
     '/settings/ai',
-    { preHandler: requireSuperAdmin },
+    { preHandler: [requireSuperAdmin, requireRecentAuth] },
     async (request, reply) => {
       const { apiKey, provider = 'claude' } = request.body;
       if (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length < 10) {
@@ -2187,7 +2275,7 @@ Rules:
   // ── DELETE /api/admin/settings/ai — remove AI API key ────────────────────
   app.delete(
     '/settings/ai',
-    { preHandler: requireSuperAdmin },
+    { preHandler: [requireSuperAdmin, requireRecentAuth] },
     async (request, reply) => {
       await prisma.platformSettings.upsert({
         where:  { id: 'singleton' },
@@ -2586,7 +2674,7 @@ Rules:
   // ── POST /api/admin/team — create new admin user ──────────────────────────
   app.post<{
     Body: { email: string; password: string; role: string; firstName?: string; lastName?: string };
-  }>('/team', { preHandler: requireAdminRole(['SUPER_ADMIN']) }, async (request, reply) => {
+  }>('/team', { preHandler: [requireAdminRole(['SUPER_ADMIN']), requireRecentAuth] }, async (request, reply) => {
     const { email, password, role, firstName = '', lastName = '' } = request.body || {};
     if (!email || !password || !role) {
       return reply.status(400).send({ success: false, error: 'email, password, and role required' });
@@ -2640,7 +2728,7 @@ Rules:
   app.patch<{
     Params: { id: string };
     Body: { role?: string; isActive?: boolean; firstName?: string; lastName?: string };
-  }>('/team/:id', { preHandler: requireAdminRole(['SUPER_ADMIN']) }, async (request, reply) => {
+  }>('/team/:id', { preHandler: [requireAdminRole(['SUPER_ADMIN']), requireRecentAuth] }, async (request, reply) => {
     const { id } = request.params;
     const { role, isActive, firstName, lastName } = request.body || {};
     const requester = request.user as any;
@@ -2689,7 +2777,7 @@ Rules:
   // ── DELETE /api/admin/team/:id — deactivate (soft delete) ────────────────
   app.delete<{ Params: { id: string } }>(
     '/team/:id',
-    { preHandler: requireAdminRole(['SUPER_ADMIN']) },
+    { preHandler: [requireAdminRole(['SUPER_ADMIN']), requireRecentAuth] },
     async (request, reply) => {
       const { id } = request.params;
       const requester = request.user as any;
@@ -2959,7 +3047,7 @@ Rules:
   // Immediate anonymization — bypasses 30-day grace (SUPER_ADMIN only, irreversible)
   app.post<{ Params: { id: string } }>(
     '/tenants/:id/gdpr/anonymize-now',
-    { preHandler: requireAdminRole(['SUPER_ADMIN']) },
+    { preHandler: [requireAdminRole(['SUPER_ADMIN']), requireRecentAuth] },
     async (request, reply) => {
       const { id } = request.params;
       const adminUser = request.user as any;
@@ -3651,7 +3739,7 @@ Rules:
   // ── PATCH /api/admin/storage ───────────────────────────────────────────────
   app.patch<{ Body: Partial<StorageConfig> }>(
     '/storage',
-    { preHandler: requireAdminRole(['SUPER_ADMIN']) },
+    { preHandler: [requireAdminRole(['SUPER_ADMIN']), requireRecentAuth] },
     async (request, reply) => {
       const adminUser = request.user as any;
       const body = request.body ?? {};
