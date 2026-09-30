@@ -88,9 +88,17 @@ async function stock(tenantId: string, opts: {
     });
   }
   if (opts.expense) {
+    // Dated in the resort's own timezone, because that is the calendar the
+    // service windows the month by. Dating it in UTC passed for most of the
+    // month and then failed: this resort is on Kiritimati (+14), so from 10:00
+    // UTC on the last day of a month it is already the 1st there, and an
+    // expense dated "today in UTC" falls before the resort's month began.
+    const { timezone } = await prisma.tenant.findUniqueOrThrow({
+      where: { id: tenantId }, select: { timezone: true },
+    });
     await prisma.expense.create({
       data: {
-        tenantId, date: tenantToday('UTC'), category: 'SUPPLIES',
+        tenantId, date: tenantToday(timezone), category: 'SUPPLIES',
         description: 'Soap', amount: opts.expense, createdBy: 'test',
       },
     });
