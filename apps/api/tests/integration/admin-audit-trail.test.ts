@@ -14,6 +14,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { buildApp } from '../../src/app';
 import { prisma } from '@resort-pro/database';
+import { signAdmin } from '../helpers/auth';
 import type { FastifyInstance } from 'fastify';
 
 let app: FastifyInstance;
@@ -48,13 +49,15 @@ beforeAll(async () => {
     data: { referrerId, referredId: referred.id },
   })).id;
 
-  adminToken = app.jwt.sign({ sub: `admin-${run}`, email: adminEmail, adminRole: 'SUPER_ADMIN' });
+  adminToken = (await signAdmin(app, { email: adminEmail })).token;
 }, 60000);
 
 afterAll(async () => {
   await prisma.auditLog.deleteMany({ where: { adminEmail } });
   await prisma.referral.deleteMany({ where: { id: referralId } });
   await prisma.tenant.deleteMany({ where: { slug: { startsWith: run } } });
+  // The admin row the token helper made, and its session with it.
+  await prisma.adminUser.deleteMany({ where: { email: adminEmail } });
   await app.close();
 });
 

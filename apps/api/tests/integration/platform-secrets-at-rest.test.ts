@@ -16,6 +16,7 @@ import { buildApp } from '../../src/app';
 import { prisma } from '@resort-pro/database';
 import { getStorageConfig, invalidateStorageCache } from '../../src/services/storage';
 import { keepEnv } from '../helpers/env';
+import { signAdmin } from '../helpers/auth';
 import type { FastifyInstance } from 'fastify';
 
 let app: FastifyInstance;
@@ -49,7 +50,7 @@ beforeAll(async () => {
     };
   }
 
-  adminToken = app.jwt.sign({ sub: `admin-${run}`, email: adminEmail, adminRole: 'SUPER_ADMIN' });
+  adminToken = (await signAdmin(app, { email: adminEmail })).token;
 }, 60000);
 
 afterAll(async () => {
@@ -68,6 +69,7 @@ afterAll(async () => {
   });
   invalidateStorageCache();
   await prisma.auditLog.deleteMany({ where: { adminEmail } });
+  await prisma.adminUser.deleteMany({ where: { email: adminEmail } });
   await app.close();
 });
 

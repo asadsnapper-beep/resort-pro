@@ -2731,10 +2731,35 @@ model AdminUser {
   updatedAt    DateTime  @updatedAt
 
   recoveryCodes AdminRecoveryCode[]
+  sessions      AdminSession[]
 
   @@index([role])
   @@index([isActive])
   @@map("admin_users")
+}
+
+// A sign-in that can be taken back.
+//
+// The admin token used to be a bearer JWT and nothing else: once issued there
+// was no way to stop it short of its eight hours, so a token lifted from a
+// laptop was eight hours of the whole platform and nobody could end it. The
+// token now names a row here, and this row can be revoked.
+model AdminSession {
+  id          String    @id @default(cuid())
+  adminUserId String
+  createdAt   DateTime  @default(now())
+  lastSeenAt  DateTime  @default(now())
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  revokedBy   String? // email, when someone else ended it
+  ipAddress   String?
+  userAgent   String?
+
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([adminUserId])
+  @@index([expiresAt])
+  @@map("admin_sessions")
 }
 
 // The day the phone is lost.

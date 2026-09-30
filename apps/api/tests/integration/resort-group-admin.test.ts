@@ -12,7 +12,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildApp } from '../../src/app';
 import { prisma } from '@resort-pro/database';
-import { verifyOwnerAndLogin } from '../helpers/auth';
+import { verifyOwnerAndLogin, signAdmin } from '../helpers/auth';
 import type { FastifyInstance } from 'fastify';
 
 let app: FastifyInstance;
@@ -71,14 +71,13 @@ beforeAll(async () => {
   });
   expect(linked.statusCode, linked.body).toBe(200);
 
-  adminToken = app.jwt.sign({
-    sub: `admin-${run}`, email: `admin-${run}@test.com`, adminRole: 'SUPER_ADMIN',
-  });
+  adminToken = (await signAdmin(app, { email: `admin-${run}@test.com` })).token;
 }, 60000);
 
 afterAll(async () => {
   await prisma.resortGroup.deleteMany({ where: { ownerUserId } });
   await prisma.tenant.deleteMany({ where: { slug: { startsWith: run } } });
+  await prisma.adminUser.deleteMany({ where: { email: `admin-${run}@test.com` } });
   await app.close();
 });
 

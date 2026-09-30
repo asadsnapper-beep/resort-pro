@@ -66,6 +66,41 @@ const ROUTE_PERMISSIONS: Record<string, AdminRole[]> = {
   read:           ['SUPER_ADMIN', 'SUPPORT', 'FINANCE', 'VIEWER'],
 };
 
+/** How long an admin sign-in lasts, in the token and in the session row alike. */
+const ADMIN_SESSION_HOURS = 8;
+
+/**
+ * Don't write `lastSeenAt` on every request. The panel fires several calls per
+ * page; a minute's resolution is plenty for "is this session still in use".
+ */
+const LAST_SEEN_RESOLUTION_MS = 60_000;
+
+/**
+ * Check that the session the token names is still one we honour.
+ *
+ * This is the part a bearer JWT cannot do by itself: revoking a row here stops
+ * every token naming it, at once, rather than waiting out its eight hours.
+ */
+async function liveSession(sessionId: string): Promise<{ ok: boolean; reason?: string }> {
+  const session = await prisma.adminSession.findUnique({
+    where: { id: sessionId },
+    select: { revokedAt: true, expiresAt: true, lastSeenAt: true },
+  });
+
+  if (!session) return { ok: false, reason: 'This session no longer exists. Sign in again.' };
+  if (session.revokedAt) return { ok: false, reason: 'This session was signed out. Sign in again.' };
+  if (session.expiresAt <= new Date()) return { ok: false, reason: 'This session has expired. Sign in again.' };
+
+  if (Date.now() - session.lastSeenAt.getTime() > LAST_SEEN_RESOLUTION_MS) {
+    await prisma.adminSession.update({
+      where: { id: sessionId },
+      data: { lastSeenAt: new Date() },
+    }).catch(() => { /* a missed heartbeat is not worth failing a request over */ });
+  }
+
+  return { ok: true };
+}
+
 /** Verify JWT and check role. Pass no roles arg to require any valid admin. */
 function requireAdminRole(roles: AdminRole[] = ['SUPER_ADMIN', 'SUPPORT', 'FINANCE', 'VIEWER']) {
   return async (request: any, reply: any) => {
@@ -82,6 +117,24 @@ function requireAdminRole(roles: AdminRole[] = ['SUPER_ADMIN', 'SUPPORT', 'FINAN
     }
     if (!roles.includes(adminRole)) {
       return reply.status(403).send({ success: false, error: `Requires role: ${roles.join(' or ')}` });
+    }
+
+    // A token issued before sessions existed names no session, and there is no
+    // row to revoke for it — so it is refused rather than quietly trusted. The
+    // cost is one sign-in on the day this deploys; the alternative is a
+    // permanent way around revocation.
+    const sessionId = request.user?.sid as string | undefined;
+    if (!sessionId) {
+      return reply.status(401).send({
+        success: false,
+        error: 'Sign in again — this session predates revocable sessions.',
+        code: 'SESSION_REQUIRED',
+      });
+    }
+
+    const live = await liveSession(sessionId);
+    if (!live.ok) {
+      return reply.status(401).send({ success: false, error: live.reason, code: 'SESSION_ENDED' });
     }
   };
 }
@@ -244,14 +297,27 @@ export async function adminRoutes(app: FastifyInstance) {
       data: { lastLoginAt: new Date() },
     });
 
+    const session = await prisma.adminSession.create({
+      data: {
+        adminUserId: adminUser.id,
+        expiresAt: new Date(Date.now() + ADMIN_SESSION_HOURS * 60 * 60 * 1000),
+        ipAddress: request.ip,
+        // Truncated: a user-agent is for telling two sign-ins apart, not for
+        // keeping a full fingerprint of the person's browser.
+        userAgent: (request.headers['user-agent'] ?? '').toString().slice(0, 200) || null,
+      },
+      select: { id: true },
+    });
+
     const token = app.jwt.sign(
       {
         sub: adminUser.id,
         email: adminUser.email,
         adminRole: adminUser.role,  // new field — replaces isSuperAdmin bool
         isSuperAdmin: adminUser.role === 'SUPER_ADMIN', // backward compat
+        sid: session.id, // the row that makes this token revocable
       },
-      { expiresIn: '8h' }
+      { expiresIn: `${ADMIN_SESSION_HOURS}h` }
     );
 
     return reply.send({
@@ -268,6 +334,75 @@ export async function adminRoutes(app: FastifyInstance) {
       },
     });
   });
+
+  // ── POST /api/admin/logout ─────────────────────────────────────────────
+  // Signing out now means something on the server, not just a cleared
+  // localStorage: the token stops working everywhere it was copied to.
+  app.post('/logout', { preHandler: requireAdminRole() }, async (request, reply) => {
+    const me = request.user as any;
+    await prisma.adminSession.updateMany({
+      where: { id: me.sid, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return reply.send(ok(null, 'Signed out.'));
+  });
+
+  // ── GET /api/admin/sessions ────────────────────────────────────────────
+  // Where this account is signed in. Answering "is someone else using my
+  // account" needs somewhere to look, and there was nowhere.
+  app.get('/sessions', { preHandler: requireAdminRole() }, async (request, reply) => {
+    const me = request.user as any;
+    const sessions = await prisma.adminSession.findMany({
+      where: { adminUserId: me.sub, revokedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { lastSeenAt: 'desc' },
+      select: {
+        id: true, createdAt: true, lastSeenAt: true, expiresAt: true,
+        ipAddress: true, userAgent: true,
+      },
+    });
+    return reply.send(ok({
+      sessions: sessions.map((s) => ({ ...s, current: s.id === me.sid })),
+    }));
+  });
+
+  // ── POST /api/admin/sessions/revoke ────────────────────────────────────
+  // One session by id, or every other one. "Sign out everywhere else" is the
+  // thing a person wants the moment they suspect a laptop is gone.
+  app.post<{ Body: { sessionId?: string; others?: boolean } }>(
+    '/sessions/revoke',
+    { preHandler: requireAdminRole() },
+    async (request, reply) => {
+      const me = request.user as any;
+      const { sessionId, others } = request.body ?? {};
+
+      if (!sessionId && !others) {
+        return reply.status(400).send({
+          success: false,
+          error: 'Send a sessionId, or others: true.',
+        });
+      }
+
+      const { count } = await prisma.adminSession.updateMany({
+        // Scoped to this admin's own sessions: an id from somewhere else
+        // revokes nothing rather than someone else's sign-in.
+        where: others
+          ? { adminUserId: me.sub, id: { not: me.sid }, revokedAt: null }
+          : { adminUserId: me.sub, id: sessionId, revokedAt: null },
+        data: { revokedAt: new Date(), revokedBy: me.email },
+      });
+
+      await logAdminAction({
+        adminEmail: me.email,
+        action: 'admin_session_revoke',
+        targetType: 'admin_user',
+        targetId: me.sub,
+        metadata: { others: !!others, sessionId, revoked: count },
+        ipAddress: request.ip,
+      });
+
+      return reply.send(ok({ revoked: count }));
+    },
+  );
 
   // ── GET /api/admin/mfa ─────────────────────────────────────────────────
   // Whether this account has a second factor, and how many recovery codes are
