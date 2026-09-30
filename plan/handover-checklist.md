@@ -4,7 +4,7 @@ The one list. Everything else in `plan/` describes how something works or was
 meant to work; this says what is left before a real resort owner is using the
 product, and who has to do it.
 
-Last checked: **2026-09-30.**
+Last checked: **2026-09-30** (second pass, after M-03).
 
 ---
 
@@ -30,6 +30,10 @@ The code no longer does this. It cannot change a password that already exists:
 2. Wherever it works, change it — and assume everything that account can reach
    has been reachable by anyone who guessed.
 3. Then set `SUPER_ADMIN_PASSWORD` (item 4) so the next deployment has one.
+4. Then turn on two-factor at `/admin/security`, and keep the ten recovery
+   codes somewhere that is not the phone — they are shown once, and they are
+   the only way back in if it is lost. Do it in this order: a second factor on
+   top of a password that may already be known is worth much less.
 
 ---
 
@@ -128,7 +132,7 @@ the database, and the pilot resorts are about to be onboarded by hand.
 
 ### 6. Push `dev` → `main` — **founder decides, Claude runs it**
 
-`dev` is 83 commits ahead of `main`, whose newest commit is from 13 September.
+`dev` is 93 commits ahead of `main`, whose newest commit is from 13 September.
 Everything since — multi-resort, guest SMS/WhatsApp, the embed widget, the group
 bill, the review fixes, the privacy fix, credential encryption — is on staging
 only.
@@ -159,10 +163,11 @@ Written down so they stop taking up room.
 | Settings "not production-ready" QA verdict | From 2026-09-09 and never retested. Most of its findings are fixed; the verdict is not. |
 | Review management, dynamic pricing, Booking.com / Airbnb | Never promised for this month. |
 | The Shop / marketplace ([marketplace.md](marketplace.md)) | A new product, planned 2026-09-27 and not started. Its phase 9 needs the same Stripe account. It earns nothing until resorts are using the PMS. Its §14 precondition — a third-party shop's own gateway credentials being encrypted — is met now; the key in item 5 is the rest of it. |
-| Admin MFA and revocable sessions (review M-03) | **A decision, not an oversight.** Admin login has rate limiting, hashed passwords, generic errors and an eight-hour token, but no second factor, no server-side revocation and no re-authentication before a delete or a GDPR erasure. A stolen browser token is full control until it expires. The mitigating fact is that there is exactly one admin — the founder — so the blast radius is one account that is not shared. It becomes urgent the day anyone else is given an admin login, which is also the day item 2 of the review's own plan applies. |
+| A QR code on the two-factor screen | Enrolment shows the setup key grouped for manual entry and an `otpauth://` link that opens the app when tapped on the phone, which is enough to enrol. A scannable QR needs a library this repo does not have; adding one is a small change and a dependency decision. |
 | Off-host backups (review M-06) | Daily dumps are verified, and they sit on the same host as the database they protect. Losing the host loses both. Needs a bucket, retention, credentials, monitoring and one documented restore drill — server work, not code, and it cannot be done from here. |
 | ESLint | Not installed anywhere in this repo, and `next lint` used to hang on its interactive setup prompt. The script is `tsc --noEmit` now, which is what CI has meant by lint for months. Adding real linting means a dependency and several hundred existing warnings, so it needs a baseline the way the design system has one. Not this month. |
-| An E2E test for the admin drawer | The phone drawer was verified by hand at 390×844. A spec needs an admin login, and `roles.spec.ts` only logs in tenant users. Worth adding when someone extends that helper. |
+| An E2E test for the admin drawer, and for two-factor | Both were verified by hand — the drawer at 390×840, the two-factor journey by signing in, enrolling, signing out and back in with a recovery code. Neither has a spec, because both need an admin login and `roles.spec.ts` only logs in tenant users. Worth adding when someone extends that helper. |
+| `tests/unit/safe-url.test.ts` does real DNS | Two of its cases resolve real hostnames — one `.invalid`, one `calendar.google.com` — inside the *unit* suite. One timed out on a slow resolver and passed on two re-runs. Flaky by construction: it should stub the resolver, or move to the integration suite where a network dependency is expected. |
 | Clearing the dead `bkash*` / `ssl*` columns on `Tenant` | Nothing in the API reads them; the live path is `TenantPaymentConfig.credentials`. They are encrypted rather than emptied, because "nothing reads them" is not "nothing is in them" and dropping a column cannot be undone. Worth a look when someone has time to see what is actually in them. |
 
 ---
@@ -197,7 +202,20 @@ So the size of what is left stays honest.
   - the platform's own credentials are encrypted (M-05);
   - the admin panel works on a phone (M-04);
   - the landing suite describes the page that exists and runs in CI again, and
-    `lint` no longer hangs on a prompt (M-07).
-- API suite 754 passing; web 117; E2E 44 across two browser projects with no
-  retries; staging deployed `dev-60c6e38` on 2026-09-30 (the deploy job is
-  green; the running tag on the host was not re-checked).
+    `lint` no longer hangs on a prompt (M-07);
+  - the admin control plane is no longer a password and an eight-hour token
+    (M-03), in four parts: a TOTP second factor with recovery codes, checked
+    against RFC 6238's own test vectors; sessions that can be revoked, so a
+    stolen token can be ended instead of waited out; the password asked for
+    again before the nine actions that cannot be undone or that write
+    credentials; and an email when the account is signed in to from a new
+    address, or two-factor is turned off. `/admin/security` is where a person
+    does all of it.
+- The staging deploy job tells the truth. A 52x from Cloudflare is the proxy
+  giving up at 100 seconds, not Portainer refusing — three deploys in a row
+  failed on it while the new image was in fact live. The job now checks what
+  Portainer actually stored, so red means the commit is not deployed.
+- API suite 824 passing; web 117; E2E 44 across two browser projects with no
+  retries; staging deployed `dev-a3773cd` on 2026-09-30 — and that now means
+  Portainer confirmed it stores this commit, rather than only that the request
+  was accepted.
