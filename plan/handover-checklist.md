@@ -4,7 +4,7 @@ The one list. Everything else in `plan/` describes how something works or was
 meant to work; this says what is left before a real resort owner is using the
 product, and who has to do it.
 
-Last checked: **2026-09-30** (second pass, after M-03).
+Last checked: **2026-10-02** — bKash is still not in hand, so the list now says what that does and does not block.
 
 ---
 
@@ -12,8 +12,8 @@ Last checked: **2026-09-30** (second pass, after M-03).
 
 ### 0. Change the super-admin password that is already out there
 
-This does not block a payment, which is why it is not in the list below. It is
-here because it is the only item where waiting makes things worse.
+It is first because it is the only item on this page where waiting makes things
+worse rather than merely later.
 
 Until 2026-09-29 the admin seeder fell back to a hard-coded `Admin@123456`
 whenever `SUPER_ADMIN_PASSWORD` was absent, no compose file passed that
@@ -37,7 +37,38 @@ The code no longer does this. It cannot change a password that already exists:
 
 ---
 
-## Blocking — nobody can be a paying customer until these are done
+## What bKash actually blocks
+
+This section used to be headed "nobody can be a paying customer until these are
+done", which was wrong in a way worth correcting: it reads as though the pilot
+cannot start, and it can. As of 2026-10-02 the founder does not have the bKash
+merchant credentials, and the application takes as long as it takes.
+
+| | Needs bKash? |
+|---|---|
+| Hand-onboarding a pilot resort, billing them outside the product, and setting their plan in the admin panel | **No** |
+| Self-serve signup: someone finds the product, pays, and starts without you | **Yes** |
+| Automatic renewal, and the group combined bill actually collecting money | **Yes** |
+
+The pilot path works today, and every piece of it was checked rather than
+assumed:
+
+- `PATCH /api/admin/tenants/:id` accepts `plan`, `planStatus` and `trialEndsAt`,
+  so a plan can be set by hand from the admin panel.
+- The billing gate only answers 402 for `past_due`, `canceled` and `incomplete`
+  — a tenant set to `active` has full access with no Stripe or bKash record
+  behind it, and the resort owner sees nothing unusual.
+
+So: take the money by bank transfer or your own bKash, set the plan, move on.
+What you lose is the ability to grow without being in the loop for every sale,
+which is a scale problem rather than a pilot one.
+
+**Start the merchant application now regardless.** It is not a same-day thing,
+and until it is started the clock has not started either.
+
+---
+
+## Blocking self-serve payment — not the pilot
 
 ### 1. bKash merchant credentials — **founder**
 
@@ -76,6 +107,12 @@ compose in its database; a deploy only rewrites the image tags in it.
 Re-run [fixes/does-production-have-bkash.md](fixes/does-production-have-bkash.md).
 All four must read "set", and the button must appear on
 `/dashboard/billing`.
+
+---
+
+## Before the production push — **founder**, then Claude runs it
+
+None of these wait for bKash.
 
 ### 4. Set `SUPER_ADMIN_PASSWORD` — **founder**, every deployment definition
 
@@ -126,24 +163,49 @@ read that before the second. It refuses to start without a key, skips anything
 already encrypted so running it twice is safe, and prints counts and column
 names only, never a value.
 
-This does not block a payment, so it is not what stops a customer paying. It is
-here because every resort onboarded before it is done adds more plain text to
-the database, and the pilot resorts are about to be onboarded by hand.
+It is here, rather than in the deferred table, because every resort onboarded
+before it is done adds more plain text to the database — and the pilot resorts
+are the next thing to happen.
 
 ### 6. Push `dev` → `main` — **founder decides, Claude runs it**
 
 `dev` is 93 commits ahead of `main`, whose newest commit is from 13 September.
 Everything since — multi-resort, guest SMS/WhatsApp, the embed widget, the group
-bill, the review fixes, the privacy fix, credential encryption — is on staging
-only.
+bill, the review fixes, the privacy fix, credential encryption, the admin
+control-plane work — is on staging only.
 
-A green deploy does not mean the new image is running. Check the running tag
-afterwards; see `memory/projects/resortpro.md`, "Delivery and operations".
+**This does not wait for bKash.** It waits only for items 4 and 5, because the
+new code refuses to save a credential without a key — see
+[fixes/set-production-secrets-before-main-push.md](fixes/set-production-secrets-before-main-push.md),
+which is the whole procedure in one page.
+
+Nine migrations go with it, including admin two-factor, sessions and
+re-authentication. Two things change for whoever is signed in to production:
+the admin session ends and needs one fresh login, and the first irreversible
+action after that asks for the password.
+
+The deploy job now verifies that Portainer stored the commit, so a green staging
+deploy means the commit is deployed. Production's own deploy does not check that
+yet — see the deferred table.
+
+---
+
+## The part that earns money this month
 
 ### 7. Hand-onboard the first resorts — **founder**
 
 The agreed strategy is pilot-first: two or three resorts set up by hand, not
 self-serve. The customer with three resorts is the obvious first.
+
+**This is the item that can start now.** It does not wait for bKash, and it is
+the only one on this list that produces a paying customer in the next few weeks.
+Per resort: create the account, take the money however suits them, then set the
+plan in the admin panel — Tenants → the resort → plan and status. Setting
+`active` gives full access with no gateway record behind it.
+
+Keep a note of who paid what and when, somewhere outside the product. When bKash
+arrives those resorts move onto real subscriptions, and that note is what makes
+the transition honest.
 
 ---
 
@@ -163,6 +225,7 @@ Written down so they stop taking up room.
 | Settings "not production-ready" QA verdict | From 2026-09-09 and never retested. Most of its findings are fixed; the verdict is not. |
 | Review management, dynamic pricing, Booking.com / Airbnb | Never promised for this month. |
 | The Shop / marketplace ([marketplace.md](marketplace.md)) | A new product, planned 2026-09-27 and not started. Its phase 9 needs the same Stripe account. It earns nothing until resorts are using the PMS. Its §14 precondition — a third-party shop's own gateway credentials being encrypted — is met now; the key in item 5 is the rest of it. |
+| Production's deploy job does not verify the commit | Staging's does now: a 52x from Cloudflare is treated as "unknown" and the job then checks what Portainer actually stored. Production exits on any non-2xx from Coolify, before its health checks run — and those checks ask "is something serving", not "is this commit serving", so simply letting the timeout through could turn a silent non-deploy into a green run. It needs its own SHA check first, which is a separate piece of work on the riskier of the two paths. |
 | A QR code on the two-factor screen | Enrolment shows the setup key grouped for manual entry and an `otpauth://` link that opens the app when tapped on the phone, which is enough to enrol. A scannable QR needs a library this repo does not have; adding one is a small change and a dependency decision. |
 | Off-host backups (review M-06) | Daily dumps are verified, and they sit on the same host as the database they protect. Losing the host loses both. Needs a bucket, retention, credentials, monitoring and one documented restore drill — server work, not code, and it cannot be done from here. |
 | ESLint | Not installed anywhere in this repo, and `next lint` used to hang on its interactive setup prompt. The script is `tsc --noEmit` now, which is what CI has meant by lint for months. Adding real linting means a dependency and several hundred existing warnings, so it needs a baseline the way the design system has one. Not this month. |
