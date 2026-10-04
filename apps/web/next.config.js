@@ -24,6 +24,17 @@ const nextConfig = {
     // Node at runtime instead of bundling it, which is the officially
     // supported fix for exactly this class of server-only-package warning.
     serverComponentsExternalPackages: ['handlebars'],
+
+    // sharp's JavaScript is traced into the standalone output on its own; the
+    // native binary it loads at runtime is not. `@img/sharp-*` are optional
+    // platform dependencies, and tracing follows imports rather than optional
+    // peers — so the build looks fine, the image ships, and the first request
+    // for an optimized image fails with "Could not load the sharp module".
+    // Found by looking in .next/standalone/node_modules after a build: sharp
+    // was there, @img was not.
+    outputFileTracingIncludes: {
+      '/**': ['../../node_modules/.pnpm/@img+sharp-*/**'],
+    },
   },
 
   // Type-checking is a real CI gate now that tsc --noEmit is actually clean
