@@ -248,45 +248,53 @@ export function LandingPage({ isBn = false }: { isBn?: boolean }) {
         )}
       </header>
 
-      {/* HERO */}
-      <section className="mx-auto grid max-w-[1240px] gap-12 px-5 py-16 sm:px-8 lg:grid-cols-2 lg:items-center lg:gap-16 lg:py-24">
-        <div className="min-w-0">
-          <Eyebrow>{isBn ? 'বাংলাদেশ ও দক্ষিণ এশিয়ার রিসোর্ট মালিকদের জন্য' : 'For resort owners in Bangladesh & South Asia'}</Eyebrow>
-          <h1 className="mt-4 text-[clamp(2.6rem,5.5vw,3.5rem)] font-extrabold leading-[1.12]">
+      {/* HERO
+          A dark band, centred, one button, and the dashboard shot starting
+          inside it and running past its lower edge into the section below.
+          The overlap is the whole idea: the page opens on the product rather
+          than on a column of text beside it. */}
+      <section className="relative" style={{ background: NAVY }}>
+        <div className="mx-auto max-w-[820px] px-5 pt-20 text-center sm:px-8 sm:pt-28">
+          <span className="font-bitcount text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: GOLD }}>
+            {isBn ? 'বাংলাদেশ ও দক্ষিণ এশিয়ার রিসোর্ট মালিকদের জন্য' : 'For resort owners in Bangladesh & South Asia'}
+          </span>
+          <h1 className="mt-5 text-[clamp(2.3rem,5vw,3.3rem)] font-extrabold leading-[1.15] text-white">
             {isBn ? 'প্রতিদিনের ঝামেলা ছাড়াই আপনার রিসোর্ট চালান।' : 'Run your resort without the daily confusion.'}
           </h1>
-          <p className="mt-5 max-w-[520px] text-lg leading-[1.6]" style={{ color: MUTED }}>
+          <p className="mx-auto mt-5 max-w-[620px] text-lg leading-[1.6] text-white/70">
             {isBn
               ? 'রুম, বুকিং, গেস্ট আর পেমেন্ট — সবকিছু এক জায়গা থেকে সহজে ম্যানেজ করুন। কোনো খাতা না, এক্সেলের ঝামেলা না, কোনো বুকিং মিস না।'
               : 'Manage rooms, bookings, guests and payments in one simple place. No notebook, no Excel mess, no missed booking.'}
           </p>
-          <div className="mt-9 flex flex-wrap items-center gap-4">
+
+          {/* One button. A second one of equal weight asks a visitor to choose
+              before they know enough to choose; the quiet link below does not. */}
+          <div className="mt-9 flex flex-col items-center gap-4">
             <Link
               href="/try"
-              className="rounded-lg px-8 py-4 text-[17px] font-bold text-white transition-colors"
+              className="rounded-lg px-9 py-4 text-[17px] font-bold text-white transition-colors"
               style={{ background: GOLD }}
               onMouseEnter={(e) => { e.currentTarget.style.background = GOLD_HOVER; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = GOLD; }}
             >
               {tryLabel}
             </Link>
-            <a
-              href="#features"
-              className="rounded-lg border-2 px-8 py-4 text-[17px] font-bold transition-colors hover:bg-black/[.03]"
-              style={{ borderColor: NAVY }}
-            >
+            <a href="#features" className="text-sm font-bold text-white/70 underline-offset-4 hover:text-white hover:underline">
               {isBn ? 'কী কী আছে দেখুন' : 'See what it does'}
             </a>
             {launchOfferActive && (
               <span className="font-bitcount text-xs font-semibold uppercase tracking-[0.1em]" style={{ color: GOLD }}>
-                · {isBn ? 'লঞ্চ অফার: ৩ মাস ফ্রি' : 'Launch offer: 3 months free'}
+                {isBn ? 'লঞ্চ অফার: ৩ মাস ফ্রি' : 'Launch offer: 3 months free'}
               </span>
             )}
           </div>
         </div>
 
-        <div className="min-w-0">
-          <div className="relative overflow-hidden rounded-2xl shadow-[0_24px_60px_-20px_rgba(20,49,77,0.3)]">
+        {/* The screenshot sits in the hero and hangs below it. The spacer under
+            it is the part that hangs over, so the next section starts behind
+            the image instead of after it. */}
+        <div className="mx-auto mt-14 max-w-[1040px] px-5 sm:px-8">
+          <div className="relative -mb-[22%] overflow-hidden rounded-2xl shadow-[0_30px_70px_-20px_rgba(0,0,0,0.45)] sm:-mb-[16%]">
             <Image
               src="/brand/hero-dashboard-preview.png"
               alt={isBn ? 'ResortPro ড্যাশবোর্ড — আজকের বুকিং, রুম ও আয় এক নজরে' : "ResortPro dashboard — today's bookings, rooms, and revenue at a glance"}
@@ -296,22 +304,11 @@ export function LandingPage({ isBn = false }: { isBn?: boolean }) {
               className="h-auto w-full object-cover"
             />
           </div>
-          <div className="mt-4 grid grid-cols-3 divide-x overflow-hidden rounded-xl border text-center" style={{ borderColor: BORDER }}>
-            {[
-              isBn ? 'আজকের বুকিং' : "Today's bookings",
-              isBn ? 'খালি রুম' : 'Available rooms',
-              isBn ? 'আজকের আয়' : 'Revenue today',
-            ].map((label) => (
-              <span key={label} className="px-2 py-3 text-[11px] font-bold uppercase tracking-[0.06em] sm:text-xs" style={{ borderColor: BORDER }}>
-                {label}
-              </span>
-            ))}
-          </div>
         </div>
       </section>
 
       {/* SOLUTION / FEATURES */}
-      <section id="features" className="py-20 sm:py-24">
+      <section id="features" className="pb-20 pt-[26%] sm:pb-24 sm:pt-[20%]">
         <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
           <h2 className="text-center text-[clamp(1.8rem,3.5vw,2.4rem)] font-extrabold">
             {isBn ? 'আপনার প্রতিদিনের রিসোর্ট কাজের জন্য এক জায়গা।' : 'One place for your daily resort work.'}
