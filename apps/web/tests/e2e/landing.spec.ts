@@ -45,7 +45,10 @@ test.describe('Landing Page', () => {
 
   test('offers the sections its own menu points at', async ({ page }) => {
     await page.goto('/');
-    for (const anchor of ['how', 'features', 'pricing']) {
+    // 'how' was here until the page was trimmed from eight sections to five —
+    // its three steps ended on "Run your resort with clarity", which is a
+    // slogan rather than a step. This going red is the spec doing its job.
+    for (const anchor of ['features', 'pricing']) {
       await expect(page.locator(`#${anchor}`)).toHaveCount(1);
     }
   });

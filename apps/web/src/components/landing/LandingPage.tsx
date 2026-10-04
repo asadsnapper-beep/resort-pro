@@ -61,42 +61,11 @@ export function LandingPage({ isBn = false }: { isBn?: boolean }) {
   }, []);
 
   const navLinks = [
-    { label: isBn ? 'কীভাবে কাজ করে' : 'How it works', href: '#how' },
     { label: isBn ? 'ফিচার' : 'Features', href: '#features' },
     { label: isBn ? 'প্রাইসিং' : 'Pricing', href: '#pricing' },
   ];
 
   const tryLabel = isBn ? 'ResortPro ব্যবহার করে দেখুন' : 'Try ResortPro';
-
-  const problems = [
-    {
-      icon: (
-        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-          <rect x="12" y="4" width="16" height="32" rx="3" stroke={NAVY} strokeWidth="2" />
-          <circle cx="20" cy="30" r="1.5" fill={NAVY} />
-        </svg>
-      ),
-      text: isBn ? 'কল আর মেসেজে বুকিং ডিটেইলস হারিয়ে যায়' : 'Booking details are lost in calls and messages',
-    },
-    {
-      icon: (
-        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-          <rect x="6" y="6" width="28" height="28" rx="3" stroke={NAVY} strokeWidth="2" />
-          <line x1="6" y1="14" x2="34" y2="14" stroke={NAVY} strokeWidth="2" />
-        </svg>
-      ),
-      text: isBn ? 'কোন রুম খালি আছে সবসময় জানা থাকে না' : 'You do not always know which room is available',
-    },
-    {
-      icon: (
-        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-          <rect x="7" y="10" width="26" height="22" rx="2" stroke={NAVY} strokeWidth="2" />
-          <line x1="7" y1="17" x2="33" y2="17" stroke={NAVY} strokeWidth="2" />
-        </svg>
-      ),
-      text: isBn ? 'গেস্ট পেমেন্ট আর হিসাব গুলিয়ে যায়' : 'Guest payments and records become confusing',
-    },
-  ];
 
   const features = [
     {
@@ -149,19 +118,6 @@ export function LandingPage({ isBn = false }: { isBn?: boolean }) {
         ? 'ইনভয়েস, পেমেন্ট ও আয় স্বয়ংক্রিয়ভাবে ট্র্যাক করুন।'
         : 'Track invoices, payments and revenue automatically.',
     },
-  ];
-
-  const steps = [
-    isBn ? 'আপনার রুম যোগ করুন' : 'Add your rooms',
-    isBn ? 'বুকিং নেওয়া শুরু করুন' : 'Start taking bookings',
-    isBn ? 'স্বচ্ছতার সাথে রিসোর্ট চালান' : 'Run your resort with clarity',
-  ];
-
-  const trustBullets = [
-    isBn ? 'কোনো টেকনিক্যাল অভিজ্ঞতা লাগবে না' : 'No technical experience needed',
-    isBn ? 'কম্পিউটার বা ফোন যেকোনো জায়গা থেকে ব্যবহার করুন' : 'Use it from your computer or phone',
-    isBn ? 'আপনার রিসোর্টের তথ্য থাকে সম্পূর্ণ গোপন' : 'Your resort data stays private',
-    isBn ? 'প্রয়োজনে বন্ধুত্বপূর্ণ সাপোর্ট পাবেন' : 'Friendly support when you need help',
   ];
 
   const pricingTiers = [
@@ -315,11 +271,11 @@ export function LandingPage({ isBn = false }: { isBn?: boolean }) {
               {tryLabel}
             </Link>
             <a
-              href="#how"
+              href="#features"
               className="rounded-lg border-2 px-8 py-4 text-[17px] font-bold transition-colors hover:bg-black/[.03]"
               style={{ borderColor: NAVY }}
             >
-              {isBn ? 'কীভাবে কাজ করে দেখুন' : 'See how it works'}
+              {isBn ? 'কী কী আছে দেখুন' : 'See what it does'}
             </a>
             {launchOfferActive && (
               <span className="font-bitcount text-xs font-semibold uppercase tracking-[0.1em]" style={{ color: GOLD }}>
@@ -354,25 +310,6 @@ export function LandingPage({ isBn = false }: { isBn?: boolean }) {
         </div>
       </section>
 
-      {/* PROBLEM */}
-      <section className="py-20 sm:py-24" style={{ background: CREAM }}>
-        <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
-          <h2 className="mx-auto max-w-[700px] text-center text-[clamp(1.8rem,3.5vw,2.4rem)] font-extrabold leading-[1.3]">
-            {isBn
-              ? 'রিসোর্ট চালানো এমনিতেই কঠিন। এটা ম্যানেজ করা কঠিন হওয়া উচিত না।'
-              : 'Running a resort is already hard. Managing it should not be.'}
-          </h2>
-          <div className="mt-14 grid gap-6 sm:grid-cols-3">
-            {problems.map((p) => (
-              <div key={p.text} className="rounded-2xl border bg-white p-8" style={{ borderColor: BORDER }}>
-                {p.icon}
-                <p className="mt-5 text-lg font-bold leading-[1.5]">{p.text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* SOLUTION / FEATURES */}
       <section id="features" className="py-20 sm:py-24">
         <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
@@ -391,65 +328,40 @@ export function LandingPage({ isBn = false }: { isBn?: boolean }) {
               </div>
             ))}
           </div>
-        </div>
-      </section>
 
-      {/* HOW IT WORKS */}
-      <section id="how" className="py-20 sm:py-24" style={{ background: CREAM }}>
-        <div className="mx-auto max-w-[900px] px-5 text-center sm:px-8">
-          <h2 className="text-[clamp(1.8rem,3.5vw,2.4rem)] font-extrabold">
-            {isBn ? 'প্রথম দিন থেকেই সহজ।' : 'Simple from day one.'}
-          </h2>
-          <div className="mt-14 grid gap-10 sm:grid-cols-3">
-            {steps.map((step, index) => (
-              <div key={step}>
-                <div className="font-bitcount text-4xl font-normal" style={{ color: GOLD }}>{index + 1}</div>
-                <p className="mt-3 text-lg font-bold">{step}</p>
+          {/* The one thing here that is not a list of modules. It used to be a
+              section of its own with its own heading, which gave a single
+              feature the same weight as the whole product. */}
+          <div className="mx-auto mt-14 grid max-w-[900px] gap-8 rounded-2xl p-8 lg:grid-cols-2 lg:items-center" style={{ background: CREAM }}>
+            <div>
+              <h3 className="text-xl font-extrabold leading-[1.4]">
+                {isBn ? 'প্রশ্ন আছে? শুধু জিজ্ঞেস করুন।' : 'Have a question? Just ask.'}
+              </h3>
+              <p className="mt-3 text-[15px] leading-[1.6]" style={{ color: MUTED }}>
+                {isBn
+                  ? 'বুকিং, রুম আর গেস্ট নিয়ে প্রশ্নের উত্তর সহজ ভাষায় — মেনুতে খোঁজাখুঁজি লাগে না।'
+                  : 'Answers about your bookings, rooms and guests in plain language — no searching through menus.'}
+              </p>
+            </div>
+            <div className="flex flex-col gap-3">
+              <div className="self-end max-w-[85%] rounded-xl px-4 py-3 text-[15px] text-white" style={{ background: NAVY }}>
+                {isBn ? 'আজ রাতে কোন রুম খালি আছে?' : 'Which rooms are free tonight?'}
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CHAT HELPER */}
-      <section className="py-20 sm:py-24">
-        <div className="mx-auto grid max-w-[900px] gap-12 px-5 sm:px-8 lg:grid-cols-2 lg:items-center">
-          <div>
-            <h2 className="text-[clamp(1.8rem,3.5vw,2.4rem)] font-extrabold leading-[1.3]">
-              {isBn ? 'প্রশ্ন আছে? শুধু জিজ্ঞেস করুন।' : 'Have a question? Just ask.'}
-            </h2>
-            <p className="mt-5 text-lg leading-[1.6]" style={{ color: MUTED }}>
-              {isBn
-                ? 'ResortPro-এর ভেতরেই একটা সহজ চ্যাট হেল্পার আছে যা আপনার বুকিং, রুম আর গেস্ট নিয়ে প্রশ্নের সহজ ভাষায় উত্তর দেয় — কোনো ম্যানুয়াল পড়া বা মেনুতে খোঁজাখুঁজি লাগে না।'
-                : 'A simple chat helper inside ResortPro answers questions about your bookings, rooms and guests in plain language — no manuals, no searching through menus.'}
-            </p>
-          </div>
-          <div className="flex flex-col gap-3.5 rounded-2xl p-7" style={{ background: CREAM }}>
-            <div className="self-end max-w-[85%] rounded-xl px-4.5 py-3.5 text-[15px] text-white" style={{ background: NAVY }}>
-              {isBn ? 'আজ রাতে কোন রুম খালি আছে?' : 'Which rooms are free tonight?'}
-            </div>
-            <div className="self-start max-w-[85%] rounded-xl border bg-white px-4.5 py-3.5 text-[15px]" style={{ borderColor: BORDER }}>
-              {isBn ? 'আজ রাতে আপনার ৬টা রুম খালি আছে — ৩টা ডাবল আর ৩টা ফ্যামিলি রুম।' : 'You have 6 rooms free tonight — 3 doubles and 3 family rooms.'}
+              <div className="self-start max-w-[85%] rounded-xl border bg-white px-4 py-3 text-[15px]" style={{ borderColor: BORDER }}>
+                {isBn ? 'আজ রাতে ৬টা রুম খালি — ৩টা ডাবল, ৩টা ফ্যামিলি।' : 'Six rooms free tonight — 3 doubles, 3 family.'}
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* TRUST + TESTIMONIAL */}
+      {/* TESTIMONIAL */}
       <section className="py-20 sm:py-24">
+        {/* One resort owner saying one thing beats four bullets claiming it.
+            "No technical experience needed", "your data stays private" and the
+            other two were assertions about ourselves; this is not. */}
         <div className="mx-auto max-w-[1240px] px-5 text-center sm:px-8">
-          <h2 className="text-[clamp(1.8rem,3.5vw,2.4rem)] font-extrabold">
-            {isBn ? 'প্রকৃত রিসোর্ট মালিকদের জন্য তৈরি।' : 'Built for real resort owners.'}
-          </h2>
-          <div className="mt-12 grid grid-cols-2 gap-6 sm:grid-cols-4">
-            {trustBullets.map((b) => (
-              <div key={b} className="flex flex-col items-center gap-3">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ background: NAVY }} />
-                <p className="text-[15px] font-bold leading-[1.4]">{b}</p>
-              </div>
-            ))}
-          </div>
-          <div className="mx-auto mt-14 flex max-w-[640px] items-center gap-5 rounded-2xl p-8 text-left" style={{ background: CREAM }}>
+          <div className="mx-auto flex max-w-[640px] items-center gap-5 rounded-2xl p-8 text-left" style={{ background: CREAM }}>
             <span
               className="flex h-16 w-16 flex-none items-center justify-center rounded-full font-bitcount text-lg font-bold"
               style={{ background: GOLD, color: '#fff' }}
