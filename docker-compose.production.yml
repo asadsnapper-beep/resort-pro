@@ -141,6 +141,17 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-resortpro}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      # Off-site copies. Without these four the nightly backup still runs and
+      # says, once a night, that everything it produced is on this machine —
+      # which is the honest state until a bucket exists.
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      BACKUP_S3_ACCESS_KEY: ${BACKUP_S3_ACCESS_KEY:-}
+      BACKUP_S3_SECRET_KEY: ${BACKUP_S3_SECRET_KEY:-}
+      # A key of its own, not CREDENTIALS_KEY: the thing it protects is a copy
+      # of the database, so a key stored in that database would be no use.
+      BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:-}
+      BACKUP_OFFSITE_RETENTION_DAYS: ${BACKUP_OFFSITE_RETENTION_DAYS:-30}
     volumes:
       - backups_data:/backups
       # Read-only: this sidecar archives the guest ID/passport images, it must

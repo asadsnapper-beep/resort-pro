@@ -10,6 +10,7 @@ export default defineConfig({
     // runnable at all. The container ships only dist/, with no tsx.
     'src/scripts/backfill-finalized-invoices.ts',
     'src/scripts/encrypt-credentials.ts',
+    'src/scripts/backup-offsite.ts',
   ],
   format: ['cjs'],
   outDir: 'dist',

@@ -45,9 +45,64 @@ archives guest documents, it must never be able to alter or delete them.
 Covered: a bad migration, a mistaken delete, operator error, a corrupted table
 — the failures that actually happen.
 
-**Not covered: losing the host.** The dumps sit on the same machine as the
-database. Copying the volume off-box is the remaining step and has not been
-done. Do not describe the system as backed up to anyone until it has.
+**Losing the host** is covered by the third leg below — but only once a bucket
+is configured. Until then the dumps sit on the same machine as the database,
+and the nightly run says so in its own output. Do not describe the system as
+backed up to anyone while that line is still printing.
+
+## The off-site copy
+
+[apps/api/src/scripts/backup-offsite.ts](../../apps/api/src/scripts/backup-offsite.ts)
+runs after the other two legs, encrypts what they produced, and puts it in an
+S3-compatible bucket — Cloudflare R2, AWS S3, MinIO, anything that speaks the
+protocol.
+
+It is encrypted here rather than left to the bucket's encryption at rest,
+because these files hold every guest's name, phone number and passport scan,
+and "the provider encrypts it" means the provider can read it. AES-256-GCM, and
+the authentication tag means a file altered in the bucket fails to decrypt
+rather than restoring quietly wrong.
+
+### Setting it up — five variables on the `backup` service
+
+```
+BACKUP_S3_BUCKET       the bucket name
+BACKUP_S3_ENDPOINT     R2/MinIO need this; AWS does not
+BACKUP_S3_ACCESS_KEY
+BACKUP_S3_SECRET_KEY
+BACKUP_ENCRYPTION_KEY  openssl rand -base64 32
+```
+
+`BACKUP_ENCRYPTION_KEY` is **its own key, not `CREDENTIALS_KEY`**. What it
+protects is a copy of the database, so a key kept in that database would be no
+use on the day it is needed. Keep it where the bucket credentials are not,
+either: whoever holds both holds the data.
+
+Give the bucket credentials write and delete on one prefix and nothing else. If
+that key leaks, the worst case should be someone deleting backups, not reading
+the live system.
+
+`BACKUP_OFFSITE_RETENTION_DAYS` defaults to 30 — longer than the 14 days kept
+locally, because off-site is the copy you reach for when the local ones are
+gone along with the machine.
+
+### Getting one back
+
+```bash
+docker exec -it <api-container> node dist/scripts/backup-offsite.js \
+  --restore resortpro/resortpro-20261004T020000Z.dump.enc /tmp/restore.dump
+```
+
+It downloads, decrypts, and prints the `pg_restore` line to run next. Restoring
+into the live database is a separate decision — read **Restore** below first.
+
+### The drill this still needs
+
+Copying is not restoring. Before anyone is told the system survives host loss,
+one timed rehearsal: fetch a copy with `--restore`, load it into a throwaway
+database, count rows, open one guest document from the uploads archive, and
+write the result in the Rehearsal section below with the date and how long it
+took.
 
 ## Check backups are running
 
