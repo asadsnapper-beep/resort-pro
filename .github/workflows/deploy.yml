@@ -161,10 +161,56 @@ jobs:
           echo "Coolify PATCH responded: HTTP $HTTP_STATUS"
           cat /tmp/coolify-resp.txt || true
 
+          # A Cloudflare 52x (or 502/504, or curl's own 000) is the proxy giving
+          # up while Coolify carries on behind it. Staging failed three deploys
+          # in a row on exactly this while the new image was in fact live, so
+          # the status is not treated as a verdict here either. What decides is
+          # the next step, which reads the stored compose back and looks for
+          # this commit — and that is a real check, unlike the health checks
+          # below, which only answer "is something serving".
+          #
+          # Everything else non-2xx is Coolify refusing: a bad token, a missing
+          # service, a malformed body. Those still stop the deploy here.
           case "$HTTP_STATUS" in
             2*) ;;
+            52?|504|502|000)
+              echo "::warning::Coolify did not answer in time (HTTP $HTTP_STATUS). It may still have applied — the next step checks."
+              ;;
             *) echo "Refusing to continue: PATCH returned HTTP $HTTP_STATUS (body above)."; exit 1 ;;
           esac
+
+      # The difference between "Coolify accepted the request" and "Coolify is
+      # deploying this commit". Without it a timed-out PATCH, or an accepted one
+      # that Coolify then dropped, would reach the health checks — and those
+      # pass just as happily on the old image, which would make a silent
+      # non-deploy look like a successful release.
+      - name: Verify Coolify stored this commit
+        env:
+          COOLIFY_API: https://manage.musafir.co.za/api/v1/services/b48m2cix8odgfuvlyr8zr31p
+        run: |
+          set -euo pipefail
+
+          for attempt in $(seq 1 10); do
+            STORED=$(curl -s "$COOLIFY_API" \
+              -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}" \
+              | jq -r '.docker_compose_raw // ""')
+
+            if echo "$STORED" | grep -q "resort-pro-api:${GITHUB_SHA}"; then
+              echo "Coolify's compose pins resort-pro-api:${GITHUB_SHA} (after ${attempt} check(s))"
+              exit 0
+            fi
+
+            echo "Not stored yet (check ${attempt}/10) — waiting."
+            sleep 15
+          done
+
+          echo "::error::Coolify's stored compose still does not reference ${GITHUB_SHA} after 10 checks — production is running the previous image."
+          echo "It pins:"
+          # `|| true` because this step runs under `set -e` and a grep that
+          # matches nothing would abort before the explicit exit below, losing
+          # the one line that says what is actually deployed.
+          echo "$STORED" | grep -oE 'resort-pro-(api|web):[^ "]*' | sort -u || true
+          exit 1
 
       - name: Wait for health check — API
         run: |
