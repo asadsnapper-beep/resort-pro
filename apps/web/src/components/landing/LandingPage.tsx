@@ -67,56 +67,113 @@ export function LandingPage({ isBn = false }: { isBn?: boolean }) {
 
   const tryLabel = isBn ? 'ResortPro ব্যবহার করে দেখুন' : 'Try ResortPro';
 
+  // Nine, in a 3×3 grid. Four cards spread over a full-width band said less
+  // than the product does; this is the same section carrying the real list.
+  // Each icon is drawn here in the same plain stroke style rather than pulled
+  // from an icon set, so the row reads as one hand.
+  const icon = (paths: React.ReactNode) => (
+    <svg width="34" height="34" viewBox="0 0 40 40" fill="none" aria-hidden="true">{paths}</svg>
+  );
+
   const features = [
     {
-      icon: (
-        <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
-          <rect x="5" y="16" width="12" height="18" rx="2" stroke={NAVY} strokeWidth="2" />
-          <rect x="23" y="8" width="12" height="26" rx="2" stroke={NAVY} strokeWidth="2" />
-        </svg>
-      ),
-      title: isBn ? 'রুম ও হাউসকিপিং' : 'Rooms & housekeeping',
+      icon: icon(<>
+        <rect x="4" y="10" width="32" height="24" rx="3" stroke={NAVY} strokeWidth="2" />
+        <line x1="4" y1="18" x2="36" y2="18" stroke={NAVY} strokeWidth="2" />
+        <line x1="12" y1="6" x2="12" y2="14" stroke={NAVY} strokeWidth="2" />
+        <line x1="28" y1="6" x2="28" y2="14" stroke={NAVY} strokeWidth="2" />
+      </>),
+      title: isBn ? 'বুকিং এখন সহজ' : 'Bookings made simple',
       desc: isBn
-        ? 'খালি, দখলকৃত ও পরিষ্কারের রুম দেখুন, এক ট্যাপে চেক-ইন/চেক-আউট করুন।'
-        : 'See available, occupied and cleaning rooms, and check guests in or out in one tap.',
+        ? 'এক জায়গা থেকে প্রতিটা বুকিং তৈরি, ম্যানেজ আর ট্র্যাক করুন।'
+        : 'Create, manage and track every booking from one clear place.',
     },
     {
-      icon: (
-        <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
-          <rect x="4" y="10" width="32" height="24" rx="3" stroke={NAVY} strokeWidth="2" />
-          <line x1="4" y1="18" x2="36" y2="18" stroke={NAVY} strokeWidth="2" />
-          <line x1="12" y1="6" x2="12" y2="14" stroke={NAVY} strokeWidth="2" />
-          <line x1="28" y1="6" x2="28" y2="14" stroke={NAVY} strokeWidth="2" />
-        </svg>
-      ),
-      title: isBn ? 'বুকিং' : 'Bookings',
+      icon: icon(<>
+        <path d="M8 34V6h16v28" stroke={NAVY} strokeWidth="2" strokeLinejoin="round" />
+        <path d="M24 20h10m0 0-4-4m4 4-4 4" stroke={NAVY} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </>),
+      title: isBn ? 'দ্রুত চেক-ইন ও চেক-আউট' : 'Faster check-in and check-out',
       desc: isBn
-        ? 'কল, ওয়াক-ইন বা নিজের ওয়েবসাইট থেকে মিনিটে বুকিং তৈরি ও ম্যানেজ করুন।'
-        : 'Create and manage bookings in minutes — from calls, walk-ins or your own website.',
+        ? 'অতিথিকে দ্রুত বরণ করুন, ওয়াক-ইন সামলান, আর নিশ্চিন্তে থাকা শেষ করুন।'
+        : 'Welcome guests quickly, handle walk-ins, and close stays with confidence.',
     },
     {
-      icon: (
-        <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
-          <circle cx="20" cy="14" r="7" stroke={NAVY} strokeWidth="2" />
-          <path d="M6 34c0-8 6-12 14-12s14 4 14 12" stroke={NAVY} strokeWidth="2" />
-        </svg>
-      ),
-      title: isBn ? 'গেস্ট' : 'Guests',
+      icon: icon(<>
+        <rect x="5" y="16" width="12" height="18" rx="2" stroke={NAVY} strokeWidth="2" />
+        <rect x="23" y="8" width="12" height="26" rx="2" stroke={NAVY} strokeWidth="2" />
+      </>),
+      title: isBn ? 'রুম ও হাউসকিপিং' : 'Room and housekeeping control',
       desc: isBn
-        ? 'গেস্টের তথ্য, ডকুমেন্ট ও থাকার ইতিহাস এক জায়গায় রাখুন।'
-        : 'Keep guest details, documents and stay history together.',
+        ? 'কোন রুম প্রস্তুত, দখলে, পরিষ্কার হচ্ছে বা নজর দরকার — সবসময় জানুন।'
+        : 'Always know which rooms are ready, occupied, cleaning, or need attention.',
     },
     {
-      icon: (
-        <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
-          <rect x="4" y="9" width="32" height="22" rx="3" stroke={NAVY} strokeWidth="2" />
-          <line x1="4" y1="16" x2="36" y2="16" stroke={NAVY} strokeWidth="2" />
-        </svg>
-      ),
-      title: isBn ? 'পেমেন্ট' : 'Payments',
+      icon: icon(<>
+        <rect x="4" y="8" width="32" height="24" rx="3" stroke={NAVY} strokeWidth="2" />
+        <line x1="4" y1="15" x2="36" y2="15" stroke={NAVY} strokeWidth="2" />
+        <circle cx="9" cy="11.5" r="1.4" fill={NAVY} />
+        <circle cx="14" cy="11.5" r="1.4" fill={NAVY} />
+      </>),
+      title: isBn ? 'নিজের বুকিং ওয়েবসাইট' : 'Your own booking website',
       desc: isBn
-        ? 'ইনভয়েস, পেমেন্ট ও আয় স্বয়ংক্রিয়ভাবে ট্র্যাক করুন।'
-        : 'Track invoices, payments and revenue automatically.',
+        ? 'অতিথিরা আপনার রিসোর্টের ওয়েবসাইট থেকেই খালি রুম দেখে সরাসরি বুক করতে পারবেন।'
+        : 'Let guests check availability and book directly from your resort website.',
+    },
+    {
+      icon: icon(<>
+        <circle cx="20" cy="14" r="7" stroke={NAVY} strokeWidth="2" />
+        <path d="M6 34c0-8 6-12 14-12s14 4 14 12" stroke={NAVY} strokeWidth="2" />
+      </>),
+      title: isBn ? 'গেস্ট হিস্ট্রি ও CRM' : 'Guest history and CRM',
+      desc: isBn
+        ? 'প্রতিটি অতিথি, তাঁদের থাকা, পছন্দ আর বুকিংয়ের ইতিহাস মনে রাখুন।'
+        : 'Remember every guest, their stays, preferences, and booking history.',
+    },
+    {
+      icon: icon(<>
+        <rect x="4" y="9" width="32" height="22" rx="3" stroke={NAVY} strokeWidth="2" />
+        <line x1="4" y1="16" x2="36" y2="16" stroke={NAVY} strokeWidth="2" />
+      </>),
+      title: isBn ? 'পেমেন্ট ও ইনভয়েস' : 'Payments and invoices',
+      desc: isBn
+        ? 'কাগজপত্রের পেছনে না ছুটে পেমেন্ট, বাকি আর ইনভয়েস ট্র্যাক করুন।'
+        : 'Track payments, balances and invoices without chasing paperwork.',
+    },
+    {
+      icon: icon(<>
+        <path d="M12 6v12a4 4 0 0 0 8 0V6" stroke={NAVY} strokeWidth="2" strokeLinecap="round" />
+        <line x1="16" y1="18" x2="16" y2="34" stroke={NAVY} strokeWidth="2" strokeLinecap="round" />
+        <path d="M28 6c-3 3-3 12 0 12v16" stroke={NAVY} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </>),
+      title: isBn ? 'রেস্টুরেন্ট ও খাবারের অর্ডার' : 'Restaurant and food orders',
+      desc: isBn
+        ? 'প্রতিদিনের রিসোর্ট কাজের পাশাপাশি রেস্টুরেন্টের অর্ডারও সামলান।'
+        : 'Manage restaurant orders alongside your daily resort operations.',
+    },
+    {
+      icon: icon(<>
+        <line x1="6" y1="34" x2="34" y2="34" stroke={NAVY} strokeWidth="2" strokeLinecap="round" />
+        <rect x="9" y="20" width="6" height="12" rx="1.5" stroke={NAVY} strokeWidth="2" />
+        <rect x="18" y="12" width="6" height="20" rx="1.5" stroke={NAVY} strokeWidth="2" />
+        <rect x="27" y="24" width="6" height="8" rx="1.5" stroke={NAVY} strokeWidth="2" />
+      </>),
+      title: isBn ? 'প্রতিদিনের ব্যবসার রিপোর্ট' : 'Daily business reports',
+      desc: isBn
+        ? 'অকুপেন্সি, আগমন, প্রস্থান, পেমেন্ট আর পারফরম্যান্স এক নজরে দেখুন।'
+        : 'See occupancy, arrivals, departures, payments and performance at a glance.',
+    },
+    {
+      icon: icon(<>
+        <rect x="5" y="5" width="13" height="13" rx="2" stroke={NAVY} strokeWidth="2" />
+        <rect x="22" y="5" width="13" height="13" rx="2" stroke={NAVY} strokeWidth="2" />
+        <rect x="5" y="22" width="13" height="13" rx="2" stroke={NAVY} strokeWidth="2" />
+        <rect x="22" y="22" width="13" height="13" rx="2" stroke={NAVY} strokeWidth="2" />
+      </>),
+      title: isBn ? 'এক টিম, এক ড্যাশবোর্ড' : 'One team, one dashboard',
+      desc: isBn
+        ? 'ফ্রন্ট ডেস্ক, রুম, স্টাফ, মেইনটেন্যান্স আর অপারেশন — সব একসাথে যুক্ত রাখুন।'
+        : 'Keep front desk, rooms, staff, maintenance and operations connected.',
     },
   ];
 
@@ -311,12 +368,14 @@ export function LandingPage({ isBn = false }: { isBn?: boolean }) {
       <section id="features" className="pb-20 pt-[26%] sm:pb-24 sm:pt-[20%]">
         <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
           <h2 className="text-center text-[clamp(1.8rem,3.5vw,2.4rem)] font-extrabold">
-            {isBn ? 'আপনার প্রতিদিনের রিসোর্ট কাজের জন্য এক জায়গা।' : 'One place for your daily resort work.'}
+            {isBn ? 'আমাদের ফিচার' : 'Our features'}
           </h2>
           <p className="mt-4 text-center text-lg" style={{ color: MUTED }}>
-            {isBn ? 'ফ্রন্ট ডেস্কের যা যা লাগে, ঠিক ততটুকুই — বাড়তি কিছু না।' : "Everything a front desk needs — nothing you don't."}
+            {isBn
+              ? 'রিসোর্ট চালাতে যা যা লাগে — প্রতিদিনের ঝামেলা ছাড়াই।'
+              : 'Everything you need to run your resort — without the daily chaos.'}
           </p>
-          <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {features.map((f) => (
               <div key={f.title} className="rounded-2xl p-7" style={{ background: CREAM }}>
                 {f.icon}
