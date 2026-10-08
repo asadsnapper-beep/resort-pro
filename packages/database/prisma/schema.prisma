@@ -2192,6 +2192,11 @@ enum CampaignStatus {
   SCHEDULED
   SENDING
   SENT
+  // A send that did not go the way the word SENT implies. Without these two,
+  // a campaign where every delivery failed was still marked SENT, and a
+  // marketer had no way to tell (CRM QA 2026-10-07, finding 005).
+  PARTIAL // some recipients got it, some did not
+  FAILED // nobody got it
   PAUSED
   CANCELLED
 }

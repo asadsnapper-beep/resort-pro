@@ -481,7 +481,19 @@ export async function crmRoutes(app: FastifyInstance) {
 
     const campaign = await db.campaign.findFirst({ where: { id } });
     if (!campaign) return reply.status(404).send({ success: false, error: 'Campaign not found' });
-    if (campaign.status === 'SENT') return reply.status(400).send({ success: false, error: 'Already sent' });
+    // FAILED is re-sendable: nobody received it, so sending again cannot
+    // duplicate anything. PARTIAL is not — some guests already have it, and
+    // re-running this loop would send to them a second time. Retrying only the
+    // recipients whose EmailSend says FAILED is the right answer there, and is
+    // its own piece of work.
+    if (campaign.status === 'SENT' || campaign.status === 'PARTIAL') {
+      return reply.status(400).send({
+        success: false,
+        error: campaign.status === 'SENT'
+          ? 'Already sent'
+          : 'Partly sent already — re-sending would deliver twice to the guests who received it.',
+      });
+    }
 
     // Build segment filter
     const seg = (campaign.segment ?? {}) as Record<string, any>;
@@ -497,6 +509,17 @@ export async function crmRoutes(app: FastifyInstance) {
     // Get tenant info for branding
     const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { name: true } });
     const wc     = await (db as any).websiteContent.findUnique({ where: { tenantId }, select: { primaryColor: true, accentColor: true } });
+
+    if (guests.length === 0) {
+      // Not a failure to deliver — there was nobody to deliver to. Leaving the
+      // campaign in DRAFT keeps it sendable once the audience exists, instead
+      // of spending it on a terminal state.
+      return reply.status(400).send({
+        success: false,
+        error: 'This campaign has no recipients — every guest has either opted out or there are none yet.',
+        code: 'NO_RECIPIENTS',
+      });
+    }
 
     await db.campaign.update({ where: { id }, data: { status: 'SENDING', recipientCount: guests.length } });
     await db.campaignStats.upsert({
@@ -529,10 +552,27 @@ export async function crmRoutes(app: FastifyInstance) {
       if (!error) sent++;
     }
 
-    await db.campaign.update({ where: { id }, data: { status: 'SENT', sentAt: new Date() } });
-    await db.campaignStats.update({ where: { campaignId: id }, data: { sent } });
+    // What actually happened, not what was attempted. This used to set SENT
+    // unconditionally — a campaign where every delivery failed told the
+    // marketer it had gone out, which is the one thing they needed to know was
+    // untrue.
+    const failed = guests.length - sent;
+    const status = sent === 0 ? 'FAILED' : failed > 0 ? 'PARTIAL' : 'SENT';
 
-    return ok({ sent, total: guests.length }, 'Campaign sent');
+    await db.campaign.update({
+      where: { id },
+      // sentAt is when it went out. Nothing went out, so there is no such time.
+      data: { status, sentAt: sent > 0 ? new Date() : null },
+    });
+    await db.campaignStats.update({ where: { campaignId: id }, data: { sent, bounced: failed } });
+
+    const message = sent === 0
+      ? `Nothing was sent — all ${failed} deliveries failed.`
+      : failed > 0
+        ? `Sent to ${sent} of ${guests.length}. ${failed} failed.`
+        : `Campaign sent to ${sent}.`;
+
+    return ok({ sent, failed, total: guests.length, status }, message);
   });
 
   app.delete('/campaigns/:id', { preHandler: pre }, async (request) => {
