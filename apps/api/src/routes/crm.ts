@@ -6,6 +6,7 @@ import { ok, validate } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
 import { sendEmail, wrapEmail, renderTemplate, SEQUENCE_TEMPLATES } from '../services/email';
 import { matchAllTerms } from '../utils/search-terms';
+import { SUBSCRIBED_GUEST } from '../utils/email-consent';
 
 // ─── Default email templates (auto-created for every new tenant) ──────────────
 const DEFAULT_EMAIL_TEMPLATES = [
@@ -486,7 +487,7 @@ export async function crmRoutes(app: FastifyInstance) {
     const seg = (campaign.segment ?? {}) as Record<string, any>;
     const guests = await db.guest.findMany({
       where: {
-        consent: { subscribed: true },
+        ...SUBSCRIBED_GUEST,
         ...(seg.tier ? { score: { tier: seg.tier } } : {}),
         ...(seg.tag  ? { tags:  { some: { tag: { name: seg.tag } } } } : {}),
       },
@@ -820,7 +821,7 @@ export async function crmRoutes(app: FastifyInstance) {
       topGuests,
     ] = await Promise.all([
       db.guest.count({ where: {} }),
-      db.emailConsent.count({ where: { subscribed: true } }),
+      db.guest.count({ where: { ...SUBSCRIBED_GUEST } }),
       db.guestScore.groupBy({ by: ['tier'], where: {}, _count: { tier: true } }),
       db.campaignStats.findMany({
         where: {},

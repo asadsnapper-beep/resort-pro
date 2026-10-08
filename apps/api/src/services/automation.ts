@@ -1,4 +1,5 @@
 import cron from 'node-cron';
+import { SUBSCRIBED_GUEST, SUBSCRIBED_GUEST_RELATION } from '../utils/email-consent';
 import { prisma } from '@resort-pro/database';
 import { sendEmail, wrapEmail, SEQUENCE_TEMPLATES } from './email';
 
@@ -134,7 +135,7 @@ async function processWinBackTrigger() {
     const guests = await prisma.guest.findMany({
       where: {
         tenantId: seq.tenantId,
-        consent:  { subscribed: true },
+        ...SUBSCRIBED_GUEST,
         bookings: { none: { createdAt: { gte: ninetyDaysAgo } } },
         enrollments: { none: { sequenceId: seq.id, status: { in: ['ACTIVE', 'COMPLETED'] } } },
       },
@@ -170,7 +171,7 @@ async function processBirthdayTrigger() {
     const guests = await prisma.guest.findMany({
       where: {
         tenantId: seq.tenantId,
-        consent:  { subscribed: true },
+        ...SUBSCRIBED_GUEST,
         notes:    { contains: `birthday:${month}-${day}` },
         enrollments: { none: { sequenceId: seq.id, status: { in: ['ACTIVE', 'COMPLETED'] }, enrolledAt: { gte: new Date(today.getFullYear(), 0, 1) } } },
       },
@@ -202,7 +203,7 @@ async function processPreArrivalTrigger() {
         tenantId: seq.tenantId,
         status:   { in: ['CONFIRMED'] },
         checkIn:  { equals: new Date(dateStr) },
-        guest:    { consent: { subscribed: true } },
+        guest:    SUBSCRIBED_GUEST_RELATION,
       },
       include: { guest: { select: { id: true } }, room: { select: { name: true } } },
     });
@@ -237,7 +238,7 @@ async function processPostStayTrigger() {
         tenantId: seq.tenantId,
         status:   'CHECKED_OUT',
         checkOut: { equals: new Date(dateStr) },
-        guest:    { consent: { subscribed: true } },
+        guest:    SUBSCRIBED_GUEST_RELATION,
       },
       include: { guest: { select: { id: true } } },
     });
