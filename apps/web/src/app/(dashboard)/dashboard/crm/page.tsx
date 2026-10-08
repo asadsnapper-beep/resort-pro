@@ -144,21 +144,31 @@ function ContactsTab({ token }: { token: string }) {
   const [search, setSearch]   = useState('');
   const [tierFilter, setTier] = useState('');
   const [loading, setLoading] = useState(true);
+  // The API has always paged. The UI asked for twenty and drew no controls, so
+  // a resort with more than twenty guests could not reach the rest of them
+  // from here at all (CRM QA finding 015).
+  const [page, setPage]       = useState(1);
+  const [pages, setPages]     = useState(1);
 
   const fetchGuests = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ limit: '20' });
+      const params = new URLSearchParams({ limit: '20', page: String(page) });
       if (search) params.set('search', search);
       if (tierFilter) params.set('tier', tierFilter);
       const res = await api.get(`/crm/contacts?${params}`, { headers: { Authorization: `Bearer ${token}` } });
       setGuests(res.data.data.guests);
       setTotal(res.data.data.total);
+      setPages(Math.max(1, res.data.data.pages ?? 1));
     } catch { /* ignore */ }
     setLoading(false);
-  }, [token, search, tierFilter]);
+  }, [token, search, tierFilter, page]);
 
   useEffect(() => { fetchGuests(); }, [fetchGuests]);
+
+  // Searching from page 4 and being shown page 4 of the new results is how a
+  // filter looks broken.
+  useEffect(() => { setPage(1); }, [search, tierFilter]);
 
   const recalcScore = async (id: string) => {
     await api.post(`/crm/contacts/${id}/recalc-score`, {}, { headers: { Authorization: `Bearer ${token}` } });
@@ -267,6 +277,26 @@ function ContactsTab({ token }: { token: string }) {
             </table>
           </div>
         )}
+
+      {pages > 1 && (
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-rp-body text-rp-muted">
+            Page {page} of {pages}
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1 || loading}
+              className="rounded-rp-card border border-rp-border px-3 py-1.5 text-rp-body disabled:opacity-40"
+            >Previous</button>
+            <button
+              onClick={() => setPage(p => Math.min(pages, p + 1))}
+              disabled={page >= pages || loading}
+              className="rounded-rp-card border border-rp-border px-3 py-1.5 text-rp-body disabled:opacity-40"
+            >Next</button>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );

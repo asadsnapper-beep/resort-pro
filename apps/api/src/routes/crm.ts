@@ -353,10 +353,13 @@ export async function crmRoutes(app: FastifyInstance) {
     return ok(tag, 'Tag created');
   });
 
-  app.delete('/tags/:id', { preHandler: pre }, async (request) => {
+  app.delete('/tags/:id', { preHandler: pre }, async (request, reply) => {
     const { db } = request;
     const { id } = request.params as { id: string };
-    await db.guestTag.deleteMany({ where: { id } });
+    // deleteMany returns a count, and ignoring it meant deleting a tag that was
+    // never there reported success (CRM QA finding 017).
+    const { count } = await db.guestTag.deleteMany({ where: { id } });
+    if (!count) return reply.status(404).send({ success: false, error: 'Tag not found' });
     return ok(null, 'Tag deleted');
   });
 
@@ -376,6 +379,8 @@ export async function crmRoutes(app: FastifyInstance) {
         update: {},
       });
     } else {
+      // No count check here on purpose: removing a tag a guest does not have
+      // is the outcome the caller asked for. Idempotent, not silent.
       await db.guestTagRelation.deleteMany({ where: { guestId: id, tagId: body.tagId } });
     }
     return ok(null, `Tag ${body.action}ed`);
@@ -430,10 +435,11 @@ export async function crmRoutes(app: FastifyInstance) {
     return ok(null, 'Template updated');
   });
 
-  app.delete('/templates/:id', { preHandler: pre }, async (request) => {
+  app.delete('/templates/:id', { preHandler: pre }, async (request, reply) => {
     const { db } = request;
     const { id } = request.params as { id: string };
-    await db.emailTemplate.deleteMany({ where: { id } });
+    const { count } = await db.emailTemplate.deleteMany({ where: { id } });
+    if (!count) return reply.status(404).send({ success: false, error: 'Template not found' });
     return ok(null, 'Template deleted');
   });
 
@@ -500,11 +506,26 @@ export async function crmRoutes(app: FastifyInstance) {
     return ok({ sent, failed, total, status }, describeSend(outcome));
   });
 
-  app.delete('/campaigns/:id', { preHandler: pre }, async (request) => {
+  app.delete('/campaigns/:id', { preHandler: pre }, async (request, reply) => {
     const { db } = request;
     const { id } = request.params as { id: string };
-    await db.campaign.deleteMany({ where: { id, status: { in: ['DRAFT', 'SCHEDULED'] } } });
-    return ok(null, 'Campaign deleted');
+
+    // The status filter is right — a campaign that has gone out is a record of
+    // something that happened and should not vanish. What was wrong is that
+    // the filter silently matched nothing and the route still said "deleted",
+    // so a marketer watched a sent campaign stay exactly where it was.
+    const { count } = await db.campaign.deleteMany({
+      where: { id, status: { in: ['DRAFT', 'SCHEDULED'] } },
+    });
+    if (count) return ok(null, 'Campaign deleted');
+
+    const existing = await db.campaign.findFirst({ where: { id }, select: { status: true } });
+    if (!existing) return reply.status(404).send({ success: false, error: 'Campaign not found' });
+
+    return reply.status(400).send({
+      success: false,
+      error: `This campaign is ${existing.status.toLowerCase()} and cannot be deleted — it is a record of emails that went out.`,
+    });
   });
 
   /* ── SEQUENCES ────────────────────────────────────────────────────────────── */
@@ -534,11 +555,12 @@ export async function crmRoutes(app: FastifyInstance) {
     return ok(seq, 'Sequence created');
   });
 
-  app.put('/sequences/:id', { preHandler: pre }, async (request) => {
+  app.put('/sequences/:id', { preHandler: pre }, async (request, reply) => {
     const { db } = request;
     const { id } = request.params as { id: string };
     const body = z.object({ name: z.string().optional(), status: z.enum(['ACTIVE', 'PAUSED', 'ARCHIVED']).optional() }).parse(request.body);
-    await db.sequence.updateMany({ where: { id }, data: body });
+    const { count } = await db.sequence.updateMany({ where: { id }, data: body });
+    if (!count) return reply.status(404).send({ success: false, error: 'Sequence not found' });
     return ok(null, 'Sequence updated');
   });
 
