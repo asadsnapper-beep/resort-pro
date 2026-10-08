@@ -7,6 +7,7 @@ import type { JwtPayload } from '@resort-pro/types';
 import { sendEmail, wrapEmail, renderTemplate, SEQUENCE_TEMPLATES } from '../services/email';
 import { matchAllTerms } from '../utils/search-terms';
 import { SUBSCRIBED_GUEST } from '../utils/email-consent';
+import { unsubscribeUrl, verifyUnsubscribeToken } from '../utils/unsubscribe-token';
 
 // ─── Default email templates (auto-created for every new tenant) ──────────────
 const DEFAULT_EMAIL_TEMPLATES = [
@@ -535,7 +536,7 @@ export async function crmRoutes(app: FastifyInstance) {
         tenantName: tenant?.name ?? 'Resort',
         primaryColor: wc?.primaryColor ?? '#1a6b5e',
         accentColor:  wc?.accentColor  ?? '#d4a853',
-        unsubscribeUrl: `${process.env.API_URL || 'http://localhost:4000'}/crm/unsubscribe/${guest.id}`,
+        unsubscribeUrl: unsubscribeUrl(guest.id),
       });
 
       const { id: resendId, error } = await sendEmail({ to: guest.email, subject: campaign.subject, html });
@@ -738,12 +739,12 @@ export async function crmRoutes(app: FastifyInstance) {
             <a href="${bookingUrl}" style="background:#7c3aed;color:#fff;padding:14px 32px;text-decoration:none;border-radius:8px;font-weight:600;display:inline-block">Claim Your Birthday Gift</a>
             <p style="color:#6b7280;font-size:14px;margin-top:24px">With birthday wishes,<br><strong>${tenantName} Team</strong></p>
             <p style="color:#9ca3af;font-size:11px;margin-top:16px">
-              <a href="${process.env.API_URL || 'http://localhost:4000'}/crm/unsubscribe/${guest.id}" style="color:#9ca3af">Unsubscribe</a>
+              <a href="${unsubscribeUrl(guest.id)}" style="color:#9ca3af">Unsubscribe</a>
             </p>
           </div>
         </div>`;
 
-      const html = wrapEmail({ body: renderTemplate(bodyHtml, { guestName: guest.firstName }), tenantName, primaryColor, accentColor, unsubscribeUrl: `${process.env.API_URL || 'http://localhost:4000'}/crm/unsubscribe/${guest.id}` });
+      const html = wrapEmail({ body: renderTemplate(bodyHtml, { guestName: guest.firstName }), tenantName, primaryColor, accentColor, unsubscribeUrl: unsubscribeUrl(guest.id) });
       const { id: resendId, error } = await sendEmail({ to: guest.email, subject, html });
 
       await prisma.emailSend.create({
@@ -821,12 +822,12 @@ export async function crmRoutes(app: FastifyInstance) {
             </div>
             <p style="color:#6b7280;font-size:14px">Warm regards,<br><strong>${tenantName} Team</strong></p>
             <p style="color:#9ca3af;font-size:11px;text-align:center;margin-top:24px">
-              <a href="${process.env.API_URL || 'http://localhost:4000'}/crm/unsubscribe/${guest.id}" style="color:#9ca3af">Unsubscribe</a>
+              <a href="${unsubscribeUrl(guest.id)}" style="color:#9ca3af">Unsubscribe</a>
             </p>
           </div>
         </div>`;
 
-      const html = wrapEmail({ body: renderTemplate(bodyHtml, { guestName: guest.firstName }), tenantName, primaryColor, accentColor, unsubscribeUrl: `${process.env.API_URL || 'http://localhost:4000'}/crm/unsubscribe/${guest.id}` });
+      const html = wrapEmail({ body: renderTemplate(bodyHtml, { guestName: guest.firstName }), tenantName, primaryColor, accentColor, unsubscribeUrl: unsubscribeUrl(guest.id) });
       const { id: resendId, error } = await sendEmail({ to: guest.email, subject, html });
 
       await prisma.emailSend.create({
@@ -887,27 +888,70 @@ export async function crmRoutes(app: FastifyInstance) {
 }
 
 /* ── Public unsubscribe route ─────────────────────────────────────────────── */
+const page = (title: string, body: string) => `
+  <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>${title}</title></head>
+  <body style="font-family:system-ui,sans-serif;text-align:center;padding:60px 20px;color:#18231f;">
+    <h2 style="margin:0 0 12px;">${title}</h2>
+    <p style="color:#6b7280;">${body}</p>
+  </body></html>`;
+
 export async function crmPublicRoutes(app: FastifyInstance) {
-  app.get('/unsubscribe/:guestId', async (request, reply) => {
-    const { guestId } = request.params as { guestId: string };
-    const guest = await prisma.guest.findUnique({ where: { id: guestId }, select: { tenantId: true } });
-    if (!guest) return reply.status(404).send('Guest not found');
+  // GET only asks. A mail scanner or a link previewer fetching this must not
+  // unsubscribe anybody — it sees a page with a button, the same as a person.
+  app.get('/unsubscribe/:token', async (request, reply) => {
+    const { token } = request.params as { token: string };
+    const guestId = verifyUnsubscribeToken(token);
+    const guest = guestId
+      ? await prisma.guest.findUnique({ where: { id: guestId }, select: { firstName: true } })
+      : null;
+
+    if (!guest) {
+      return reply.status(404).type('text/html').send(page(
+        'This link is not valid',
+        'It may have been altered on the way here. Reply to the email and ask to be removed, and someone will do it by hand.',
+      ));
+    }
+
+    return reply.type('text/html').send(`
+      <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
+      <meta name="viewport" content="width=device-width, initial-scale=1"/>
+      <title>Unsubscribe</title></head>
+      <body style="font-family:system-ui,sans-serif;text-align:center;padding:60px 20px;color:#18231f;">
+        <h2 style="margin:0 0 12px;">Stop receiving these emails?</h2>
+        <p style="color:#6b7280;margin:0 0 28px;">You will no longer get marketing emails from this resort. Booking confirmations and receipts are not affected.</p>
+        <form method="POST" action="/crm/unsubscribe/${encodeURIComponent(token)}">
+          <button type="submit" style="background:#c43c3c;color:#fff;border:0;border-radius:8px;padding:14px 32px;font-size:16px;font-weight:600;cursor:pointer;">
+            Yes, unsubscribe me
+          </button>
+        </form>
+      </body></html>
+    `);
+  });
+
+  // The POST is the one that changes anything.
+  app.post('/unsubscribe/:token', async (request, reply) => {
+    const { token } = request.params as { token: string };
+    const guestId = verifyUnsubscribeToken(token);
+    const guest = guestId
+      ? await prisma.guest.findUnique({ where: { id: guestId }, select: { tenantId: true } })
+      : null;
+
+    if (!guestId || !guest) {
+      return reply.status(404).type('text/html').send(page('This link is not valid', ''));
+    }
 
     await prisma.emailConsent.upsert({
       where:  { guestId },
       create: { tenantId: guest.tenantId, guestId, subscribed: false, unsubscribedAt: new Date() },
       update: { subscribed: false, unsubscribedAt: new Date() },
     });
-
-    // Update all active enrollments
     await prisma.sequenceEnrollment.updateMany({ where: { guestId }, data: { status: 'UNSUBSCRIBED' } });
 
-    return reply.type('text/html').send(`
-      <!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Unsubscribed</title></head>
-      <body style="font-family:sans-serif;text-align:center;padding:60px 20px;">
-        <h2>You've been unsubscribed</h2>
-        <p style="color:#6b7280;">You will no longer receive marketing emails from this resort.</p>
-      </body></html>
-    `);
+    return reply.type('text/html').send(page(
+      "You've been unsubscribed",
+      'You will no longer receive marketing emails from this resort.',
+    ));
   });
 }

@@ -47,19 +47,26 @@ const TIER_CONFIG: Record<string, { label: string; text: string; bg: string; bor
   PLATINUM: { label: 'Platinum', text: '#f8fafc', bg: '#183153', border: 'rgba(24,49,83,0.5)',    barColor: '#183153', Icon: Crown  },
 };
 
+// The same three pill looks, named once. Five statuses shared two of them by
+// repeating the hex, and the two added for PARTIAL and FAILED would have made
+// it seven copies — which is how a palette stops being a palette.
+const AMBER_PILL = { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)', text: '#b89040' };
+const DANGER_PILL = { bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)', text: 'var(--rp-danger)' };
+const CALM_PILL = { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)', text: '#183153' };
+
 const STATUS_META: Record<string, { bg: string; border: string; text: string }> = {
-  DRAFT:     { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)' },
-  SCHEDULED: { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
-  SENDING:   { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a' },
-  SENT:      { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153' },
-  PAUSED:    { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
-  CANCELLED: { bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)', text: '#c43c3c' },
+  DRAFT:     { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)', text: 'var(--rp-text-muted)' },
+  SCHEDULED: AMBER_PILL,
+  SENDING:   { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)', text: '#b8724a' },
+  SENT:      CALM_PILL,
   // A send that did not go the way SENT implies. Amber for "some of it", red
   // for "none of it" — the pill is the only place a marketer finds out.
-  PARTIAL:   { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
-  FAILED:    { bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)', text: '#c43c3c' },
-  ACTIVE:    { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153' },
-  ARCHIVED:  { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-faint)' },
+  PARTIAL:   AMBER_PILL,
+  FAILED:    DANGER_PILL,
+  PAUSED:    AMBER_PILL,
+  CANCELLED: DANGER_PILL,
+  ACTIVE:    CALM_PILL,
+  ARCHIVED:  { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)', text: 'var(--rp-text-faint)' },
 };
 
 const TRIGGER_LABELS: Record<string, string> = {
