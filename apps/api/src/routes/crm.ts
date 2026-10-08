@@ -383,7 +383,14 @@ export async function crmRoutes(app: FastifyInstance) {
   app.get('/templates', { preHandler: pre }, async (request) => {
     const { db } = request;
     const { tenantId } = request.user as JwtPayload;
-    let templates = await db.emailTemplate.findMany({ where: {}, orderBy: { isDefault: 'desc', createdAt: 'asc' } });
+    // Two fields means an array: Prisma rejects `{ isDefault, createdAt }` as
+    // one object, because key order in an object is not a sort order it will
+    // guarantee. The tab answered 500 on every load — a saved template looked
+    // to the owner like it had been accepted and then vanished.
+    let templates = await db.emailTemplate.findMany({
+      where: {},
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+    });
 
     // ── Lazy-init: first visit → create default templates ──────────────────
     if (templates.length === 0) {
