@@ -8,6 +8,7 @@ import { sendEmail, wrapEmail, renderTemplate, SEQUENCE_TEMPLATES } from '../ser
 import { matchAllTerms } from '../utils/search-terms';
 import { SUBSCRIBED_GUEST } from '../utils/email-consent';
 import { unsubscribeUrl, verifyUnsubscribeToken } from '../utils/unsubscribe-token';
+import { sendCampaign, describeSend, SEND_REFUSALS } from '../services/campaign-sender';
 
 // ─── Default email templates (auto-created for every new tenant) ──────────────
 const DEFAULT_EMAIL_TEMPLATES = [
@@ -475,105 +476,28 @@ export async function crmRoutes(app: FastifyInstance) {
   });
 
   // POST /api/crm/campaigns/:id/send — send campaign now
+  //
+  // The sending itself lives in services/campaign-sender so the scheduled
+  // dispatcher can do exactly the same thing. It used to be written out here,
+  // which is why a scheduled campaign never went anywhere: the only code that
+  // knew how to send one needed an HTTP request to exist.
   app.post('/campaigns/:id/send', { preHandler: pre }, async (request, reply) => {
-    const { db } = request;
     const { tenantId } = request.user as JwtPayload;
     const { id } = request.params as { id: string };
 
-    const campaign = await db.campaign.findFirst({ where: { id } });
-    if (!campaign) return reply.status(404).send({ success: false, error: 'Campaign not found' });
-    // FAILED is re-sendable: nobody received it, so sending again cannot
-    // duplicate anything. PARTIAL is not — some guests already have it, and
-    // re-running this loop would send to them a second time. Retrying only the
-    // recipients whose EmailSend says FAILED is the right answer there, and is
-    // its own piece of work.
-    if (campaign.status === 'SENT' || campaign.status === 'PARTIAL') {
-      return reply.status(400).send({
+    const outcome = await sendCampaign(tenantId, id);
+
+    if (!outcome.ok) {
+      const status = outcome.reason === 'not-found' ? 404 : 400;
+      return reply.status(status).send({
         success: false,
-        error: campaign.status === 'SENT'
-          ? 'Already sent'
-          : 'Partly sent already — re-sending would deliver twice to the guests who received it.',
+        error: SEND_REFUSALS[outcome.reason],
+        ...(outcome.reason === 'no-recipients' ? { code: 'NO_RECIPIENTS' } : {}),
       });
     }
 
-    // Build segment filter
-    const seg = (campaign.segment ?? {}) as Record<string, any>;
-    const guests = await db.guest.findMany({
-      where: {
-        ...SUBSCRIBED_GUEST,
-        ...(seg.tier ? { score: { tier: seg.tier } } : {}),
-        ...(seg.tag  ? { tags:  { some: { tag: { name: seg.tag } } } } : {}),
-      },
-      select: { id: true, firstName: true, email: true },
-    });
-
-    // Get tenant info for branding
-    const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { name: true } });
-    const wc     = await (db as any).websiteContent.findUnique({ where: { tenantId }, select: { primaryColor: true, accentColor: true } });
-
-    if (guests.length === 0) {
-      // Not a failure to deliver — there was nobody to deliver to. Leaving the
-      // campaign in DRAFT keeps it sendable once the audience exists, instead
-      // of spending it on a terminal state.
-      return reply.status(400).send({
-        success: false,
-        error: 'This campaign has no recipients — every guest has either opted out or there are none yet.',
-        code: 'NO_RECIPIENTS',
-      });
-    }
-
-    await db.campaign.update({ where: { id }, data: { status: 'SENDING', recipientCount: guests.length } });
-    await db.campaignStats.upsert({
-      where:  { campaignId: id },
-      create: { campaignId: id, sent: 0 },
-      update: {},
-    });
-
-    let sent = 0;
-    for (const guest of guests) {
-      const html = wrapEmail({
-        body: renderTemplate(campaign.html, { guestName: guest.firstName }),
-        tenantName: tenant?.name ?? 'Resort',
-        primaryColor: wc?.primaryColor ?? '#1a6b5e',
-        accentColor:  wc?.accentColor  ?? '#d4a853',
-        unsubscribeUrl: unsubscribeUrl(guest.id),
-      });
-
-      const { id: resendId, error } = await sendEmail({ to: guest.email, subject: campaign.subject, html });
-
-      await db.emailSend.create({
-        data: {
-          guestId:    guest.id,
-          campaignId: id,
-          subject:    campaign.subject,
-          status:     error ? 'FAILED' : 'SENT',
-          resendId:   resendId ?? undefined,
-        },
-      });
-      if (!error) sent++;
-    }
-
-    // What actually happened, not what was attempted. This used to set SENT
-    // unconditionally — a campaign where every delivery failed told the
-    // marketer it had gone out, which is the one thing they needed to know was
-    // untrue.
-    const failed = guests.length - sent;
-    const status = sent === 0 ? 'FAILED' : failed > 0 ? 'PARTIAL' : 'SENT';
-
-    await db.campaign.update({
-      where: { id },
-      // sentAt is when it went out. Nothing went out, so there is no such time.
-      data: { status, sentAt: sent > 0 ? new Date() : null },
-    });
-    await db.campaignStats.update({ where: { campaignId: id }, data: { sent, bounced: failed } });
-
-    const message = sent === 0
-      ? `Nothing was sent — all ${failed} deliveries failed.`
-      : failed > 0
-        ? `Sent to ${sent} of ${guests.length}. ${failed} failed.`
-        : `Campaign sent to ${sent}.`;
-
-    return ok({ sent, failed, total: guests.length, status }, message);
+    const { sent, failed, total, status } = outcome;
+    return ok({ sent, failed, total, status }, describeSend(outcome));
   });
 
   app.delete('/campaigns/:id', { preHandler: pre }, async (request) => {

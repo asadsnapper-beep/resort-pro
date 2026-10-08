@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { SUBSCRIBED_GUEST, SUBSCRIBED_GUEST_RELATION } from '../utils/email-consent';
 import { prisma } from '@resort-pro/database';
 import { sendEmail, wrapEmail, SEQUENCE_TEMPLATES } from './email';
+import { sendCampaign } from './campaign-sender';
 
 // ─── Send next due sequence steps ────────────────────────────────────────────
 async function processSequenceEnrollments() {
@@ -309,6 +310,44 @@ async function processPostStayTrigger() {
 }
 
 /**
+ * Campaigns whose scheduled time has arrived.
+ *
+ * The API has accepted `scheduledAt` and stored the status SCHEDULED for a
+ * long time, and nothing ever came back for those rows (CRM QA finding 009).
+ * An owner could schedule a campaign for Friday and discover on Saturday that
+ * Friday had not happened — with the campaign still sitting there saying
+ * SCHEDULED, which is the most convincing way to be wrong.
+ *
+ * Due means `scheduledAt <= now`, so a worker that was down for an hour sends
+ * the hour's campaigns when it comes back rather than skipping them. One at a
+ * time, and a campaign that throws does not stop the ones behind it.
+ */
+export async function dispatchScheduledCampaigns(): Promise<void> {
+  const due = await prisma.campaign.findMany({
+    where: { status: 'SCHEDULED', scheduledAt: { lte: new Date() } },
+    select: { id: true, tenantId: true, name: true },
+    orderBy: { scheduledAt: 'asc' },
+    take: 25,
+  });
+
+  for (const campaign of due) {
+    try {
+      const outcome = await sendCampaign(campaign.tenantId, campaign.id);
+      if (outcome.ok) {
+        console.log(`[Automation] "${campaign.name}" → ${outcome.status} (${outcome.sent}/${outcome.total})`);
+      } else {
+        // The campaign keeps its SCHEDULED status when there is nobody to send
+        // to, so it goes out if the audience appears before someone cancels it.
+        // Every other refusal is terminal and says so in the log.
+        console.warn(`[Automation] "${campaign.name}" not sent: ${outcome.reason}`);
+      }
+    } catch (err) {
+      console.error(`[Automation] "${campaign.name}" failed:`, err instanceof Error ? err.message : err);
+    }
+  }
+}
+
+/**
  * Every trigger that fires once a day, in one callable place.
  *
  * It used to live inside the cron callback, which meant the only way to
@@ -333,6 +372,13 @@ export function startAutomationEngine() {
   cron.schedule('*/15 * * * *', async () => {
     try { await processSequenceEnrollments(); }
     catch (e) { console.error('[Automation] processSequenceEnrollments error:', e); }
+  });
+
+  // Scheduled campaigns on the same cadence. Daily would mean a campaign set
+  // for 09:00 going out at 08:00 the next morning, which is not scheduling.
+  cron.schedule('*/15 * * * *', async () => {
+    try { await dispatchScheduledCampaigns(); }
+    catch (e) { console.error('[Automation] dispatchScheduledCampaigns error:', e); }
   });
 
   // Trigger checks run daily at 08:00
