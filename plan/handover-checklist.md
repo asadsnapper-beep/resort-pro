@@ -4,7 +4,7 @@ The one list. Everything else in `plan/` describes how something works or was
 meant to work; this says what is left before a real resort owner is using the
 product, and who has to do it.
 
-Last checked: **2026-10-02** — bKash is still not in hand, so the list now says what that does and does not block.
+Last checked: **2026-10-08** — after the CRM deep QA, which this list had never mentioned.
 
 ---
 
@@ -169,7 +169,7 @@ are the next thing to happen.
 
 ### 6. Push `dev` → `main` — **founder decides, Claude runs it**
 
-`dev` is 93 commits ahead of `main`, whose newest commit is from 13 September.
+`dev` is 112 commits ahead of `main`, whose newest commit is from 13 September.
 Everything since — multi-resort, guest SMS/WhatsApp, the embed widget, the group
 bill, the review fixes, the privacy fix, credential encryption, the admin
 control-plane work — is on staging only.
@@ -226,6 +226,9 @@ Written down so they stop taking up room.
 | Review management, dynamic pricing, Booking.com / Airbnb | Never promised for this month. |
 | The Shop / marketplace ([marketplace.md](marketplace.md)) | A new product, planned 2026-09-27 and not started. Its phase 9 needs the same Stripe account. It earns nothing until resorts are using the PMS. Its §14 precondition — a third-party shop's own gateway credentials being encrypted — is met now; the key in item 5 is the rest of it. |
 | Production's deploy job does not verify the commit | Staging's does now: a 52x from Cloudflare is treated as "unknown" and the job then checks what Portainer actually stored. Production exits on any non-2xx from Coolify, before its health checks run — and those checks ask "is something serving", not "is this commit serving", so simply letting the timeout through could turn a silent non-deploy into a green run. It needs its own SHA check first, which is a separate piece of work on the riskier of the two paths. |
+| CRM open and click tracking (CRM-008) | **The honest move here is to remove the claim, not build the feature.** The schema has `openedAt`, click and bounce columns and a campaign stats block, and nothing anywhere writes them — there is no open pixel, no click redirect, no Resend webhook. So the KPIs read 0%, and an owner seeing "0% opened" concludes the campaign failed when the truth is that nothing is being measured. A wrong number is worse than a missing one. Either hide those tiles until the tracking exists, or build it properly: pixel route, click redirect, webhook handler, and tests. |
+| The CRM's remaining silent failures (CRM-012) | Several tabs still `catch {}` and render an empty list, so a backend failure and "no data yet" look identical. The sequence form was fixed because that was the half of CRM-007 that hid it; the others are the same shape and have not been. |
+| CRM APIs with no way to reach them (CRM-016) | Contact detail and history, tag CRUD and assignment, template editing, segment filters, manual enrolment — all implemented, none reachable from the CRM screen. Not broken, just invisible, which is its own kind of waste. |
 | A QR code on the two-factor screen | Enrolment shows the setup key grouped for manual entry and an `otpauth://` link that opens the app when tapped on the phone, which is enough to enrol. A scannable QR needs a library this repo does not have; adding one is a small change and a dependency decision. |
 | Off-host backups (review M-06) | Daily dumps are verified, and they sit on the same host as the database they protect. Losing the host loses both. Needs a bucket, retention, credentials, monitoring and one documented restore drill — server work, not code, and it cannot be done from here. |
 | ESLint | Not installed anywhere in this repo, and `next lint` used to hang on its interactive setup prompt. The script is `tsc --noEmit` now, which is what CI has meant by lint for months. Adding real linting means a dependency and several hundred existing warnings, so it needs a baseline the way the design system has one. Not this month. |
@@ -278,7 +281,36 @@ So the size of what is left stays honest.
   giving up at 100 seconds, not Portainer refusing — three deploys in a row
   failed on it while the new image was in fact live. The job now checks what
   Portainer actually stored, so red means the commit is not deployed.
-- API suite 824 passing; web 117; E2E 44 across two browser projects with no
-  retries; staging deployed `dev-a3773cd` on 2026-09-30 — and that now means
+- The CRM works, which it did not on 2026-10-07. A deep QA that day returned
+  NO-GO on it, and this list had never mentioned the CRM at all — an entire
+  module sold on the STARTER plan, absent from the page about what is ready.
+  Nine of its findings are closed:
+  - Templates and Analytics answered 500 on every load, and a new sequence
+    could not be given a step, and a tag could not be put on a guest. Three of
+    those were one bug: the tenant-scoped client injected `tenantId` into three
+    models that have no such column. They are scoped through their parent now,
+    and a create checks the parent belongs to the tenant — skipping the scope
+    would have swapped a loud 500 for a quiet cross-tenant read.
+  - The audience an owner was shown was not the audience that got the email.
+    The list counted a guest with no consent row as subscribed; the sender
+    required one. Ten shown, nobody reached, campaign reported as sent. One
+    rule now, in one place.
+  - A campaign is SENT only when it was. PARTIAL and FAILED exist, `sentAt`
+    stays empty when nothing went out, and an empty audience is refused rather
+    than recorded as a send to zero people.
+  - Scheduled campaigns go out. The API had stored `scheduledAt` for a long
+    time with nothing ever coming back for those rows, because the only code
+    that could send a campaign lived inside an HTTP handler.
+  - The Anniversary, Booking Confirmed and Check-in triggers enrol somebody.
+    All three were offered by the UI and processed by nothing. Birthday was
+    accepted and enrolled nobody — it searched guest notes for a string while
+    `Guest.dateOfBirth` sat there unused.
+  - The unsubscribe link cannot be tripped by a mail scanner: the GET asks, a
+    POST acts, and the guest id is replaced by a signed token.
+  - Deleting something that is not there, or a campaign that has gone out, says
+    so instead of reporting success. Contacts can be paged past the first
+    twenty.
+- API suite 930 passing; web 117; E2E 44 across two browser projects with no
+  retries; staging deployed `dev-0198614` on 2026-10-08 — and that now means
   Portainer confirmed it stores this commit, rather than only that the request
   was accepted.
