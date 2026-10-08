@@ -151,40 +151,95 @@ async function processWinBackTrigger() {
   }
 }
 
-// ─── Auto-enroll guests for BIRTHDAY sequences ───────────────────────────────
-async function processBirthdayTrigger() {
-  const birthdaySequences = await prisma.sequence.findMany({
-    where: { trigger: 'BIRTHDAY', status: 'ACTIVE' },
-    select: { id: true, tenantId: true, triggerMeta: true },
+/**
+ * Guests with a date coming up, for the two sequences that run off one.
+ *
+ * Both used to be broken in their own way. BIRTHDAY searched `notes` for the
+ * string `birthday:MM-DD`, with a comment saying "in a real implementation
+ * you'd have a dob field on Guest" — and `Guest.dateOfBirth` has existed all
+ * along, so the sequence enrolled nobody while the daily runner, reading the
+ * real column, mailed people (CRM QA finding 011's two incompatible sources).
+ * ANNIVERSARY was not offered to the API at all: the UI listed it, the
+ * validator rejected it, and the form swallowed the 400 (finding 007).
+ *
+ * Raw SQL because the match is on the month and day of a date, which Prisma's
+ * `where` cannot express. The consent rule is spelled out here rather than
+ * imported, for the same reason — it is the SQL form of SUBSCRIBED_GUEST: a
+ * guest with no consent row has not opted out.
+ */
+async function enrolOnUpcomingDate(
+  trigger: 'BIRTHDAY' | 'ANNIVERSARY',
+  daysAhead = 3,
+) {
+  const sequences = await prisma.sequence.findMany({
+    where: { trigger, status: 'ACTIVE' },
+    select: { id: true, tenantId: true },
   });
+  if (sequences.length === 0) return;
 
-  const today   = new Date();
-  const target  = new Date(today.getTime() + 3 * 86400000); // 3 days ahead
+  const target = new Date(Date.now() + daysAhead * 86400000);
+  const month = target.getUTCMonth() + 1;
+  const day = target.getUTCDate();
+  const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1));
 
-  for (const seq of birthdaySequences) {
-    // Guests whose birthday is in 3 days (if dateOfBirth stored in notes — simplified)
-    // In a real implementation you'd have a dob field on Guest
-    // Here we check the notes field for "birthday:MM-DD" pattern
-    const month = String(target.getMonth() + 1).padStart(2, '0');
-    const day   = String(target.getDate()).padStart(2, '0');
-
-    const guests = await prisma.guest.findMany({
-      where: {
-        tenantId: seq.tenantId,
-        ...SUBSCRIBED_GUEST,
-        notes:    { contains: `birthday:${month}-${day}` },
-        enrollments: { none: { sequenceId: seq.id, status: { in: ['ACTIVE', 'COMPLETED'] }, enrolledAt: { gte: new Date(today.getFullYear(), 0, 1) } } },
-      },
-      select: { id: true },
-    });
+  for (const seq of sequences) {
+    const guests = trigger === 'BIRTHDAY'
+      ? await prisma.$queryRaw<{ id: string }[]>`
+          SELECT g.id
+          FROM guests g
+          LEFT JOIN email_consents c ON c."guestId" = g.id
+          WHERE g."tenantId" = ${seq.tenantId}
+            AND g."dateOfBirth" IS NOT NULL
+            AND EXTRACT(MONTH FROM g."dateOfBirth") = ${month}
+            AND EXTRACT(DAY   FROM g."dateOfBirth") = ${day}
+            AND (c."subscribed" IS NULL OR c."subscribed" = true)
+        `
+      // The anniversary of a guest's first stay, which is what the daily
+      // runner has always meant by the word.
+      : await prisma.$queryRaw<{ id: string }[]>`
+          SELECT g.id
+          FROM guests g
+          LEFT JOIN email_consents c ON c."guestId" = g.id
+          JOIN (
+            SELECT b."guestId", MIN(b."checkOut") AS first_stay
+            FROM bookings b
+            WHERE b.status = 'CHECKED_OUT'
+            GROUP BY b."guestId"
+          ) f ON f."guestId" = g.id
+          WHERE g."tenantId" = ${seq.tenantId}
+            AND EXTRACT(MONTH FROM f.first_stay) = ${month}
+            AND EXTRACT(DAY   FROM f.first_stay) = ${day}
+            AND f.first_stay < ${target}
+            AND (c."subscribed" IS NULL OR c."subscribed" = true)
+        `;
 
     for (const guest of guests) {
+      // Once a year, not once a run: the sequence fires on a date that comes
+      // round annually, so the window is the calendar year.
+      const already = await prisma.sequenceEnrollment.count({
+        where: {
+          sequenceId: seq.id,
+          guestId: guest.id,
+          enrolledAt: { gte: yearStart },
+          status: { in: ['ACTIVE', 'COMPLETED'] },
+        },
+      });
+      if (already > 0) continue;
+
       await prisma.sequenceEnrollment.create({
-        data: { tenantId: seq.tenantId, sequenceId: seq.id, guestId: guest.id, triggerMeta: { birthdayDate: `${target.getFullYear()}-${month}-${day}` } },
+        data: {
+          tenantId: seq.tenantId,
+          sequenceId: seq.id,
+          guestId: guest.id,
+          triggerMeta: { on: target.toISOString().slice(0, 10) },
+        },
       }).catch(() => {});
     }
   }
 }
+
+const processBirthdayTrigger = () => enrolOnUpcomingDate('BIRTHDAY');
+const processAnniversaryTrigger = () => enrolOnUpcomingDate('ANNIVERSARY');
 
 // ─── Auto-enroll for PRE_ARRIVAL (3 days before check-in) ───────────────────
 async function processPreArrivalTrigger() {
@@ -253,6 +308,23 @@ async function processPostStayTrigger() {
   }
 }
 
+/**
+ * Every trigger that fires once a day, in one callable place.
+ *
+ * It used to live inside the cron callback, which meant the only way to
+ * exercise it was to wait until 08:00 — so a trigger that enrolled nobody
+ * looked exactly like a quiet night.
+ */
+export async function runDailyTriggers(): Promise<void> {
+  await Promise.all([
+    processPreArrivalTrigger(),
+    processPostStayTrigger(),
+    processBirthdayTrigger(),
+    processAnniversaryTrigger(),
+    processWinBackTrigger(),
+  ]);
+}
+
 // ─── Main: start all cron jobs ────────────────────────────────────────────────
 export function startAutomationEngine() {
   console.log('[Automation] Starting CRM automation engine...');
@@ -266,12 +338,7 @@ export function startAutomationEngine() {
   // Trigger checks run daily at 08:00
   cron.schedule('0 8 * * *', async () => {
     try {
-      await Promise.all([
-        processPreArrivalTrigger(),
-        processPostStayTrigger(),
-        processBirthdayTrigger(),
-        processWinBackTrigger(),
-      ]);
+      await runDailyTriggers();
       console.log('[Automation] Daily triggers processed');
     } catch (e) { console.error('[Automation] Daily trigger error:', e); }
   });

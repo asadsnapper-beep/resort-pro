@@ -458,13 +458,21 @@ function SequencesTab({ token }: { token: string }) {
 
   useEffect(() => { fetch(); }, [fetch]);
 
+  // The form used to `catch { /* ignore */ }`, so a rejected trigger closed
+  // nothing, said nothing, and left the owner clicking Create again. That is
+  // how the Anniversary mismatch stayed invisible for as long as it did.
+  const [error, setError] = useState('');
+
   const createSequence = async () => {
     if (!form.name) return;
     setSaving(true);
+    setError('');
     try {
       await api.post('/crm/sequences', form, { headers: { Authorization: `Bearer ${token}` } });
       setShowNew(false); setForm({ name: '', trigger: 'BOOKING_CONFIRMED' }); fetch();
-    } catch { /* ignore */ }
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'That did not save. Try again, or pick a different trigger.');
+    }
     setSaving(false);
   };
 
@@ -513,6 +521,11 @@ function SequencesTab({ token }: { token: string }) {
               </select>
             </div>
           </div>
+          {error && (
+            // Tokens rather than the arbitrary sizes the rest of this file
+            // uses — a new line should not add to the debt it sits next to.
+            <p className="rounded-rp-card bg-rp-red-bg px-3 py-2 text-rp-body text-rp-danger">{error}</p>
+          )}
           <div className="flex gap-3 pt-2" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
             <button onClick={createSequence} disabled={saving}
               className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium disabled:opacity-60 hover:opacity-90"

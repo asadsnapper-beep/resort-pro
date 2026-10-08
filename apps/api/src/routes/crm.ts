@@ -597,7 +597,9 @@ export async function crmRoutes(app: FastifyInstance) {
 
   const sequenceSchema = z.object({
     name:        z.string().min(1),
-    trigger:     z.enum(['BOOKING_CONFIRMED', 'PRE_ARRIVAL', 'CHECK_IN', 'POST_STAY', 'WIN_BACK', 'BIRTHDAY', 'MANUAL']),
+    // ANNIVERSARY was missing here while the UI offered it and the Prisma enum
+    // had it, so choosing it returned a 400 the form threw away (finding 007).
+    trigger:     z.enum(['BOOKING_CONFIRMED', 'PRE_ARRIVAL', 'CHECK_IN', 'POST_STAY', 'WIN_BACK', 'BIRTHDAY', 'ANNIVERSARY', 'MANUAL']),
     triggerMeta: z.record(z.any()).optional(),
   });
 
