@@ -392,14 +392,40 @@ export function startAutomationEngine() {
   console.log('[Automation] Cron jobs registered ✓');
 }
 
-// ─── On-demand: enroll on booking confirmed ───────────────────────────────────
-export async function enrollOnBookingConfirmed(tenantId: string, guestId: string, meta: {
-  confirmationNo: string; roomName: string; checkIn: string; checkOut: string;
-}) {
+// ─── On-demand: the two triggers that fire on something a person did ─────────
+/**
+ * Enrol a guest in the sequences waiting on one event.
+ *
+ * Both of these were offered by the UI and processed by nothing (CRM QA
+ * 2026-10-07, finding 010). `enrollOnBookingConfirmed` existed and had no
+ * caller anywhere in the codebase; CHECK_IN was selectable, accepted, and had
+ * no processor at all. So an owner could build a welcome sequence on either,
+ * see it listed as ACTIVE, and watch it never enrol a soul — the same shape as
+ * the Anniversary trigger, one screen along.
+ *
+ * Unlike the date triggers, these are called from the request that caused them
+ * rather than from a nightly sweep, because "when the booking is confirmed"
+ * means then and not at 08:00 tomorrow.
+ */
+async function enrolOnEvent(
+  trigger: 'BOOKING_CONFIRMED' | 'CHECK_IN',
+  tenantId: string,
+  guestId: string,
+  meta: Record<string, string>,
+): Promise<void> {
   const sequences = await prisma.sequence.findMany({
-    where: { tenantId, trigger: 'BOOKING_CONFIRMED', status: 'ACTIVE' },
+    where: { tenantId, trigger, status: 'ACTIVE' },
     select: { id: true },
   });
+  if (sequences.length === 0) return;
+
+  // A guest who has opted out is not enrolled. The sender checks again before
+  // each step, but enrolling them anyway would leave rows that exist only to
+  // be skipped, and make "enrolled" mean two different things in the UI.
+  const consent = await prisma.emailConsent.findUnique({
+    where: { guestId }, select: { subscribed: true },
+  });
+  if (consent && !consent.subscribed) return;
 
   for (const seq of sequences) {
     await prisma.sequenceEnrollment.upsert({
@@ -408,11 +434,44 @@ export async function enrollOnBookingConfirmed(tenantId: string, guestId: string
       update: { status: 'ACTIVE', currentStep: 0, completedAt: null, triggerMeta: meta },
     }).catch(() => {});
   }
+}
 
-  // Ensure consent record exists (opted in by booking)
-  await prisma.emailConsent.upsert({
-    where:  { guestId },
-    create: { tenantId, guestId, subscribed: true },
-    update: {},
+/**
+ * Both callers pass a booking id rather than the details.
+ *
+ * The details are only needed to fill in an email, and only if a sequence is
+ * actually waiting on the event — so the lookup happens after that check,
+ * inside here, instead of on every booking whether anyone is listening or not.
+ */
+async function enrolOnBookingEvent(
+  trigger: 'BOOKING_CONFIRMED' | 'CHECK_IN',
+  tenantId: string,
+  bookingId: string,
+): Promise<void> {
+  const waiting = await prisma.sequence.count({
+    where: { tenantId, trigger, status: 'ACTIVE' },
+  });
+  if (waiting === 0) return;
+
+  const booking = await prisma.booking.findFirst({
+    where: { id: bookingId, tenantId },
+    select: {
+      guestId: true, confirmationNo: true, checkIn: true, checkOut: true,
+      room: { select: { name: true, number: true } },
+    },
+  });
+  if (!booking) return;
+
+  await enrolOnEvent(trigger, tenantId, booking.guestId, {
+    confirmationNo: booking.confirmationNo,
+    roomName: booking.room?.name || booking.room?.number || '',
+    checkIn: booking.checkIn.toISOString(),
+    checkOut: booking.checkOut.toISOString(),
   });
 }
+
+export const enrollOnBookingConfirmed = (tenantId: string, bookingId: string) =>
+  enrolOnBookingEvent('BOOKING_CONFIRMED', tenantId, bookingId);
+
+export const enrollOnCheckIn = (tenantId: string, bookingId: string) =>
+  enrolOnBookingEvent('CHECK_IN', tenantId, bookingId);
