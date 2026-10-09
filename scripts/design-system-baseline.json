@@ -2,10 +2,10 @@
   "note": "Written by scripts/design-system-ratchet.mjs. Numbers may only go DOWN.",
   "pages": 48,
   "counts": {
-    "hardcoded-hex": 2780,
-    "inline-style": 1466,
+    "hardcoded-hex": 2778,
+    "inline-style": 1465,
     "handwritten-page-header": 1,
-    "arbitrary-font-size": 1423,
+    "arbitrary-font-size": 1422,
     "arbitrary-radius": 866,
     "inline-card-shadow": 108
   }

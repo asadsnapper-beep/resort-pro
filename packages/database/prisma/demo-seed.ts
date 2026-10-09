@@ -864,6 +864,15 @@ async function main() {
   console.log(`✅ ${templateDefs.length} Email templates created`);
 
   // ── Campaigns ────────────────────────────────────────────────────
+  // Only `sent` and `bounced` are seeded. The demo used to ship 87 opens and
+  // 34 clicks on 142 sends — a 61% open rate — for tracking that does not
+  // exist: there is no open pixel, click redirect or Resend webhook anywhere
+  // in the API, so nothing writes opened, clicked, delivered or unsubscribed.
+  // Seeding them meant the demo demonstrated a feature the product does not
+  // have, to prospects as well as to us (CRM QA 2026-10-07, finding 008).
+  //
+  // `sent` is now the former `delivered` figure, so the arithmetic still holds:
+  // recipientCount = sent + bounced.
   const campaignDefs = [
     {
       name: 'Eid-ul-Fitr 2026 Promotion',
@@ -873,7 +882,7 @@ async function main() {
       sentAt: daysAgo(14),
       scheduledAt: daysAgo(15),
       recipientCount: 142,
-      statsData: { sent: 142, delivered: 138, opened: 87, clicked: 34, bounced: 4, unsubscribed: 2 },
+      statsData: { sent: 138, bounced: 4 },
     },
     {
       name: 'Win-Back — Guests Inactive 90+ Days',
@@ -883,7 +892,7 @@ async function main() {
       sentAt: daysAgo(7),
       scheduledAt: daysAgo(8),
       recipientCount: 63,
-      statsData: { sent: 63, delivered: 61, opened: 28, clicked: 12, bounced: 2, unsubscribed: 1 },
+      statsData: { sent: 61, bounced: 2 },
     },
     {
       name: 'Monthly Newsletter — May 2026',
@@ -893,7 +902,7 @@ async function main() {
       sentAt: daysAgo(3),
       scheduledAt: daysAgo(4),
       recipientCount: 218,
-      statsData: { sent: 218, delivered: 212, opened: 104, clicked: 41, bounced: 6, unsubscribed: 3 },
+      statsData: { sent: 212, bounced: 6 },
     },
     {
       name: 'Summer Package Launch',
@@ -960,10 +969,17 @@ async function main() {
         }).catch(() => {});
       }
 
-      // Add some EmailSend records for sent campaigns
+      // Add some EmailSend records for sent campaigns.
+      //
+      // Only SENT and FAILED, because those are the only two statuses any
+      // code path writes — campaign-sender.ts and automation.ts both set
+      // `error ? 'FAILED' : 'SENT'` and nothing else ever touches the row.
+      // This block used to cycle through DELIVERED / OPENED / CLICKED and
+      // stamp deliveredAt and openedAt, none of which the product can
+      // produce. The EmailSendStatus enum keeps those values for the
+      // tracking that should exist; the demo should not pretend it does.
       if (c.status === 'SENT' && c.sentAt) {
         const sampleGuests = guestIds.slice(0, Math.min(8, c.recipientCount));
-        const statuses = ['DELIVERED', 'OPENED', 'CLICKED', 'DELIVERED', 'OPENED', 'BOUNCED', 'DELIVERED', 'OPENED'] as const;
         for (let i = 0; i < sampleGuests.length; i++) {
           await prisma.emailSend.create({
             data: {
@@ -971,11 +987,8 @@ async function main() {
               guestId: sampleGuests[i],
               campaignId: campaign.id,
               subject: c.subject,
-              status: statuses[i % statuses.length],
-              deliveredAt: c.sentAt,
-              openedAt: statuses[i % statuses.length] === 'OPENED' || statuses[i % statuses.length] === 'CLICKED'
-                ? new Date(c.sentAt.getTime() + 3600_000)
-                : null,
+              // One in eight failed, which matches the bounced counts above.
+              status: i % 8 === 5 ? 'FAILED' : 'SENT',
             },
           }).catch(() => {});
         }

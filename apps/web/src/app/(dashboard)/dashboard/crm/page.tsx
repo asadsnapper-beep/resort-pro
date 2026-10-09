@@ -24,7 +24,7 @@ interface EmailTemplate { id: string; name: string; subject: string; html: strin
 interface Campaign {
   id: string; name: string; subject: string; status: string;
   recipientCount: number; sentAt?: string; scheduledAt?: string;
-  stats?: { sent: number; opened: number; clicked: number; bounced: number };
+  stats?: { sent: number; bounced: number };
   _count: { sends: number };
 }
 interface Sequence {
@@ -35,7 +35,7 @@ interface Sequence {
 interface Analytics {
   totalContacts: number; subscribed: number;
   tierCounts: { tier: string; _count: { tier: number } }[];
-  campaignStats: { campaign: { name: string; sentAt?: string }; sent: number; opened: number; clicked: number }[];
+  campaignStats: { campaign: { name: string; sentAt?: string }; sent: number; bounced: number }[];
   topGuests: { score: number; tier: string; guest: { firstName: string; lastName: string; email: string } }[];
 }
 
@@ -82,6 +82,28 @@ const TRIGGER_LABELS: Record<string, string> = {
 
 const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
 const labelCls = 'block text-[11.5px] font-medium text-[#64748b] mb-1.5';
+
+/**
+ * Which campaign numbers this page is allowed to show.
+ *
+ * `CampaignStats` has columns for sent, delivered, opened, clicked, bounced
+ * and unsubscribed, and `EmailSend` has openedAt/deliveredAt/bouncedAt with an
+ * `EmailClick` table behind it. Only two of them are ever written: the sender
+ * sets `sent`, and `bounced` (which it uses for sends the provider rejected
+ * outright — not a true bounce, but a real failure count). There is no open
+ * pixel, no click redirect and no Resend webhook anywhere in the API.
+ *
+ * So the Open Rate and Click Rate shown here were arithmetic on zeros, and the
+ * demo seeded 87 opens and 34 clicks on 142 sends — a 61% open rate for a
+ * feature that records nothing. A resort owner would reasonably have made
+ * decisions on it, and a prospect was shown it as working.
+ *
+ * The columns stay: they are the right shape for the tracking that should
+ * exist, and dropping them would cost a migration and buy nothing. What goes
+ * is the claim. Put these back when something populates them — and when it
+ * does, `bounced` wants splitting from the send-failure count it currently
+ * doubles as (CRM QA 2026-10-07, finding 008).
+ */
 
 /**
  * The reason the API gave, or a fallback.
@@ -500,17 +522,18 @@ function CampaignsTab({ token }: { token: string }) {
                   <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">Subject: {c.subject}</p>
                   {c.sentAt && <p className="text-[12px] mt-1 text-[#94a3b8] dark:text-[#7f99ab]">Sent {new Date(c.sentAt).toLocaleDateString()}</p>}
                 </div>
+                {/* Opened and Clicked used to sit here with a percentage under
+                    each. Nothing writes either number — see "Which campaign
+                    numbers this page is allowed to show" at the top. */}
                 {c.stats && (
                   <div className="flex gap-5 text-center shrink-0">
                     {[
-                      { label: 'Sent',    val: c.stats.sent },
-                      { label: 'Opened',  val: c.stats.opened,  rate: c.stats.sent ? Math.round(c.stats.opened / c.stats.sent * 100) : 0 },
-                      { label: 'Clicked', val: c.stats.clicked, rate: c.stats.sent ? Math.round(c.stats.clicked / c.stats.sent * 100) : 0 },
+                      { label: 'Sent',   val: c.stats.sent },
+                      { label: 'Failed', val: c.stats.bounced },
                     ].map(s => (
                       <div key={s.label}>
                         <p className="text-[17px] font-bold text-[#183153] dark:text-[#f8fafc]">{s.val}</p>
                         <p className="text-[11px] text-[#64748b] dark:text-[#a9c1d0]">{s.label}</p>
-                        {'rate' in s && s.rate > 0 && <p className="text-[11px] font-medium" style={{ color: '#183153' }}>{s.rate}%</p>}
                       </div>
                     ))}
                   </div>
@@ -955,9 +978,10 @@ function AnalyticsTab({ token }: { token: string }) {
   if (loading) return <div className="py-16 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Loading analytics…</div>;
   if (!data)   return <LoadFailed what="analytics" onRetry={fetch} />;
 
-  const totalSent = data.campaignStats.reduce((s, c) => s + c.sent, 0);
-  const openRate  = data.campaignStats.reduce((s, c) => s + c.opened, 0);
-  const clickRate = data.campaignStats.reduce((s, c) => s + c.clicked, 0);
+  // Only across the five most recent campaigns, which is what the route
+  // returns. The tiles say so rather than implying all time.
+  const totalSent   = data.campaignStats.reduce((s, c) => s + c.sent, 0);
+  const totalFailed = data.campaignStats.reduce((s, c) => s + c.bounced, 0);
 
   return (
     <div className="space-y-6">
@@ -991,8 +1015,10 @@ function AnalyticsTab({ token }: { token: string }) {
         {[
           { label: 'Total Contacts', val: data.totalContacts, Icon: Users,       iconBg: 'var(--rp-teal-bg)', iconColor: '#183153' },
           { label: 'Subscribed',     val: data.subscribed,    Icon: CheckCircle, iconBg: 'var(--rp-teal-bg)', iconColor: '#183153' },
-          { label: 'Open Rate',      val: totalSent > 0 ? `${Math.round(openRate / totalSent * 100)}%` : '—', Icon: Mail, iconBg: 'var(--rp-amber-bg)', iconColor: '#b89040' },
-          { label: 'Click Rate',     val: totalSent > 0 ? `${Math.round(clickRate / totalSent * 100)}%` : '—', Icon: TrendingUp, iconBg: 'var(--rp-surface-3)', iconColor: 'var(--rp-text-subtle)' },
+          // Was Open Rate and Click Rate. Both were percentages of a number
+          // nothing records; these two are counted by the sender itself.
+          { label: 'Sent (last 5 campaigns)', val: totalSent,   Icon: Mail,       iconBg: 'var(--rp-amber-bg)', iconColor: '#b89040' },
+          { label: 'Failed to send',          val: totalFailed, Icon: TrendingUp, iconBg: 'var(--rp-surface-3)', iconColor: 'var(--rp-text-subtle)' },
         ].map(({ label, val, Icon, iconBg, iconColor }) => (
           <div key={label} className="rounded-[14px] border bg-white p-5"
             style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
@@ -1073,7 +1099,7 @@ function AnalyticsTab({ token }: { token: string }) {
       {data.campaignStats.length > 0 && (
         <div className="rounded-[14px] border bg-white p-5"
           style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
-          <h3 className="text-[14px] font-semibold mb-4 text-[#183153] dark:text-[#f8fafc]">Recent Campaign Performance</h3>
+          <h3 className="text-[14px] font-semibold mb-4 text-[#183153] dark:text-[#f8fafc]">Recent Campaign Delivery</h3>
           <div className="space-y-3">
             {data.campaignStats.map((cs, i) => (
               <div key={i} className="flex items-center gap-4 py-2.5"
@@ -1083,9 +1109,8 @@ function AnalyticsTab({ token }: { token: string }) {
                   {cs.campaign.sentAt && <p className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">{new Date(cs.campaign.sentAt).toLocaleDateString()}</p>}
                 </div>
                 {[
-                  { label: 'Sent',    val: cs.sent,    color: 'var(--rp-text-muted)' },
-                  { label: 'Opened',  val: cs.opened,  color: '#183153' },
-                  { label: 'Clicked', val: cs.clicked, color: '#b89040' },
+                  { label: 'Sent',   val: cs.sent,    color: 'var(--rp-text-muted)' },
+                  { label: 'Failed', val: cs.bounced, color: '#183153' },
                 ].map(s => (
                   <div key={s.label} className="text-center w-16">
                     <p className="text-[15px] font-bold" style={{ color: s.color }}>{s.val}</p>
