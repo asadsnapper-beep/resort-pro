@@ -169,6 +169,55 @@ describe('asking who is due', () => {
   });
 });
 
+describe('an attempt that never left the building', () => {
+  it('does not use up the guest for the next 300 days', async () => {
+    // This is not hypothetical. The suppression only asked whether an
+    // EmailSend row existed, and a row is written whether or not the provider
+    // accepted it — so with RESEND_API_KEY unset, as it is in this suite and
+    // as it was in the QA environment, one run marked every guest FAILED and
+    // excluded all of them for most of a year having sent nothing.
+    const guest = await prisma.guest.create({
+      data: {
+        tenantId, firstName: 'Shireen', lastName: 'P',
+        email: `shireen-${run}@test.com`, dateOfBirth: birthdayToday(),
+      },
+    });
+    await prisma.emailSend.create({
+      data: {
+        tenantId, guestId: guest.id,
+        subject: '🎂 Happy Birthday Shireen!', status: 'FAILED',
+      },
+    });
+
+    const body = JSON.parse((await runDaily({ dryRun: true })).body).data;
+
+    expect(body.birthday.recipients.map((r: { id: string }) => r.id)).toContain(guest.id);
+
+    await prisma.guest.delete({ where: { id: guest.id } });
+  });
+
+  it('but one that did go out still suppresses', async () => {
+    const guest = await prisma.guest.create({
+      data: {
+        tenantId, firstName: 'Tahmid', lastName: 'P',
+        email: `tahmid-${run}@test.com`, dateOfBirth: birthdayToday(),
+      },
+    });
+    await prisma.emailSend.create({
+      data: {
+        tenantId, guestId: guest.id,
+        subject: '🎂 Happy Birthday Tahmid!', status: 'SENT',
+      },
+    });
+
+    const body = JSON.parse((await runDaily({ dryRun: true })).body).data;
+
+    expect(body.birthday.recipients.map((r: { id: string }) => r.id)).not.toContain(guest.id);
+
+    await prisma.guest.delete({ where: { id: guest.id } });
+  });
+});
+
 describe('then sending', () => {
   it('reaches exactly the guests the preview named', async () => {
     const previewed: string[] = JSON.parse((await runDaily({ dryRun: true })).body)
@@ -194,9 +243,14 @@ describe('then sending', () => {
     expect(rows).toBeGreaterThan(0);
   });
 
-  it('now reports nobody, because the send suppressed them', async () => {
+  it('and is still due, because email is disabled here so nothing arrived', async () => {
+    // This test used to assert the opposite — that the run had suppressed
+    // him. It passed for the wrong reason: the suppression counted any
+    // EmailSend row, and with no RESEND_API_KEY every row is FAILED. So the
+    // old behaviour was "attempted once, locked out for 300 days, received
+    // nothing", and the old test was a description of the bug.
     const body = JSON.parse((await runDaily({ dryRun: true })).body).data;
 
-    expect(body.birthday.found).toBe(0);
+    expect(body.birthday.recipients.map((r: { id: string }) => r.id)).toContain(birthdayGuestId);
   });
 });

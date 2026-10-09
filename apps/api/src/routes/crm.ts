@@ -286,6 +286,20 @@ async function recalcScore(tenantId: string, guestId: string) {
  * `dateOfBirth`, and an aggregate over `checkOut` — neither of which Prisma's
  * `where` can express. The consent clause is the SQL form of SUBSCRIBED_GUEST:
  * a guest with no consent row has not opted out.
+ *
+ * `status <> 'FAILED'` is the part that is easy to leave out and expensive to
+ * leave out. The suppression looked only at whether a row existed, and a row
+ * is written whether or not the email left the building — so an attempt made
+ * while RESEND_API_KEY was unset, or while Resend was down, excluded that
+ * guest for 300 days having sent them nothing. With email disabled that is
+ * every guest at once: one click and nobody gets a birthday email this year.
+ *
+ * The cost of the fix is retries. A birthday matches on one calendar day, so
+ * a permanently undeliverable address is attempted once a year as before. The
+ * anniversary window is 355–375 days wide, so a broken address is attempted
+ * on each of those days until one succeeds. Those attempts reach nobody — a
+ * success still suppresses the rest — so the price is log noise and provider
+ * calls, not mail to a guest.
  */
 type Recipient = { id: string; firstName: string; email: string };
 
@@ -306,6 +320,7 @@ function birthdayRecipients(tenantId: string, today: Date) {
         WHERE es."guestId" = g.id
           AND es."tenantId" = ${tenantId}
           AND es.subject ILIKE '%birthday%'
+          AND es.status <> 'FAILED'
           AND es."createdAt" > NOW() - INTERVAL '300 days'
       )
   `;
@@ -326,6 +341,7 @@ function anniversaryRecipients(tenantId: string) {
         WHERE es."guestId" = g.id
           AND es."tenantId" = ${tenantId}
           AND es.subject ILIKE '%anniversary%'
+          AND es.status <> 'FAILED'
           AND es."createdAt" > NOW() - INTERVAL '300 days'
       )
       AND NOT EXISTS (
