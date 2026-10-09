@@ -83,6 +83,18 @@ const TRIGGER_LABELS: Record<string, string> = {
 const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
 const labelCls = 'block text-[11.5px] font-medium text-[#64748b] mb-1.5';
 
+/**
+ * The reason the API gave, or a fallback.
+ *
+ * Worth a helper because the API now has reasons worth reading. The delete
+ * routes were taught to answer "this campaign is SENT and cannot be deleted —
+ * it is a record of emails that went out" instead of a cheerful lie, and the
+ * handlers here had no `catch`, so that sentence went nowhere at all: the
+ * owner confirmed the delete, nothing happened, and nothing said why.
+ */
+const apiMessage = (err: any, fallback: string): string =>
+  err?.response?.data?.error || fallback;
+
 function StatusPill({ status }: { status: string }) {
   const m = STATUS_META[status] ?? STATUS_META.DRAFT;
   return (
@@ -211,8 +223,12 @@ function ContactsTab({ token }: { token: string }) {
   useEffect(() => { setPage(1); }, [search, tierFilter]);
 
   const recalcScore = async (id: string) => {
-    await api.post(`/crm/contacts/${id}/recalc-score`, {}, { headers: { Authorization: `Bearer ${token}` } });
-    fetchGuests();
+    try {
+      await api.post(`/crm/contacts/${id}/recalc-score`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      fetchGuests();
+    } catch (err) {
+      alert(apiMessage(err, 'Could not recalculate that score. Try again.'));
+    }
   };
 
   return (
@@ -398,8 +414,14 @@ function CampaignsTab({ token }: { token: string }) {
 
   const deleteCampaign = async (id: string) => {
     if (!confirm('Delete this campaign?')) return;
-    await api.delete(`/crm/campaigns/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-    fetch();
+    try {
+      await api.delete(`/crm/campaigns/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      fetch();
+    } catch (err) {
+      // The API refuses to delete a campaign that has gone out, and explains
+      // why. Without this catch that explanation was never shown to anyone.
+      alert(apiMessage(err, 'Could not delete that campaign.'));
+    }
   };
 
   return (
@@ -502,7 +524,7 @@ function CampaignsTab({ token }: { token: string }) {
                     </button>
                   )}
                   {['DRAFT', 'SCHEDULED'].includes(c.status) && (
-                    <button onClick={() => deleteCampaign(c.id)}
+                    <button onClick={() => deleteCampaign(c.id)} aria-label="Delete campaign"
                       className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#fef2f2] text-[#94a3b8] dark:text-[#7f99ab]">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -527,6 +549,7 @@ function SequencesTab({ token }: { token: string }) {
   const [showSteps, setShowSteps] = useState<string | null>(null);
   const [form, setForm]     = useState({ name: '', trigger: 'BOOKING_CONFIRMED' });
   const [stepForm, setStepForm] = useState({ subject: '', html: '', delayDays: 0 });
+  const [stepError, setStepError] = useState('');
   const [saving, setSaving] = useState(false);
 
   const [failed, setFailed] = useState(false);
@@ -565,15 +588,30 @@ function SequencesTab({ token }: { token: string }) {
 
   const toggleStatus = async (seq: Sequence) => {
     const status = seq.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
-    await api.put(`/crm/sequences/${seq.id}`, { status }, { headers: { Authorization: `Bearer ${token}` } });
-    fetch();
+    try {
+      await api.put(`/crm/sequences/${seq.id}`, { status }, { headers: { Authorization: `Bearer ${token}` } });
+      fetch();
+    } catch (err) {
+      // The pill is never updated optimistically, so a failure leaves it
+      // reading ACTIVE — which is true. It just needs to say that the pause
+      // did not take, because "I paused it" is the one thing an owner must
+      // not be wrong about when the sequence keeps sending email.
+      alert(apiMessage(err, `Could not ${status === 'PAUSED' ? 'pause' : 'resume'} that sequence — it is still ${seq.status}.`));
+    }
   };
 
   const addStep = async (seqId: string) => {
-    if (!stepForm.subject || !stepForm.html) return;
-    await api.post(`/crm/sequences/${seqId}/steps`, stepForm, { headers: { Authorization: `Bearer ${token}` } });
-    setStepForm({ subject: '', html: '', delayDays: 0 });
-    fetch();
+    if (!stepForm.subject || !stepForm.html) { setStepError('Subject and body are both required'); return; }
+    setStepError('');
+    try {
+      await api.post(`/crm/sequences/${seqId}/steps`, stepForm, { headers: { Authorization: `Bearer ${token}` } });
+      setStepForm({ subject: '', html: '', delayDays: 0 });
+      fetch();
+    } catch (err) {
+      // "A sequence can be created but a step cannot be added" was a Critical
+      // in the CRM QA. It presented as the Add button doing nothing.
+      setStepError(apiMessage(err, 'Could not add that step. Try again.'));
+    }
   };
 
   return (
@@ -671,7 +709,10 @@ function SequencesTab({ token }: { token: string }) {
                       style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
                       {seq.status === 'ACTIVE' ? <><Pause className="h-3 w-3" /> Pause</> : <><Play className="h-3 w-3" /> Resume</>}
                     </button>
-                    <button onClick={() => setShowSteps(showSteps === seq.id ? null : seq.id)}
+                    {/* One stepError for the tab is fine — only one panel is
+                        ever open — but it must not follow you to the next
+                        sequence. */}
+                    <button onClick={() => { setStepError(''); setShowSteps(showSteps === seq.id ? null : seq.id); }}
                       className="flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-[12px] font-medium hover:opacity-90"
                       style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
                       <ChevronDown className={`h-3 w-3 transition-transform ${showSteps === seq.id ? 'rotate-180' : ''}`} />
@@ -715,6 +756,9 @@ function SequencesTab({ token }: { token: string }) {
                     <textarea value={stepForm.html} onChange={e => setStepForm(p => ({ ...p, html: e.target.value }))}
                       rows={3} placeholder="Email body (HTML or text, use {{guestName}})"
                       className={inputCls + ' font-mono resize-none'} />
+                    {stepError && (
+                      <p className="rounded-rp-panel bg-rp-red-bg px-3 py-2 text-rp-meta text-rp-danger">{stepError}</p>
+                    )}
                     <button onClick={() => addStep(seq.id)}
                       className="flex items-center gap-1.5 rounded-[8px] px-4 py-2 text-[12.5px] font-medium hover:opacity-90"
                       style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
@@ -775,8 +819,12 @@ function TemplatesTab({ token }: { token: string }) {
 
   const deleteTemplate = async (id: string) => {
     if (!confirm('Delete this template?')) return;
-    await api.delete(`/crm/templates/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-    fetch();
+    try {
+      await api.delete(`/crm/templates/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      fetch();
+    } catch (err) {
+      alert(apiMessage(err, 'Could not delete that template.'));
+    }
   };
 
   return (
@@ -857,7 +905,7 @@ function TemplatesTab({ token }: { token: string }) {
                   style={{ background: 'var(--rp-teal-bg)' }}>
                   <Mail className="h-5 w-5" style={{ color: '#183153' }} />
                 </div>
-                <button onClick={() => deleteTemplate(t.id)}
+                <button onClick={() => deleteTemplate(t.id)} aria-label="Delete template"
                   className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#fef2f2] text-[#94a3b8] dark:text-[#7f99ab]">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
