@@ -32,6 +32,12 @@ interface Sequence {
   steps: { id: string; subject: string; delayDays: number; stepOrder: number }[];
   _count: { enrollments: number };
 }
+interface AutomationRecipient { id: string; firstName: string; email: string }
+interface AutomationPreview {
+  dryRun: true;
+  birthday:    { found: number; recipients: AutomationRecipient[] };
+  anniversary: { found: number; recipients: AutomationRecipient[] };
+}
 interface Analytics {
   totalContacts: number; subscribed: number;
   tierCounts: { tier: string; _count: { tier: number } }[];
@@ -945,6 +951,73 @@ function TemplatesTab({ token }: { token: string }) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
+   DAILY AUTOMATION — WHO WOULD GET THIS
+
+   Named addresses, not a count. "3 guests" is not something anybody can check,
+   and this is the screen where a wrong audience becomes real email: every send
+   also suppresses that guest for 300 days, so a mistaken run cancels the one
+   that should have gone (CRM QA 2026-10-07, finding 011).
+══════════════════════════════════════════════════════════════════════════════ */
+function AutomationPreviewPanel({ preview, busy, onSend, onCancel }: {
+  preview: AutomationPreview;
+  busy: boolean;
+  onSend: () => void;
+  onCancel: () => void;
+}) {
+  const total = preview.birthday.found + preview.anniversary.found;
+
+  const group = (label: string, recipients: AutomationRecipient[]) => (
+    <div key={label}>
+      <p className="text-rp-label font-semibold uppercase tracking-[0.08em] text-rp-muted">
+        {label} — {recipients.length}
+      </p>
+      {recipients.length === 0 ? (
+        <p className="mt-1 text-rp-meta text-rp-faint">Nobody today.</p>
+      ) : (
+        <ul className="mt-1.5 space-y-1">
+          {recipients.map(r => (
+            <li key={r.id} className="text-rp-meta text-rp-text">
+              {r.firstName} <span className="text-rp-muted">&lt;{r.email}&gt;</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="space-y-4 rounded-rp-card border border-rp-border bg-rp-surface p-5 shadow-rp-card">
+      <div>
+        <p className="text-rp-body font-semibold text-rp-text">
+          {total === 0 ? 'Nothing to send today' : `This will email ${total} ${total === 1 ? 'guest' : 'guests'}`}
+        </p>
+        <p className="mt-0.5 text-rp-meta text-rp-muted">
+          Nothing has been sent yet. Email cannot be recalled, so check the list first.
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        {group('🎂 Birthday', preview.birthday.recipients)}
+        {group('🏖️ Anniversary', preview.anniversary.recipients)}
+      </div>
+
+      <div className="flex gap-3 border-t border-rp-border pt-3">
+        <button onClick={onSend} disabled={busy || total === 0}
+          className="flex items-center gap-2 rounded-rp-ctrl bg-rp-btn-accent px-4 py-2 text-rp-body font-semibold text-rp-btn-accent-text hover:opacity-90 disabled:opacity-60">
+          {busy
+            ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending…</>
+            : total === 0 ? 'Nothing to send' : `Send to ${total}`}
+        </button>
+        <button onClick={onCancel} disabled={busy}
+          className="rounded-rp-ctrl border border-rp-border-md px-4 py-2 text-rp-body font-medium text-rp-subtle hover:opacity-80 disabled:opacity-60">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
    ANALYTICS TAB
 ══════════════════════════════════════════════════════════════════════════════ */
 function AnalyticsTab({ token }: { token: string }) {
@@ -952,6 +1025,7 @@ function AnalyticsTab({ token }: { token: string }) {
   const [loading, setLoading]       = useState(true);
   const [automating, setAutomating] = useState(false);
   const [autoResult, setAutoResult] = useState<{ birthday: { found: number; sent: number }; anniversary: { found: number; sent: number } } | null>(null);
+  const [preview, setPreview] = useState<AutomationPreview | null>(null);
 
   const fetch = useCallback(async () => {
     setLoading(true);
@@ -966,12 +1040,35 @@ function AnalyticsTab({ token }: { token: string }) {
 
   useEffect(() => { fetch(); }, [fetch]);
 
+  /**
+   * Step one of two. "Run Now" used to send on the click.
+   *
+   * Nothing about that was recoverable: the email is gone, and every send
+   * writes a row that suppresses the same guest for 300 days, so a mistaken
+   * run also cancels the real one (CRM QA 2026-10-07, finding 011). The API
+   * answers this from the same queries the send uses, so the names below are
+   * the names that would receive email.
+   */
+  const previewAutomation = async () => {
+    setAutomating(true); setAutoResult(null); setPreview(null);
+    try {
+      const res = await api.post('/crm/automation/run-daily', { dryRun: true }, { headers: { Authorization: `Bearer ${token}` } });
+      setPreview(res.data.data);
+    } catch (err) {
+      alert(apiMessage(err, 'Could not work out who this would go to. Nothing was sent.'));
+    }
+    setAutomating(false);
+  };
+
   const runAutomation = async () => {
-    setAutomating(true); setAutoResult(null);
+    setAutomating(true);
     try {
       const res = await api.post('/crm/automation/run-daily', {}, { headers: { Authorization: `Bearer ${token}` } });
       setAutoResult(res.data.data);
-    } catch { alert('Failed to run automation. Check server logs.'); }
+      setPreview(null);
+    } catch (err) {
+      alert(apiMessage(err, 'Failed to run automation. Check server logs.'));
+    }
     setAutomating(false);
   };
 
@@ -994,7 +1091,7 @@ function AnalyticsTab({ token }: { token: string }) {
           </p>
           <p className="text-[12.5px] mt-0.5 text-[#475569] dark:text-[#9db4c4]">
             Sends birthday greetings (🎂) and resort anniversary emails (🏖️) to qualifying guests.
-            Run daily via cron, or manually here for testing.
+            This runs on its own every morning — use this to see who is due, and to send early.
           </p>
           {autoResult && (
             <div className="mt-3 flex gap-4 text-[12.5px]">
@@ -1003,12 +1100,21 @@ function AnalyticsTab({ token }: { token: string }) {
             </div>
           )}
         </div>
-        <button onClick={runAutomation} disabled={automating}
-          className="flex shrink-0 items-center gap-2 rounded-[9px] px-4 py-2.5 text-[13px] font-semibold hover:opacity-90 disabled:opacity-60"
-          style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
-          {automating ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Running…</> : '▶ Run Now'}
-        </button>
+        {!preview && (
+          <button onClick={previewAutomation} disabled={automating} aria-label="See who is due an email"
+            className="flex shrink-0 items-center gap-2 rounded-rp-ctrl bg-rp-btn-accent px-4 py-2.5 text-rp-body font-semibold text-rp-btn-accent-text hover:opacity-90 disabled:opacity-60">
+            {automating ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking…</> : 'See who is due'}
+          </button>
+        )}
       </div>
+
+      {/* The recipient list, before anything is sent. */}
+      {preview && <AutomationPreviewPanel
+        preview={preview}
+        busy={automating}
+        onSend={runAutomation}
+        onCancel={() => setPreview(null)}
+      />}
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

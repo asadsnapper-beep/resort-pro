@@ -268,6 +268,77 @@ async function recalcScore(tenantId: string, guestId: string) {
   });
 }
 
+// ─── Who the daily automation would write to ─────────────────────────────────
+/**
+ * The two audience queries, lifted out of the send loop.
+ *
+ * "Run Now" sent birthday and anniversary email to real guests the instant it
+ * was clicked, with no recipient list and no confirmation — and since every
+ * send writes an EmailSend row that suppresses the next one for 300 days,
+ * a mistaken click is not undoable (CRM QA 2026-10-07, finding 011).
+ *
+ * The point of extracting them is that the preview and the send now run the
+ * same SQL. A preview assembled from a second, similar-looking query would be
+ * a new way to be wrong about who gets email, which is the problem rather than
+ * the fix.
+ *
+ * Raw SQL because both match on parts of a date — the month and day of
+ * `dateOfBirth`, and an aggregate over `checkOut` — neither of which Prisma's
+ * `where` can express. The consent clause is the SQL form of SUBSCRIBED_GUEST:
+ * a guest with no consent row has not opted out.
+ */
+type Recipient = { id: string; firstName: string; email: string };
+
+function birthdayRecipients(tenantId: string, today: Date) {
+  const month = today.getMonth() + 1; // 1-12
+  const day = today.getDate();
+  return prisma.$queryRaw<Recipient[]>`
+    SELECT g.id, g."firstName", g.email
+    FROM guests g
+    LEFT JOIN email_consents c ON c."guestId" = g.id
+    WHERE g."tenantId" = ${tenantId}
+      AND g."dateOfBirth" IS NOT NULL
+      AND EXTRACT(MONTH FROM g."dateOfBirth") = ${month}
+      AND EXTRACT(DAY   FROM g."dateOfBirth") = ${day}
+      AND (c."subscribed" IS NULL OR c."subscribed" = true)
+      AND NOT EXISTS (
+        SELECT 1 FROM email_sends es
+        WHERE es."guestId" = g.id
+          AND es."tenantId" = ${tenantId}
+          AND es.subject ILIKE '%birthday%'
+          AND es."createdAt" > NOW() - INTERVAL '300 days'
+      )
+  `;
+}
+
+/** Guests whose first stay ended ~a year ago and who have not been back. */
+function anniversaryRecipients(tenantId: string) {
+  return prisma.$queryRaw<(Recipient & { firstStay: Date })[]>`
+    SELECT DISTINCT ON (g.id)
+      g.id, g."firstName", g.email, MIN(b."checkOut") AS "firstStay"
+    FROM guests g
+    JOIN bookings b ON b."guestId" = g.id AND b.status = 'CHECKED_OUT'
+    LEFT JOIN email_consents c ON c."guestId" = g.id
+    WHERE g."tenantId" = ${tenantId}
+      AND (c."subscribed" IS NULL OR c."subscribed" = true)
+      AND NOT EXISTS (
+        SELECT 1 FROM email_sends es
+        WHERE es."guestId" = g.id
+          AND es."tenantId" = ${tenantId}
+          AND es.subject ILIKE '%anniversary%'
+          AND es."createdAt" > NOW() - INTERVAL '300 days'
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM bookings b2
+        WHERE b2."guestId" = g.id
+          AND b2.status = 'CHECKED_OUT'
+          AND b2."checkOut" > NOW() - INTERVAL '60 days'
+      )
+    GROUP BY g.id, g."firstName", g.email
+    HAVING MIN(b."checkOut") BETWEEN NOW() - INTERVAL '375 days' AND NOW() - INTERVAL '355 days'
+  `;
+}
+
 // ─── Routes ──────────────────────────────────────────────────────────────────
 export async function crmRoutes(app: FastifyInstance) {
   const pre = requireRole('OWNER', 'MANAGER', 'MARKETER');
@@ -615,15 +686,38 @@ export async function crmRoutes(app: FastifyInstance) {
    * Sends birthday emails to guests celebrating today, and resort-anniversary
    * emails to guests who stayed exactly ~1 year ago and haven't returned.
    *
-   * Call this from a cron job (e.g. every day at 08:00 local time).
-   * Also callable manually from the CRM dashboard for testing.
+   * `{ dryRun: true }` answers who would receive what and sends nothing. The
+   * dashboard always asks for that first and will not send until somebody has
+   * seen the list; both paths run the same audience queries, so the list is
+   * not a second opinion.
+   *
+   * Sending remains the default on purpose. The in-app cron already calls
+   * runDailyTriggers() at 08:00, but plan/guest-crm.md documents an external
+   * `curl -X POST .../automation/run-daily` cron, and quietly turning that
+   * into a no-op would stop somebody's birthday email without a word.
    */
   app.post('/automation/run-daily', { preHandler: pre }, async (request) => {
     const { tenantId } = request.user as JwtPayload;
+    const dryRun = (request.body as { dryRun?: boolean } | undefined)?.dryRun === true;
 
-    const today     = new Date();
-    const todayMonth = today.getMonth() + 1; // 1-12
-    const todayDay   = today.getDate();
+    const today = new Date();
+
+    if (dryRun) {
+      const [birthday, anniversary] = await Promise.all([
+        birthdayRecipients(tenantId, today),
+        anniversaryRecipients(tenantId),
+      ]);
+      // Names and addresses, because "3 guests" is not something anybody can
+      // check. No EmailSend rows are written, so this does not consume the
+      // 300-day suppression that a real run would.
+      return ok({
+        dryRun: true,
+        birthday: { found: birthday.length, recipients: birthday },
+        anniversary: { found: anniversary.length, recipients: anniversary },
+      }, birthday.length + anniversary.length === 0
+        ? 'Nothing to send today.'
+        : `${birthday.length} birthday and ${anniversary.length} anniversary emails would go out.`);
+    }
 
     // Get tenant branding for email wrapper
     const [tenant, wc] = await Promise.all([
@@ -642,26 +736,8 @@ export async function crmRoutes(app: FastifyInstance) {
       include: { steps: { orderBy: { stepOrder: 'asc' }, take: 1 } },
     });
 
-    // Find guests whose birthday is TODAY, subscribed, not already emailed this year
-    const birthdayGuests = await prisma.$queryRaw<
-      { id: string; firstName: string; email: string }[]
-    >`
-      SELECT g.id, g."firstName", g.email
-      FROM guests g
-      LEFT JOIN email_consents c ON c."guestId" = g.id
-      WHERE g."tenantId" = ${tenantId}
-        AND g."dateOfBirth" IS NOT NULL
-        AND EXTRACT(MONTH FROM g."dateOfBirth") = ${todayMonth}
-        AND EXTRACT(DAY   FROM g."dateOfBirth") = ${todayDay}
-        AND (c."subscribed" IS NULL OR c."subscribed" = true)
-        AND NOT EXISTS (
-          SELECT 1 FROM email_sends es
-          WHERE es."guestId" = g.id
-            AND es."tenantId" = ${tenantId}
-            AND es.subject ILIKE '%birthday%'
-            AND es."createdAt" > NOW() - INTERVAL '300 days'
-        )
-    `;
+    // The same query the dry run answered from.
+    const birthdayGuests = await birthdayRecipients(tenantId, today);
 
     let birthdaySent = 0;
     for (const guest of birthdayGuests) {
@@ -715,32 +791,7 @@ export async function crmRoutes(app: FastifyInstance) {
       include: { steps: { orderBy: { stepOrder: 'asc' }, take: 1 } },
     });
 
-    const anniversaryGuests = await prisma.$queryRaw<
-      { id: string; firstName: string; email: string; firstStay: Date }[]
-    >`
-      SELECT DISTINCT ON (g.id)
-        g.id, g."firstName", g.email, MIN(b."checkOut") AS "firstStay"
-      FROM guests g
-      JOIN bookings b ON b."guestId" = g.id AND b.status = 'CHECKED_OUT'
-      LEFT JOIN email_consents c ON c."guestId" = g.id
-      WHERE g."tenantId" = ${tenantId}
-        AND (c."subscribed" IS NULL OR c."subscribed" = true)
-        AND NOT EXISTS (
-          SELECT 1 FROM email_sends es
-          WHERE es."guestId" = g.id
-            AND es."tenantId" = ${tenantId}
-            AND es.subject ILIKE '%anniversary%'
-            AND es."createdAt" > NOW() - INTERVAL '300 days'
-        )
-        AND NOT EXISTS (
-          SELECT 1 FROM bookings b2
-          WHERE b2."guestId" = g.id
-            AND b2.status = 'CHECKED_OUT'
-            AND b2."checkOut" > NOW() - INTERVAL '60 days'
-        )
-      GROUP BY g.id, g."firstName", g.email
-      HAVING MIN(b."checkOut") BETWEEN NOW() - INTERVAL '375 days' AND NOW() - INTERVAL '355 days'
-    `;
+    const anniversaryGuests = await anniversaryRecipients(tenantId);
 
     let anniversarySent = 0;
     for (const guest of anniversaryGuests) {

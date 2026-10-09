@@ -291,10 +291,28 @@ AND NOT sent anniversary email in last 300 days
 ```
 
 ### Cron Setup
+
+**You do not need this.** `startAutomationEngine()` in
+`apps/api/src/services/automation.ts` already runs the daily triggers at 08:00
+inside the API process. Adding the cron below on top of it means two runs a
+day — the second is mostly absorbed by the 300-day per-guest suppression, but
+it is not something to set up on purpose.
+
+Kept here because it may already be configured somewhere: the route still
+sends by default rather than previewing, so an existing cron keeps working.
+
 ```bash
-# Run every morning at 08:00
+# Redundant with the in-app scheduler — see above.
 0 8 * * * curl -X POST https://api.yourresort.com/crm/automation/run-daily \
   -H "Authorization: Bearer $STAFF_JWT_TOKEN"
+```
+
+To see who is due without sending anything:
+
+```bash
+curl -X POST https://api.yourresort.com/crm/automation/run-daily \
+  -H "Authorization: Bearer $STAFF_JWT_TOKEN" \
+  -H "Content-Type: application/json" -d '{"dryRun":true}'
 ```
 
 ---

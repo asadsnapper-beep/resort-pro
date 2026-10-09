@@ -3,10 +3,10 @@
   "pages": 48,
   "counts": {
     "hardcoded-hex": 2778,
-    "inline-style": 1465,
+    "inline-style": 1464,
     "handwritten-page-header": 1,
-    "arbitrary-font-size": 1422,
-    "arbitrary-radius": 866,
+    "arbitrary-font-size": 1421,
+    "arbitrary-radius": 865,
     "inline-card-shadow": 108
   }
 }
