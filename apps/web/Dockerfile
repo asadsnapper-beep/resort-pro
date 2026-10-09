@@ -3,8 +3,14 @@
 # Build context: repo ROOT  (docker build -f apps/web/Dockerfile .)
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Base image comes from AWS's public ECR mirror of the Docker official
+# images, not from Docker Hub directly. Docker Hub's unauthenticated pull limit
+# (429 Too Many Requests on `node:20-alpine`) failed every image build on
+# shared GitHub runners, and an immediate re-run failed the same way — it is
+# not a transient blip. public.ecr.aws/docker/library/* carries the same
+# images; the alternative is a Docker Hub login in CI, which needs a token.
 # ── Stage 1: base ─────────────────────────────────────────────────────────────
-FROM node:20-alpine AS base
+FROM public.ecr.aws/docker/library/node:20-alpine AS base
 RUN apk add --no-cache libc6-compat python3 make g++
 # Install pnpm directly via npm — more reliable than corepack in CI/Docker
 RUN npm install -g pnpm@9
@@ -37,7 +43,7 @@ ENV NEXT_PUBLIC_CLARITY_ID=$NEXT_PUBLIC_CLARITY_ID
 RUN pnpm --filter @resort-pro/web build
 
 # ── Stage 3: runtime ──────────────────────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM public.ecr.aws/docker/library/node:20-alpine AS runner
 RUN apk add --no-cache wget
 WORKDIR /app
 ENV NODE_ENV=production

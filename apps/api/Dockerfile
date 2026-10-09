@@ -3,8 +3,14 @@
 # Build context: repo ROOT  (docker build -f apps/api/Dockerfile .)
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Base image comes from AWS's public ECR mirror of the Docker official
+# images, not from Docker Hub directly. Docker Hub's unauthenticated pull limit
+# (429 Too Many Requests on `node:20-alpine`) failed every image build on
+# shared GitHub runners, and an immediate re-run failed the same way — it is
+# not a transient blip. public.ecr.aws/docker/library/* carries the same
+# images; the alternative is a Docker Hub login in CI, which needs a token.
 # ── Stage 1: base ─────────────────────────────────────────────────────────────
-FROM node:20-alpine AS base
+FROM public.ecr.aws/docker/library/node:20-alpine AS base
 RUN apk add --no-cache libc6-compat openssl python3 make g++
 RUN npm install -g pnpm@9
 
@@ -28,7 +34,7 @@ RUN cd packages/database && npx prisma generate --schema=prisma/schema.prisma
 RUN pnpm --filter @resort-pro/api build
 
 # ── Stage 3: runtime ──────────────────────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM public.ecr.aws/docker/library/node:20-alpine AS runner
 # postgresql-client supplies pg_dump/pg_restore for the backup sidecar, which
 # runs this same image. Baking them in rather than bind-mounting scripts from
 # the host: the staging deploy hands Portainer the compose file as a *string*,

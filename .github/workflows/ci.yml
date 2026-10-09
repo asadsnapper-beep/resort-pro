@@ -76,7 +76,11 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15-alpine
+        # Docker Hub's unauthenticated pull limit (429) was failing these
+        # jobs at "Initialize containers", before a single test ran. AWS's
+        # public ECR mirrors the Docker official images and does not apply
+        # that limit. See the note in apps/api/Dockerfile.
+        image: public.ecr.aws/docker/library/postgres:15-alpine
         env:
           POSTGRES_USER: resortpro
           POSTGRES_PASSWORD: resortpro
@@ -133,7 +137,11 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15-alpine
+        # Docker Hub's unauthenticated pull limit (429) was failing these
+        # jobs at "Initialize containers", before a single test ran. AWS's
+        # public ECR mirrors the Docker official images and does not apply
+        # that limit. See the note in apps/api/Dockerfile.
+        image: public.ecr.aws/docker/library/postgres:15-alpine
         env:
           POSTGRES_USER: resortpro
           POSTGRES_PASSWORD: resortpro
@@ -200,7 +208,11 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15-alpine
+        # Docker Hub's unauthenticated pull limit (429) was failing these
+        # jobs at "Initialize containers", before a single test ran. AWS's
+        # public ECR mirrors the Docker official images and does not apply
+        # that limit. See the note in apps/api/Dockerfile.
+        image: public.ecr.aws/docker/library/postgres:15-alpine
         env:
           POSTGRES_USER: resortpro
           POSTGRES_PASSWORD: resortpro
