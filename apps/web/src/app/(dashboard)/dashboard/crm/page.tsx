@@ -5,7 +5,7 @@ import {
   Users, Mail, Megaphone, GitBranch, BarChart3,
   Plus, Search, Send, Trash2, Play, Pause,
   X, ChevronDown, CheckCircle, Crown, Medal, Award,
-  TrendingUp, ArrowRight, RefreshCw, Loader2,
+  TrendingUp, ArrowRight, RefreshCw, Loader2, AlertTriangle,
 } from 'lucide-react';
 import { PageShell, PageHeader } from '@/components/patterns';
 import { useAuthStore } from '@/store/auth';
@@ -136,6 +136,42 @@ export default function CRMPage() {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
+   LOAD FAILURE
+
+   Every tab fetched its list inside a try/catch whose catch body was the word
+   "ignore", so a 500 from the API drew the same "No campaigns yet" as a resort
+   that genuinely has none (CRM QA 2026-10-07, finding 012). Templates and
+   Analytics were both returning 500 during that QA run — which is exactly why
+   an owner would conclude the CRM was empty rather than broken, and never
+   report it.
+
+   A retry button, not just a message: most of what breaks here is transient,
+   and a reload of the whole dashboard to re-fetch one tab is a poor trade.
+══════════════════════════════════════════════════════════════════════════════ */
+function LoadFailed({ what, onRetry, nested = false, className = '' }: {
+  what: string;
+  onRetry: () => void;
+  /** Already inside a card — don't draw a second border around this one. */
+  nested?: boolean;
+  className?: string;
+}) {
+  const frame = nested ? '' : 'rounded-rp-card border border-rp-border bg-rp-surface shadow-rp-card';
+  return (
+    <div className={`flex flex-col items-center justify-center gap-3 py-16 text-center ${frame} ${className}`}>
+      <AlertTriangle className="h-8 w-8 text-rp-danger" />
+      <div>
+        <p className="text-rp-body font-semibold text-rp-text">Could not load {what}</p>
+        <p className="mt-1 text-rp-meta text-rp-muted">Something went wrong on our side — this is not an empty list.</p>
+      </div>
+      <button onClick={onRetry}
+        className="flex items-center gap-2 rounded-rp-btn bg-rp-btn-accent px-4 py-2 text-rp-body font-medium text-rp-btn-accent-text hover:opacity-90">
+        <RefreshCw className="h-4 w-4" /> Try again
+      </button>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
    CONTACTS TAB
 ══════════════════════════════════════════════════════════════════════════════ */
 function ContactsTab({ token }: { token: string }) {
@@ -149,9 +185,11 @@ function ContactsTab({ token }: { token: string }) {
   // from here at all (CRM QA finding 015).
   const [page, setPage]       = useState(1);
   const [pages, setPages]     = useState(1);
+  const [failed, setFailed]   = useState(false);
 
   const fetchGuests = useCallback(async () => {
     setLoading(true);
+    setFailed(false);
     try {
       const params = new URLSearchParams({ limit: '20', page: String(page) });
       if (search) params.set('search', search);
@@ -160,7 +198,9 @@ function ContactsTab({ token }: { token: string }) {
       setGuests(res.data.data.guests);
       setTotal(res.data.data.total);
       setPages(Math.max(1, res.data.data.pages ?? 1));
-    } catch { /* ignore */ }
+    } catch {
+      setFailed(true);
+    }
     setLoading(false);
   }, [token, search, tierFilter, page]);
 
@@ -194,14 +234,19 @@ function ContactsTab({ token }: { token: string }) {
         </button>
       </div>
 
-      <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">
-        <span className="font-semibold text-[#183153] dark:text-[#f8fafc]">{total}</span> total contacts
-      </p>
+      {/* A failed load used to leave this reading "0 total contacts". */}
+      {!failed && (
+        <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">
+          <span className="font-semibold text-[#183153] dark:text-[#f8fafc]">{total}</span> total contacts
+        </p>
+      )}
 
       <div className="rounded-[14px] border bg-white overflow-hidden"
         style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
         {loading ? (
           <div className="py-16 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Loading contacts…</div>
+        ) : failed ? (
+          <LoadFailed what="contacts" onRetry={fetchGuests} nested />
         ) : guests.length === 0 ? (
           <div className="py-16 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">No contacts found</div>
         ) : (
@@ -278,7 +323,7 @@ function ContactsTab({ token }: { token: string }) {
           </div>
         )}
 
-      {pages > 1 && (
+      {pages > 1 && !failed && (
         <div className="flex items-center justify-between gap-3">
           <span className="text-rp-body text-rp-muted">
             Page {page} of {pages}
@@ -314,12 +359,17 @@ function CampaignsTab({ token }: { token: string }) {
   const [saving, setSaving] = useState(false);
   const [error, setError]  = useState('');
 
+  const [failed, setFailed] = useState(false);
+
   const fetch = useCallback(async () => {
     setLoading(true);
+    setFailed(false);
     try {
       const res = await api.get('/crm/campaigns', { headers: { Authorization: `Bearer ${token}` } });
       setCampaigns(res.data.data);
-    } catch { /* ignore */ }
+    } catch {
+      setFailed(true);
+    }
     setLoading(false);
   }, [token]);
 
@@ -407,6 +457,8 @@ function CampaignsTab({ token }: { token: string }) {
       <div className="space-y-3">
         {loading ? (
           <div className="py-12 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Loading campaigns…</div>
+        ) : failed ? (
+          <LoadFailed what="campaigns" onRetry={fetch} />
         ) : campaigns.length === 0 ? (
           <div className="py-16 text-center rounded-[14px] border bg-white"
             style={{ borderColor: 'var(--rp-border)' }}>
@@ -477,12 +529,17 @@ function SequencesTab({ token }: { token: string }) {
   const [stepForm, setStepForm] = useState({ subject: '', html: '', delayDays: 0 });
   const [saving, setSaving] = useState(false);
 
+  const [failed, setFailed] = useState(false);
+
   const fetch = useCallback(async () => {
     setLoading(true);
+    setFailed(false);
     try {
       const res = await api.get('/crm/sequences', { headers: { Authorization: `Bearer ${token}` } });
       setSequences(res.data.data);
-    } catch { /* ignore */ }
+    } catch {
+      setFailed(true);
+    }
     setLoading(false);
   }, [token]);
 
@@ -574,6 +631,8 @@ function SequencesTab({ token }: { token: string }) {
       <div className="space-y-3">
         {loading ? (
           <div className="py-12 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Loading sequences…</div>
+        ) : failed ? (
+          <LoadFailed what="sequences" onRetry={fetch} />
         ) : sequences.length === 0 ? (
           <div className="py-16 text-center rounded-[14px] border bg-white" style={{ borderColor: 'var(--rp-border)' }}>
             <GitBranch className="h-10 w-10 mx-auto mb-3 text-[#94a3b8] dark:text-[#7f99ab]" />
@@ -682,24 +741,35 @@ function TemplatesTab({ token }: { token: string }) {
   const [form, setForm]   = useState({ name: '', subject: '', html: '', preheader: '' });
   const [saving, setSaving] = useState(false);
 
+  const [failed, setFailed] = useState(false);
+  const [error, setError]   = useState('');
+
   const fetch = useCallback(async () => {
     setLoading(true);
+    setFailed(false);
     try {
       const res = await api.get('/crm/templates', { headers: { Authorization: `Bearer ${token}` } });
       setTemplates(res.data.data);
-    } catch { /* ignore */ }
+    } catch {
+      setFailed(true);
+    }
     setLoading(false);
   }, [token]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
   const createTemplate = async () => {
-    if (!form.name || !form.subject || !form.html) return;
+    if (!form.name || !form.subject || !form.html) { setError('All fields required'); return; }
     setSaving(true);
+    setError('');
     try {
       await api.post('/crm/templates', form, { headers: { Authorization: `Bearer ${token}` } });
       setShowNew(false); setForm({ name: '', subject: '', html: '', preheader: '' }); fetch();
-    } catch { /* ignore */ }
+    } catch (err: any) {
+      // Silently swallowed before: the form stayed open with the text still in
+      // it and nothing said why, so the obvious read was "the button is dead".
+      setError(err?.response?.data?.error || 'That did not save. Try again.');
+    }
     setSaving(false);
   };
 
@@ -750,6 +820,9 @@ function TemplatesTab({ token }: { token: string }) {
               rows={8} placeholder="<h2>Hi {{guestName}},</h2>"
               className={inputCls + ' font-mono resize-none'} />
           </div>
+          {error && (
+            <p className="rounded-rp-card bg-rp-red-bg px-3 py-2 text-rp-body text-rp-danger">{error}</p>
+          )}
           <div className="flex gap-3 pt-2" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
             <button onClick={createTemplate} disabled={saving}
               className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium disabled:opacity-60 hover:opacity-90"
@@ -768,6 +841,8 @@ function TemplatesTab({ token }: { token: string }) {
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         {loading ? (
           <div className="col-span-3 py-12 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Loading templates…</div>
+        ) : failed ? (
+          <LoadFailed what="templates" onRetry={fetch} className="col-span-3" />
         ) : templates.length === 0 ? (
           <div className="col-span-3 py-16 text-center rounded-[14px] border bg-white" style={{ borderColor: 'var(--rp-border)' }}>
             <Mail className="h-10 w-10 mx-auto mb-3 text-[#94a3b8] dark:text-[#7f99ab]" />
@@ -807,11 +882,18 @@ function AnalyticsTab({ token }: { token: string }) {
   const [automating, setAutomating] = useState(false);
   const [autoResult, setAutoResult] = useState<{ birthday: { found: number; sent: number }; anniversary: { found: number; sent: number } } | null>(null);
 
-  useEffect(() => {
-    api.get('/crm/analytics', { headers: { Authorization: `Bearer ${token}` } })
-      .then(res => { setData(res.data.data); setLoading(false); })
-      .catch(() => setLoading(false));
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/crm/analytics', { headers: { Authorization: `Bearer ${token}` } });
+      setData(res.data.data);
+    } catch {
+      setData(null);
+    }
+    setLoading(false);
   }, [token]);
+
+  useEffect(() => { fetch(); }, [fetch]);
 
   const runAutomation = async () => {
     setAutomating(true); setAutoResult(null);
@@ -823,7 +905,7 @@ function AnalyticsTab({ token }: { token: string }) {
   };
 
   if (loading) return <div className="py-16 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Loading analytics…</div>;
-  if (!data)   return <div className="py-16 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Failed to load analytics</div>;
+  if (!data)   return <LoadFailed what="analytics" onRetry={fetch} />;
 
   const totalSent = data.campaignStats.reduce((s, c) => s + c.sent, 0);
   const openRate  = data.campaignStats.reduce((s, c) => s + c.opened, 0);
