@@ -8,6 +8,10 @@ on:
 env:
   REGISTRY: ghcr.io
   OWNER: asadsnapper-beep
+  # Lifted to env because the `secrets` context is not available in a step's
+  # `if`, only in `with`/`env`. `env` is, so the login step can skip itself
+  # when the secret is absent.
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
 
 concurrency:
   group: deploy-staging
@@ -44,7 +48,7 @@ jobs:
       # is not on public.ecr.aws or ghcr.io, so the mirror trick used for the
       # base images is not available here.
       - name: Log in to Docker Hub
-        if: ${{ secrets.DOCKERHUB_USERNAME != '' }}
+        if: env.DOCKERHUB_USERNAME != ''
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
