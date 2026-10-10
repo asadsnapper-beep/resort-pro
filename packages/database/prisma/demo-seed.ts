@@ -44,6 +44,26 @@ function daysFromNow(n: number): Date {
   d.setHours(12, 0, 0, 0);
   return d;
 }
+/**
+ * A birthday, as month/day in a given year.
+ *
+ * `bornToday` is relative to seed time on purpose, the same way the seed's
+ * bookings are. Without at least one guest due today, the CRM's Daily
+ * Automation panel reads "Nothing to send today" on every day of the year and
+ * the feature looks broken — which is what staging showed: eighteen guests,
+ * not one `dateOfBirth` between them (CRM QA finding 011's neighbourhood).
+ *
+ * This is seed data chosen to exercise a real feature, not a claim about
+ * something that happened — unlike the 87 opens and 34 clicks this file used
+ * to assert for tracking that does not exist.
+ */
+function born(year: number, month: number, day: number): Date {
+  return new Date(Date.UTC(year, month - 1, day, 12));
+}
+function bornToday(year: number): Date {
+  const now = new Date();
+  return new Date(Date.UTC(year, now.getMonth(), now.getDate(), 12));
+}
 function dateOnly(d: Date): Date {
   return new Date(d.toISOString().split('T')[0]);
 }
@@ -223,26 +243,77 @@ async function main() {
   // ════════════════════════════════════════════════════════════════
   // 6. GUESTS
   // ════════════════════════════════════════════════════════════════
+  // Addresses are all @example.com, which RFC 2606 reserves and which cannot
+  // receive mail. They used to be gmail.com, yahoo.com, outlook.com and
+  // hotmail.com — eighteen plausible real addresses. The seed writes no
+  // EmailConsent rows, and a guest with no consent row counts as subscribed,
+  // so every demo campaign and every date trigger had all eighteen in its
+  // audience. Nothing was ever sent from staging, but the day RESEND_API_KEY
+  // is configured, one press of "Send Now" on a demo tenant mails a resort
+  // promotion to eighteen strangers.
   const guestDefs = [
-    { firstName: 'Ahmed',   lastName: 'Rahman',    email: 'ahmed.rahman@gmail.com',    phone: '+8801711111001', nationality: 'Bangladeshi', notes: 'Prefers high floor, vegetarian meals' },
-    { firstName: 'Fatima',  lastName: 'Begum',     email: 'fatima.begum@yahoo.com',    phone: '+8801811111002', nationality: 'Bangladeshi', notes: 'Anniversary couple — arrange flowers' },
-    { firstName: 'Tanvir',  lastName: 'Ahmed',     email: 'tanvir.ahmed@hotmail.com',  phone: '+8801911111003', nationality: 'Bangladeshi', notes: '' },
-    { firstName: 'Nasreen', lastName: 'Khatun',    email: 'nasreen.k@gmail.com',       phone: '+8801611111004', nationality: 'Bangladeshi', notes: 'Requires extra pillow' },
-    { firstName: 'Rafiq',   lastName: 'Islam',     email: 'rafiq.islam@gmail.com',     phone: '+8801511111005', nationality: 'Bangladeshi', notes: '' },
-    { firstName: 'Priya',   lastName: 'Sharma',    email: 'priya.sharma@gmail.com',    phone: '+919811111006', nationality: 'Indian',       notes: 'Jain food required' },
-    { firstName: 'David',   lastName: 'Chen',      email: 'david.chen@outlook.com',    phone: '+8562011111007', nationality: 'Malaysian',    notes: 'Halal food preference' },
-    { firstName: 'Sarah',   lastName: 'Johnson',   email: 'sarah.j@gmail.com',         phone: '+447911111008', nationality: 'British',      notes: 'Gluten intolerant' },
-    { firstName: 'Omar',    lastName: 'Abdullah',  email: 'omar.abdl@gmail.com',       phone: '+971501111009', nationality: 'Emirati',      notes: 'VIP guest, suite preferred' },
-    { firstName: 'Mia',     lastName: 'Tanaka',    email: 'mia.tanaka@gmail.com',      phone: '+8190111110010', nationality: 'Japanese',     notes: '' },
-    { firstName: 'Kabir',   lastName: 'Hossain',   email: 'kabir.h@yahoo.com',         phone: '+8801711111011', nationality: 'Bangladeshi', notes: 'Corporate client — Apex Group' },
-    { firstName: 'Ritu',    lastName: 'Das',       email: 'ritu.das@gmail.com',        phone: '+8801911111012', nationality: 'Bangladeshi', notes: '' },
-    { firstName: 'James',   lastName: 'Wilson',    email: 'james.w@gmail.com',         phone: '+12121111013',  nationality: 'American',     notes: 'Frequent traveler' },
-    { firstName: 'Ayesha',  lastName: 'Siddiqui',  email: 'ayesha.s@gmail.com',        phone: '+923001111014', nationality: 'Pakistani',    notes: '' },
-    { firstName: 'Sumon',   lastName: 'Biswas',    email: 'sumon.b@gmail.com',         phone: '+8801811111015', nationality: 'Bangladeshi', notes: 'Group leader — family reunion' },
-    { firstName: 'Nila',    lastName: 'Chowdhury', email: 'nila.c@gmail.com',          phone: '+8801611111016', nationality: 'Bangladeshi', notes: '' },
-    { firstName: 'Rashed',  lastName: 'Mahmud',    email: 'rashed.m@gmail.com',        phone: '+8801511111017', nationality: 'Bangladeshi', notes: 'Honeymoon trip' },
-    { firstName: 'Tasneem', lastName: 'Akter',     email: 'tasneem.a@gmail.com',       phone: '+8801711111018', nationality: 'Bangladeshi', notes: '' },
+    { firstName: 'Ahmed',   lastName: 'Rahman',    email: 'ahmed.rahman@example.com',    phone: '+8801711111001', nationality: 'Bangladeshi', notes: 'Prefers high floor, vegetarian meals', dateOfBirth: born(1985, 3, 14) },
+    { firstName: 'Fatima',  lastName: 'Begum',     email: 'fatima.begum@example.com',    phone: '+8801811111002', nationality: 'Bangladeshi', notes: 'Anniversary couple — arrange flowers', dateOfBirth: born(1990, 7, 2) },
+    { firstName: 'Tanvir',  lastName: 'Ahmed',     email: 'tanvir.ahmed@example.com',  phone: '+8801911111003', nationality: 'Bangladeshi', notes: '', dateOfBirth: born(1978, 11, 23) },
+    { firstName: 'Nasreen', lastName: 'Khatun',    email: 'nasreen.k@example.com',       phone: '+8801611111004', nationality: 'Bangladeshi', notes: 'Requires extra pillow', dateOfBirth: born(1982, 1, 9) },
+    { firstName: 'Rafiq',   lastName: 'Islam',     email: 'rafiq.islam@example.com',     phone: '+8801511111005', nationality: 'Bangladeshi', notes: '', dateOfBirth: bornToday(1988) },
+    { firstName: 'Priya',   lastName: 'Sharma',    email: 'priya.sharma@example.com',    phone: '+919811111006', nationality: 'Indian',       notes: 'Jain food required', dateOfBirth: born(1995, 5, 30) },
+    { firstName: 'David',   lastName: 'Chen',      email: 'david.chen@example.com',    phone: '+8562011111007', nationality: 'Malaysian',    notes: 'Halal food preference', dateOfBirth: born(1973, 9, 17) },
+    { firstName: 'Sarah',   lastName: 'Johnson',   email: 'sarah.j@example.com',         phone: '+447911111008', nationality: 'British',      notes: 'Gluten intolerant', dateOfBirth: born(1991, 2, 11) },
+    { firstName: 'Omar',    lastName: 'Abdullah',  email: 'omar.abdl@example.com',       phone: '+971501111009', nationality: 'Emirati',      notes: 'VIP guest, suite preferred', dateOfBirth: born(1968, 12, 5) },
+    { firstName: 'Mia',     lastName: 'Tanaka',    email: 'mia.tanaka@example.com',      phone: '+8190111110010', nationality: 'Japanese',     notes: '', dateOfBirth: born(1997, 4, 21) },
+    { firstName: 'Kabir',   lastName: 'Hossain',   email: 'kabir.h@example.com',         phone: '+8801711111011', nationality: 'Bangladeshi', notes: 'Corporate client — Apex Group', dateOfBirth: born(1980, 6, 8) },
+    { firstName: 'Ritu',    lastName: 'Das',       email: 'ritu.das@example.com',        phone: '+8801911111012', nationality: 'Bangladeshi', notes: '', dateOfBirth: born(1993, 10, 2) },
+    { firstName: 'James',   lastName: 'Wilson',    email: 'james.w@example.com',         phone: '+12121111013',  nationality: 'American',     notes: 'Frequent traveler', dateOfBirth: born(1975, 8, 19) },
+    { firstName: 'Ayesha',  lastName: 'Siddiqui',  email: 'ayesha.s@example.com',        phone: '+923001111014', nationality: 'Pakistani',    notes: '', dateOfBirth: born(1989, 1, 27) },
+    { firstName: 'Sumon',   lastName: 'Biswas',    email: 'sumon.b@example.com',         phone: '+8801811111015', nationality: 'Bangladeshi', notes: 'Group leader — family reunion', dateOfBirth: born(1965, 5, 3) },
+    { firstName: 'Nila',    lastName: 'Chowdhury', email: 'nila.c@example.com',          phone: '+8801611111016', nationality: 'Bangladeshi', notes: '', dateOfBirth: born(1998, 3, 25) },
+    { firstName: 'Rashed',  lastName: 'Mahmud',    email: 'rashed.m@example.com',        phone: '+8801511111017', nationality: 'Bangladeshi', notes: 'Honeymoon trip', dateOfBirth: born(1986, 12, 14) },
+    { firstName: 'Tasneem', lastName: 'Akter',     email: 'tasneem.a@example.com',       phone: '+8801711111018', nationality: 'Bangladeshi', notes: '', dateOfBirth: born(1992, 9, 6) },
+    // Guest 18 exists for the ANNIVERSARY trigger and nothing else. It needs a
+    // first checkout 355–375 days ago AND no checkout in the last 60 days, and
+    // no existing demo guest can satisfy both: all eighteen have a booking
+    // inside the last 60 days, so every one of them is excluded. Without her
+    // the trigger has never had a single candidate in the demo.
+    { firstName: 'Shireen', lastName: 'Kabir',     email: 'shireen.k@example.com',     phone: '+8801711111019', nationality: 'Bangladeshi', notes: 'Stayed once last year — anniversary candidate', dateOfBirth: born(1983, 6, 12) },
   ];
+
+  // Re-point anyone already seeded under the old address, scoped to this
+  // tenant. The upsert below keys on email, so without this a reseed would
+  // leave the eighteen gmail.com rows in place — still subscribed, still in
+  // every campaign audience — and add eighteen @example.com duplicates beside
+  // them. Which would mean the fix protected new environments and left the
+  // ones that already exist exactly as they were.
+  for (const g of guestDefs) {
+    const local = g.email.split('@')[0];
+    try {
+      await prisma.guest.updateMany({
+        where: {
+          tenantId: tid,
+          email: { startsWith: `${local}@`, not: g.email },
+        },
+        data: { email: g.email },
+      });
+    } catch {
+      // (tenantId, email) is unique, so this throws if a row already holds the
+      // new address while a stale one holds the old. Say so rather than
+      // failing the seed — but say it, because that guest is then still
+      // sitting in the audience under a deliverable address.
+      console.warn(`[seed] could not re-point ${local}@… to ${g.email} — resolve by hand`);
+    }
+  }
+
+  // Backfill the birthday on guests that already exist. The upsert below
+  // passes `update: {}`, so a guest seeded before this change keeps whatever
+  // it had — which is how a reseed produced nineteen guests and exactly one
+  // dateOfBirth: only the new row got the new field. Scoped to rows where it
+  // is still null, so a date typed into the dashboard by hand survives.
+  for (const g of guestDefs) {
+    await prisma.guest.updateMany({
+      where: { tenantId: tid, email: g.email, dateOfBirth: null },
+      data: { dateOfBirth: g.dateOfBirth },
+    });
+  }
 
   const guestIds: string[] = [];
   for (const g of guestDefs) {
@@ -271,6 +342,10 @@ async function main() {
 
   const bookingDefs: BookingDef[] = [
     // ── Checked-out (past) ─────────────────────────────────────────────────
+    // Her only stay. 365 days back sits in the middle of the 355–375 day
+    // window the anniversary query looks in, so it stays a candidate for about
+    // three weeks rather than for one exact day.
+    { roomNumber: '101', guestIdx: 18, checkIn: daysAgo(368), checkOut: daysAgo(365), status: 'CHECKED_OUT', paymentStatus: 'PAID', adults: 2, children: 0, totalAmount: 9500, paidAmount: 9500, actualCheckIn: daysAgo(368), actualCheckOut: daysAgo(365), source: 'ONLINE' },
     { roomNumber: '101', guestIdx: 0,  checkIn: daysAgo(60), checkOut: daysAgo(57), status: 'CHECKED_OUT', paymentStatus: 'PAID',    adults: 2, children: 0, totalAmount: 10500, paidAmount: 10500, actualCheckIn: daysAgo(60), actualCheckOut: daysAgo(57), source: 'ONLINE' },
     { roomNumber: '201', guestIdx: 1,  checkIn: daysAgo(55), checkOut: daysAgo(52), status: 'CHECKED_OUT', paymentStatus: 'PAID',    adults: 2, children: 0, totalAmount: 19500, paidAmount: 19500, actualCheckIn: daysAgo(55), actualCheckOut: daysAgo(52), source: 'ONLINE', specialRequests: 'Anniversary arrangement' },
     { roomNumber: '301', guestIdx: 8,  checkIn: daysAgo(50), checkOut: daysAgo(46), status: 'CHECKED_OUT', paymentStatus: 'PAID',    adults: 2, children: 2, totalAmount: 48000, paidAmount: 48000, actualCheckIn: daysAgo(50), actualCheckOut: daysAgo(46), source: 'DIRECT' },
