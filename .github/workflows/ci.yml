@@ -74,29 +74,33 @@ jobs:
     name: Schema Drift Check
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        # Docker Hub's unauthenticated pull limit (429) was failing these
-        # jobs at "Initialize containers", before a single test ran. AWS's
-        # public ECR mirrors the Docker official images and does not apply
-        # that limit. See the note in apps/api/Dockerfile.
-        image: public.ecr.aws/docker/library/postgres:15-alpine
-        env:
-          POSTGRES_USER: resortpro
-          POSTGRES_PASSWORD: resortpro
-          POSTGRES_DB: resortpro_drift
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     env:
       DATABASE_URL: postgresql://resortpro:resortpro@localhost:5432/resortpro_drift
 
     steps:
+      # The database comes from the runner's own PostgreSQL, not a service
+      # container, because every registry we tried rate-limits anonymous
+      # pulls. Docker Hub refused with 429 ("unauthenticated pull rate
+      # limit"), so 0fa6fa9 moved these to AWS public ECR — and ECR then
+      # refused the third pull of one CI run with "Data limit exceeded",
+      # failing E2E at "Initialize containers" before a test could run.
+      #
+      # The runner image ships PostgreSQL already, stopped. Starting it costs
+      # no pull, no quota and no credential. It is also 16 rather than the 15
+      # these jobs asked Docker for, which matches what production actually
+      # runs (postgres:16-alpine in the compose files) — so CI was testing
+      # against the older major until now.
+      - name: Start PostgreSQL and create the database
+        run: |
+          sudo systemctl start postgresql
+          psql --version
+          for _ in $(seq 1 30); do pg_isready -h localhost -p 5432 && break; sleep 1; done
+          pg_isready -h localhost -p 5432
+          sudo -u postgres psql -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE resortpro LOGIN PASSWORD 'resortpro' SUPERUSER;"
+          sudo -u postgres createdb -O resortpro resortpro_drift
+          PGPASSWORD=resortpro psql -h localhost -U resortpro -d resortpro_drift -c 'SELECT version();'
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -135,31 +139,35 @@ jobs:
     name: API Permission Tests
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        # Docker Hub's unauthenticated pull limit (429) was failing these
-        # jobs at "Initialize containers", before a single test ran. AWS's
-        # public ECR mirrors the Docker official images and does not apply
-        # that limit. See the note in apps/api/Dockerfile.
-        image: public.ecr.aws/docker/library/postgres:15-alpine
-        env:
-          POSTGRES_USER: resortpro
-          POSTGRES_PASSWORD: resortpro
-          POSTGRES_DB: resortpro_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     env:
       DATABASE_URL: postgresql://resortpro:resortpro@localhost:5432/resortpro_test
       JWT_SECRET: ci-test-secret-do-not-use-in-prod
       NODE_ENV: test
 
     steps:
+      # The database comes from the runner's own PostgreSQL, not a service
+      # container, because every registry we tried rate-limits anonymous
+      # pulls. Docker Hub refused with 429 ("unauthenticated pull rate
+      # limit"), so 0fa6fa9 moved these to AWS public ECR — and ECR then
+      # refused the third pull of one CI run with "Data limit exceeded",
+      # failing E2E at "Initialize containers" before a test could run.
+      #
+      # The runner image ships PostgreSQL already, stopped. Starting it costs
+      # no pull, no quota and no credential. It is also 16 rather than the 15
+      # these jobs asked Docker for, which matches what production actually
+      # runs (postgres:16-alpine in the compose files) — so CI was testing
+      # against the older major until now.
+      - name: Start PostgreSQL and create the database
+        run: |
+          sudo systemctl start postgresql
+          psql --version
+          for _ in $(seq 1 30); do pg_isready -h localhost -p 5432 && break; sleep 1; done
+          pg_isready -h localhost -p 5432
+          sudo -u postgres psql -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE resortpro LOGIN PASSWORD 'resortpro' SUPERUSER;"
+          sudo -u postgres createdb -O resortpro resortpro_test
+          PGPASSWORD=resortpro psql -h localhost -U resortpro -d resortpro_test -c 'SELECT version();'
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -206,24 +214,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: api-tests          # only run E2E if API tests pass
 
-    services:
-      postgres:
-        # Docker Hub's unauthenticated pull limit (429) was failing these
-        # jobs at "Initialize containers", before a single test ran. AWS's
-        # public ECR mirrors the Docker official images and does not apply
-        # that limit. See the note in apps/api/Dockerfile.
-        image: public.ecr.aws/docker/library/postgres:15-alpine
-        env:
-          POSTGRES_USER: resortpro
-          POSTGRES_PASSWORD: resortpro
-          POSTGRES_DB: resortpro_e2e
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     env:
       DATABASE_URL: postgresql://resortpro:resortpro@localhost:5432/resortpro_e2e
@@ -233,6 +223,29 @@ jobs:
       PORT: 3000
 
     steps:
+      # The database comes from the runner's own PostgreSQL, not a service
+      # container, because every registry we tried rate-limits anonymous
+      # pulls. Docker Hub refused with 429 ("unauthenticated pull rate
+      # limit"), so 0fa6fa9 moved these to AWS public ECR — and ECR then
+      # refused the third pull of one CI run with "Data limit exceeded",
+      # failing E2E at "Initialize containers" before a test could run.
+      #
+      # The runner image ships PostgreSQL already, stopped. Starting it costs
+      # no pull, no quota and no credential. It is also 16 rather than the 15
+      # these jobs asked Docker for, which matches what production actually
+      # runs (postgres:16-alpine in the compose files) — so CI was testing
+      # against the older major until now.
+      - name: Start PostgreSQL and create the database
+        run: |
+          sudo systemctl start postgresql
+          psql --version
+          for _ in $(seq 1 30); do pg_isready -h localhost -p 5432 && break; sleep 1; done
+          pg_isready -h localhost -p 5432
+          sudo -u postgres psql -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE resortpro LOGIN PASSWORD 'resortpro' SUPERUSER;"
+          sudo -u postgres createdb -O resortpro resortpro_e2e
+          PGPASSWORD=resortpro psql -h localhost -U resortpro -d resortpro_e2e -c 'SELECT version();'
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
