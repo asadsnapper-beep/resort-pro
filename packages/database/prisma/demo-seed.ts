@@ -107,6 +107,59 @@ async function main() {
   console.log(`✅ Tenant: ${tenant.name} (${tid})`);
 
   // ════════════════════════════════════════════════════════════════
+  // 1b. RESET THE TRANSACTIONAL DATA
+  //
+  // Seventeen of the blocks below call `create`, not `upsert`, because most of
+  // what they write has no natural key to upsert on. So running this file
+  // twice used to double the demo: seventy-two bookings on the same rooms,
+  // twelve campaigns, two of every menu item — occupancy and revenue that mean
+  // nothing, and a demo nobody should show anyone. CI reseeds on every run and
+  // the staging host has been seeded more than once.
+  //
+  // Clearing first makes the whole file idempotent without touching the index
+  // arithmetic the later blocks depend on (`bookingIds[od.bookingIdx]` and
+  // friends), which is what made the alternative — skip-if-exists, loading the
+  // ids back in defs order — the more fragile fix.
+  //
+  // What is NOT cleared, because every one of these is already an upsert and
+  // re-running it converges: the tenant, its users and staff (the documented
+  // demo logins keep working), rooms, guests, the loyalty programme shell,
+  // website content, and the global themes.
+  //
+  // Scoped to this tenant by id throughout. The slug is a literal above, so
+  // this cannot reach another resort's data.
+  // ════════════════════════════════════════════════════════════════
+  const scope = { tenantId: tid };
+  // Order is children-before-parents. Most of these cascade from Tenant
+  // anyway, but the SetNull relations (a food order's booking, an email send's
+  // campaign) are tidier cleared in this order than left to flap to null
+  // mid-wipe.
+  const cleared = {
+    foodOrders:         (await prisma.foodOrder.deleteMany({ where: scope })).count,
+    emailSends:         (await prisma.emailSend.deleteMany({ where: scope })).count,
+    enrollments:        (await prisma.sequenceEnrollment.deleteMany({ where: scope })).count,
+    sequences:          (await prisma.sequence.deleteMany({ where: scope })).count,  // cascades steps
+    campaigns:          (await prisma.campaign.deleteMany({ where: scope })).count,  // cascades stats
+    emailTemplates:     (await prisma.emailTemplate.deleteMany({ where: scope })).count,
+    loyaltyAccounts:    (await prisma.loyaltyAccount.deleteMany({ where: scope })).count, // cascades txns
+    bookings:           (await prisma.booking.deleteMany({ where: scope })).count,
+    housekeepingTasks:  (await prisma.housekeepingTask.deleteMany({ where: scope })).count,
+    maintenanceTickets: (await prisma.maintenanceTicket.deleteMany({ where: scope })).count,
+    supportTickets:     (await prisma.supportTicket.deleteMany({ where: scope })).count,
+    expenses:           (await prisma.expense.deleteMany({ where: scope })).count,
+    inventoryItems:     (await prisma.inventoryItem.deleteMany({ where: scope })).count,
+    menuItems:          (await prisma.menuItem.deleteMany({ where: scope })).count,
+    ratePlans:          (await prisma.ratePlan.deleteMany({ where: scope })).count,
+  };
+  const clearedTotal = Object.values(cleared).reduce((a, b) => a + b, 0);
+  if (clearedTotal === 0) {
+    console.log('✅ Nothing to clear — first run on this tenant');
+  } else {
+    console.log(`✅ Cleared ${clearedTotal} rows from a previous run:`);
+    for (const [k, n] of Object.entries(cleared)) if (n) console.log(`     ${n} ${k}`);
+  }
+
+  // ════════════════════════════════════════════════════════════════
   // 2. USERS + STAFF
   // ════════════════════════════════════════════════════════════════
   const owner = await prisma.user.upsert({
