@@ -12,7 +12,8 @@
     "seed:demo": "tsx prisma/demo-seed.ts",
     "studio": "prisma studio",
     "generate": "prisma generate",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts",
+    "fix:demo-guests": "tsx prisma/fix-demo-guests.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.19.0",
