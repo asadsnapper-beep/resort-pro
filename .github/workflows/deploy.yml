@@ -118,8 +118,8 @@ jobs:
       # The SSH key can run nothing else (forced command, tailnet source only).
       #
       # Needs these repository secrets/variables (no addresses or emails live in this file):
-      #   secrets:   TS_OAUTH_CLIENT_ID, TS_OAUTH_SECRET, DEPLOY_SSH_KEY
-      #   variables: DEPLOY_HOST, DEPLOY_KNOWN_HOSTS
+      #   secrets (all of them, so the address is masked in public logs):
+      #     TS_OAUTH_CLIENT_ID, TS_OAUTH_SECRET, DEPLOY_SSH_KEY, DEPLOY_HOST, DEPLOY_KNOWN_HOSTS
       - name: Connect to Tailscale (tag:ci)
         uses: tailscale/github-action@v3
         with:
@@ -131,8 +131,8 @@ jobs:
         timeout-minutes: 12
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
-          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
           for v in DEPLOY_SSH_KEY DEPLOY_HOST DEPLOY_KNOWN_HOSTS; do
