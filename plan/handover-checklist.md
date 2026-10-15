@@ -79,28 +79,32 @@ BKASH_APP_KEY   BKASH_APP_SECRET   BKASH_USERNAME   BKASH_PASSWORD
 ```
 
 Verified on 2026-09-27: they exist **nowhere** — not in the running production
-container, not in Coolify's variable list, not in Coolify's stored compose.
-Until they do, `getPlatformBkash()` is null, `/billing/checkout/bkash` answers
-503, and the "Pay with bKash" button is not rendered at all.
+container, not in production's configuration. Until they do,
+`getPlatformBkash()` is null, `/billing/checkout/bkash` answers 503, and the
+"Pay with bKash" button is not rendered at all.
 
-### 2. Put them into Coolify — **founder**, two places
+### 2. Put them into `/opt/resortpro/.env` — **founder**, one place
 
-Both are needed. Either alone does nothing.
+Four lines on the server, then apply:
 
-- **Environment Variables** → the four names and their values.
-- **The stored compose**, `api` service `environment:` block → the four
-  pass-through lines:
+```
+BKASH_APP_KEY=…
+BKASH_APP_SECRET=…
+BKASH_USERNAME=…
+BKASH_PASSWORD=…
+```
 
-  ```yaml
-        BKASH_APP_KEY: ${BKASH_APP_KEY:-}
-        BKASH_APP_SECRET: ${BKASH_APP_SECRET:-}
-        BKASH_USERNAME: ${BKASH_USERNAME:-}
-        BKASH_PASSWORD: ${BKASH_PASSWORD:-}
-  ```
+```bash
+cd /opt/resortpro && docker compose up -d
+```
 
-`docker-compose.coolify.yml` in git already has these lines — **copy from
-there, and do not expect git to apply them.** Coolify keeps its own copy of the
-compose in its database; a deploy only rewrites the image tags in it.
+`api` loads that file with `env_file`, so this is the whole change.
+
+> **This step used to be two places and a trap.** Under Coolify it needed a
+> variable *and* a matching pass-through line in Coolify's stored compose, and
+> either alone did nothing. Production left Coolify on 2026-10-15/16; the trap
+> went with it. Do not add these in Coolify — that service is archived and does
+> not run.
 
 ### 3. Prove it worked — **either of us**
 
@@ -136,7 +140,7 @@ credential a resort pastes stays plain text exactly as before.
 
 A different value in each of the three:
 
-- Coolify (production) · Portainer (staging) · `apps/api/.env` (local)
+- `/opt/resortpro/.env` on the host (production) · Portainer (staging) · `apps/api/.env` (local)
 
 ```bash
 openssl rand -base64 32
@@ -219,13 +223,13 @@ Written down so they stop taking up room.
 | Combined billing, card half | The bKash half works. The card half needs Stripe. |
 | Four orphaned ID scans on staging | They predate the privacy fix. New deletions are clean. Sweep by hand when convenient. |
 | Old guest documents with `localhost` URLs | Existing rows only; new uploads are correct. |
-| Coolify compose drift | Nothing reconciles Coolify's stored compose with git. A real gap, and a bigger piece of work than this month allows. |
-| `redis` on the shared `coolify` network under a generic name | The DNS-ambiguity class that the `resortpro-postgres` alias was added to fix. Server work. |
+| Production compose not in git | Was Coolify's stored copy drifting from git; since 2026-10-15/16 it is `/opt/resortpro/docker-compose.yml` drifting from nothing, because no file in the repo describes production. Same gap, new address. Proposal: [production-compose-in-git.md](production-compose-in-git.md). |
+| ~~`redis` on the shared `coolify` network~~ | **Closed by the move.** `postgres`, `redis`, `worker` and `backup` are on the private `resortpro_net` only; just `api` and `web` join `coolify` so Traefik can reach them. |
 | Android sync gaps | A rejected change vanishes silently; an offline restart logs the housekeeper out. |
 | Settings "not production-ready" QA verdict | From 2026-09-09 and never retested. Most of its findings are fixed; the verdict is not. |
 | Review management, dynamic pricing, Booking.com / Airbnb | Never promised for this month. |
 | The Shop / marketplace ([marketplace.md](marketplace.md)) | A new product, planned 2026-09-27 and not started. Its phase 9 needs the same Stripe account. It earns nothing until resorts are using the PMS. Its §14 precondition — a third-party shop's own gateway credentials being encrypted — is met now; the key in item 5 is the rest of it. |
-| Production's deploy job does not verify the commit | Staging's does now: a 52x from Cloudflare is treated as "unknown" and the job then checks what Portainer actually stored. Production exits on any non-2xx from Coolify, before its health checks run — and those checks ask "is something serving", not "is this commit serving", so simply letting the timeout through could turn a silent non-deploy into a green run. It needs its own SHA check first, which is a separate piece of work on the riskier of the two paths. |
+| Production's deploy job does not verify the commit | Staging's does now: a 52x from Cloudflare is treated as "unknown" and the job then checks what Portainer actually stored. **Largely closed by the move:** production's `deploy.sh` now validates the tag, checks both images exist, takes a pre-deploy dump and aborts if it fails, waits for health, checks api/apex/app through Traefik, and rolls back and e-mails the owners if unhealthy. What it still cannot do is undo a migration — Prisma runs them at api startup, so the dump is the only restore point. |
 | CRM open and click tracking (CRM-008) | **The honest move here is to remove the claim, not build the feature.** The schema has `openedAt`, click and bounce columns and a campaign stats block, and nothing anywhere writes them — there is no open pixel, no click redirect, no Resend webhook. So the KPIs read 0%, and an owner seeing "0% opened" concludes the campaign failed when the truth is that nothing is being measured. A wrong number is worse than a missing one. Either hide those tiles until the tracking exists, or build it properly: pixel route, click redirect, webhook handler, and tests. |
 | The CRM's remaining silent failures (CRM-012) | Several tabs still `catch {}` and render an empty list, so a backend failure and "no data yet" look identical. The sequence form was fixed because that was the half of CRM-007 that hid it; the others are the same shape and have not been. |
 | CRM APIs with no way to reach them (CRM-016) | Contact detail and history, tag CRUD and assignment, template editing, segment filters, manual enrolment — all implemented, none reachable from the CRM screen. Not broken, just invisible, which is its own kind of waste. |

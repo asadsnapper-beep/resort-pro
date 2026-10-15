@@ -1,7 +1,12 @@
 # Two secrets production needs before `dev` → `main`
 
-**Who does this:** the founder, by hand in Coolify. Not a Claude session — these
-are the production keys, and no session needs to see them.
+**Who does this:** the founder, by hand on the server. Not a Claude session —
+these are the production keys, and no session needs to see them.
+
+> **Rewritten 2026-10-16.** Production left Coolify on 2026-10-15/16, so the
+> original two-place Coolify edit this file described no longer exists — and
+> doing it in Coolify now would change nothing, because the archived service
+> there is not what runs. It is one file on the host instead.
 
 **Why now:** the 93 commits waiting on `dev` change what happens when these are
 missing. Today production is only *less protected* without them. After the push
@@ -40,25 +45,26 @@ SMS credentials in again — there is no recovery, by design.
 
 **Do not paste either value into a chat, including to me.**
 
-## Step 2 — Coolify → the ResortPro service → *Environment Variables*
+## Step 2 — one edit, on the server
 
-Add both names with their values.
+Add both lines to `/opt/resortpro/.env`:
 
-## Step 3 — Coolify → *Configuration* → the stored compose
-
-Find the `api` service's `environment:` block and add the two pass-through
-lines:
-
-```yaml
-      CREDENTIALS_KEY: ${CREDENTIALS_KEY:-}
-      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-}
+```
+CREDENTIALS_KEY=<the 44-character value>
+SUPER_ADMIN_PASSWORD=<the 32-character value>
 ```
 
-**Both steps are needed. Either alone does nothing** — the same trap as the
-bKash variables in [does-production-have-bkash.md](does-production-have-bkash.md).
-Coolify keeps its own copy of the compose in its database; a deploy rewrites the
-image tags in it and nothing else, so the version of this file in git never
-reaches production on its own.
+Then apply it:
+
+```bash
+cd /opt/resortpro && docker compose up -d
+```
+
+`api`, `worker` and `web` load that file with `env_file`, so this is the whole
+change. **There is no second place to edit.** The old version of this file
+asked for a Coolify variable *and* a pass-through line in Coolify's stored
+compose, and warned that either alone did nothing. That trap is gone with the
+platform that created it.
 
 ## Step 4 — tell me, and I will push `dev` → `main`
 
@@ -66,15 +72,18 @@ Say "set" — nothing else. I will run the push, watch the deploy, and report th
 migration and health-check results. Nine migrations are waiting, including the
 three for admin two-factor, sessions and re-authentication.
 
-Then, in the running container (Coolify → the `api` container → Terminal), this
-prints names and lengths only:
+Then, in the running container, this prints names and lengths only — never
+values:
 
 ```bash
-for v in CREDENTIALS_KEY SUPER_ADMIN_PASSWORD; do
+docker exec rp-api sh -c 'for v in CREDENTIALS_KEY SUPER_ADMIN_PASSWORD; do
   eval "x=\$$v"
   if [ -z "$x" ]; then echo "$v MISSING"; else echo "$v set (${#x} chars)"; fi
-done
+done'
 ```
+
+Exact container name on purpose: `docker exec $(docker ps -qf name=api)` is a
+substring match and can hit another project's container on that shared host.
 
 Both should read "set". `CREDENTIALS_KEY` should be 44 characters, and
 `SUPER_ADMIN_PASSWORD` 32 — that is what base64 of 32 and 24 bytes comes to, and

@@ -291,7 +291,7 @@ Custom domain না থাকলে tenant পাবে:
 Cloudflare DNS:
 ```
 Type    Name    Content
-A       *       88.99.141.243   (Proxied)
+A       *       <production-host>   (Proxied)
 ```
 
 Next.js middleware (`middleware.ts`):

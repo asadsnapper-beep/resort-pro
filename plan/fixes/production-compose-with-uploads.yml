@@ -1,3 +1,9 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ⚠ SUPERSEDED 2026-10-16 — production left Coolify on 2026-10-15/16 and this
+#   is not what it runs. Do not paste this anywhere. The live compose is
+#   /opt/resortpro/docker-compose.yml on the host; the proposal to put it in
+#   git is plan/production-compose-in-git.md.
+# ─────────────────────────────────────────────────────────────────────────────
 name: resortpro
 services:
   postgres:

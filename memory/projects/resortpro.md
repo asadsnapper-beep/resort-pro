@@ -141,9 +141,9 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
   clear capacity warnings, 60-day price-change notice, and 12-month price
   protection for existing paid customers.
 - Stripe/bKash price IDs are production configuration, not source-code values.
-  The repository compose files have mappings, but Coolify stores its own raw
-  compose configuration; verify new values there before claiming paid checkout
-  is operational.
+  The repository compose files have mappings, but production reads its own
+  `/opt/resortpro/.env` on the server; verify new values there before claiming
+  paid checkout is operational.
 
 ## Design rules
 
@@ -174,6 +174,33 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
 
 ## Delivery and operations
 
+> ### Production left Coolify on 2026-10-15/16. Most of what follows was rewritten that day.
+>
+> Production is now a plain `docker compose` stack in `/opt/resortpro` on the
+> Hetzner host. Containers are `rp-postgres`, `rp-redis`, `rp-api`, `rp-web`,
+> `rp-worker`, `rp-backup`. Traefik still fronts it and still comes from
+> Coolify, but it routes by labels in that compose — nothing else about
+> ResortPro is in Coolify any more.
+>
+> **Never tell anyone to edit, start or redeploy ResortPro in Coolify.** The old
+> service is stopped and renamed `ARCHIVED-resortpro-DO-NOT-START`, and the
+> token GitHub holds is read-only on purpose. Starting it would put a second
+> stack with stale data behind the same hostnames. Production config changes are
+> now exact diffs for `/opt/resortpro/.env` or the server's compose, handed to
+> the ops session as a prompt with verification commands.
+>
+> `postgres` and `redis` as bare hostnames no longer exist in production; the
+> app reaches the database as `rp-postgres`. Containers must be addressed by
+> exact name — `docker ps --filter name=rp-`, `docker logs rp-api`. A substring
+> filter like `docker ps -qf 'name=api'` can match another project's containers
+> on that shared host, which has already broken one check.
+>
+> Logs: `/var/log/resortpro-deploy.log`, `/var/log/resortpro-backup.log`.
+>
+> The production compose is **not in git yet**, so it is still the drift problem
+> we had with Coolify, one layer along. Putting it under version control is
+> proposed in `plan/production-compose-in-git.md`.
+
 - The required release path is **local → `dev` staging → `main` production**.
   Do not send an untested local change straight to `main` except for an
   explicitly approved emergency fix.
@@ -183,18 +210,33 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
   builds SHA-tagged `:dev-<sha>` images and updates the Portainer staging stack.
 - Only after the staging flow works, merge `dev` into `main`. `main` deployment
   uses `.github/workflows/deploy.yml`: it builds SHA-tagged API and web GHCR
-  images, patches Coolify's stored raw compose via its API, then waits for API
-  and web health checks. A green deploy workflow confirms both health endpoints,
-  not necessarily every separate CI job.
+  images, joins Tailscale as `tag:ci`, and SSHes to the host under a forced
+  command that accepts nothing but a 40-hex SHA. That runs
+  `/opt/resortpro/ops/deploy.sh <sha>`, which validates the tag, checks both
+  images exist, **takes a fresh database dump and aborts if that fails**,
+  switches `IMAGE_TAG`, pulls, brings the stack up, waits for health, checks
+  api/apex/app through Traefik, and on failure **rolls back and emails the
+  owners**. The deploy address comes from GitHub secrets, because this repo is
+  public.
+- **A rollback cannot undo a migration.** Prisma migrations run inside the api
+  container at startup, so the code goes back and the schema does not. The
+  pre-deploy dump is the restore point — that is what it is for.
 - **The two environments get their compose differently, and this trips people
   up.** Staging's workflow sends the *whole* `docker-compose.staging.yml` as
   text, so any edit to that file reaches staging on the next deploy.
-  Production's compose lives **in Coolify's own database, not in git**; the
-  workflow fetches it, rewrites only the image tags, and puts it back. So a
-  change to `docker-compose.coolify.yml` — a new volume, a new env var, a
-  changed entrypoint — **never reaches production on its own**. It has to be
-  typed into Coolify by hand. Design changes so the part that must ship in the
-  image does, and only the unavoidable line needs a manual edit.
+  Production's compose lives **on the server, in `/opt/resortpro`, and is not
+  in git**. `deploy.sh` changes the image tag and nothing else. So a new volume,
+  a new env var or a changed entrypoint **never reaches production on its own** —
+  it is a hand edit on the host. Design changes so the part that must ship in
+  the image does, and only the unavoidable line needs a server edit.
+- Adding an environment variable is now one line in `/opt/resortpro/.env` plus
+  `docker compose up -d`, because api, worker and web all load it with
+  `env_file`. The `backup` service does **not** use `env_file`, so a variable it
+  needs has to be wired to it explicitly.
+- Only `api` and `web` join Coolify's shared `coolify` network, so Traefik can
+  reach them. `postgres`, `redis`, `worker` and `backup` sit on the private
+  `resortpro_net` only. Volumes are `resortpro_pgdata`, `_redis`, `_uploads`,
+  `_backups`.
 - A green deploy is not proof the new code is running. Prove it with something
   only the new build has — a route that did not exist (401 rather than 404), a
   row in `_prisma_migrations`, a changed response. If a batch adds no such
@@ -242,14 +284,17 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
   nightly on an ambiguous hostname. Now in place on production: the `backup`
   sidecar with the uploads volume mounted read-only, an unambiguous database
   hostname, a verified retention policy, and a restore test.
-- **A failing backup now tells someone.** A Coolify Scheduled Task checks the
-  result and emails through Resend, and the alert was proven by making a run
-  fail rather than by assuming the wiring works. This was the missing half:
-  staging's backup had been broken since August and nothing said so, which is
-  the only reason it ran for a month producing fifty zero-byte dumps.
-  The task and its alert live **in Coolify only** — they are not in git, so
-  they will not be recreated by any deploy, and nothing in this repository
-  will tell you they exist.
+- **A failing backup now tells someone.** As of 2026-10-15/16 this is a host
+  `systemd` timer at 02:00 UTC: it runs the backup, re-verifies it, copies it
+  off the server, checks the copy, and emails the owners on **any** failure. A
+  watchdog emails if nothing has succeeded in 27 hours. The Coolify Scheduled
+  Task that used to do this no longer exists.
+  The alert was originally proven by making a run fail rather than by assuming
+  the wiring works. That mattered: staging's backup had been broken since
+  August and nothing said so, which is the only reason it ran for a month
+  producing fifty zero-byte dumps.
+  The timer and the watchdog live **on the host, not in git**, so no deploy
+  recreates them and nothing in this repository will tell you they exist.
 - **The worker runs on production as of 2026-09-13.** Until then pre-arrival
   reminders, iCal sync, daily reports, automation sequences, trial emails and
   the expiry of abandoned booking holds had never run there at all.
@@ -265,28 +310,27 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
   sends no email: it cancelled **2** unpaid `PENDING` bookings (WEB-MSL5BVT6,
   WEB-MSMAK3XW), freeing rooms they had been blocking. It never touches a
   booking with any recorded payment.
-- Whatever is added, backups still sit on the same host as the database.
-  Copying them off-box has not been done.
-- **`postgres` is an ambiguous hostname on production.** Coolify's `coolify`
-  network is shared by every project on the host, and Coolify's own database
-  container carries the alias `postgres` too — so DNS returns two addresses and
-  each lookup can land on either. From 10 September the production backup
-  resolved it to Coolify's own database and failed nightly with "password
-  authentication failed", while the password, the pg_hba rules and
-  `password_encryption` were all correct. The API resolved to the wrong host as
-  well and survived only by holding the pool it opened at startup, making every
-  restart a coin flip. It failed safely purely because the two databases have
-  different passwords; had they matched, `prisma migrate deploy` would have run
-  this schema into Coolify's database.
-- **That hostname is fixed in both places, but not with the same name.** Git's
-  `docker-compose.coolify.yml` gives postgres the network alias
-  `resortpro-postgres` and addresses it that way (commit `b108746`), which is
-  what staging runs. Production's stored compose instead uses the container
-  name, `postgres-b48m2cix8odgfuvlyr8zr31p`, on both the `backup` service's
-  `POSTGRES_HOST` and the api's `DATABASE_URL`. Both are unambiguous and both
-  are correct; they are simply different strings. Do not "fix" one to match
-  the other without checking which file you are looking at — production's
-  compose is not generated from git.
+- Backups are copied off the server as of 2026-10-15/16, and the copy is
+  checked. Before that they sat on the same host as the database, which is not
+  a backup.
+- **The `postgres` ambiguous-hostname hazard is gone, and it is worth knowing
+  why it existed.** Coolify's `coolify` network is shared by every project on
+  the host, and Coolify's own database container carried the alias `postgres`
+  too — so DNS returned two addresses and each lookup could land on either.
+  From 10 September the production backup resolved it to Coolify's database and
+  failed nightly with "password authentication failed" while the password, the
+  pg_hba rules and `password_encryption` were all correct. The API resolved
+  wrongly as well and survived only by holding the pool it opened at startup,
+  making every restart a coin flip. It failed safely purely because the two
+  databases had different passwords; had they matched, `prisma migrate deploy`
+  would have run this schema into Coolify's database.
+  Since the move, production's `postgres` is on the private `resortpro_net`
+  only and is addressed as `rp-postgres`. There is nothing to collide with.
+- Staging still runs `docker-compose.staging.yml`, where postgres has the
+  network alias `resortpro-postgres` (commit `b108746`). So the two
+  environments name the database differently — `rp-postgres` on production,
+  `resortpro-postgres` on staging. Both are unambiguous. Do not "fix" one to
+  match the other; check which environment you are looking at.
 - **What "no Stripe on production" actually means** (read 2026-09-14). Three
   different things get called card payment, and only two depend on the
   platform's `STRIPE_*` variables:
@@ -401,17 +445,19 @@ Do not re-discover these; do not claim any of them is done without checking.
   container-local and every redeploy discarded it — guest IDs, room photos, menu
   pictures, website and vehicle images alike. Two guest documents from 11 and 14
   August were lost this way and cannot be recovered. The `uploads_data` volume
-  and `STORAGE_LOCAL_DIR` are now in Coolify's compose, verified the only way
-  that counts: upload a file, count it, redeploy, count again — 1 and 1.
+  and `STORAGE_LOCAL_DIR` were fixed then, verified the only way that counts:
+  upload a file, count it, redeploy, count again — 1 and 1. Since the move off
+  Coolify the volume is `resortpro_uploads` in the server's compose.
 - **Production cannot take a payment (verified 2026-09-27).** All four of
   `BKASH_APP_KEY`, `BKASH_APP_SECRET`, `BKASH_USERNAME`, `BKASH_PASSWORD` are
-  missing from the running api container, from Coolify's variable list, and
-  from Coolify's stored compose — they were never added anywhere. So
+  missing from the running api container and from production's configuration
+  — they were never added anywhere. So
   `getPlatformBkash()` is null, `/billing/checkout/bkash` answers 503 and the
   "Pay with bKash" button never renders. **This is the single thing standing
   between the product and a paying customer.** Fixing it needs the merchant
-  credentials from bKash plus two hand-edits in Coolify (the variables *and*
-  the four pass-through lines in its stored compose — git's copy is not live).
+  credentials from bKash plus four lines in `/opt/resortpro/.env` and a
+  `docker compose up -d`. Since api loads that file with `env_file`, this is no
+  longer the two-place edit it was under Coolify.
   `RESEND_API_KEY` and `WEB_URL` are set, so email works; `EMAIL_FROM` and
   `APP_URL` are unset but harmless, the code defaults both. Production's health
   path is `https://api.resortpro.site/health` — `resortpro.site/api/health`
@@ -426,16 +472,20 @@ Do not re-discover these; do not claim any of them is done without checking.
   third party is asked to store *their* credentials — see
   [plan/marketplace.md](../../plan/marketplace.md) §14.
 - **Production has both a backup and a worker** — see "Backups" above.
-  Coolify's own scheduled-backup feature does not apply, because production's
-  postgres lives inside the service compose rather than being a standalone
-  Coolify database resource, which is why the sidecar exists instead. Production's database is about 16 MB.
-- **Coolify's stored compose is a stale snapshot of `docker-compose.coolify.yml`
-  and nothing reconciles them.** The gap is smaller than it was: `uploads_data`
-  / `STORAGE_LOCAL_DIR`, the `backup` service and the `worker` service have all
-  since been typed into Coolify by hand, and the database hostname was made
-  unambiguous there. Everything below is the 2026-09-10 measurement, kept
-  because the *mechanism* has not changed — a service in git still never
-  reaches production on its own. Missing on
+  The sidecar exists because postgres lives inside the stack rather than being
+  a managed database resource; since 2026-10-15/16 a host `systemd` timer drives
+  it and copies the result off the server. Production's database is about 16 MB.
+- **Production's compose is not in git, and nothing reconciles it.** This used
+  to be Coolify's stored copy drifting from `docker-compose.coolify.yml`; since
+  2026-10-15/16 it is `/opt/resortpro/docker-compose.yml` on the host drifting
+  from nothing at all, because no file in this repository describes what
+  production runs. The *mechanism* is unchanged and is the reason this section
+  still matters: **a service added in git never reaches production on its
+  own.** Putting that compose under version control is proposed in
+  `plan/production-compose-in-git.md`.
+  Everything below is the 2026-09-10 measurement, kept for the mechanism
+  rather than the numbers — the specific gaps it lists were closed by hand
+  before the move. Missing on
   production: the `uploads_data` volume and `STORAGE_LOCAL_DIR`; the `backup`
   and `worker` services; every `STRIPE_*` variable including the secret key, so
   the *platform's* card billing is off (see "What 'no Stripe' actually
@@ -471,8 +521,8 @@ Do not re-discover these; do not claim any of them is done without checking.
   is no both-sides resolution UI for a 409; no global offline banner; "Report a
   problem" does not create a maintenance ticket. The walk-in document Retry
   button has not been pressed on a real device.
-- **`SEED_DEMO_REFRESH`** is set in Coolify's stored compose but no deploy has
-  used it. The safer first move is a one-off manual
+- **`SEED_DEMO_REFRESH`** is set in production's configuration but no deploy
+  has used it. The safer first move is a one-off manual
   `docker exec … SEED_DEMO_REFRESH=1 node dist/scripts/seed-demo.js`, because
   the seed gates API startup.
 - **Signup and `/plans`:** open product question — whether every signup CTA
@@ -499,7 +549,7 @@ question is "what is left" rather than "how does this work".
 | Landing/marketing design | `plan/landing-page-design-instructions.md` plus this file's pricing correction |
 | Pricing/billing/onboarding | `plan/launch-pricing-and-trial-abuse-prevention.md`, `code-instructions/pricing-implementation-steps-2-4.md`, `packages/types/src/plans.ts` |
 | Android app | `apps/android/README.md`, `plan/mobile-app-ux.md`, `plan/offline-sync-conflicts.md` |
-| Deploy/production | `.github/workflows/deploy.yml`, `docs/coolify-deployment.md`, `DEPLOY.md`, and the compose caveat above |
+| Deploy/production | `.github/workflows/deploy.yml` and the Delivery section above. `docs/coolify-deployment.md`, `DEPLOY.md`, `coolify.yml` and `docker-compose.coolify.yml` are **historical** — they describe a path production no longer uses |
 | Backups/restore | `plan/fixes/backup-restore-runbook.md` |
 | Feature work | `docs/PROGRESS.md`, then the relevant `plan/*.md` and task document |
 | Security/data | `plan/security-audit-2026-07.md`, `plan/auth-origin-hardening.md`, `docs/SYSTEM_REVIEW.md` |

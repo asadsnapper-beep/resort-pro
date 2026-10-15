@@ -91,7 +91,7 @@ export async function buildApp() {
   }
 
   const app = Fastify({
-    // Behind Coolify/Traefik: without this, request.protocol/hostname reflect
+    // Behind Traefik: without this, request.protocol/hostname reflect
     // the internal http connection instead of the real public https domain —
     // this silently broke every upload URL (defaulted to http://localhost:4000).
     trustProxy: true,

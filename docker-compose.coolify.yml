@@ -1,4 +1,19 @@
 # ─────────────────────────────────────────────────────────────────────────────
+# ⚠ HISTORICAL — this file is NOT what production runs.
+#
+# Production left Coolify on 2026-10-15/16 and is now a plain docker compose
+# stack in /opt/resortpro on the host, with containers rp-postgres, rp-redis,
+# rp-api, rp-web, rp-worker and rp-backup. That compose is not in git yet; see
+# plan/production-compose-in-git.md.
+#
+# Editing this file changes nothing on production. The old Coolify service is
+# stopped and renamed ARCHIVED-resortpro-DO-NOT-START — starting it would put a
+# second stack with stale data behind the same hostnames.
+#
+# scripts/check-backup-credentials.mjs still reads this file, so it is a
+# template that must stay internally consistent, not a live description.
+# ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 # ResortPro — Coolify deployment (pre-built images from GHCR)
 #
 # Images are built by GitHub Actions (.github/workflows/docker-build.yml)
