@@ -3,14 +3,23 @@
 # Build context: repo ROOT  (docker build -f apps/web/Dockerfile .)
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Base image comes from AWS's public ECR mirror of the Docker official
-# images, not from Docker Hub directly. Docker Hub's unauthenticated pull limit
-# (429 Too Many Requests on `node:20-alpine`) failed every image build on
-# shared GitHub runners, and an immediate re-run failed the same way — it is
-# not a transient blip. public.ecr.aws/docker/library/* carries the same
-# images; the alternative is a Docker Hub login in CI, which needs a token.
+# Base image comes from our own GHCR copy of the Docker official node image,
+# made by .github/workflows/mirror-base-images.yml. Docker Hub refused these
+# pulls with 429 "unauthenticated pull rate limit"; AWS public ECR then refused
+# them with 429 "Data limit exceeded". Both quotas are per source IP on shared
+# runners and neither is ours to raise. GHCR is not metered against us and the
+# build jobs already log in to it.
+#
+# Pinned by digest so a build is reproducible and upstream cannot change what
+# we ship. To refresh: run the "Mirror base images to GHCR" workflow, take the
+# digest from its job summary, and update NODE_IMAGE here and in
+# apps/api/Dockerfile. That is a deliberate commit, not an automatic one.
+#
+# Overridable for a local build without GHCR access:
+#   docker build --build-arg NODE_IMAGE=node:20-alpine -f apps/web/Dockerfile .
+ARG NODE_IMAGE=ghcr.io/asadsnapper-beep/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
 # ── Stage 1: base ─────────────────────────────────────────────────────────────
-FROM public.ecr.aws/docker/library/node:20-alpine AS base
+FROM ${NODE_IMAGE} AS base
 RUN apk add --no-cache libc6-compat python3 make g++
 # Install pnpm directly via npm — more reliable than corepack in CI/Docker
 RUN npm install -g pnpm@9
@@ -43,7 +52,7 @@ ENV NEXT_PUBLIC_CLARITY_ID=$NEXT_PUBLIC_CLARITY_ID
 RUN pnpm --filter @resort-pro/web build
 
 # ── Stage 3: runtime ──────────────────────────────────────────────────────────
-FROM public.ecr.aws/docker/library/node:20-alpine AS runner
+FROM ${NODE_IMAGE} AS runner
 RUN apk add --no-cache wget
 WORKDIR /app
 ENV NODE_ENV=production
