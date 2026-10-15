@@ -12,12 +12,23 @@ name: Verify production image build
 # Use it after changing a Dockerfile, the base-image pin, or anything the
 # builds depend on, and before a release that rests on one of those.
 #
-# Dispatch only — it never runs on a push, because a full image build on every
-# commit would cost minutes for an answer the pnpm build in ci.yml already
-# gives for the code itself.
+# Runs on dispatch, and on a push that touches what the images are built from.
+# Not on every commit: a full image build would cost minutes for an answer the
+# pnpm build in ci.yml already gives about the code. This answers the rarer
+# question — can the images still be built at all — which is precisely what a
+# Dockerfile or base-image change puts in doubt.
+#
+# The path trigger is also the only way to run this from a branch:
+# workflow_dispatch is offered only once a workflow is on the default branch.
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - apps/api/Dockerfile
+      - apps/web/Dockerfile
+      - .github/workflows/verify-image-build.yml
+      - .github/workflows/mirror-base-images.yml
 
 jobs:
   build:
