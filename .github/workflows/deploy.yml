@@ -97,7 +97,7 @@ jobs:
   # The production DB is not reachable from GitHub runners (docker-internal
   # host `postgres`), so a runner-side migrate job can never work.
 
-  # ─── Step 2: Deploy via Coolify API ────────────────────────────────────────
+  # ─── Step 2: Deploy to the production server (Tailscale + restricted SSH) ──
   deploy:
     name: Deploy to production server
     runs-on: ubuntu-latest
