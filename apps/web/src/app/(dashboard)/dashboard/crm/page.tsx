@@ -11,6 +11,7 @@ import { PageShell, PageHeader } from '@/components/patterns';
 import { useAuthStore } from '@/store/auth';
 import { api } from '@/lib/api';
 import { TAG_COLOURS, DEFAULT_TAG_COLOUR } from '@/lib/tag-colours';
+import { ContactDetailSheet } from '@/components/crm/ContactDetailSheet';
 
 /* ── Types ────────────────────────────────────────────────────────────────── */
 interface GuestContact {
@@ -229,6 +230,9 @@ function ContactsTab({ token }: { token: string }) {
   const [page, setPage]       = useState(1);
   const [pages, setPages]     = useState(1);
   const [failed, setFailed]   = useState(false);
+  // `GET /crm/contacts/:id` returns the score, consent, tags, stays, email and
+  // sequence enrolments, and nothing opened it (CRM QA finding 016).
+  const [openContact, setOpenContact] = useState<string | null>(null);
 
   const fetchGuests = useCallback(async () => {
     setLoading(true);
@@ -321,7 +325,15 @@ function ContactsTab({ token }: { token: string }) {
                             {g.firstName[0]}{g.lastName[0]}
                           </div>
                           <div>
-                            <p className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{g.firstName} {g.lastName}</p>
+                            {/* The name opens the sheet, not the whole row:
+                                the row also carries a recalc button, and a
+                                row-wide handler would fire on that too. */}
+                            <button
+                              onClick={() => setOpenContact(g.id)}
+                              className="text-left text-[13px] font-medium text-[#183153] hover:underline dark:text-[#f8fafc]"
+                            >
+                              {g.firstName} {g.lastName}
+                            </button>
                             <p className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">{g.email}</p>
                           </div>
                         </div>
@@ -369,6 +381,13 @@ function ContactsTab({ token }: { token: string }) {
             </table>
           </div>
         )}
+
+      <ContactDetailSheet
+        contactId={openContact}
+        token={token}
+        onClose={() => setOpenContact(null)}
+        onChanged={fetchGuests}
+      />
 
       {pages > 1 && !failed && (
         <div className="flex items-center justify-between gap-3">
