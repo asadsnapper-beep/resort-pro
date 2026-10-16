@@ -5,7 +5,7 @@ import {
   Users, Mail, Megaphone, GitBranch, BarChart3,
   Plus, Search, Send, Trash2, Play, Pause,
   X, ChevronDown, CheckCircle, Crown, Medal, Award,
-  TrendingUp, ArrowRight, RefreshCw, Loader2, AlertTriangle, Tag as TagIcon, Pencil,
+  TrendingUp, ArrowRight, RefreshCw, Loader2, AlertTriangle, Tag as TagIcon, Pencil, CalendarClock,
 } from 'lucide-react';
 import { PageShell, PageHeader } from '@/components/patterns';
 import { useAuthStore } from '@/store/auth';
@@ -457,9 +457,11 @@ function TagsTab({ token }: { token: string }) {
   const createTag = async () => {
     const trimmed = name.trim();
     if (!trimmed) { setError('A tag needs a name'); return; }
-    // The API has no uniqueness constraint on the name, so two tags called
-    // "VIP" are possible and indistinguishable on a guest. Caught here because
-    // the list is already loaded; the server should grow its own check.
+    // Checked here because the list is already loaded, so the owner hears it
+    // without a round trip. It is not the real boundary: GuestTag is
+    // `@@unique([tenantId, name])` and the route now answers 409 — an earlier
+    // version of this comment said the API had no such constraint, which was
+    // wrong.
     if (tags.some(t => t.name.toLowerCase() === trimmed.toLowerCase())) {
       setError(`There is already a tag called "${trimmed}"`);
       return;
@@ -603,6 +605,21 @@ function CampaignsTab({ token }: { token: string }) {
 
   const [failed, setFailed] = useState(false);
 
+  // `POST /crm/campaigns` has always accepted templateId, segment and
+  // scheduledAt, and the form sent none of them (CRM QA finding 016). The
+  // scheduled dispatcher has existed since baef93b, so scheduling was a
+  // working feature with no way to ask for it.
+  //
+  // The audience offers a tier and a tag and nothing else, because
+  // campaign-sender.ts reads exactly `segment.tier` and `segment.tag` and
+  // ignores anything else it is given. Offering a filter the sender drops on
+  // the floor is how you end up promising an audience and mailing everyone.
+  const [schedule, setSchedule] = useState('');
+  const [segTier, setSegTier]   = useState('');
+  const [segTag, setSegTag]     = useState('');
+  const [tagChoices, setTagChoices] = useState<Tag[]>([]);
+  const [templateChoices, setTemplateChoices] = useState<EmailTemplate[]>([]);
+
   const fetch = useCallback(async () => {
     setLoading(true);
     setFailed(false);
@@ -617,12 +634,54 @@ function CampaignsTab({ token }: { token: string }) {
 
   useEffect(() => { fetch(); }, [fetch]);
 
+  // Only when the form opens: reading the list is the common visit.
+  const openForm = async () => {
+    setShowNew(true);
+    setError('');
+    const auth = { headers: { Authorization: `Bearer ${token}` } };
+    const [tags, templates] = await Promise.all([
+      api.get('/crm/tags', auth).catch(() => null),
+      api.get('/crm/templates', auth).catch(() => null),
+    ]);
+    setTagChoices(tags?.data?.data ?? []);
+    setTemplateChoices(templates?.data?.data ?? []);
+  };
+
+  /** Only the two keys campaign-sender.ts actually reads. */
+  const buildSegment = () => {
+    const seg: Record<string, string> = {};
+    if (segTier) seg.tier = segTier;
+    if (segTag) seg.tag = segTag;
+    return seg;
+  };
+
+  const useTemplate = (id: string) => {
+    const t = templateChoices.find(x => x.id === id);
+    if (!t) return;
+    // Copies the content in rather than linking by id alone, so what the
+    // owner sees in the box is what goes out — editing a template later must
+    // not silently rewrite a campaign that was already approved.
+    setForm(f => ({ ...f, subject: f.subject || t.subject, html: t.html }));
+  };
+
   const createCampaign = async () => {
     if (!form.name || !form.subject || !form.html) { setError('All fields required'); return; }
+    if (schedule && new Date(schedule).getTime() <= Date.now()) {
+      setError('That time has already passed. Pick a future time, or leave it blank to save a draft.');
+      return;
+    }
     setSaving(true); setError('');
     try {
-      await api.post('/crm/campaigns', form, { headers: { Authorization: `Bearer ${token}` } });
-      setShowNew(false); setForm({ name: '', subject: '', html: '' }); fetch();
+      const segment = buildSegment();
+      await api.post('/crm/campaigns', {
+        ...form,
+        ...(Object.keys(segment).length ? { segment } : {}),
+        ...(schedule ? { scheduledAt: new Date(schedule).toISOString() } : {}),
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      setShowNew(false);
+      setForm({ name: '', subject: '', html: '' });
+      setSchedule(''); setSegTier(''); setSegTag('');
+      fetch();
     } catch { setError('Failed to create campaign'); }
     setSaving(false);
   };
@@ -653,7 +712,7 @@ function CampaignsTab({ token }: { token: string }) {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <button onClick={() => setShowNew(true)}
+        <button onClick={openForm}
           className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium hover:opacity-90"
           style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
           <Plus className="h-4 w-4" /> New Campaign
@@ -686,12 +745,92 @@ function CampaignsTab({ token }: { token: string }) {
               rows={6} placeholder="<h2>Hi {{guestName}},</h2><p>We have a special offer...</p>"
               className={inputCls + ' font-mono resize-none'} />
           </div>
+          {/* ── Start from a template ──────────────────────────────────── */}
+          {templateChoices.length > 0 && (
+            <div>
+              <label className={labelCls}>Start from a template (optional)</label>
+              <select
+                defaultValue=""
+                onChange={e => useTemplate(e.target.value)}
+                className={inputCls + ' cursor-pointer'}
+              >
+                <option value="">Write it myself</option>
+                {templateChoices.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-rp-micro text-rp-muted">
+                Copies the template's wording in so you can change it. Editing the
+                template later will not rewrite this campaign.
+              </p>
+            </div>
+          )}
+
+          {/* ── Audience ───────────────────────────────────────────────── */}
+          <div className="rounded-rp-panel border border-rp-border bg-rp-surface-2 p-4">
+            <p className="text-rp-body font-semibold text-rp-text">Who gets this</p>
+            <p className="mt-0.5 text-rp-meta text-rp-muted">
+              Leave both blank to send to every subscribed guest. Both set means
+              guests who match both.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className={labelCls}>Tier</label>
+                <select value={segTier} onChange={e => setSegTier(e.target.value)}
+                  className={inputCls + ' cursor-pointer'}>
+                  <option value="">Any tier</option>
+                  {Object.entries(TIER_CONFIG).map(([k, v]) => (
+                    <option key={k} value={k}>{v.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Tag</label>
+                <select value={segTag} onChange={e => setSegTag(e.target.value)}
+                  className={inputCls + ' cursor-pointer'}>
+                  <option value="">Any tag</option>
+                  {tagChoices.map(t => (
+                    <option key={t.id} value={t.name}>{t.name}</option>
+                  ))}
+                </select>
+                {tagChoices.length === 0 && (
+                  <p className="mt-1 text-rp-micro text-rp-muted">
+                    No tags yet — create one on the Tags tab.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ── When ───────────────────────────────────────────────────── */}
+          <div>
+            <label className={labelCls}>Send at (optional)</label>
+            <input
+              type="datetime-local"
+              value={schedule}
+              onChange={e => setSchedule(e.target.value)}
+              className={inputCls + ' max-w-[260px]'}
+            />
+            <p className="mt-1 text-rp-micro text-rp-muted">
+              {schedule
+                ? 'Saved as scheduled. The worker checks every 15 minutes and sends it when the time passes.'
+                : 'Leave blank to save a draft you send by hand.'}
+            </p>
+          </div>
+
           {error && <p className="text-[12px]" style={{ color: '#c43c3c' }}>{error}</p>}
           <div className="flex gap-3 pt-2" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
             <button onClick={createCampaign} disabled={saving}
               className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium disabled:opacity-60 hover:opacity-90"
               style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
-              {saving ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…</> : <><Plus className="h-4 w-4" /> Save as Draft</>}
+              {/* The label has to follow the outcome: with a time set the API
+                  stores this as SCHEDULED, so "Save as Draft" would be the
+                  button telling you the opposite of what it did. */}
+              {saving
+                ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…</>
+                : schedule
+                  ? <><CalendarClock className="h-4 w-4" /> Schedule</>
+                  : <><Plus className="h-4 w-4" /> Save as Draft</>}
             </button>
             <button onClick={() => setShowNew(false)}
               className="rounded-[9px] border px-4 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]"

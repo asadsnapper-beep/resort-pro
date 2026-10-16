@@ -380,6 +380,48 @@ async function main() {
   console.log(`✅ ${guestIds.length} Guests created`);
 
   // ════════════════════════════════════════════════════════════════
+  // 6b. GUEST TAGS
+  //
+  // The seed created none, so the CRM's Tags tab was empty in the demo and
+  // the campaign segments could not name one. Two of those segments used to
+  // claim an audience the sender cannot express — see the note on `segment`
+  // below — and the honest way to say "these guests" is a tag, so the demo
+  // needs real ones.
+  //
+  // Names are matched by the segments above, so changing one here means
+  // changing it there.
+  // ════════════════════════════════════════════════════════════════
+  const tagDefs = [
+    { name: 'Corporate',    color: '#183153', guests: [10] },
+    { name: 'Win-Back',     color: '#c4733c', guests: [18] },
+    { name: 'Honeymoon',    color: '#c43c3c', guests: [16] },
+    { name: 'VIP',          color: '#b89040', guests: [8] },
+    { name: 'Repeat Guest', color: '#2f8f7a', guests: [0, 1, 4] },
+  ];
+
+  let tagRelations = 0;
+  for (const t of tagDefs) {
+    const tag = await prisma.guestTag.upsert({
+      where:  { tenantId_name: { tenantId: tid, name: t.name } },
+      update: {},
+      create: { tenantId: tid, name: t.name, color: t.color },
+    }).catch(() => null);
+    if (!tag) continue;
+
+    for (const idx of t.guests) {
+      const guestId = guestIds[idx];
+      if (!guestId) continue;
+      await prisma.guestTagRelation.upsert({
+        where:  { guestId_tagId: { guestId, tagId: tag.id } },
+        create: { guestId, tagId: tag.id },
+        update: {},
+      }).catch(() => {});
+      tagRelations += 1;
+    }
+  }
+  console.log(`✅ ${tagDefs.length} Guest tags created (${tagRelations} assignments)`);
+
+  // ════════════════════════════════════════════════════════════════
   // 7. BOOKINGS
   // ════════════════════════════════════════════════════════════════
   type BookingDef = {
@@ -1079,13 +1121,29 @@ async function main() {
         scheduledAt: c.scheduledAt,
         sentAt: c.sentAt,
         recipientCount: c.recipientCount,
+        // Only `tier` and `tag` exist as far as the sender is concerned:
+        // campaign-sender.ts reads `segment.tier` and `segment.tag` and
+        // ignores every other key. Three of the four shapes here were
+        // therefore fiction —
+        //
+        //   { tier: 'VIP' }        VIP is not a GuestTier (STANDARD, SILVER,
+        //                          GOLD, PLATINUM), so this matched nobody
+        //   { inactiveDays: 90 }   not read at all → sent to everyone
+        //   { tags: ['Corporate'] } the key is `tag`, singular, and a name →
+        //                          not read → sent to everyone
+        //
+        // So two demo campaigns advertised a narrow audience and would have
+        // mailed the whole list, and one could never find a recipient. Same
+        // class of thing as the 87 fake opens this file used to carry.
         segment: c.name.includes('VIP')
-          ? { tier: 'VIP' }
+          ? { tier: 'PLATINUM' }
           : c.name.includes('Win-Back')
-          ? { inactiveDays: 90 }
+          // The sender has no inactivity filter. A tag is the honest way to
+          // express "these guests", and the Tags tab can now make one.
+          ? { tag: 'Win-Back' }
           : c.name.includes('Corporate')
-          ? { tags: ['Corporate'] }
-          : { all: true },
+          ? { tag: 'Corporate' }
+          : {},
       },
     }).catch(() => null);
 

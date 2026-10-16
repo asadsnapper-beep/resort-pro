@@ -433,11 +433,38 @@ export async function crmRoutes(app: FastifyInstance) {
     return ok(tags);
   });
 
-  app.post('/tags', { preHandler: pre }, async (request) => {
+  app.post('/tags', { preHandler: pre }, async (request, reply) => {
     const { db } = request;
     const body = z.object({ name: z.string().min(1), color: z.string().optional() }).parse(request.body);
-    const tag  = await db.guestTag.create({ data: { name: body.name, color: body.color ?? '#6b7280' } });
-    return ok(tag, 'Tag created');
+
+    // GuestTag is `@@unique([tenantId, name])`, so a repeat name does not
+    // reach the database — it raises P2002 and, unhandled, surfaced as a 500.
+    // A second tag with the same name would be indistinguishable from the
+    // first once it is on a guest, so refusing is right; answering 500 for a
+    // thing the caller can fix is not.
+    const existing = await db.guestTag.findFirst({ where: { name: body.name } });
+    if (existing) {
+      return reply.status(409).send({
+        success: false,
+        error: `There is already a tag called "${body.name}".`,
+      });
+    }
+
+    try {
+      const tag = await db.guestTag.create({ data: { name: body.name, color: body.color ?? '#6b7280' } });
+      return ok(tag, 'Tag created');
+    } catch (err) {
+      // Two requests can pass the check above at the same time; the
+      // constraint is what actually decides, so translate its answer rather
+      // than letting a race read as a server fault.
+      if ((err as { code?: string }).code === 'P2002') {
+        return reply.status(409).send({
+          success: false,
+          error: `There is already a tag called "${body.name}".`,
+        });
+      }
+      throw err;
+    }
   });
 
   app.delete('/tags/:id', { preHandler: pre }, async (request, reply) => {
