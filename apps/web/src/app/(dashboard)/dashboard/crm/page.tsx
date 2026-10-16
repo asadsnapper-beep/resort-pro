@@ -5,11 +5,12 @@ import {
   Users, Mail, Megaphone, GitBranch, BarChart3,
   Plus, Search, Send, Trash2, Play, Pause,
   X, ChevronDown, CheckCircle, Crown, Medal, Award,
-  TrendingUp, ArrowRight, RefreshCw, Loader2, AlertTriangle,
+  TrendingUp, ArrowRight, RefreshCw, Loader2, AlertTriangle, Tag as TagIcon,
 } from 'lucide-react';
 import { PageShell, PageHeader } from '@/components/patterns';
 import { useAuthStore } from '@/store/auth';
 import { api } from '@/lib/api';
+import { TAG_COLOURS, DEFAULT_TAG_COLOUR } from '@/lib/tag-colours';
 
 /* ── Types ────────────────────────────────────────────────────────────────── */
 interface GuestContact {
@@ -136,10 +137,11 @@ function StatusPill({ status }: { status: string }) {
 ══════════════════════════════════════════════════════════════════════════════ */
 export default function CRMPage() {
   const { token } = useAuthStore();
-  const [tab, setTab] = useState<'contacts' | 'campaigns' | 'sequences' | 'templates' | 'analytics'>('contacts');
+  const [tab, setTab] = useState<'contacts' | 'tags' | 'campaigns' | 'sequences' | 'templates' | 'analytics'>('contacts');
 
   const tabs = [
     { id: 'contacts',  label: 'Contacts',  Icon: Users     },
+    { id: 'tags',      label: 'Tags',      Icon: TagIcon   },
     { id: 'campaigns', label: 'Campaigns', Icon: Megaphone },
     { id: 'sequences', label: 'Sequences', Icon: GitBranch },
     { id: 'templates', label: 'Templates', Icon: Mail      },
@@ -167,6 +169,7 @@ export default function CRMPage() {
       </div>
 
       {tab === 'contacts'  && <ContactsTab  token={token!} />}
+      {tab === 'tags'      && <TagsTab      token={token!} />}
       {tab === 'campaigns' && <CampaignsTab token={token!} />}
       {tab === 'sequences' && <SequencesTab token={token!} />}
       {tab === 'templates' && <TemplatesTab token={token!} />}
@@ -387,6 +390,177 @@ function ContactsTab({ token }: { token: string }) {
         </div>
       )}
       </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   TAGS TAB
+
+   `GET/POST /crm/tags` and `DELETE /crm/tags/:id` have always existed and the
+   dashboard called none of them (CRM QA 2026-10-07, finding 016). The Contacts
+   table renders each guest's tags, so the column was there and could never
+   fill: no screen could create a tag, and the QA's own run recorded tags as
+   "Fail at assignment".
+
+   This tab is the half that manages them. Putting a tag *on* a guest is the
+   other half and comes next — a tag nobody can assign is still only half a
+   feature, and saying so is better than implying this closes 016.
+══════════════════════════════════════════════════════════════════════════════ */
+function TagsTab({ token }: { token: string }) {
+  const [tags, setTags]       = useState<Tag[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed]   = useState(false);
+  const [name, setName]       = useState('');
+  const [colour, setColour]   = useState<string>(DEFAULT_TAG_COLOUR);
+  const [saving, setSaving]   = useState(false);
+  const [error, setError]     = useState('');
+
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    setFailed(false);
+    try {
+      const res = await api.get('/crm/tags', { headers: { Authorization: `Bearer ${token}` } });
+      setTags(res.data.data);
+    } catch {
+      setFailed(true);
+    }
+    setLoading(false);
+  }, [token]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  const createTag = async () => {
+    const trimmed = name.trim();
+    if (!trimmed) { setError('A tag needs a name'); return; }
+    // The API has no uniqueness constraint on the name, so two tags called
+    // "VIP" are possible and indistinguishable on a guest. Caught here because
+    // the list is already loaded; the server should grow its own check.
+    if (tags.some(t => t.name.toLowerCase() === trimmed.toLowerCase())) {
+      setError(`There is already a tag called "${trimmed}"`);
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      await api.post('/crm/tags', { name: trimmed, color: colour },
+        { headers: { Authorization: `Bearer ${token}` } });
+      setName('');
+      fetch();
+    } catch (err) {
+      setError(apiMessage(err, 'Could not create that tag. Try again.'));
+    }
+    setSaving(false);
+  };
+
+  const deleteTag = async (tag: Tag) => {
+    // The count is in the confirm on purpose: deleting a tag removes it from
+    // every guest who has it, and "Delete this tag?" does not tell you that
+    // you are about to untag forty people.
+    const used = tag._count.relations;
+    const warning = used > 0
+      ? `"${tag.name}" is on ${used} ${used === 1 ? 'guest' : 'guests'}. Deleting it removes it from all of them. Continue?`
+      : `Delete "${tag.name}"?`;
+    if (!confirm(warning)) return;
+    try {
+      await api.delete(`/crm/tags/${tag.id}`, { headers: { Authorization: `Bearer ${token}` } });
+      fetch();
+    } catch (err) {
+      alert(apiMessage(err, 'Could not delete that tag.'));
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* New tag */}
+      <div className="rounded-rp-card border border-rp-border bg-rp-surface p-5 shadow-rp-card">
+        <p className="text-rp-body font-semibold text-rp-text">New tag</p>
+        <p className="mt-0.5 text-rp-meta text-rp-muted">
+          Group guests by anything you sort them by — Corporate, Honeymoon, Repeat.
+          Campaign segments can target a tag.
+        </p>
+
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <input
+            value={name}
+            onChange={e => { setName(e.target.value); setError(''); }}
+            onKeyDown={e => { if (e.key === 'Enter') createTag(); }}
+            placeholder="Tag name"
+            className={inputCls + ' max-w-[240px]'}
+          />
+          <div className="flex items-center gap-1.5">
+            {TAG_COLOURS.map(c => (
+              <button
+                key={c}
+                onClick={() => setColour(c)}
+                aria-label={`Use colour ${c}`}
+                aria-pressed={colour === c}
+                className={`h-6 w-6 rounded-full transition-transform ${colour === c ? 'scale-110 ring-2 ring-offset-2 ring-rp-border-md' : ''}`}
+                style={{ background: c }}
+              />
+            ))}
+          </div>
+          <button
+            onClick={createTag}
+            disabled={saving}
+            className="flex items-center gap-2 rounded-rp-ctrl bg-rp-btn-accent px-4 py-2 text-rp-body font-medium text-rp-btn-accent-text hover:opacity-90 disabled:opacity-60"
+          >
+            {saving ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Creating…</> : <><Plus className="h-4 w-4" /> Create</>}
+          </button>
+        </div>
+
+        {error && (
+          <p className="mt-3 rounded-rp-panel bg-rp-red-bg px-3 py-2 text-rp-meta text-rp-danger">{error}</p>
+        )}
+      </div>
+
+      {/* The tags themselves */}
+      {loading ? (
+        <div className="py-12 text-center text-rp-body text-rp-muted">Loading tags…</div>
+      ) : failed ? (
+        <LoadFailed what="tags" onRetry={fetch} />
+      ) : tags.length === 0 ? (
+        <div className="rounded-rp-card border border-rp-border bg-rp-surface py-16 text-center shadow-rp-card">
+          <TagIcon className="mx-auto mb-3 h-10 w-10 text-rp-faint" />
+          <p className="text-rp-body text-rp-muted">No tags yet. Create one above.</p>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-rp-card border border-rp-border bg-rp-surface shadow-rp-card">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-rp-surface-2">
+                {['Tag', 'Guests', ''].map(h => (
+                  <th key={h} className="px-5 py-3 text-left text-rp-label font-semibold uppercase tracking-[0.08em] text-rp-muted">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {tags.map(t => (
+                <tr key={t.id} className="border-t border-rp-border">
+                  <td className="px-5 py-3">
+                    <span className="inline-flex items-center gap-2 text-rp-body text-rp-text">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: t.color }} />
+                      {t.name}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-rp-body text-rp-muted">
+                    {t._count.relations}
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    <button
+                      onClick={() => deleteTag(t)}
+                      aria-label={`Delete tag ${t.name}`}
+                      className="flex h-[28px] w-[28px] items-center justify-center rounded-rp-xs text-rp-faint transition-colors hover:bg-rp-red-bg"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

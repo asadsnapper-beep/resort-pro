@@ -493,7 +493,13 @@ export async function crmRoutes(app: FastifyInstance) {
         data: DEFAULT_EMAIL_TEMPLATES.map(t => ({ ...t, tenantId })),
         skipDuplicates: true,
       });
-      templates = await db.emailTemplate.findMany({ where: {}, orderBy: { isDefault: 'desc', createdAt: 'asc' } });
+      // Array form here too. The note above explains why the call before this
+      // one needed it; this fallback was left on the object form, and it is
+      // the branch that runs on a tenant's *first* visit to the tab — the one
+      // place a mistake stays hidden, because it only ever runs once each.
+      templates = await db.emailTemplate.findMany({
+        where: {}, orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+      });
     }
 
     return ok(templates);
