@@ -5,7 +5,7 @@ import {
   Users, Mail, Megaphone, GitBranch, BarChart3,
   Plus, Search, Send, Trash2, Play, Pause,
   X, ChevronDown, CheckCircle, Crown, Medal, Award,
-  TrendingUp, ArrowRight, RefreshCw, Loader2, AlertTriangle, Tag as TagIcon,
+  TrendingUp, ArrowRight, RefreshCw, Loader2, AlertTriangle, Tag as TagIcon, Pencil,
 } from 'lucide-react';
 import { PageShell, PageHeader } from '@/components/patterns';
 import { useAuthStore } from '@/store/auth';
@@ -22,7 +22,12 @@ interface GuestContact {
   _count: { bookings: number };
 }
 interface Tag { id: string; name: string; color: string; _count: { relations: number }; }
-interface EmailTemplate { id: string; name: string; subject: string; html: string; createdAt: string; }
+interface EmailTemplate {
+  id: string; name: string; subject: string; html: string; createdAt: string;
+  preheader?: string;
+  /** One of the eight starter templates — restorable, unlike one written here. */
+  isDefault?: boolean;
+}
 interface Campaign {
   id: string; name: string; subject: string; status: string;
   recipientCount: number; sentAt?: string; scheduledAt?: string;
@@ -1006,6 +1011,11 @@ function TemplatesTab({ token }: { token: string }) {
   const [showNew, setShowNew]     = useState(false);
   const [form, setForm]   = useState({ name: '', subject: '', html: '', preheader: '' });
   const [saving, setSaving] = useState(false);
+  // `PUT /crm/templates/:id` has always existed and nothing called it, so
+  // fixing a typo meant deleting the template and typing it again (CRM QA
+  // finding 016). The same form does both; this is which one.
+  const [editing, setEditing] = useState<EmailTemplate | null>(null);
+  const [restoring, setRestoring] = useState(false);
 
   const [failed, setFailed] = useState(false);
   const [error, setError]   = useState('');
@@ -1024,25 +1034,69 @@ function TemplatesTab({ token }: { token: string }) {
 
   useEffect(() => { fetch(); }, [fetch]);
 
-  const createTemplate = async () => {
+  const blank = { name: '', subject: '', html: '', preheader: '' };
+
+  const closeForm = () => {
+    setShowNew(false);
+    setEditing(null);
+    setForm(blank);
+    setError('');
+  };
+
+  const startEdit = (t: EmailTemplate) => {
+    setEditing(t);
+    setShowNew(true);
+    setError('');
+    setForm({
+      name: t.name, subject: t.subject, html: t.html,
+      preheader: (t as { preheader?: string }).preheader ?? '',
+    });
+  };
+
+  const saveTemplate = async () => {
     if (!form.name || !form.subject || !form.html) { setError('All fields required'); return; }
     setSaving(true);
     setError('');
     try {
-      await api.post('/crm/templates', form, { headers: { Authorization: `Bearer ${token}` } });
-      setShowNew(false); setForm({ name: '', subject: '', html: '', preheader: '' }); fetch();
-    } catch (err: any) {
+      const auth = { headers: { Authorization: `Bearer ${token}` } };
+      if (editing) {
+        await api.put(`/crm/templates/${editing.id}`, form, auth);
+      } else {
+        await api.post('/crm/templates', form, auth);
+      }
+      closeForm();
+      fetch();
+    } catch (err) {
       // Silently swallowed before: the form stayed open with the text still in
       // it and nothing said why, so the obvious read was "the button is dead".
-      setError(err?.response?.data?.error || 'That did not save. Try again.');
+      setError(apiMessage(err, 'That did not save. Try again.'));
     }
     setSaving(false);
   };
 
-  const deleteTemplate = async (id: string) => {
-    if (!confirm('Delete this template?')) return;
+  const restoreDefaults = async () => {
+    setRestoring(true);
     try {
-      await api.delete(`/crm/templates/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await api.post('/crm/templates/restore-defaults', {},
+        { headers: { Authorization: `Bearer ${token}` } });
+      alert(res.data.message);
+      fetch();
+    } catch (err) {
+      alert(apiMessage(err, 'Could not restore the default templates.'));
+    }
+    setRestoring(false);
+  };
+
+  const deleteTemplate = async (t: EmailTemplate) => {
+    // A default is starter content and is restorable; a template the owner
+    // wrote is not. Same button, different stakes, so say which.
+    const isDefault = (t as { isDefault?: boolean }).isDefault === true;
+    const warning = isDefault
+      ? `"${t.name}" is one of the default templates. You can bring it back with "Restore defaults". Delete it?`
+      : `Delete "${t.name}"? This one was written here, so it cannot be restored.`;
+    if (!confirm(warning)) return;
+    try {
+      await api.delete(`/crm/templates/${t.id}`, { headers: { Authorization: `Bearer ${token}` } });
       fetch();
     } catch (err) {
       alert(apiMessage(err, 'Could not delete that template.'));
@@ -1051,8 +1105,17 @@ function TemplatesTab({ token }: { token: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <button onClick={() => setShowNew(true)}
+      <div className="flex flex-wrap justify-end gap-3">
+        {/* Deleting a default used to be unrecoverable: GET /templates
+            re-creates them only when the list is completely empty, so losing
+            one left it gone. */}
+        <button onClick={restoreDefaults} disabled={restoring}
+          className="flex items-center gap-2 rounded-rp-ctrl border border-rp-border-md px-4 py-2 text-rp-body font-medium text-rp-subtle hover:opacity-80 disabled:opacity-60">
+          {restoring
+            ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Restoring…</>
+            : <><RefreshCw className="h-4 w-4" /> Restore defaults</>}
+        </button>
+        <button onClick={() => { setEditing(null); setForm(blank); setShowNew(true); }}
           className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium hover:opacity-90"
           style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
           <Plus className="h-4 w-4" /> New Template
@@ -1063,7 +1126,7 @@ function TemplatesTab({ token }: { token: string }) {
         <div className="rounded-[14px] border bg-white p-6 space-y-4"
           style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           <div className="flex items-center justify-between">
-            <h3 className="text-[14px] font-semibold text-[#183153] dark:text-[#f8fafc]">New Email Template</h3>
+            <h3 className="text-[14px] font-semibold text-[#183153] dark:text-[#f8fafc]">{editing ? `Edit “${editing.name}”` : 'New Email Template'}</h3>
             <button onClick={() => setShowNew(false)}
               className="flex h-[26px] w-[26px] items-center justify-center rounded-full hover:bg-[#f4f1eb] text-[#64748b] dark:text-[#a9c1d0]"><X className="h-4 w-4" /></button>
           </div>
@@ -1094,12 +1157,14 @@ function TemplatesTab({ token }: { token: string }) {
             <p className="rounded-rp-card bg-rp-red-bg px-3 py-2 text-rp-body text-rp-danger">{error}</p>
           )}
           <div className="flex gap-3 pt-2" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
-            <button onClick={createTemplate} disabled={saving}
+            <button onClick={saveTemplate} disabled={saving}
               className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium disabled:opacity-60 hover:opacity-90"
               style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
-              {saving ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…</> : 'Save Template'}
+              {saving
+                ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…</>
+                : editing ? 'Save changes' : 'Save Template'}
             </button>
-            <button onClick={() => setShowNew(false)}
+            <button onClick={closeForm}
               className="rounded-[9px] border px-4 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]"
               style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
               Cancel
@@ -1127,12 +1192,25 @@ function TemplatesTab({ token }: { token: string }) {
                   style={{ background: 'var(--rp-teal-bg)' }}>
                   <Mail className="h-5 w-5" style={{ color: '#183153' }} />
                 </div>
-                <button onClick={() => deleteTemplate(t.id)} aria-label="Delete template"
-                  className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#fef2f2] text-[#94a3b8] dark:text-[#7f99ab]">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => startEdit(t)} aria-label={`Edit template ${t.name}`}
+                    className="flex h-[26px] w-[26px] items-center justify-center rounded-rp-xs text-rp-faint transition-colors hover:bg-rp-surface-3 hover:text-rp-text">
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button onClick={() => deleteTemplate(t)} aria-label={`Delete template ${t.name}`}
+                    className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#fef2f2] text-[#94a3b8] dark:text-[#7f99ab]">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
-              <h3 className="text-[13.5px] font-semibold mb-1 text-[#183153] dark:text-[#f8fafc]">{t.name}</h3>
+              <div className="mb-1 flex items-center gap-2">
+                <h3 className="text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">{t.name}</h3>
+                {(t as { isDefault?: boolean }).isDefault && (
+                  <span className="rounded-rp-xs bg-rp-surface-3 px-1.5 py-[1px] text-rp-micro font-semibold text-rp-muted">
+                    Default
+                  </span>
+                )}
+              </div>
               <p className="text-[12.5px] mb-3 flex-1 line-clamp-2 text-[#64748b] dark:text-[#a9c1d0]">{t.subject}</p>
               <p className="text-[11.5px] text-[#94a3b8] dark:text-[#7f99ab]">{new Date(t.createdAt).toLocaleDateString()}</p>
             </div>

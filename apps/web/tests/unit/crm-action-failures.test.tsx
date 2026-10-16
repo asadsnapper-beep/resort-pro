@@ -147,7 +147,9 @@ describe('deleting a template that is not there', () => {
 
     render(<CRMPage />);
     openTab('Templates');
-    fireEvent.click(await screen.findByLabelText('Delete template'));
+    // The label names the template now — in a grid of them, "Delete
+    // template" did not say which one.
+    fireEvent.click(await screen.findByLabelText('Delete template Welcome'));
 
     await waitFor(() => expect(alerted).toContain('Template not found'));
   });

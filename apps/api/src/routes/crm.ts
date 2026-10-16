@@ -536,6 +536,49 @@ export async function crmRoutes(app: FastifyInstance) {
     return ok(null, 'Template deleted');
   });
 
+  /**
+   * POST /api/crm/templates/restore-defaults
+   *
+   * Puts back any of the eight starter templates that is missing.
+   *
+   * Deleting one was unrecoverable, which the QA filed as "template defaults
+   * can be deleted; there is no protection or restore control" (finding 016).
+   * `GET /templates` does re-create them — but only when the list is
+   * completely empty, so deleting *one* left it gone for good while the
+   * mechanism to bring it back sat one condition away.
+   *
+   * Restoring rather than refusing the delete, deliberately. A resort that
+   * does not send win-back offers should be able to remove that template; the
+   * problem was never that deletion is wrong, it is that it could not be
+   * undone. This leaves the owner in charge and takes away the cliff.
+   *
+   * Matched by name, so a default the owner edited and renamed is treated as
+   * gone and comes back alongside their version rather than overwriting it.
+   */
+  app.post('/templates/restore-defaults', { preHandler: pre }, async (request) => {
+    const { db } = request;
+    const { tenantId } = request.user as JwtPayload;
+
+    const existing = await db.emailTemplate.findMany({ where: {}, select: { name: true } });
+    const have = new Set(existing.map((t) => t.name));
+    const missing = DEFAULT_EMAIL_TEMPLATES.filter((t) => !have.has(t.name));
+
+    if (missing.length === 0) {
+      return ok({ restored: 0, names: [] }, 'Nothing was missing — all default templates are present.');
+    }
+
+    await db.emailTemplate.createMany({
+      data: missing.map((t) => ({ ...t, tenantId })),
+      skipDuplicates: true,
+    });
+
+    const names = missing.map((t) => t.name);
+    return ok(
+      { restored: names.length, names },
+      `Restored ${names.length} default ${names.length === 1 ? 'template' : 'templates'}: ${names.join(', ')}.`,
+    );
+  });
+
   /* ── CAMPAIGNS ────────────────────────────────────────────────────────────── */
 
   app.get('/campaigns', { preHandler: pre }, async (request) => {
