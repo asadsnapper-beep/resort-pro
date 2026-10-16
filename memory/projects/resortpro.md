@@ -249,6 +249,26 @@ The only self-serve plans are defined in `packages/types/src/plans.ts`:
   relevant build/tests, deploy only after an explicit implementation request,
   and report any configuration action that needs founder-owned credentials.
 
+### There are two demo seeds, and only one of them runs
+
+This cost a session's work before the difference was noticed, so check it
+before concluding anything about what the demo does.
+
+| file | tenant | who runs it |
+|---|---|---|
+| `apps/api/src/scripts/seed-demo.ts` | slug `demo`, "Coral Bay Resort", 11 guests | **CI** (`pnpm seed:demo` from `apps/api`) and the **API container at startup** |
+| `packages/database/prisma/demo-seed.ts` | slug `palm-paradise-resort`, 19 guests | nothing automated — only by hand from `packages/database` |
+
+So a fix made in the second file reaches no environment on its own, and a green
+CI says nothing about it. The giveaway is the guest count: staging reporting
+"10 guests" is the live seed, not the other one.
+
+The live seed is the better-built of the two: it skips entirely if the demo
+tenant already exists, takes `--refresh` / `SEED_DEMO_REFRESH=1` to rebuild,
+and refuses to refresh a tenant that is not flagged `isDemo`. Its guests were
+always on `@coralbay.demo` / `@example.com`, so the "the demo could mail
+strangers" hazard was only ever in the unused file.
+
 ### Backups — read before promising anything about them
 
 - The `backup` sidecar runs `scripts/backup-db.sh`, which runs two independent

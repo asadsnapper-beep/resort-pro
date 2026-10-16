@@ -1,3 +1,23 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// ⚠ THIS IS NOT THE SEED CI OR PRODUCTION RUNS.
+//
+// Two demo seeds exist and they are easy to confuse — this one cost a session's
+// work before the difference was noticed:
+//
+//   apps/api/src/scripts/seed-demo.ts   tenant slug 'demo', "Coral Bay Resort",
+//                                       10 guests. Run by CI (`pnpm seed:demo`
+//                                       from apps/api) and by the API container
+//                                       at startup. THAT ONE IS LIVE.
+//
+//   this file                           tenant slug 'palm-paradise-resort',
+//                                       19 guests. Nothing automated runs it;
+//                                       only `pnpm seed:demo` from
+//                                       packages/database, by hand.
+//
+// So a fix made here reaches no environment on its own, and CI passing says
+// nothing about it. Check which file you are in before concluding anything
+// about what the demo does.
+// ─────────────────────────────────────────────────────────────────────────────
 /**
  * ResortPro — Full Demo Seed
  * Run: cd packages/database && npx ts-node --compiler-options '{"module":"CommonJS"}' prisma/demo-seed.ts

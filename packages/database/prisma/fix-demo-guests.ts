@@ -17,6 +17,13 @@
  * Idempotent and additive: run it twice and the second run reports no work.
  * It deletes nothing.
  *
+ * ⚠ This targets tenant slug 'palm-paradise-resort', which is THIS directory's
+ *   seed — not the live one. CI and the API container run
+ *   apps/api/src/scripts/seed-demo.ts, whose tenant is slug 'demo' and whose
+ *   guests were already on @coralbay.demo / @example.com. So on staging this
+ *   script finds no tenant and correctly does nothing; it was written for a
+ *   hazard that the live seed never had.
+ *
  *   DATABASE_URL=… npx tsx prisma/fix-demo-guests.ts          # report only
  *   DATABASE_URL=… npx tsx prisma/fix-demo-guests.ts --apply  # make changes
  */
