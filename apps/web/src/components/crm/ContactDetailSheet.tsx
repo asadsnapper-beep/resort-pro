@@ -27,6 +27,7 @@ import { api } from '@/lib/api';
 import { TAG_COLOURS } from '@/lib/tag-colours';
 
 interface TagRow { id: string; name: string; color: string }
+interface SequenceRow { id: string; name: string; trigger: string; status: string }
 
 interface ContactDetail {
   id: string;
@@ -43,7 +44,7 @@ interface ContactDetail {
     totalAmount: number; room?: { name: string } | null;
   }[];
   emailSends: { id: string; subject: string; status: string; createdAt: string }[];
-  enrollments: { id: string; status: string; sequence: { name: string; trigger: string } }[];
+  enrollments: { id: string; status: string; sequenceId: string; sequence: { name: string; trigger: string } }[];
 }
 
 const TIER_LABEL: Record<string, string> = {
@@ -78,6 +79,12 @@ export function ContactDetailSheet({
   const [allTags, setAllTags] = useState<TagRow[]>([]);
   const [picking, setPicking] = useState(false);
   const [busyTag, setBusyTag] = useState<string | null>(null);
+  // `POST /crm/sequences/:id/enroll` existed and no screen called it, so a
+  // sequence could only ever be joined by its trigger firing — there was no
+  // way to put one guest into a welcome flow by hand (CRM QA finding 016).
+  const [sequences, setSequences] = useState<SequenceRow[]>([]);
+  const [enrolling, setEnrolling] = useState(false);
+  const [busySeq, setBusySeq] = useState<string | null>(null);
 
   const auth = { headers: { Authorization: `Bearer ${token}` } };
 
@@ -110,6 +117,52 @@ export function ContactDetailSheet({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  const loadSequences = useCallback(async () => {
+    try {
+      const res = await api.get('/crm/sequences', auth);
+      setSequences(res.data.data);
+    } catch {
+      setSequences([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  const enrol = async (seq: SequenceRow, existing?: { status: string }) => {
+    if (!contactId || !data) return;
+
+    // The endpoint upserts and resets: status ACTIVE, currentStep 0,
+    // completedAt null. So re-enrolling somebody who finished sends them the
+    // whole sequence again, and the word for that is "restart", not "enrol".
+    const again = !!existing;
+    const unsubscribed = data.consent?.subscribed === false;
+
+    const lines = [
+      again
+        ? `Restart "${seq.name}" for ${data.firstName}? They finished it, and restarting sends every step again from the first.`
+        : `Enrol ${data.firstName} in "${seq.name}"? They will start receiving its emails.`,
+    ];
+    if (unsubscribed) {
+      lines.push('');
+      lines.push('Note: this guest is unsubscribed, so the worker will mark the enrolment UNSUBSCRIBED and send nothing.');
+    }
+    if (seq.status !== 'ACTIVE') {
+      lines.push('');
+      lines.push(`Note: this sequence is ${seq.status}, so nothing is sent until it is active.`);
+    }
+    if (!confirm(lines.join('\n'))) return;
+
+    setBusySeq(seq.id);
+    try {
+      await api.post(`/crm/sequences/${seq.id}/enroll`, { guestId: contactId }, auth);
+      await load();
+      setEnrolling(false);
+      onChanged?.();
+    } catch (err: any) {
+      alert(err?.response?.data?.error || 'Could not enrol them in that sequence.');
+    }
+    setBusySeq(null);
+  };
 
   const setTag = async (tagId: string, action: 'add' | 'remove') => {
     if (!contactId) return;
@@ -292,6 +345,58 @@ export function ContactDetailSheet({
                   </li>
                 ))}
               </ul>
+            )}
+
+            {/* Enrolling by hand. Until now a sequence could only be joined by
+                its trigger firing, so there was no way to put one guest into a
+                welcome flow — the endpoint existed and nothing called it. */}
+            {!enrolling ? (
+              <button
+                onClick={() => { setEnrolling(true); loadSequences(); }}
+                className="inline-flex items-center gap-1 rounded-rp-xs border border-dashed border-rp-border-md px-2 py-[3px] text-rp-micro font-semibold text-rp-muted hover:text-rp-text"
+              >
+                <Plus className="h-3 w-3" /> Enrol in a sequence
+              </button>
+            ) : sequences.length === 0 ? (
+              <p className="text-rp-micro text-rp-muted">
+                No sequences exist yet — build one on the Sequences tab.
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                {sequences.map(seq => {
+                  const existing = data.enrollments.find(e => e.sequenceId === seq.id);
+                  const active = existing?.status === 'ACTIVE';
+                  return (
+                    <button
+                      key={seq.id}
+                      onClick={() => enrol(seq, existing && !active ? existing : undefined)}
+                      disabled={active || busySeq === seq.id}
+                      title={active ? 'Already running for this guest' : undefined}
+                      className="flex w-full items-center justify-between gap-3 rounded-rp-panel border border-rp-border px-3 py-2 text-left text-rp-meta hover:bg-rp-surface-2 disabled:opacity-50 disabled:hover:bg-transparent"
+                    >
+                      <span className="text-rp-text">
+                        {seq.name}
+                        {seq.status !== 'ACTIVE' && (
+                          <span className="ml-2 text-rp-micro text-rp-muted">({seq.status})</span>
+                        )}
+                      </span>
+                      <span className="shrink-0 text-rp-micro font-semibold text-rp-muted">
+                        {busySeq === seq.id
+                          ? <Loader2 className="h-3 w-3 animate-spin" />
+                          : active ? 'Already in it'
+                          : existing ? 'Restart'
+                          : 'Enrol'}
+                      </span>
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setEnrolling(false)}
+                  className="text-rp-micro text-rp-muted hover:text-rp-text"
+                >
+                  Cancel
+                </button>
+              </div>
             )}
           </Section>
         </div>

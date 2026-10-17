@@ -39,9 +39,10 @@ const contact = (over: Record<string, unknown> = {}) => ({
 });
 
 /** The sheet fetches the contact; the tag list only when the picker opens. */
-const route = (detail: unknown, tags: unknown[] = []) => {
+const route = (detail: unknown, tags: unknown[] = [], sequences: unknown[] = []) => {
   get.mockImplementation((url: string) => {
     if (url === '/crm/tags') return Promise.resolve({ data: { data: tags } });
+    if (url === '/crm/sequences') return Promise.resolve({ data: { data: sequences } });
     return Promise.resolve({ data: { data: detail } });
   });
 };
@@ -49,9 +50,15 @@ const route = (detail: unknown, tags: unknown[] = []) => {
 const open = (over: Record<string, unknown> = {}) =>
   render(<ContactDetailSheet contactId="g1" token="tok" onClose={vi.fn()} {...over} />);
 
+let confirmText = '';
+
 beforeEach(() => {
   get.mockReset(); post.mockReset();
+  confirmText = '';
   vi.stubGlobal('alert', vi.fn());
+  // Enrolling asks first, because it starts real email. jsdom has no confirm,
+  // so without this the handler bails and the test proves nothing.
+  vi.stubGlobal('confirm', (m: string) => { confirmText = m; return true; });
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
@@ -191,5 +198,101 @@ describe('putting a tag on a guest', () => {
     fireEvent.click(await screen.findByText('Corporate'));
 
     await waitFor(() => expect(globalThis.alert).toHaveBeenCalledWith('Guest not found'));
+  });
+});
+
+describe('enrolling by hand', () => {
+  const welcome = { id: 'sq1', name: 'Welcome Flow', trigger: 'MANUAL', status: 'ACTIVE' };
+
+  it('posts to the endpoint nobody was calling', async () => {
+    route(contact(), [], [welcome]);
+    open();
+    await screen.findByText('Rafiq Islam');
+
+    fireEvent.click(screen.getByText('Enrol in a sequence'));
+    fireEvent.click(await screen.findByText('Welcome Flow'));
+
+    await waitFor(() => expect(post).toHaveBeenCalledWith(
+      '/crm/sequences/sq1/enroll', { guestId: 'g1' }, expect.anything(),
+    ));
+  });
+
+  it('warns that emails will start, and sends nothing if cancelled', async () => {
+    route(contact(), [], [welcome]);
+    vi.stubGlobal('confirm', (m: string) => { confirmText = m; return false; });
+    open();
+    await screen.findByText('Rafiq Islam');
+
+    fireEvent.click(screen.getByText('Enrol in a sequence'));
+    fireEvent.click(await screen.findByText('Welcome Flow'));
+
+    await waitFor(() => expect(confirmText).toMatch(/start receiving its emails/));
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it('offers "Restart" for one they finished, and says it resends every step', async () => {
+    // The endpoint upserts with currentStep 0, so re-enrolling replays the
+    // whole sequence. Calling that "Enrol" would understate it.
+    route(
+      contact({ enrollments: [{ id: 'en1', status: 'COMPLETED', sequenceId: 'sq1', sequence: { name: 'Welcome Flow', trigger: 'MANUAL' } }] }),
+      [], [welcome],
+    );
+    open();
+    await screen.findByText('Rafiq Islam');
+
+    fireEvent.click(screen.getByText('Enrol in a sequence'));
+    expect(await screen.findByText('Restart')).toBeTruthy();
+
+    fireEvent.click(screen.getByText('Restart'));
+    await waitFor(() => expect(confirmText).toMatch(/every step again from the first/));
+  });
+
+  it('will not re-enrol somebody it is already running for', async () => {
+    route(
+      contact({ enrollments: [{ id: 'en1', status: 'ACTIVE', sequenceId: 'sq1', sequence: { name: 'Welcome Flow', trigger: 'MANUAL' } }] }),
+      [], [welcome],
+    );
+    open();
+    await screen.findByText('Rafiq Islam');
+
+    fireEvent.click(screen.getByText('Enrol in a sequence'));
+
+    expect(await screen.findByText('Already in it')).toBeTruthy();
+    expect((screen.getByText('Already in it').closest('button') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('admits an unsubscribed guest will receive nothing', async () => {
+    route(contact({ consent: { subscribed: false } }), [], [welcome]);
+    open();
+    await screen.findByText('Rafiq Islam');
+
+    fireEvent.click(screen.getByText('Enrol in a sequence'));
+    fireEvent.click(await screen.findByText('Welcome Flow'));
+
+    // The worker flips the enrolment to UNSUBSCRIBED and sends nothing, so
+    // enrolling them looks like it worked and achieves nothing.
+    await waitFor(() => expect(confirmText).toMatch(/unsubscribed/i));
+    expect(confirmText).toMatch(/send nothing/);
+  });
+
+  it('says a paused sequence will not send yet', async () => {
+    route(contact(), [], [{ ...welcome, status: 'PAUSED' }]);
+    open();
+    await screen.findByText('Rafiq Islam');
+
+    fireEvent.click(screen.getByText('Enrol in a sequence'));
+    fireEvent.click(await screen.findByText('Welcome Flow'));
+
+    await waitFor(() => expect(confirmText).toMatch(/is PAUSED/));
+  });
+
+  it('points at the Sequences tab when none exist', async () => {
+    route(contact(), [], []);
+    open();
+    await screen.findByText('Rafiq Islam');
+
+    fireEvent.click(screen.getByText('Enrol in a sequence'));
+
+    expect(await screen.findByText(/No sequences exist yet/)).toBeTruthy();
   });
 });
