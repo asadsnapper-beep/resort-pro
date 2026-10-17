@@ -1,0 +1,177 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ResortPro — production
+#
+# ⚠ DRAFT. Not yet what production runs. /opt/resortpro/docker-compose.yml on
+#   the host is still the live file. This was assembled from the ops session's
+#   description plus the structure of docker-compose.staging.yml, by a session
+#   with no server access that has never seen the live file. Reconcile it
+#   before anything uses it — see plan/production-compose-in-git.md for the
+#   list of what is known and what is guessed.
+#
+# Secrets live in /opt/resortpro/.env on the host and are never in git. This
+# repository is public: no server address, no tailnet name, no owner e-mail
+# and no key material belongs in this file. The hostnames below are the public
+# ones DNS already answers for.
+#
+# IMAGE_TAG is supplied by ops/deploy.sh, which must not edit this file.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: resortpro
+
+x-env-file: &env-file
+  env_file:
+    - /opt/resortpro/.env
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  # Private network only. The old `postgres` hostname collided with Coolify's
+  # own database on the shared network and failed the nightly backup for weeks;
+  # the app addresses this as rp-postgres and there is nothing to collide with.
+  postgres:
+    image: postgres:16-alpine
+    container_name: rp-postgres
+    restart: unless-stopped
+    networks: [resortpro_net]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - resortpro_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: rp-redis
+    restart: unless-stopped
+    networks: [resortpro_net]
+    volumes:
+      - resortpro_redis:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ── API (Fastify) ───────────────────────────────────────────────────────────
+  # Joins `coolify` as well, because Traefik lives there and still fronts this
+  # stack. Nothing else about ResortPro is in Coolify.
+  api:
+    image: ghcr.io/asadsnapper-beep/resort-pro-api:${IMAGE_TAG}
+    container_name: rp-api
+    restart: unless-stopped
+    pull_policy: always
+    <<: *env-file
+    networks: [resortpro_net, coolify]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    volumes:
+      - resortpro_uploads:/app/uploads
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:4000/health']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=coolify
+      - traefik.http.routers.rp-api.rule=Host(`api.resortpro.site`)
+      - traefik.http.routers.rp-api.entrypoints=https
+      - traefik.http.routers.rp-api.tls.certresolver=letsencrypt
+      - traefik.http.services.rp-api.loadbalancer.server.port=4000
+
+  # ── Web (Next.js) ───────────────────────────────────────────────────────────
+  web:
+    image: ghcr.io/asadsnapper-beep/resort-pro-web:${IMAGE_TAG}
+    container_name: rp-web
+    restart: unless-stopped
+    pull_policy: always
+    <<: *env-file
+    networks: [resortpro_net, coolify]
+    depends_on:
+      api: { condition: service_started }
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=coolify
+      # Apex, www, app, and the wildcard that gives every tenant its subdomain.
+      - traefik.http.routers.rp-web.rule=Host(`resortpro.site`) || Host(`www.resortpro.site`) || Host(`app.resortpro.site`) || HostRegexp(`{sub:[a-z0-9-]+}.resortpro.site`)
+      - traefik.http.routers.rp-web.entrypoints=https
+      - traefik.http.routers.rp-web.tls.certresolver=letsencrypt
+      - traefik.http.routers.rp-web.tls.domains[0].main=resortpro.site
+      - traefik.http.routers.rp-web.tls.domains[0].sans=*.resortpro.site
+      - traefik.http.services.rp-web.loadbalancer.server.port=3000
+
+  # ── Worker (cron: reminders, iCal, reports, automation, trial mail) ─────────
+  # Private network only — it talks to nobody from outside.
+  worker:
+    image: ghcr.io/asadsnapper-beep/resort-pro-api:${IMAGE_TAG}
+    container_name: rp-worker
+    restart: unless-stopped
+    pull_policy: always
+    <<: *env-file
+    networks: [resortpro_net]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    volumes:
+      - resortpro_uploads:/app/uploads
+    command: ['node', 'dist/worker.js']
+
+  # ── Backup sidecar ──────────────────────────────────────────────────────────
+  # Deliberately NOT on env_file: this service takes only what it needs, so a
+  # variable added for the app cannot change the backup's behaviour by accident.
+  # A host systemd timer at 02:00 UTC drives it, re-verifies the result, copies
+  # it off the server and e-mails the owners on any failure.
+  #
+  # Uploads are mounted read-only: the thing that reads your files to copy them
+  # should not be able to write them.
+  backup:
+    image: ghcr.io/asadsnapper-beep/resort-pro-api:${IMAGE_TAG}
+    container_name: rp-backup
+    restart: unless-stopped
+    networks: [resortpro_net]
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      POSTGRES_HOST: rp-postgres
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - resortpro_uploads:/app/uploads:ro
+      - resortpro_backups:/backups
+
+networks:
+  resortpro_net:
+    name: resortpro_net
+  # Created and owned by Coolify, which runs Traefik. Declared external so
+  # this stack joins it rather than trying to manage it.
+  coolify:
+    external: true
+
+volumes:
+  resortpro_pgdata:
+    name: resortpro_pgdata
+  resortpro_redis:
+    name: resortpro_redis
+  resortpro_uploads:
+    name: resortpro_uploads
+  resortpro_backups:
+    name: resortpro_backups

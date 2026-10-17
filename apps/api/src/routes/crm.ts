@@ -6,6 +6,9 @@ import { ok, validate } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
 import { sendEmail, wrapEmail, renderTemplate, SEQUENCE_TEMPLATES } from '../services/email';
 import { matchAllTerms } from '../utils/search-terms';
+import { SUBSCRIBED_GUEST } from '../utils/email-consent';
+import { unsubscribeUrl, verifyUnsubscribeToken } from '../utils/unsubscribe-token';
+import { sendCampaign, describeSend, SEND_REFUSALS } from '../services/campaign-sender';
 
 // ─── Default email templates (auto-created for every new tenant) ──────────────
 const DEFAULT_EMAIL_TEMPLATES = [
@@ -265,6 +268,93 @@ async function recalcScore(tenantId: string, guestId: string) {
   });
 }
 
+// ─── Who the daily automation would write to ─────────────────────────────────
+/**
+ * The two audience queries, lifted out of the send loop.
+ *
+ * "Run Now" sent birthday and anniversary email to real guests the instant it
+ * was clicked, with no recipient list and no confirmation — and since every
+ * send writes an EmailSend row that suppresses the next one for 300 days,
+ * a mistaken click is not undoable (CRM QA 2026-10-07, finding 011).
+ *
+ * The point of extracting them is that the preview and the send now run the
+ * same SQL. A preview assembled from a second, similar-looking query would be
+ * a new way to be wrong about who gets email, which is the problem rather than
+ * the fix.
+ *
+ * Raw SQL because both match on parts of a date — the month and day of
+ * `dateOfBirth`, and an aggregate over `checkOut` — neither of which Prisma's
+ * `where` can express. The consent clause is the SQL form of SUBSCRIBED_GUEST:
+ * a guest with no consent row has not opted out.
+ *
+ * `status <> 'FAILED'` is the part that is easy to leave out and expensive to
+ * leave out. The suppression looked only at whether a row existed, and a row
+ * is written whether or not the email left the building — so an attempt made
+ * while RESEND_API_KEY was unset, or while Resend was down, excluded that
+ * guest for 300 days having sent them nothing. With email disabled that is
+ * every guest at once: one click and nobody gets a birthday email this year.
+ *
+ * The cost of the fix is retries. A birthday matches on one calendar day, so
+ * a permanently undeliverable address is attempted once a year as before. The
+ * anniversary window is 355–375 days wide, so a broken address is attempted
+ * on each of those days until one succeeds. Those attempts reach nobody — a
+ * success still suppresses the rest — so the price is log noise and provider
+ * calls, not mail to a guest.
+ */
+type Recipient = { id: string; firstName: string; email: string };
+
+function birthdayRecipients(tenantId: string, today: Date) {
+  const month = today.getMonth() + 1; // 1-12
+  const day = today.getDate();
+  return prisma.$queryRaw<Recipient[]>`
+    SELECT g.id, g."firstName", g.email
+    FROM guests g
+    LEFT JOIN email_consents c ON c."guestId" = g.id
+    WHERE g."tenantId" = ${tenantId}
+      AND g."dateOfBirth" IS NOT NULL
+      AND EXTRACT(MONTH FROM g."dateOfBirth") = ${month}
+      AND EXTRACT(DAY   FROM g."dateOfBirth") = ${day}
+      AND (c."subscribed" IS NULL OR c."subscribed" = true)
+      AND NOT EXISTS (
+        SELECT 1 FROM email_sends es
+        WHERE es."guestId" = g.id
+          AND es."tenantId" = ${tenantId}
+          AND es.subject ILIKE '%birthday%'
+          AND es.status <> 'FAILED'
+          AND es."createdAt" > NOW() - INTERVAL '300 days'
+      )
+  `;
+}
+
+/** Guests whose first stay ended ~a year ago and who have not been back. */
+function anniversaryRecipients(tenantId: string) {
+  return prisma.$queryRaw<(Recipient & { firstStay: Date })[]>`
+    SELECT DISTINCT ON (g.id)
+      g.id, g."firstName", g.email, MIN(b."checkOut") AS "firstStay"
+    FROM guests g
+    JOIN bookings b ON b."guestId" = g.id AND b.status = 'CHECKED_OUT'
+    LEFT JOIN email_consents c ON c."guestId" = g.id
+    WHERE g."tenantId" = ${tenantId}
+      AND (c."subscribed" IS NULL OR c."subscribed" = true)
+      AND NOT EXISTS (
+        SELECT 1 FROM email_sends es
+        WHERE es."guestId" = g.id
+          AND es."tenantId" = ${tenantId}
+          AND es.subject ILIKE '%anniversary%'
+          AND es.status <> 'FAILED'
+          AND es."createdAt" > NOW() - INTERVAL '300 days'
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM bookings b2
+        WHERE b2."guestId" = g.id
+          AND b2.status = 'CHECKED_OUT'
+          AND b2."checkOut" > NOW() - INTERVAL '60 days'
+      )
+    GROUP BY g.id, g."firstName", g.email
+    HAVING MIN(b."checkOut") BETWEEN NOW() - INTERVAL '375 days' AND NOW() - INTERVAL '355 days'
+  `;
+}
+
 // ─── Routes ──────────────────────────────────────────────────────────────────
 export async function crmRoutes(app: FastifyInstance) {
   const pre = requireRole('OWNER', 'MANAGER', 'MARKETER');
@@ -343,17 +433,47 @@ export async function crmRoutes(app: FastifyInstance) {
     return ok(tags);
   });
 
-  app.post('/tags', { preHandler: pre }, async (request) => {
+  app.post('/tags', { preHandler: pre }, async (request, reply) => {
     const { db } = request;
     const body = z.object({ name: z.string().min(1), color: z.string().optional() }).parse(request.body);
-    const tag  = await db.guestTag.create({ data: { name: body.name, color: body.color ?? '#6b7280' } });
-    return ok(tag, 'Tag created');
+
+    // GuestTag is `@@unique([tenantId, name])`, so a repeat name does not
+    // reach the database — it raises P2002 and, unhandled, surfaced as a 500.
+    // A second tag with the same name would be indistinguishable from the
+    // first once it is on a guest, so refusing is right; answering 500 for a
+    // thing the caller can fix is not.
+    const existing = await db.guestTag.findFirst({ where: { name: body.name } });
+    if (existing) {
+      return reply.status(409).send({
+        success: false,
+        error: `There is already a tag called "${body.name}".`,
+      });
+    }
+
+    try {
+      const tag = await db.guestTag.create({ data: { name: body.name, color: body.color ?? '#6b7280' } });
+      return ok(tag, 'Tag created');
+    } catch (err) {
+      // Two requests can pass the check above at the same time; the
+      // constraint is what actually decides, so translate its answer rather
+      // than letting a race read as a server fault.
+      if ((err as { code?: string }).code === 'P2002') {
+        return reply.status(409).send({
+          success: false,
+          error: `There is already a tag called "${body.name}".`,
+        });
+      }
+      throw err;
+    }
   });
 
-  app.delete('/tags/:id', { preHandler: pre }, async (request) => {
+  app.delete('/tags/:id', { preHandler: pre }, async (request, reply) => {
     const { db } = request;
     const { id } = request.params as { id: string };
-    await db.guestTag.deleteMany({ where: { id } });
+    // deleteMany returns a count, and ignoring it meant deleting a tag that was
+    // never there reported success (CRM QA finding 017).
+    const { count } = await db.guestTag.deleteMany({ where: { id } });
+    if (!count) return reply.status(404).send({ success: false, error: 'Tag not found' });
     return ok(null, 'Tag deleted');
   });
 
@@ -373,6 +493,8 @@ export async function crmRoutes(app: FastifyInstance) {
         update: {},
       });
     } else {
+      // No count check here on purpose: removing a tag a guest does not have
+      // is the outcome the caller asked for. Idempotent, not silent.
       await db.guestTagRelation.deleteMany({ where: { guestId: id, tagId: body.tagId } });
     }
     return ok(null, `Tag ${body.action}ed`);
@@ -383,7 +505,14 @@ export async function crmRoutes(app: FastifyInstance) {
   app.get('/templates', { preHandler: pre }, async (request) => {
     const { db } = request;
     const { tenantId } = request.user as JwtPayload;
-    let templates = await db.emailTemplate.findMany({ where: {}, orderBy: { isDefault: 'desc', createdAt: 'asc' } });
+    // Two fields means an array: Prisma rejects `{ isDefault, createdAt }` as
+    // one object, because key order in an object is not a sort order it will
+    // guarantee. The tab answered 500 on every load — a saved template looked
+    // to the owner like it had been accepted and then vanished.
+    let templates = await db.emailTemplate.findMany({
+      where: {},
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+    });
 
     // ── Lazy-init: first visit → create default templates ──────────────────
     if (templates.length === 0) {
@@ -391,7 +520,13 @@ export async function crmRoutes(app: FastifyInstance) {
         data: DEFAULT_EMAIL_TEMPLATES.map(t => ({ ...t, tenantId })),
         skipDuplicates: true,
       });
-      templates = await db.emailTemplate.findMany({ where: {}, orderBy: { isDefault: 'desc', createdAt: 'asc' } });
+      // Array form here too. The note above explains why the call before this
+      // one needed it; this fallback was left on the object form, and it is
+      // the branch that runs on a tenant's *first* visit to the tab — the one
+      // place a mistake stays hidden, because it only ever runs once each.
+      templates = await db.emailTemplate.findMany({
+        where: {}, orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+      });
     }
 
     return ok(templates);
@@ -420,11 +555,55 @@ export async function crmRoutes(app: FastifyInstance) {
     return ok(null, 'Template updated');
   });
 
-  app.delete('/templates/:id', { preHandler: pre }, async (request) => {
+  app.delete('/templates/:id', { preHandler: pre }, async (request, reply) => {
     const { db } = request;
     const { id } = request.params as { id: string };
-    await db.emailTemplate.deleteMany({ where: { id } });
+    const { count } = await db.emailTemplate.deleteMany({ where: { id } });
+    if (!count) return reply.status(404).send({ success: false, error: 'Template not found' });
     return ok(null, 'Template deleted');
+  });
+
+  /**
+   * POST /api/crm/templates/restore-defaults
+   *
+   * Puts back any of the eight starter templates that is missing.
+   *
+   * Deleting one was unrecoverable, which the QA filed as "template defaults
+   * can be deleted; there is no protection or restore control" (finding 016).
+   * `GET /templates` does re-create them — but only when the list is
+   * completely empty, so deleting *one* left it gone for good while the
+   * mechanism to bring it back sat one condition away.
+   *
+   * Restoring rather than refusing the delete, deliberately. A resort that
+   * does not send win-back offers should be able to remove that template; the
+   * problem was never that deletion is wrong, it is that it could not be
+   * undone. This leaves the owner in charge and takes away the cliff.
+   *
+   * Matched by name, so a default the owner edited and renamed is treated as
+   * gone and comes back alongside their version rather than overwriting it.
+   */
+  app.post('/templates/restore-defaults', { preHandler: pre }, async (request) => {
+    const { db } = request;
+    const { tenantId } = request.user as JwtPayload;
+
+    const existing = await db.emailTemplate.findMany({ where: {}, select: { name: true } });
+    const have = new Set(existing.map((t) => t.name));
+    const missing = DEFAULT_EMAIL_TEMPLATES.filter((t) => !have.has(t.name));
+
+    if (missing.length === 0) {
+      return ok({ restored: 0, names: [] }, 'Nothing was missing — all default templates are present.');
+    }
+
+    await db.emailTemplate.createMany({
+      data: missing.map((t) => ({ ...t, tenantId })),
+      skipDuplicates: true,
+    });
+
+    const names = missing.map((t) => t.name);
+    return ok(
+      { restored: names.length, names },
+      `Restored ${names.length} default ${names.length === 1 ? 'template' : 'templates'}: ${names.join(', ')}.`,
+    );
   });
 
   /* ── CAMPAIGNS ────────────────────────────────────────────────────────────── */
@@ -466,72 +645,50 @@ export async function crmRoutes(app: FastifyInstance) {
   });
 
   // POST /api/crm/campaigns/:id/send — send campaign now
+  //
+  // The sending itself lives in services/campaign-sender so the scheduled
+  // dispatcher can do exactly the same thing. It used to be written out here,
+  // which is why a scheduled campaign never went anywhere: the only code that
+  // knew how to send one needed an HTTP request to exist.
   app.post('/campaigns/:id/send', { preHandler: pre }, async (request, reply) => {
-    const { db } = request;
     const { tenantId } = request.user as JwtPayload;
     const { id } = request.params as { id: string };
 
-    const campaign = await db.campaign.findFirst({ where: { id } });
-    if (!campaign) return reply.status(404).send({ success: false, error: 'Campaign not found' });
-    if (campaign.status === 'SENT') return reply.status(400).send({ success: false, error: 'Already sent' });
+    const outcome = await sendCampaign(tenantId, id);
 
-    // Build segment filter
-    const seg = (campaign.segment ?? {}) as Record<string, any>;
-    const guests = await db.guest.findMany({
-      where: {
-        consent: { subscribed: true },
-        ...(seg.tier ? { score: { tier: seg.tier } } : {}),
-        ...(seg.tag  ? { tags:  { some: { tag: { name: seg.tag } } } } : {}),
-      },
-      select: { id: true, firstName: true, email: true },
-    });
-
-    // Get tenant info for branding
-    const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { name: true } });
-    const wc     = await (db as any).websiteContent.findUnique({ where: { tenantId }, select: { primaryColor: true, accentColor: true } });
-
-    await db.campaign.update({ where: { id }, data: { status: 'SENDING', recipientCount: guests.length } });
-    await db.campaignStats.upsert({
-      where:  { campaignId: id },
-      create: { campaignId: id, sent: 0 },
-      update: {},
-    });
-
-    let sent = 0;
-    for (const guest of guests) {
-      const html = wrapEmail({
-        body: renderTemplate(campaign.html, { guestName: guest.firstName }),
-        tenantName: tenant?.name ?? 'Resort',
-        primaryColor: wc?.primaryColor ?? '#1a6b5e',
-        accentColor:  wc?.accentColor  ?? '#d4a853',
-        unsubscribeUrl: `${process.env.API_URL || 'http://localhost:4000'}/crm/unsubscribe/${guest.id}`,
+    if (!outcome.ok) {
+      const status = outcome.reason === 'not-found' ? 404 : 400;
+      return reply.status(status).send({
+        success: false,
+        error: SEND_REFUSALS[outcome.reason],
+        ...(outcome.reason === 'no-recipients' ? { code: 'NO_RECIPIENTS' } : {}),
       });
-
-      const { id: resendId, error } = await sendEmail({ to: guest.email, subject: campaign.subject, html });
-
-      await db.emailSend.create({
-        data: {
-          guestId:    guest.id,
-          campaignId: id,
-          subject:    campaign.subject,
-          status:     error ? 'FAILED' : 'SENT',
-          resendId:   resendId ?? undefined,
-        },
-      });
-      if (!error) sent++;
     }
 
-    await db.campaign.update({ where: { id }, data: { status: 'SENT', sentAt: new Date() } });
-    await db.campaignStats.update({ where: { campaignId: id }, data: { sent } });
-
-    return ok({ sent, total: guests.length }, 'Campaign sent');
+    const { sent, failed, total, status } = outcome;
+    return ok({ sent, failed, total, status }, describeSend(outcome));
   });
 
-  app.delete('/campaigns/:id', { preHandler: pre }, async (request) => {
+  app.delete('/campaigns/:id', { preHandler: pre }, async (request, reply) => {
     const { db } = request;
     const { id } = request.params as { id: string };
-    await db.campaign.deleteMany({ where: { id, status: { in: ['DRAFT', 'SCHEDULED'] } } });
-    return ok(null, 'Campaign deleted');
+
+    // The status filter is right — a campaign that has gone out is a record of
+    // something that happened and should not vanish. What was wrong is that
+    // the filter silently matched nothing and the route still said "deleted",
+    // so a marketer watched a sent campaign stay exactly where it was.
+    const { count } = await db.campaign.deleteMany({
+      where: { id, status: { in: ['DRAFT', 'SCHEDULED'] } },
+    });
+    if (count) return ok(null, 'Campaign deleted');
+
+    const existing = await db.campaign.findFirst({ where: { id }, select: { status: true } });
+    if (!existing) return reply.status(404).send({ success: false, error: 'Campaign not found' });
+
+    return reply.status(400).send({
+      success: false,
+      error: `This campaign is ${existing.status.toLowerCase()} and cannot be deleted — it is a record of emails that went out.`,
+    });
   });
 
   /* ── SEQUENCES ────────────────────────────────────────────────────────────── */
@@ -548,7 +705,9 @@ export async function crmRoutes(app: FastifyInstance) {
 
   const sequenceSchema = z.object({
     name:        z.string().min(1),
-    trigger:     z.enum(['BOOKING_CONFIRMED', 'PRE_ARRIVAL', 'CHECK_IN', 'POST_STAY', 'WIN_BACK', 'BIRTHDAY', 'MANUAL']),
+    // ANNIVERSARY was missing here while the UI offered it and the Prisma enum
+    // had it, so choosing it returned a 400 the form threw away (finding 007).
+    trigger:     z.enum(['BOOKING_CONFIRMED', 'PRE_ARRIVAL', 'CHECK_IN', 'POST_STAY', 'WIN_BACK', 'BIRTHDAY', 'ANNIVERSARY', 'MANUAL']),
     triggerMeta: z.record(z.any()).optional(),
   });
 
@@ -559,11 +718,12 @@ export async function crmRoutes(app: FastifyInstance) {
     return ok(seq, 'Sequence created');
   });
 
-  app.put('/sequences/:id', { preHandler: pre }, async (request) => {
+  app.put('/sequences/:id', { preHandler: pre }, async (request, reply) => {
     const { db } = request;
     const { id } = request.params as { id: string };
     const body = z.object({ name: z.string().optional(), status: z.enum(['ACTIVE', 'PAUSED', 'ARCHIVED']).optional() }).parse(request.body);
-    await db.sequence.updateMany({ where: { id }, data: body });
+    const { count } = await db.sequence.updateMany({ where: { id }, data: body });
+    if (!count) return reply.status(404).send({ success: false, error: 'Sequence not found' });
     return ok(null, 'Sequence updated');
   });
 
@@ -618,15 +778,38 @@ export async function crmRoutes(app: FastifyInstance) {
    * Sends birthday emails to guests celebrating today, and resort-anniversary
    * emails to guests who stayed exactly ~1 year ago and haven't returned.
    *
-   * Call this from a cron job (e.g. every day at 08:00 local time).
-   * Also callable manually from the CRM dashboard for testing.
+   * `{ dryRun: true }` answers who would receive what and sends nothing. The
+   * dashboard always asks for that first and will not send until somebody has
+   * seen the list; both paths run the same audience queries, so the list is
+   * not a second opinion.
+   *
+   * Sending remains the default on purpose. The in-app cron already calls
+   * runDailyTriggers() at 08:00, but plan/guest-crm.md documents an external
+   * `curl -X POST .../automation/run-daily` cron, and quietly turning that
+   * into a no-op would stop somebody's birthday email without a word.
    */
   app.post('/automation/run-daily', { preHandler: pre }, async (request) => {
     const { tenantId } = request.user as JwtPayload;
+    const dryRun = (request.body as { dryRun?: boolean } | undefined)?.dryRun === true;
 
-    const today     = new Date();
-    const todayMonth = today.getMonth() + 1; // 1-12
-    const todayDay   = today.getDate();
+    const today = new Date();
+
+    if (dryRun) {
+      const [birthday, anniversary] = await Promise.all([
+        birthdayRecipients(tenantId, today),
+        anniversaryRecipients(tenantId),
+      ]);
+      // Names and addresses, because "3 guests" is not something anybody can
+      // check. No EmailSend rows are written, so this does not consume the
+      // 300-day suppression that a real run would.
+      return ok({
+        dryRun: true,
+        birthday: { found: birthday.length, recipients: birthday },
+        anniversary: { found: anniversary.length, recipients: anniversary },
+      }, birthday.length + anniversary.length === 0
+        ? 'Nothing to send today.'
+        : `${birthday.length} birthday and ${anniversary.length} anniversary emails would go out.`);
+    }
 
     // Get tenant branding for email wrapper
     const [tenant, wc] = await Promise.all([
@@ -645,26 +828,8 @@ export async function crmRoutes(app: FastifyInstance) {
       include: { steps: { orderBy: { stepOrder: 'asc' }, take: 1 } },
     });
 
-    // Find guests whose birthday is TODAY, subscribed, not already emailed this year
-    const birthdayGuests = await prisma.$queryRaw<
-      { id: string; firstName: string; email: string }[]
-    >`
-      SELECT g.id, g."firstName", g.email
-      FROM guests g
-      LEFT JOIN email_consents c ON c."guestId" = g.id
-      WHERE g."tenantId" = ${tenantId}
-        AND g."dateOfBirth" IS NOT NULL
-        AND EXTRACT(MONTH FROM g."dateOfBirth") = ${todayMonth}
-        AND EXTRACT(DAY   FROM g."dateOfBirth") = ${todayDay}
-        AND (c."subscribed" IS NULL OR c."subscribed" = true)
-        AND NOT EXISTS (
-          SELECT 1 FROM email_sends es
-          WHERE es."guestId" = g.id
-            AND es."tenantId" = ${tenantId}
-            AND es.subject ILIKE '%birthday%'
-            AND es."createdAt" > NOW() - INTERVAL '300 days'
-        )
-    `;
+    // The same query the dry run answered from.
+    const birthdayGuests = await birthdayRecipients(tenantId, today);
 
     let birthdaySent = 0;
     for (const guest of birthdayGuests) {
@@ -690,12 +855,12 @@ export async function crmRoutes(app: FastifyInstance) {
             <a href="${bookingUrl}" style="background:#7c3aed;color:#fff;padding:14px 32px;text-decoration:none;border-radius:8px;font-weight:600;display:inline-block">Claim Your Birthday Gift</a>
             <p style="color:#6b7280;font-size:14px;margin-top:24px">With birthday wishes,<br><strong>${tenantName} Team</strong></p>
             <p style="color:#9ca3af;font-size:11px;margin-top:16px">
-              <a href="${process.env.API_URL || 'http://localhost:4000'}/crm/unsubscribe/${guest.id}" style="color:#9ca3af">Unsubscribe</a>
+              <a href="${unsubscribeUrl(guest.id)}" style="color:#9ca3af">Unsubscribe</a>
             </p>
           </div>
         </div>`;
 
-      const html = wrapEmail({ body: renderTemplate(bodyHtml, { guestName: guest.firstName }), tenantName, primaryColor, accentColor, unsubscribeUrl: `${process.env.API_URL || 'http://localhost:4000'}/crm/unsubscribe/${guest.id}` });
+      const html = wrapEmail({ body: renderTemplate(bodyHtml, { guestName: guest.firstName }), tenantName, primaryColor, accentColor, unsubscribeUrl: unsubscribeUrl(guest.id) });
       const { id: resendId, error } = await sendEmail({ to: guest.email, subject, html });
 
       await prisma.emailSend.create({
@@ -718,32 +883,7 @@ export async function crmRoutes(app: FastifyInstance) {
       include: { steps: { orderBy: { stepOrder: 'asc' }, take: 1 } },
     });
 
-    const anniversaryGuests = await prisma.$queryRaw<
-      { id: string; firstName: string; email: string; firstStay: Date }[]
-    >`
-      SELECT DISTINCT ON (g.id)
-        g.id, g."firstName", g.email, MIN(b."checkOut") AS "firstStay"
-      FROM guests g
-      JOIN bookings b ON b."guestId" = g.id AND b.status = 'CHECKED_OUT'
-      LEFT JOIN email_consents c ON c."guestId" = g.id
-      WHERE g."tenantId" = ${tenantId}
-        AND (c."subscribed" IS NULL OR c."subscribed" = true)
-        AND NOT EXISTS (
-          SELECT 1 FROM email_sends es
-          WHERE es."guestId" = g.id
-            AND es."tenantId" = ${tenantId}
-            AND es.subject ILIKE '%anniversary%'
-            AND es."createdAt" > NOW() - INTERVAL '300 days'
-        )
-        AND NOT EXISTS (
-          SELECT 1 FROM bookings b2
-          WHERE b2."guestId" = g.id
-            AND b2.status = 'CHECKED_OUT'
-            AND b2."checkOut" > NOW() - INTERVAL '60 days'
-        )
-      GROUP BY g.id, g."firstName", g.email
-      HAVING MIN(b."checkOut") BETWEEN NOW() - INTERVAL '375 days' AND NOW() - INTERVAL '355 days'
-    `;
+    const anniversaryGuests = await anniversaryRecipients(tenantId);
 
     let anniversarySent = 0;
     for (const guest of anniversaryGuests) {
@@ -773,12 +913,12 @@ export async function crmRoutes(app: FastifyInstance) {
             </div>
             <p style="color:#6b7280;font-size:14px">Warm regards,<br><strong>${tenantName} Team</strong></p>
             <p style="color:#9ca3af;font-size:11px;text-align:center;margin-top:24px">
-              <a href="${process.env.API_URL || 'http://localhost:4000'}/crm/unsubscribe/${guest.id}" style="color:#9ca3af">Unsubscribe</a>
+              <a href="${unsubscribeUrl(guest.id)}" style="color:#9ca3af">Unsubscribe</a>
             </p>
           </div>
         </div>`;
 
-      const html = wrapEmail({ body: renderTemplate(bodyHtml, { guestName: guest.firstName }), tenantName, primaryColor, accentColor, unsubscribeUrl: `${process.env.API_URL || 'http://localhost:4000'}/crm/unsubscribe/${guest.id}` });
+      const html = wrapEmail({ body: renderTemplate(bodyHtml, { guestName: guest.firstName }), tenantName, primaryColor, accentColor, unsubscribeUrl: unsubscribeUrl(guest.id) });
       const { id: resendId, error } = await sendEmail({ to: guest.email, subject, html });
 
       await prisma.emailSend.create({
@@ -813,7 +953,7 @@ export async function crmRoutes(app: FastifyInstance) {
       topGuests,
     ] = await Promise.all([
       db.guest.count({ where: {} }),
-      db.emailConsent.count({ where: { subscribed: true } }),
+      db.guest.count({ where: { ...SUBSCRIBED_GUEST } }),
       db.guestScore.groupBy({ by: ['tier'], where: {}, _count: { tier: true } }),
       db.campaignStats.findMany({
         where: {},
@@ -839,27 +979,70 @@ export async function crmRoutes(app: FastifyInstance) {
 }
 
 /* ── Public unsubscribe route ─────────────────────────────────────────────── */
+const page = (title: string, body: string) => `
+  <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>${title}</title></head>
+  <body style="font-family:system-ui,sans-serif;text-align:center;padding:60px 20px;color:#18231f;">
+    <h2 style="margin:0 0 12px;">${title}</h2>
+    <p style="color:#6b7280;">${body}</p>
+  </body></html>`;
+
 export async function crmPublicRoutes(app: FastifyInstance) {
-  app.get('/unsubscribe/:guestId', async (request, reply) => {
-    const { guestId } = request.params as { guestId: string };
-    const guest = await prisma.guest.findUnique({ where: { id: guestId }, select: { tenantId: true } });
-    if (!guest) return reply.status(404).send('Guest not found');
+  // GET only asks. A mail scanner or a link previewer fetching this must not
+  // unsubscribe anybody — it sees a page with a button, the same as a person.
+  app.get('/unsubscribe/:token', async (request, reply) => {
+    const { token } = request.params as { token: string };
+    const guestId = verifyUnsubscribeToken(token);
+    const guest = guestId
+      ? await prisma.guest.findUnique({ where: { id: guestId }, select: { firstName: true } })
+      : null;
+
+    if (!guest) {
+      return reply.status(404).type('text/html').send(page(
+        'This link is not valid',
+        'It may have been altered on the way here. Reply to the email and ask to be removed, and someone will do it by hand.',
+      ));
+    }
+
+    return reply.type('text/html').send(`
+      <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
+      <meta name="viewport" content="width=device-width, initial-scale=1"/>
+      <title>Unsubscribe</title></head>
+      <body style="font-family:system-ui,sans-serif;text-align:center;padding:60px 20px;color:#18231f;">
+        <h2 style="margin:0 0 12px;">Stop receiving these emails?</h2>
+        <p style="color:#6b7280;margin:0 0 28px;">You will no longer get marketing emails from this resort. Booking confirmations and receipts are not affected.</p>
+        <form method="POST" action="/crm/unsubscribe/${encodeURIComponent(token)}">
+          <button type="submit" style="background:#c43c3c;color:#fff;border:0;border-radius:8px;padding:14px 32px;font-size:16px;font-weight:600;cursor:pointer;">
+            Yes, unsubscribe me
+          </button>
+        </form>
+      </body></html>
+    `);
+  });
+
+  // The POST is the one that changes anything.
+  app.post('/unsubscribe/:token', async (request, reply) => {
+    const { token } = request.params as { token: string };
+    const guestId = verifyUnsubscribeToken(token);
+    const guest = guestId
+      ? await prisma.guest.findUnique({ where: { id: guestId }, select: { tenantId: true } })
+      : null;
+
+    if (!guestId || !guest) {
+      return reply.status(404).type('text/html').send(page('This link is not valid', ''));
+    }
 
     await prisma.emailConsent.upsert({
       where:  { guestId },
       create: { tenantId: guest.tenantId, guestId, subscribed: false, unsubscribedAt: new Date() },
       update: { subscribed: false, unsubscribedAt: new Date() },
     });
-
-    // Update all active enrollments
     await prisma.sequenceEnrollment.updateMany({ where: { guestId }, data: { status: 'UNSUBSCRIBED' } });
 
-    return reply.type('text/html').send(`
-      <!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Unsubscribed</title></head>
-      <body style="font-family:sans-serif;text-align:center;padding:60px 20px;">
-        <h2>You've been unsubscribed</h2>
-        <p style="color:#6b7280;">You will no longer receive marketing emails from this resort.</p>
-      </body></html>
-    `);
+    return reply.type('text/html').send(page(
+      "You've been unsubscribed",
+      'You will no longer receive marketing emails from this resort.',
+    ));
   });
 }

@@ -31,4 +31,16 @@ sh "$dir/backup-uploads.sh" || {
   status=1
 }
 
+# The third leg: copy what the first two produced somewhere this machine is not.
+# Runs last because it has nothing to copy until they have finished, and it is
+# the API image's compiled script rather than a shell one because encrypting a
+# multi-megabyte dump and speaking S3 are not things to write in `sh`.
+#
+# With no bucket configured it says so and succeeds — a nightly failure for a
+# feature nobody has set up yet is how real failures stop being read.
+node /app/dist/scripts/backup-offsite.js || {
+  echo "[backup] the off-site copy FAILED — see the error above" >&2
+  status=1
+}
+
 exit "$status"

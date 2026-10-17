@@ -5,11 +5,13 @@ import {
   Users, Mail, Megaphone, GitBranch, BarChart3,
   Plus, Search, Send, Trash2, Play, Pause,
   X, ChevronDown, CheckCircle, Crown, Medal, Award,
-  TrendingUp, ArrowRight, RefreshCw, Loader2,
+  TrendingUp, ArrowRight, RefreshCw, Loader2, AlertTriangle, Tag as TagIcon, Pencil, CalendarClock,
 } from 'lucide-react';
 import { PageShell, PageHeader } from '@/components/patterns';
 import { useAuthStore } from '@/store/auth';
 import { api } from '@/lib/api';
+import { TAG_COLOURS, DEFAULT_TAG_COLOUR } from '@/lib/tag-colours';
+import { ContactDetailSheet } from '@/components/crm/ContactDetailSheet';
 
 /* ── Types ────────────────────────────────────────────────────────────────── */
 interface GuestContact {
@@ -20,11 +22,16 @@ interface GuestContact {
   _count: { bookings: number };
 }
 interface Tag { id: string; name: string; color: string; _count: { relations: number }; }
-interface EmailTemplate { id: string; name: string; subject: string; html: string; createdAt: string; }
+interface EmailTemplate {
+  id: string; name: string; subject: string; html: string; createdAt: string;
+  preheader?: string;
+  /** One of the eight starter templates — restorable, unlike one written here. */
+  isDefault?: boolean;
+}
 interface Campaign {
   id: string; name: string; subject: string; status: string;
   recipientCount: number; sentAt?: string; scheduledAt?: string;
-  stats?: { sent: number; opened: number; clicked: number; bounced: number };
+  stats?: { sent: number; bounced: number };
   _count: { sends: number };
 }
 interface Sequence {
@@ -32,10 +39,16 @@ interface Sequence {
   steps: { id: string; subject: string; delayDays: number; stepOrder: number }[];
   _count: { enrollments: number };
 }
+interface AutomationRecipient { id: string; firstName: string; email: string }
+interface AutomationPreview {
+  dryRun: true;
+  birthday:    { found: number; recipients: AutomationRecipient[] };
+  anniversary: { found: number; recipients: AutomationRecipient[] };
+}
 interface Analytics {
   totalContacts: number; subscribed: number;
   tierCounts: { tier: string; _count: { tier: number } }[];
-  campaignStats: { campaign: { name: string; sentAt?: string }; sent: number; opened: number; clicked: number }[];
+  campaignStats: { campaign: { name: string; sentAt?: string }; sent: number; bounced: number }[];
   topGuests: { score: number; tier: string; guest: { firstName: string; lastName: string; email: string } }[];
 }
 
@@ -47,15 +60,26 @@ const TIER_CONFIG: Record<string, { label: string; text: string; bg: string; bor
   PLATINUM: { label: 'Platinum', text: '#f8fafc', bg: '#183153', border: 'rgba(24,49,83,0.5)',    barColor: '#183153', Icon: Crown  },
 };
 
+// The same three pill looks, named once. Five statuses shared two of them by
+// repeating the hex, and the two added for PARTIAL and FAILED would have made
+// it seven copies — which is how a palette stops being a palette.
+const AMBER_PILL = { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)', text: '#b89040' };
+const DANGER_PILL = { bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)', text: 'var(--rp-danger)' };
+const CALM_PILL = { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)', text: '#183153' };
+
 const STATUS_META: Record<string, { bg: string; border: string; text: string }> = {
-  DRAFT:     { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)' },
-  SCHEDULED: { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
-  SENDING:   { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a' },
-  SENT:      { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153' },
-  PAUSED:    { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
-  CANCELLED: { bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)', text: '#c43c3c' },
-  ACTIVE:    { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153' },
-  ARCHIVED:  { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-faint)' },
+  DRAFT:     { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)', text: 'var(--rp-text-muted)' },
+  SCHEDULED: AMBER_PILL,
+  SENDING:   { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)', text: '#b8724a' },
+  SENT:      CALM_PILL,
+  // A send that did not go the way SENT implies. Amber for "some of it", red
+  // for "none of it" — the pill is the only place a marketer finds out.
+  PARTIAL:   AMBER_PILL,
+  FAILED:    DANGER_PILL,
+  PAUSED:    AMBER_PILL,
+  CANCELLED: DANGER_PILL,
+  ACTIVE:    CALM_PILL,
+  ARCHIVED:  { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)', text: 'var(--rp-text-faint)' },
 };
 
 const TRIGGER_LABELS: Record<string, string> = {
@@ -72,6 +96,40 @@ const TRIGGER_LABELS: Record<string, string> = {
 const inputCls = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#183153] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#183153]/30';
 const labelCls = 'block text-[11.5px] font-medium text-[#64748b] mb-1.5';
 
+/**
+ * Which campaign numbers this page is allowed to show.
+ *
+ * `CampaignStats` has columns for sent, delivered, opened, clicked, bounced
+ * and unsubscribed, and `EmailSend` has openedAt/deliveredAt/bouncedAt with an
+ * `EmailClick` table behind it. Only two of them are ever written: the sender
+ * sets `sent`, and `bounced` (which it uses for sends the provider rejected
+ * outright — not a true bounce, but a real failure count). There is no open
+ * pixel, no click redirect and no Resend webhook anywhere in the API.
+ *
+ * So the Open Rate and Click Rate shown here were arithmetic on zeros, and the
+ * demo seeded 87 opens and 34 clicks on 142 sends — a 61% open rate for a
+ * feature that records nothing. A resort owner would reasonably have made
+ * decisions on it, and a prospect was shown it as working.
+ *
+ * The columns stay: they are the right shape for the tracking that should
+ * exist, and dropping them would cost a migration and buy nothing. What goes
+ * is the claim. Put these back when something populates them — and when it
+ * does, `bounced` wants splitting from the send-failure count it currently
+ * doubles as (CRM QA 2026-10-07, finding 008).
+ */
+
+/**
+ * The reason the API gave, or a fallback.
+ *
+ * Worth a helper because the API now has reasons worth reading. The delete
+ * routes were taught to answer "this campaign is SENT and cannot be deleted —
+ * it is a record of emails that went out" instead of a cheerful lie, and the
+ * handlers here had no `catch`, so that sentence went nowhere at all: the
+ * owner confirmed the delete, nothing happened, and nothing said why.
+ */
+const apiMessage = (err: any, fallback: string): string =>
+  err?.response?.data?.error || fallback;
+
 function StatusPill({ status }: { status: string }) {
   const m = STATUS_META[status] ?? STATUS_META.DRAFT;
   return (
@@ -85,10 +143,11 @@ function StatusPill({ status }: { status: string }) {
 ══════════════════════════════════════════════════════════════════════════════ */
 export default function CRMPage() {
   const { token } = useAuthStore();
-  const [tab, setTab] = useState<'contacts' | 'campaigns' | 'sequences' | 'templates' | 'analytics'>('contacts');
+  const [tab, setTab] = useState<'contacts' | 'tags' | 'campaigns' | 'sequences' | 'templates' | 'analytics'>('contacts');
 
   const tabs = [
     { id: 'contacts',  label: 'Contacts',  Icon: Users     },
+    { id: 'tags',      label: 'Tags',      Icon: TagIcon   },
     { id: 'campaigns', label: 'Campaigns', Icon: Megaphone },
     { id: 'sequences', label: 'Sequences', Icon: GitBranch },
     { id: 'templates', label: 'Templates', Icon: Mail      },
@@ -116,11 +175,48 @@ export default function CRMPage() {
       </div>
 
       {tab === 'contacts'  && <ContactsTab  token={token!} />}
+      {tab === 'tags'      && <TagsTab      token={token!} />}
       {tab === 'campaigns' && <CampaignsTab token={token!} />}
       {tab === 'sequences' && <SequencesTab token={token!} />}
       {tab === 'templates' && <TemplatesTab token={token!} />}
       {tab === 'analytics' && <AnalyticsTab token={token!} />}
     </PageShell>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   LOAD FAILURE
+
+   Every tab fetched its list inside a try/catch whose catch body was the word
+   "ignore", so a 500 from the API drew the same "No campaigns yet" as a resort
+   that genuinely has none (CRM QA 2026-10-07, finding 012). Templates and
+   Analytics were both returning 500 during that QA run — which is exactly why
+   an owner would conclude the CRM was empty rather than broken, and never
+   report it.
+
+   A retry button, not just a message: most of what breaks here is transient,
+   and a reload of the whole dashboard to re-fetch one tab is a poor trade.
+══════════════════════════════════════════════════════════════════════════════ */
+function LoadFailed({ what, onRetry, nested = false, className = '' }: {
+  what: string;
+  onRetry: () => void;
+  /** Already inside a card — don't draw a second border around this one. */
+  nested?: boolean;
+  className?: string;
+}) {
+  const frame = nested ? '' : 'rounded-rp-card border border-rp-border bg-rp-surface shadow-rp-card';
+  return (
+    <div className={`flex flex-col items-center justify-center gap-3 py-16 text-center ${frame} ${className}`}>
+      <AlertTriangle className="h-8 w-8 text-rp-danger" />
+      <div>
+        <p className="text-rp-body font-semibold text-rp-text">Could not load {what}</p>
+        <p className="mt-1 text-rp-meta text-rp-muted">Something went wrong on our side — this is not an empty list.</p>
+      </div>
+      <button onClick={onRetry}
+        className="flex items-center gap-2 rounded-rp-btn bg-rp-btn-accent px-4 py-2 text-rp-body font-medium text-rp-btn-accent-text hover:opacity-90">
+        <RefreshCw className="h-4 w-4" /> Try again
+      </button>
+    </div>
   );
 }
 
@@ -133,25 +229,46 @@ function ContactsTab({ token }: { token: string }) {
   const [search, setSearch]   = useState('');
   const [tierFilter, setTier] = useState('');
   const [loading, setLoading] = useState(true);
+  // The API has always paged. The UI asked for twenty and drew no controls, so
+  // a resort with more than twenty guests could not reach the rest of them
+  // from here at all (CRM QA finding 015).
+  const [page, setPage]       = useState(1);
+  const [pages, setPages]     = useState(1);
+  const [failed, setFailed]   = useState(false);
+  // `GET /crm/contacts/:id` returns the score, consent, tags, stays, email and
+  // sequence enrolments, and nothing opened it (CRM QA finding 016).
+  const [openContact, setOpenContact] = useState<string | null>(null);
 
   const fetchGuests = useCallback(async () => {
     setLoading(true);
+    setFailed(false);
     try {
-      const params = new URLSearchParams({ limit: '20' });
+      const params = new URLSearchParams({ limit: '20', page: String(page) });
       if (search) params.set('search', search);
       if (tierFilter) params.set('tier', tierFilter);
       const res = await api.get(`/crm/contacts?${params}`, { headers: { Authorization: `Bearer ${token}` } });
       setGuests(res.data.data.guests);
       setTotal(res.data.data.total);
-    } catch { /* ignore */ }
+      setPages(Math.max(1, res.data.data.pages ?? 1));
+    } catch {
+      setFailed(true);
+    }
     setLoading(false);
-  }, [token, search, tierFilter]);
+  }, [token, search, tierFilter, page]);
 
   useEffect(() => { fetchGuests(); }, [fetchGuests]);
 
+  // Searching from page 4 and being shown page 4 of the new results is how a
+  // filter looks broken.
+  useEffect(() => { setPage(1); }, [search, tierFilter]);
+
   const recalcScore = async (id: string) => {
-    await api.post(`/crm/contacts/${id}/recalc-score`, {}, { headers: { Authorization: `Bearer ${token}` } });
-    fetchGuests();
+    try {
+      await api.post(`/crm/contacts/${id}/recalc-score`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      fetchGuests();
+    } catch (err) {
+      alert(apiMessage(err, 'Could not recalculate that score. Try again.'));
+    }
   };
 
   return (
@@ -173,14 +290,19 @@ function ContactsTab({ token }: { token: string }) {
         </button>
       </div>
 
-      <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">
-        <span className="font-semibold text-[#183153] dark:text-[#f8fafc]">{total}</span> total contacts
-      </p>
+      {/* A failed load used to leave this reading "0 total contacts". */}
+      {!failed && (
+        <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">
+          <span className="font-semibold text-[#183153] dark:text-[#f8fafc]">{total}</span> total contacts
+        </p>
+      )}
 
       <div className="rounded-[14px] border bg-white overflow-hidden"
         style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
         {loading ? (
           <div className="py-16 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Loading contacts…</div>
+        ) : failed ? (
+          <LoadFailed what="contacts" onRetry={fetchGuests} nested />
         ) : guests.length === 0 ? (
           <div className="py-16 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">No contacts found</div>
         ) : (
@@ -208,7 +330,15 @@ function ContactsTab({ token }: { token: string }) {
                             {g.firstName[0]}{g.lastName[0]}
                           </div>
                           <div>
-                            <p className="text-[13px] font-medium text-[#183153] dark:text-[#f8fafc]">{g.firstName} {g.lastName}</p>
+                            {/* The name opens the sheet, not the whole row:
+                                the row also carries a recalc button, and a
+                                row-wide handler would fire on that too. */}
+                            <button
+                              onClick={() => setOpenContact(g.id)}
+                              className="text-left text-[13px] font-medium text-[#183153] hover:underline dark:text-[#f8fafc]"
+                            >
+                              {g.firstName} {g.lastName}
+                            </button>
                             <p className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">{g.email}</p>
                           </div>
                         </div>
@@ -256,7 +386,207 @@ function ContactsTab({ token }: { token: string }) {
             </table>
           </div>
         )}
+
+      <ContactDetailSheet
+        contactId={openContact}
+        token={token}
+        onClose={() => setOpenContact(null)}
+        onChanged={fetchGuests}
+      />
+
+      {pages > 1 && !failed && (
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-rp-body text-rp-muted">
+            Page {page} of {pages}
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1 || loading}
+              className="rounded-rp-card border border-rp-border px-3 py-1.5 text-rp-body disabled:opacity-40"
+            >Previous</button>
+            <button
+              onClick={() => setPage(p => Math.min(pages, p + 1))}
+              disabled={page >= pages || loading}
+              className="rounded-rp-card border border-rp-border px-3 py-1.5 text-rp-body disabled:opacity-40"
+            >Next</button>
+          </div>
+        </div>
+      )}
       </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   TAGS TAB
+
+   `GET/POST /crm/tags` and `DELETE /crm/tags/:id` have always existed and the
+   dashboard called none of them (CRM QA 2026-10-07, finding 016). The Contacts
+   table renders each guest's tags, so the column was there and could never
+   fill: no screen could create a tag, and the QA's own run recorded tags as
+   "Fail at assignment".
+
+   This tab is the half that manages them. Putting a tag *on* a guest is the
+   other half and comes next — a tag nobody can assign is still only half a
+   feature, and saying so is better than implying this closes 016.
+══════════════════════════════════════════════════════════════════════════════ */
+function TagsTab({ token }: { token: string }) {
+  const [tags, setTags]       = useState<Tag[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed]   = useState(false);
+  const [name, setName]       = useState('');
+  const [colour, setColour]   = useState<string>(DEFAULT_TAG_COLOUR);
+  const [saving, setSaving]   = useState(false);
+  const [error, setError]     = useState('');
+
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    setFailed(false);
+    try {
+      const res = await api.get('/crm/tags', { headers: { Authorization: `Bearer ${token}` } });
+      setTags(res.data.data);
+    } catch {
+      setFailed(true);
+    }
+    setLoading(false);
+  }, [token]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  const createTag = async () => {
+    const trimmed = name.trim();
+    if (!trimmed) { setError('A tag needs a name'); return; }
+    // Checked here because the list is already loaded, so the owner hears it
+    // without a round trip. It is not the real boundary: GuestTag is
+    // `@@unique([tenantId, name])` and the route now answers 409 — an earlier
+    // version of this comment said the API had no such constraint, which was
+    // wrong.
+    if (tags.some(t => t.name.toLowerCase() === trimmed.toLowerCase())) {
+      setError(`There is already a tag called "${trimmed}"`);
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      await api.post('/crm/tags', { name: trimmed, color: colour },
+        { headers: { Authorization: `Bearer ${token}` } });
+      setName('');
+      fetch();
+    } catch (err) {
+      setError(apiMessage(err, 'Could not create that tag. Try again.'));
+    }
+    setSaving(false);
+  };
+
+  const deleteTag = async (tag: Tag) => {
+    // The count is in the confirm on purpose: deleting a tag removes it from
+    // every guest who has it, and "Delete this tag?" does not tell you that
+    // you are about to untag forty people.
+    const used = tag._count.relations;
+    const warning = used > 0
+      ? `"${tag.name}" is on ${used} ${used === 1 ? 'guest' : 'guests'}. Deleting it removes it from all of them. Continue?`
+      : `Delete "${tag.name}"?`;
+    if (!confirm(warning)) return;
+    try {
+      await api.delete(`/crm/tags/${tag.id}`, { headers: { Authorization: `Bearer ${token}` } });
+      fetch();
+    } catch (err) {
+      alert(apiMessage(err, 'Could not delete that tag.'));
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* New tag */}
+      <div className="rounded-rp-card border border-rp-border bg-rp-surface p-5 shadow-rp-card">
+        <p className="text-rp-body font-semibold text-rp-text">New tag</p>
+        <p className="mt-0.5 text-rp-meta text-rp-muted">
+          Group guests by anything you sort them by — Corporate, Honeymoon, Repeat.
+          Campaign segments can target a tag.
+        </p>
+
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <input
+            value={name}
+            onChange={e => { setName(e.target.value); setError(''); }}
+            onKeyDown={e => { if (e.key === 'Enter') createTag(); }}
+            placeholder="Tag name"
+            className={inputCls + ' max-w-[240px]'}
+          />
+          <div className="flex items-center gap-1.5">
+            {TAG_COLOURS.map(c => (
+              <button
+                key={c}
+                onClick={() => setColour(c)}
+                aria-label={`Use colour ${c}`}
+                aria-pressed={colour === c}
+                className={`h-6 w-6 rounded-full transition-transform ${colour === c ? 'scale-110 ring-2 ring-offset-2 ring-rp-border-md' : ''}`}
+                style={{ background: c }}
+              />
+            ))}
+          </div>
+          <button
+            onClick={createTag}
+            disabled={saving}
+            className="flex items-center gap-2 rounded-rp-ctrl bg-rp-btn-accent px-4 py-2 text-rp-body font-medium text-rp-btn-accent-text hover:opacity-90 disabled:opacity-60"
+          >
+            {saving ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Creating…</> : <><Plus className="h-4 w-4" /> Create</>}
+          </button>
+        </div>
+
+        {error && (
+          <p className="mt-3 rounded-rp-panel bg-rp-red-bg px-3 py-2 text-rp-meta text-rp-danger">{error}</p>
+        )}
+      </div>
+
+      {/* The tags themselves */}
+      {loading ? (
+        <div className="py-12 text-center text-rp-body text-rp-muted">Loading tags…</div>
+      ) : failed ? (
+        <LoadFailed what="tags" onRetry={fetch} />
+      ) : tags.length === 0 ? (
+        <div className="rounded-rp-card border border-rp-border bg-rp-surface py-16 text-center shadow-rp-card">
+          <TagIcon className="mx-auto mb-3 h-10 w-10 text-rp-faint" />
+          <p className="text-rp-body text-rp-muted">No tags yet. Create one above.</p>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-rp-card border border-rp-border bg-rp-surface shadow-rp-card">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-rp-surface-2">
+                {['Tag', 'Guests', ''].map(h => (
+                  <th key={h} className="px-5 py-3 text-left text-rp-label font-semibold uppercase tracking-[0.08em] text-rp-muted">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {tags.map(t => (
+                <tr key={t.id} className="border-t border-rp-border">
+                  <td className="px-5 py-3">
+                    <span className="inline-flex items-center gap-2 text-rp-body text-rp-text">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: t.color }} />
+                      {t.name}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-rp-body text-rp-muted">
+                    {t._count.relations}
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    <button
+                      onClick={() => deleteTag(t)}
+                      aria-label={`Delete tag ${t.name}`}
+                      className="flex h-[28px] w-[28px] items-center justify-center rounded-rp-xs text-rp-faint transition-colors hover:bg-rp-red-bg"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -273,23 +603,85 @@ function CampaignsTab({ token }: { token: string }) {
   const [saving, setSaving] = useState(false);
   const [error, setError]  = useState('');
 
+  const [failed, setFailed] = useState(false);
+
+  // `POST /crm/campaigns` has always accepted templateId, segment and
+  // scheduledAt, and the form sent none of them (CRM QA finding 016). The
+  // scheduled dispatcher has existed since baef93b, so scheduling was a
+  // working feature with no way to ask for it.
+  //
+  // The audience offers a tier and a tag and nothing else, because
+  // campaign-sender.ts reads exactly `segment.tier` and `segment.tag` and
+  // ignores anything else it is given. Offering a filter the sender drops on
+  // the floor is how you end up promising an audience and mailing everyone.
+  const [schedule, setSchedule] = useState('');
+  const [segTier, setSegTier]   = useState('');
+  const [segTag, setSegTag]     = useState('');
+  const [tagChoices, setTagChoices] = useState<Tag[]>([]);
+  const [templateChoices, setTemplateChoices] = useState<EmailTemplate[]>([]);
+
   const fetch = useCallback(async () => {
     setLoading(true);
+    setFailed(false);
     try {
       const res = await api.get('/crm/campaigns', { headers: { Authorization: `Bearer ${token}` } });
       setCampaigns(res.data.data);
-    } catch { /* ignore */ }
+    } catch {
+      setFailed(true);
+    }
     setLoading(false);
   }, [token]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
+  // Only when the form opens: reading the list is the common visit.
+  const openForm = async () => {
+    setShowNew(true);
+    setError('');
+    const auth = { headers: { Authorization: `Bearer ${token}` } };
+    const [tags, templates] = await Promise.all([
+      api.get('/crm/tags', auth).catch(() => null),
+      api.get('/crm/templates', auth).catch(() => null),
+    ]);
+    setTagChoices(tags?.data?.data ?? []);
+    setTemplateChoices(templates?.data?.data ?? []);
+  };
+
+  /** Only the two keys campaign-sender.ts actually reads. */
+  const buildSegment = () => {
+    const seg: Record<string, string> = {};
+    if (segTier) seg.tier = segTier;
+    if (segTag) seg.tag = segTag;
+    return seg;
+  };
+
+  const useTemplate = (id: string) => {
+    const t = templateChoices.find(x => x.id === id);
+    if (!t) return;
+    // Copies the content in rather than linking by id alone, so what the
+    // owner sees in the box is what goes out — editing a template later must
+    // not silently rewrite a campaign that was already approved.
+    setForm(f => ({ ...f, subject: f.subject || t.subject, html: t.html }));
+  };
+
   const createCampaign = async () => {
     if (!form.name || !form.subject || !form.html) { setError('All fields required'); return; }
+    if (schedule && new Date(schedule).getTime() <= Date.now()) {
+      setError('That time has already passed. Pick a future time, or leave it blank to save a draft.');
+      return;
+    }
     setSaving(true); setError('');
     try {
-      await api.post('/crm/campaigns', form, { headers: { Authorization: `Bearer ${token}` } });
-      setShowNew(false); setForm({ name: '', subject: '', html: '' }); fetch();
+      const segment = buildSegment();
+      await api.post('/crm/campaigns', {
+        ...form,
+        ...(Object.keys(segment).length ? { segment } : {}),
+        ...(schedule ? { scheduledAt: new Date(schedule).toISOString() } : {}),
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      setShowNew(false);
+      setForm({ name: '', subject: '', html: '' });
+      setSchedule(''); setSegTier(''); setSegTag('');
+      fetch();
     } catch { setError('Failed to create campaign'); }
     setSaving(false);
   };
@@ -307,14 +699,20 @@ function CampaignsTab({ token }: { token: string }) {
 
   const deleteCampaign = async (id: string) => {
     if (!confirm('Delete this campaign?')) return;
-    await api.delete(`/crm/campaigns/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-    fetch();
+    try {
+      await api.delete(`/crm/campaigns/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      fetch();
+    } catch (err) {
+      // The API refuses to delete a campaign that has gone out, and explains
+      // why. Without this catch that explanation was never shown to anyone.
+      alert(apiMessage(err, 'Could not delete that campaign.'));
+    }
   };
 
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <button onClick={() => setShowNew(true)}
+        <button onClick={openForm}
           className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium hover:opacity-90"
           style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
           <Plus className="h-4 w-4" /> New Campaign
@@ -347,12 +745,92 @@ function CampaignsTab({ token }: { token: string }) {
               rows={6} placeholder="<h2>Hi {{guestName}},</h2><p>We have a special offer...</p>"
               className={inputCls + ' font-mono resize-none'} />
           </div>
+          {/* ── Start from a template ──────────────────────────────────── */}
+          {templateChoices.length > 0 && (
+            <div>
+              <label className={labelCls}>Start from a template (optional)</label>
+              <select
+                defaultValue=""
+                onChange={e => useTemplate(e.target.value)}
+                className={inputCls + ' cursor-pointer'}
+              >
+                <option value="">Write it myself</option>
+                {templateChoices.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-rp-micro text-rp-muted">
+                Copies the template's wording in so you can change it. Editing the
+                template later will not rewrite this campaign.
+              </p>
+            </div>
+          )}
+
+          {/* ── Audience ───────────────────────────────────────────────── */}
+          <div className="rounded-rp-panel border border-rp-border bg-rp-surface-2 p-4">
+            <p className="text-rp-body font-semibold text-rp-text">Who gets this</p>
+            <p className="mt-0.5 text-rp-meta text-rp-muted">
+              Leave both blank to send to every subscribed guest. Both set means
+              guests who match both.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className={labelCls}>Tier</label>
+                <select value={segTier} onChange={e => setSegTier(e.target.value)}
+                  className={inputCls + ' cursor-pointer'}>
+                  <option value="">Any tier</option>
+                  {Object.entries(TIER_CONFIG).map(([k, v]) => (
+                    <option key={k} value={k}>{v.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Tag</label>
+                <select value={segTag} onChange={e => setSegTag(e.target.value)}
+                  className={inputCls + ' cursor-pointer'}>
+                  <option value="">Any tag</option>
+                  {tagChoices.map(t => (
+                    <option key={t.id} value={t.name}>{t.name}</option>
+                  ))}
+                </select>
+                {tagChoices.length === 0 && (
+                  <p className="mt-1 text-rp-micro text-rp-muted">
+                    No tags yet — create one on the Tags tab.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ── When ───────────────────────────────────────────────────── */}
+          <div>
+            <label className={labelCls}>Send at (optional)</label>
+            <input
+              type="datetime-local"
+              value={schedule}
+              onChange={e => setSchedule(e.target.value)}
+              className={inputCls + ' max-w-[260px]'}
+            />
+            <p className="mt-1 text-rp-micro text-rp-muted">
+              {schedule
+                ? 'Saved as scheduled. The worker checks every 15 minutes and sends it when the time passes.'
+                : 'Leave blank to save a draft you send by hand.'}
+            </p>
+          </div>
+
           {error && <p className="text-[12px]" style={{ color: '#c43c3c' }}>{error}</p>}
           <div className="flex gap-3 pt-2" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
             <button onClick={createCampaign} disabled={saving}
               className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium disabled:opacity-60 hover:opacity-90"
               style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
-              {saving ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…</> : <><Plus className="h-4 w-4" /> Save as Draft</>}
+              {/* The label has to follow the outcome: with a time set the API
+                  stores this as SCHEDULED, so "Save as Draft" would be the
+                  button telling you the opposite of what it did. */}
+              {saving
+                ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…</>
+                : schedule
+                  ? <><CalendarClock className="h-4 w-4" /> Schedule</>
+                  : <><Plus className="h-4 w-4" /> Save as Draft</>}
             </button>
             <button onClick={() => setShowNew(false)}
               className="rounded-[9px] border px-4 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]"
@@ -366,6 +844,8 @@ function CampaignsTab({ token }: { token: string }) {
       <div className="space-y-3">
         {loading ? (
           <div className="py-12 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Loading campaigns…</div>
+        ) : failed ? (
+          <LoadFailed what="campaigns" onRetry={fetch} />
         ) : campaigns.length === 0 ? (
           <div className="py-16 text-center rounded-[14px] border bg-white"
             style={{ borderColor: 'var(--rp-border)' }}>
@@ -385,17 +865,18 @@ function CampaignsTab({ token }: { token: string }) {
                   <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">Subject: {c.subject}</p>
                   {c.sentAt && <p className="text-[12px] mt-1 text-[#94a3b8] dark:text-[#7f99ab]">Sent {new Date(c.sentAt).toLocaleDateString()}</p>}
                 </div>
+                {/* Opened and Clicked used to sit here with a percentage under
+                    each. Nothing writes either number — see "Which campaign
+                    numbers this page is allowed to show" at the top. */}
                 {c.stats && (
                   <div className="flex gap-5 text-center shrink-0">
                     {[
-                      { label: 'Sent',    val: c.stats.sent },
-                      { label: 'Opened',  val: c.stats.opened,  rate: c.stats.sent ? Math.round(c.stats.opened / c.stats.sent * 100) : 0 },
-                      { label: 'Clicked', val: c.stats.clicked, rate: c.stats.sent ? Math.round(c.stats.clicked / c.stats.sent * 100) : 0 },
+                      { label: 'Sent',   val: c.stats.sent },
+                      { label: 'Failed', val: c.stats.bounced },
                     ].map(s => (
                       <div key={s.label}>
                         <p className="text-[17px] font-bold text-[#183153] dark:text-[#f8fafc]">{s.val}</p>
                         <p className="text-[11px] text-[#64748b] dark:text-[#a9c1d0]">{s.label}</p>
-                        {'rate' in s && s.rate > 0 && <p className="text-[11px] font-medium" style={{ color: '#183153' }}>{s.rate}%</p>}
                       </div>
                     ))}
                   </div>
@@ -409,7 +890,7 @@ function CampaignsTab({ token }: { token: string }) {
                     </button>
                   )}
                   {['DRAFT', 'SCHEDULED'].includes(c.status) && (
-                    <button onClick={() => deleteCampaign(c.id)}
+                    <button onClick={() => deleteCampaign(c.id)} aria-label="Delete campaign"
                       className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#fef2f2] text-[#94a3b8] dark:text-[#7f99ab]">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -434,40 +915,69 @@ function SequencesTab({ token }: { token: string }) {
   const [showSteps, setShowSteps] = useState<string | null>(null);
   const [form, setForm]     = useState({ name: '', trigger: 'BOOKING_CONFIRMED' });
   const [stepForm, setStepForm] = useState({ subject: '', html: '', delayDays: 0 });
+  const [stepError, setStepError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const [failed, setFailed] = useState(false);
 
   const fetch = useCallback(async () => {
     setLoading(true);
+    setFailed(false);
     try {
       const res = await api.get('/crm/sequences', { headers: { Authorization: `Bearer ${token}` } });
       setSequences(res.data.data);
-    } catch { /* ignore */ }
+    } catch {
+      setFailed(true);
+    }
     setLoading(false);
   }, [token]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
+  // The form used to `catch { /* ignore */ }`, so a rejected trigger closed
+  // nothing, said nothing, and left the owner clicking Create again. That is
+  // how the Anniversary mismatch stayed invisible for as long as it did.
+  const [error, setError] = useState('');
+
   const createSequence = async () => {
     if (!form.name) return;
     setSaving(true);
+    setError('');
     try {
       await api.post('/crm/sequences', form, { headers: { Authorization: `Bearer ${token}` } });
       setShowNew(false); setForm({ name: '', trigger: 'BOOKING_CONFIRMED' }); fetch();
-    } catch { /* ignore */ }
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'That did not save. Try again, or pick a different trigger.');
+    }
     setSaving(false);
   };
 
   const toggleStatus = async (seq: Sequence) => {
     const status = seq.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
-    await api.put(`/crm/sequences/${seq.id}`, { status }, { headers: { Authorization: `Bearer ${token}` } });
-    fetch();
+    try {
+      await api.put(`/crm/sequences/${seq.id}`, { status }, { headers: { Authorization: `Bearer ${token}` } });
+      fetch();
+    } catch (err) {
+      // The pill is never updated optimistically, so a failure leaves it
+      // reading ACTIVE — which is true. It just needs to say that the pause
+      // did not take, because "I paused it" is the one thing an owner must
+      // not be wrong about when the sequence keeps sending email.
+      alert(apiMessage(err, `Could not ${status === 'PAUSED' ? 'pause' : 'resume'} that sequence — it is still ${seq.status}.`));
+    }
   };
 
   const addStep = async (seqId: string) => {
-    if (!stepForm.subject || !stepForm.html) return;
-    await api.post(`/crm/sequences/${seqId}/steps`, stepForm, { headers: { Authorization: `Bearer ${token}` } });
-    setStepForm({ subject: '', html: '', delayDays: 0 });
-    fetch();
+    if (!stepForm.subject || !stepForm.html) { setStepError('Subject and body are both required'); return; }
+    setStepError('');
+    try {
+      await api.post(`/crm/sequences/${seqId}/steps`, stepForm, { headers: { Authorization: `Bearer ${token}` } });
+      setStepForm({ subject: '', html: '', delayDays: 0 });
+      fetch();
+    } catch (err) {
+      // "A sequence can be created but a step cannot be added" was a Critical
+      // in the CRM QA. It presented as the Add button doing nothing.
+      setStepError(apiMessage(err, 'Could not add that step. Try again.'));
+    }
   };
 
   return (
@@ -502,6 +1012,11 @@ function SequencesTab({ token }: { token: string }) {
               </select>
             </div>
           </div>
+          {error && (
+            // Tokens rather than the arbitrary sizes the rest of this file
+            // uses — a new line should not add to the debt it sits next to.
+            <p className="rounded-rp-card bg-rp-red-bg px-3 py-2 text-rp-body text-rp-danger">{error}</p>
+          )}
           <div className="flex gap-3 pt-2" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
             <button onClick={createSequence} disabled={saving}
               className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium disabled:opacity-60 hover:opacity-90"
@@ -520,6 +1035,8 @@ function SequencesTab({ token }: { token: string }) {
       <div className="space-y-3">
         {loading ? (
           <div className="py-12 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Loading sequences…</div>
+        ) : failed ? (
+          <LoadFailed what="sequences" onRetry={fetch} />
         ) : sequences.length === 0 ? (
           <div className="py-16 text-center rounded-[14px] border bg-white" style={{ borderColor: 'var(--rp-border)' }}>
             <GitBranch className="h-10 w-10 mx-auto mb-3 text-[#94a3b8] dark:text-[#7f99ab]" />
@@ -558,7 +1075,10 @@ function SequencesTab({ token }: { token: string }) {
                       style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
                       {seq.status === 'ACTIVE' ? <><Pause className="h-3 w-3" /> Pause</> : <><Play className="h-3 w-3" /> Resume</>}
                     </button>
-                    <button onClick={() => setShowSteps(showSteps === seq.id ? null : seq.id)}
+                    {/* One stepError for the tab is fine — only one panel is
+                        ever open — but it must not follow you to the next
+                        sequence. */}
+                    <button onClick={() => { setStepError(''); setShowSteps(showSteps === seq.id ? null : seq.id); }}
                       className="flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-[12px] font-medium hover:opacity-90"
                       style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
                       <ChevronDown className={`h-3 w-3 transition-transform ${showSteps === seq.id ? 'rotate-180' : ''}`} />
@@ -602,6 +1122,9 @@ function SequencesTab({ token }: { token: string }) {
                     <textarea value={stepForm.html} onChange={e => setStepForm(p => ({ ...p, html: e.target.value }))}
                       rows={3} placeholder="Email body (HTML or text, use {{guestName}})"
                       className={inputCls + ' font-mono resize-none'} />
+                    {stepError && (
+                      <p className="rounded-rp-panel bg-rp-red-bg px-3 py-2 text-rp-meta text-rp-danger">{stepError}</p>
+                    )}
                     <button onClick={() => addStep(seq.id)}
                       className="flex items-center gap-1.5 rounded-[8px] px-4 py-2 text-[12.5px] font-medium hover:opacity-90"
                       style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
@@ -627,38 +1150,111 @@ function TemplatesTab({ token }: { token: string }) {
   const [showNew, setShowNew]     = useState(false);
   const [form, setForm]   = useState({ name: '', subject: '', html: '', preheader: '' });
   const [saving, setSaving] = useState(false);
+  // `PUT /crm/templates/:id` has always existed and nothing called it, so
+  // fixing a typo meant deleting the template and typing it again (CRM QA
+  // finding 016). The same form does both; this is which one.
+  const [editing, setEditing] = useState<EmailTemplate | null>(null);
+  const [restoring, setRestoring] = useState(false);
+
+  const [failed, setFailed] = useState(false);
+  const [error, setError]   = useState('');
 
   const fetch = useCallback(async () => {
     setLoading(true);
+    setFailed(false);
     try {
       const res = await api.get('/crm/templates', { headers: { Authorization: `Bearer ${token}` } });
       setTemplates(res.data.data);
-    } catch { /* ignore */ }
+    } catch {
+      setFailed(true);
+    }
     setLoading(false);
   }, [token]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
-  const createTemplate = async () => {
-    if (!form.name || !form.subject || !form.html) return;
+  const blank = { name: '', subject: '', html: '', preheader: '' };
+
+  const closeForm = () => {
+    setShowNew(false);
+    setEditing(null);
+    setForm(blank);
+    setError('');
+  };
+
+  const startEdit = (t: EmailTemplate) => {
+    setEditing(t);
+    setShowNew(true);
+    setError('');
+    setForm({
+      name: t.name, subject: t.subject, html: t.html,
+      preheader: (t as { preheader?: string }).preheader ?? '',
+    });
+  };
+
+  const saveTemplate = async () => {
+    if (!form.name || !form.subject || !form.html) { setError('All fields required'); return; }
     setSaving(true);
+    setError('');
     try {
-      await api.post('/crm/templates', form, { headers: { Authorization: `Bearer ${token}` } });
-      setShowNew(false); setForm({ name: '', subject: '', html: '', preheader: '' }); fetch();
-    } catch { /* ignore */ }
+      const auth = { headers: { Authorization: `Bearer ${token}` } };
+      if (editing) {
+        await api.put(`/crm/templates/${editing.id}`, form, auth);
+      } else {
+        await api.post('/crm/templates', form, auth);
+      }
+      closeForm();
+      fetch();
+    } catch (err) {
+      // Silently swallowed before: the form stayed open with the text still in
+      // it and nothing said why, so the obvious read was "the button is dead".
+      setError(apiMessage(err, 'That did not save. Try again.'));
+    }
     setSaving(false);
   };
 
-  const deleteTemplate = async (id: string) => {
-    if (!confirm('Delete this template?')) return;
-    await api.delete(`/crm/templates/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-    fetch();
+  const restoreDefaults = async () => {
+    setRestoring(true);
+    try {
+      const res = await api.post('/crm/templates/restore-defaults', {},
+        { headers: { Authorization: `Bearer ${token}` } });
+      alert(res.data.message);
+      fetch();
+    } catch (err) {
+      alert(apiMessage(err, 'Could not restore the default templates.'));
+    }
+    setRestoring(false);
+  };
+
+  const deleteTemplate = async (t: EmailTemplate) => {
+    // A default is starter content and is restorable; a template the owner
+    // wrote is not. Same button, different stakes, so say which.
+    const isDefault = (t as { isDefault?: boolean }).isDefault === true;
+    const warning = isDefault
+      ? `"${t.name}" is one of the default templates. You can bring it back with "Restore defaults". Delete it?`
+      : `Delete "${t.name}"? This one was written here, so it cannot be restored.`;
+    if (!confirm(warning)) return;
+    try {
+      await api.delete(`/crm/templates/${t.id}`, { headers: { Authorization: `Bearer ${token}` } });
+      fetch();
+    } catch (err) {
+      alert(apiMessage(err, 'Could not delete that template.'));
+    }
   };
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <button onClick={() => setShowNew(true)}
+      <div className="flex flex-wrap justify-end gap-3">
+        {/* Deleting a default used to be unrecoverable: GET /templates
+            re-creates them only when the list is completely empty, so losing
+            one left it gone. */}
+        <button onClick={restoreDefaults} disabled={restoring}
+          className="flex items-center gap-2 rounded-rp-ctrl border border-rp-border-md px-4 py-2 text-rp-body font-medium text-rp-subtle hover:opacity-80 disabled:opacity-60">
+          {restoring
+            ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Restoring…</>
+            : <><RefreshCw className="h-4 w-4" /> Restore defaults</>}
+        </button>
+        <button onClick={() => { setEditing(null); setForm(blank); setShowNew(true); }}
           className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium hover:opacity-90"
           style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
           <Plus className="h-4 w-4" /> New Template
@@ -669,7 +1265,7 @@ function TemplatesTab({ token }: { token: string }) {
         <div className="rounded-[14px] border bg-white p-6 space-y-4"
           style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
           <div className="flex items-center justify-between">
-            <h3 className="text-[14px] font-semibold text-[#183153] dark:text-[#f8fafc]">New Email Template</h3>
+            <h3 className="text-[14px] font-semibold text-[#183153] dark:text-[#f8fafc]">{editing ? `Edit “${editing.name}”` : 'New Email Template'}</h3>
             <button onClick={() => setShowNew(false)}
               className="flex h-[26px] w-[26px] items-center justify-center rounded-full hover:bg-[#f4f1eb] text-[#64748b] dark:text-[#a9c1d0]"><X className="h-4 w-4" /></button>
           </div>
@@ -696,13 +1292,18 @@ function TemplatesTab({ token }: { token: string }) {
               rows={8} placeholder="<h2>Hi {{guestName}},</h2>"
               className={inputCls + ' font-mono resize-none'} />
           </div>
+          {error && (
+            <p className="rounded-rp-card bg-rp-red-bg px-3 py-2 text-rp-body text-rp-danger">{error}</p>
+          )}
           <div className="flex gap-3 pt-2" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
-            <button onClick={createTemplate} disabled={saving}
+            <button onClick={saveTemplate} disabled={saving}
               className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium disabled:opacity-60 hover:opacity-90"
               style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
-              {saving ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…</> : 'Save Template'}
+              {saving
+                ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…</>
+                : editing ? 'Save changes' : 'Save Template'}
             </button>
-            <button onClick={() => setShowNew(false)}
+            <button onClick={closeForm}
               className="rounded-[9px] border px-4 py-2 text-[13px] font-medium hover:bg-[#f4f1eb]"
               style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
               Cancel
@@ -714,6 +1315,8 @@ function TemplatesTab({ token }: { token: string }) {
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         {loading ? (
           <div className="col-span-3 py-12 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Loading templates…</div>
+        ) : failed ? (
+          <LoadFailed what="templates" onRetry={fetch} className="col-span-3" />
         ) : templates.length === 0 ? (
           <div className="col-span-3 py-16 text-center rounded-[14px] border bg-white" style={{ borderColor: 'var(--rp-border)' }}>
             <Mail className="h-10 w-10 mx-auto mb-3 text-[#94a3b8] dark:text-[#7f99ab]" />
@@ -728,17 +1331,97 @@ function TemplatesTab({ token }: { token: string }) {
                   style={{ background: 'var(--rp-teal-bg)' }}>
                   <Mail className="h-5 w-5" style={{ color: '#183153' }} />
                 </div>
-                <button onClick={() => deleteTemplate(t.id)}
-                  className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#fef2f2] text-[#94a3b8] dark:text-[#7f99ab]">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => startEdit(t)} aria-label={`Edit template ${t.name}`}
+                    className="flex h-[26px] w-[26px] items-center justify-center rounded-rp-xs text-rp-faint transition-colors hover:bg-rp-surface-3 hover:text-rp-text">
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button onClick={() => deleteTemplate(t)} aria-label={`Delete template ${t.name}`}
+                    className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#fef2f2] text-[#94a3b8] dark:text-[#7f99ab]">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
-              <h3 className="text-[13.5px] font-semibold mb-1 text-[#183153] dark:text-[#f8fafc]">{t.name}</h3>
+              <div className="mb-1 flex items-center gap-2">
+                <h3 className="text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">{t.name}</h3>
+                {(t as { isDefault?: boolean }).isDefault && (
+                  <span className="rounded-rp-xs bg-rp-surface-3 px-1.5 py-[1px] text-rp-micro font-semibold text-rp-muted">
+                    Default
+                  </span>
+                )}
+              </div>
               <p className="text-[12.5px] mb-3 flex-1 line-clamp-2 text-[#64748b] dark:text-[#a9c1d0]">{t.subject}</p>
               <p className="text-[11.5px] text-[#94a3b8] dark:text-[#7f99ab]">{new Date(t.createdAt).toLocaleDateString()}</p>
             </div>
           ))
         )}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   DAILY AUTOMATION — WHO WOULD GET THIS
+
+   Named addresses, not a count. "3 guests" is not something anybody can check,
+   and this is the screen where a wrong audience becomes real email: every send
+   also suppresses that guest for 300 days, so a mistaken run cancels the one
+   that should have gone (CRM QA 2026-10-07, finding 011).
+══════════════════════════════════════════════════════════════════════════════ */
+function AutomationPreviewPanel({ preview, busy, onSend, onCancel }: {
+  preview: AutomationPreview;
+  busy: boolean;
+  onSend: () => void;
+  onCancel: () => void;
+}) {
+  const total = preview.birthday.found + preview.anniversary.found;
+
+  const group = (label: string, recipients: AutomationRecipient[]) => (
+    <div key={label}>
+      <p className="text-rp-label font-semibold uppercase tracking-[0.08em] text-rp-muted">
+        {label} — {recipients.length}
+      </p>
+      {recipients.length === 0 ? (
+        <p className="mt-1 text-rp-meta text-rp-faint">Nobody today.</p>
+      ) : (
+        <ul className="mt-1.5 space-y-1">
+          {recipients.map(r => (
+            <li key={r.id} className="text-rp-meta text-rp-text">
+              {r.firstName} <span className="text-rp-muted">&lt;{r.email}&gt;</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="space-y-4 rounded-rp-card border border-rp-border bg-rp-surface p-5 shadow-rp-card">
+      <div>
+        <p className="text-rp-body font-semibold text-rp-text">
+          {total === 0 ? 'Nothing to send today' : `This will email ${total} ${total === 1 ? 'guest' : 'guests'}`}
+        </p>
+        <p className="mt-0.5 text-rp-meta text-rp-muted">
+          Nothing has been sent yet. Email cannot be recalled, so check the list first.
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        {group('🎂 Birthday', preview.birthday.recipients)}
+        {group('🏖️ Anniversary', preview.anniversary.recipients)}
+      </div>
+
+      <div className="flex gap-3 border-t border-rp-border pt-3">
+        <button onClick={onSend} disabled={busy || total === 0}
+          className="flex items-center gap-2 rounded-rp-ctrl bg-rp-btn-accent px-4 py-2 text-rp-body font-semibold text-rp-btn-accent-text hover:opacity-90 disabled:opacity-60">
+          {busy
+            ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending…</>
+            : total === 0 ? 'Nothing to send' : `Send to ${total}`}
+        </button>
+        <button onClick={onCancel} disabled={busy}
+          className="rounded-rp-ctrl border border-rp-border-md px-4 py-2 text-rp-body font-medium text-rp-subtle hover:opacity-80 disabled:opacity-60">
+          Cancel
+        </button>
       </div>
     </div>
   );
@@ -752,28 +1435,60 @@ function AnalyticsTab({ token }: { token: string }) {
   const [loading, setLoading]       = useState(true);
   const [automating, setAutomating] = useState(false);
   const [autoResult, setAutoResult] = useState<{ birthday: { found: number; sent: number }; anniversary: { found: number; sent: number } } | null>(null);
+  const [preview, setPreview] = useState<AutomationPreview | null>(null);
 
-  useEffect(() => {
-    api.get('/crm/analytics', { headers: { Authorization: `Bearer ${token}` } })
-      .then(res => { setData(res.data.data); setLoading(false); })
-      .catch(() => setLoading(false));
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/crm/analytics', { headers: { Authorization: `Bearer ${token}` } });
+      setData(res.data.data);
+    } catch {
+      setData(null);
+    }
+    setLoading(false);
   }, [token]);
 
+  useEffect(() => { fetch(); }, [fetch]);
+
+  /**
+   * Step one of two. "Run Now" used to send on the click.
+   *
+   * Nothing about that was recoverable: the email is gone, and every send
+   * writes a row that suppresses the same guest for 300 days, so a mistaken
+   * run also cancels the real one (CRM QA 2026-10-07, finding 011). The API
+   * answers this from the same queries the send uses, so the names below are
+   * the names that would receive email.
+   */
+  const previewAutomation = async () => {
+    setAutomating(true); setAutoResult(null); setPreview(null);
+    try {
+      const res = await api.post('/crm/automation/run-daily', { dryRun: true }, { headers: { Authorization: `Bearer ${token}` } });
+      setPreview(res.data.data);
+    } catch (err) {
+      alert(apiMessage(err, 'Could not work out who this would go to. Nothing was sent.'));
+    }
+    setAutomating(false);
+  };
+
   const runAutomation = async () => {
-    setAutomating(true); setAutoResult(null);
+    setAutomating(true);
     try {
       const res = await api.post('/crm/automation/run-daily', {}, { headers: { Authorization: `Bearer ${token}` } });
       setAutoResult(res.data.data);
-    } catch { alert('Failed to run automation. Check server logs.'); }
+      setPreview(null);
+    } catch (err) {
+      alert(apiMessage(err, 'Failed to run automation. Check server logs.'));
+    }
     setAutomating(false);
   };
 
   if (loading) return <div className="py-16 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Loading analytics…</div>;
-  if (!data)   return <div className="py-16 text-center text-[13px] text-[#64748b] dark:text-[#a9c1d0]">Failed to load analytics</div>;
+  if (!data)   return <LoadFailed what="analytics" onRetry={fetch} />;
 
-  const totalSent = data.campaignStats.reduce((s, c) => s + c.sent, 0);
-  const openRate  = data.campaignStats.reduce((s, c) => s + c.opened, 0);
-  const clickRate = data.campaignStats.reduce((s, c) => s + c.clicked, 0);
+  // Only across the five most recent campaigns, which is what the route
+  // returns. The tiles say so rather than implying all time.
+  const totalSent   = data.campaignStats.reduce((s, c) => s + c.sent, 0);
+  const totalFailed = data.campaignStats.reduce((s, c) => s + c.bounced, 0);
 
   return (
     <div className="space-y-6">
@@ -786,7 +1501,7 @@ function AnalyticsTab({ token }: { token: string }) {
           </p>
           <p className="text-[12.5px] mt-0.5 text-[#475569] dark:text-[#9db4c4]">
             Sends birthday greetings (🎂) and resort anniversary emails (🏖️) to qualifying guests.
-            Run daily via cron, or manually here for testing.
+            This runs on its own every morning — use this to see who is due, and to send early.
           </p>
           {autoResult && (
             <div className="mt-3 flex gap-4 text-[12.5px]">
@@ -795,20 +1510,31 @@ function AnalyticsTab({ token }: { token: string }) {
             </div>
           )}
         </div>
-        <button onClick={runAutomation} disabled={automating}
-          className="flex shrink-0 items-center gap-2 rounded-[9px] px-4 py-2.5 text-[13px] font-semibold hover:opacity-90 disabled:opacity-60"
-          style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
-          {automating ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Running…</> : '▶ Run Now'}
-        </button>
+        {!preview && (
+          <button onClick={previewAutomation} disabled={automating} aria-label="See who is due an email"
+            className="flex shrink-0 items-center gap-2 rounded-rp-ctrl bg-rp-btn-accent px-4 py-2.5 text-rp-body font-semibold text-rp-btn-accent-text hover:opacity-90 disabled:opacity-60">
+            {automating ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking…</> : 'See who is due'}
+          </button>
+        )}
       </div>
+
+      {/* The recipient list, before anything is sent. */}
+      {preview && <AutomationPreviewPanel
+        preview={preview}
+        busy={automating}
+        onSend={runAutomation}
+        onCancel={() => setPreview(null)}
+      />}
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Total Contacts', val: data.totalContacts, Icon: Users,       iconBg: 'var(--rp-teal-bg)', iconColor: '#183153' },
           { label: 'Subscribed',     val: data.subscribed,    Icon: CheckCircle, iconBg: 'var(--rp-teal-bg)', iconColor: '#183153' },
-          { label: 'Open Rate',      val: totalSent > 0 ? `${Math.round(openRate / totalSent * 100)}%` : '—', Icon: Mail, iconBg: 'var(--rp-amber-bg)', iconColor: '#b89040' },
-          { label: 'Click Rate',     val: totalSent > 0 ? `${Math.round(clickRate / totalSent * 100)}%` : '—', Icon: TrendingUp, iconBg: 'var(--rp-surface-3)', iconColor: 'var(--rp-text-subtle)' },
+          // Was Open Rate and Click Rate. Both were percentages of a number
+          // nothing records; these two are counted by the sender itself.
+          { label: 'Sent (last 5 campaigns)', val: totalSent,   Icon: Mail,       iconBg: 'var(--rp-amber-bg)', iconColor: '#b89040' },
+          { label: 'Failed to send',          val: totalFailed, Icon: TrendingUp, iconBg: 'var(--rp-surface-3)', iconColor: 'var(--rp-text-subtle)' },
         ].map(({ label, val, Icon, iconBg, iconColor }) => (
           <div key={label} className="rounded-[14px] border bg-white p-5"
             style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
@@ -889,7 +1615,7 @@ function AnalyticsTab({ token }: { token: string }) {
       {data.campaignStats.length > 0 && (
         <div className="rounded-[14px] border bg-white p-5"
           style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
-          <h3 className="text-[14px] font-semibold mb-4 text-[#183153] dark:text-[#f8fafc]">Recent Campaign Performance</h3>
+          <h3 className="text-[14px] font-semibold mb-4 text-[#183153] dark:text-[#f8fafc]">Recent Campaign Delivery</h3>
           <div className="space-y-3">
             {data.campaignStats.map((cs, i) => (
               <div key={i} className="flex items-center gap-4 py-2.5"
@@ -899,9 +1625,8 @@ function AnalyticsTab({ token }: { token: string }) {
                   {cs.campaign.sentAt && <p className="text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">{new Date(cs.campaign.sentAt).toLocaleDateString()}</p>}
                 </div>
                 {[
-                  { label: 'Sent',    val: cs.sent,    color: 'var(--rp-text-muted)' },
-                  { label: 'Opened',  val: cs.opened,  color: '#183153' },
-                  { label: 'Clicked', val: cs.clicked, color: '#b89040' },
+                  { label: 'Sent',   val: cs.sent,    color: 'var(--rp-text-muted)' },
+                  { label: 'Failed', val: cs.bounced, color: '#183153' },
                 ].map(s => (
                   <div key={s.label} className="text-center w-16">
                     <p className="text-[15px] font-bold" style={{ color: s.color }}>{s.val}</p>

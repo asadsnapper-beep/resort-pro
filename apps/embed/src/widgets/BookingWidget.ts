@@ -4,7 +4,7 @@
  */
 
 import { api, EmbedConfig, Room, BookingResult } from '../api/client'
-import { formatMoney, today, nightsBetween, toDateStr, loadScript } from '../utils/dom'
+import { formatMoney, today, nightsBetween, toDateStr } from '../utils/dom'
 import { applyTheme } from '../utils/theme'
 
 export interface WidgetConfig {
@@ -16,7 +16,9 @@ export interface WidgetConfig {
   checkOut?: string
 }
 
-type Step = 'dates' | 'rooms' | 'details' | 'payment' | 'success'
+// No 'success' step: the booking is not confirmed until the hosted checkout
+// completes it, so this widget has no honest moment at which to say so.
+type Step = 'dates' | 'rooms' | 'details' | 'payment'
 
 interface State {
   step: Step
@@ -29,31 +31,15 @@ interface State {
   confirmationNo: string
   totalAmount: number
   nights: number
-  paymentMethod: 'manual' | 'bkash' | 'ssl' | 'stripe' | null
   loading: boolean
   error: string
-  stripeReady: boolean
 }
 
-// Stripe types (loaded from CDN on demand)
-declare const Stripe: (key: string) => StripeInstance
-interface StripeInstance {
-  elements: (opts: { clientSecret: string }) => StripeElements
-}
-interface StripeElements {
-  create: (type: string) => StripeElement
-  submit: () => Promise<{ error?: { message: string } }>
-}
-interface StripeElement {
-  mount: (el: HTMLElement) => void
-}
 
 export class BookingWidget {
   private container: HTMLElement
   private cfg: WidgetConfig
   private state: State
-  private stripeElements: StripeElements | null = null
-  private stripePaymentEl: StripeElement | null = null
 
   constructor(container: HTMLElement, config: WidgetConfig) {
     this.container = container
@@ -73,10 +59,8 @@ export class BookingWidget {
       confirmationNo: '',
       totalAmount: 0,
       nights: 0,
-      paymentMethod: null,
       loading: false,
       error: '',
-      stripeReady: false,
     }
 
     // Apply brand color to container
@@ -93,7 +77,6 @@ export class BookingWidget {
   // ── Rendering ──────────────────────────────────────────────────────────────
 
   private render() {
-    const { step } = this.state
     this.container.innerHTML = `
       <div class="rp-widget rp-card">
         ${this.renderStepTabs()}
@@ -103,14 +86,6 @@ export class BookingWidget {
         </div>
       </div>
     `
-
-    // After render: if stripe step is active and we have clientSecret, mount element
-    if (step === 'payment' && this.state.stripeReady && this.stripeElements) {
-      const mountTarget = this.container.querySelector<HTMLElement>('#rp-stripe-element')
-      if (mountTarget && this.stripePaymentEl) {
-        this.stripePaymentEl.mount(mountTarget)
-      }
-    }
   }
 
   private renderStepTabs(): string {
@@ -120,7 +95,7 @@ export class BookingWidget {
       { key: 'details', label: 'Details' },
       { key: 'payment', label: 'Payment' },
     ]
-    const order: Step[] = ['dates', 'rooms', 'details', 'payment', 'success']
+    const order: Step[] = ['dates', 'rooms', 'details', 'payment']
     const currentIndex = order.indexOf(this.state.step)
 
     return `
@@ -146,7 +121,6 @@ export class BookingWidget {
       case 'rooms':   return this.renderRooms()
       case 'details': return this.renderDetails()
       case 'payment': return this.renderPayment()
-      case 'success': return this.renderSuccess()
     }
   }
 
@@ -324,25 +298,18 @@ export class BookingWidget {
   }
 
   private renderPayment(): string {
-    const { paymentMethod, checkIn, checkOut, selectedRoom, stripeReady } = this.state
+    const { checkIn, checkOut, selectedRoom } = this.state
     const nights = nightsBetween(checkIn, checkOut)
     const total = selectedRoom ? formatMoney(selectedRoom.basePrice * nights, this.cfg.currency) : ''
-    const { gateways } = this.cfg
 
-    const methods: { key: 'manual' | 'bkash' | 'ssl' | 'stripe'; label: string; icon: string; desc: string }[] = [
-      { key: 'manual',  label: 'Pay at Hotel',    icon: '🏨', desc: 'Pay when you arrive' },
-      { key: 'bkash',   label: 'bKash',           icon: '📱', desc: 'Mobile financial service' },
-      { key: 'ssl',     label: 'SSL Commerce',    icon: '💳', desc: 'Card, mobile banking & more' },
-      { key: 'stripe',  label: 'Credit / Debit Card', icon: '💳', desc: 'Powered by Stripe — secure payment' },
-    ]
-
-    const enabledMethods = methods.filter(m => gateways[m.key])
-
+    // One button, not a gateway picker: the checkout page offers exactly the
+    // methods this resort has enabled, so choosing here too would ask the
+    // guest the same question twice.
     return `
       <div class="rp-space-4">
         <div>
           <h2 style="font-size:18px;font-weight:700;">Payment</h2>
-          <p style="color:var(--rp-muted);font-size:13px;">Choose how you'd like to pay</p>
+          <p style="color:var(--rp-muted);font-size:13px;">Your room is held while you complete checkout.</p>
         </div>
         <div class="rp-summary">
           <div class="rp-summary-row" style="font-weight:700;">
@@ -354,70 +321,13 @@ export class BookingWidget {
             <span>${nights} night${nights !== 1 ? 's' : ''}</span>
           </div>
         </div>
-        <div class="rp-space-3">
-          ${enabledMethods.map(m => `
-            <div class="rp-pay-card ${paymentMethod === m.key ? 'selected' : ''}"
-              data-action="pick-payment" data-method="${m.key}">
-              <div class="rp-pay-radio">
-                <div class="rp-pay-dot"></div>
-              </div>
-              <span style="font-size:20px;">${m.icon}</span>
-              <div>
-                <div style="font-weight:600;font-size:14px;">${m.label}</div>
-                <div style="font-size:12px;color:var(--rp-muted);">${m.desc}</div>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-        ${paymentMethod === 'stripe' && stripeReady ? `
-          <div id="rp-stripe-element" style="padding:12px;border:1px solid var(--rp-border);border-radius:var(--rp-radius-sm);"></div>
-          <button class="rp-btn rp-btn-primary" data-action="pay-stripe">Pay Now — ${total}</button>
-        ` : paymentMethod === 'stripe' && !stripeReady ? `
-          <div class="rp-spinner"></div>
-        ` : `
-          <button class="rp-btn rp-btn-primary" data-action="confirm-payment"
-            ${!paymentMethod ? 'disabled' : ''}>
-            Confirm Booking
-          </button>
-        `}
+        <button class="rp-btn rp-btn-primary" data-action="confirm-payment">
+          Continue to secure checkout
+        </button>
         <button class="rp-btn rp-btn-outline" style="margin-top:-8px;" data-action="back-to-details">← Back</button>
       </div>
     `
   }
-
-  private renderSuccess(): string {
-    const { confirmationNo, nights, totalAmount } = this.state
-    const total = formatMoney(totalAmount, this.cfg.currency)
-    return `
-      <div class="rp-success">
-        <div class="rp-success-icon">✅</div>
-        <h2 style="font-size:20px;font-weight:700;margin-bottom:6px;">Booking Confirmed!</h2>
-        <p style="color:var(--rp-muted);font-size:13px;margin-bottom:20px;">
-          A confirmation has been sent to your email.
-        </p>
-        <div style="text-align:left;border:1px solid var(--rp-border);border-radius:var(--rp-radius-sm);overflow:hidden;">
-          <div class="rp-success-ref" style="padding:10px 16px;">
-            <span style="color:var(--rp-muted);">Confirmation No.</span>
-            <span style="font-weight:700;font-family:monospace;">${escHtml(confirmationNo)}</span>
-          </div>
-          <div class="rp-success-ref" style="padding:10px 16px;">
-            <span style="color:var(--rp-muted);">Nights</span>
-            <span>${nights}</span>
-          </div>
-          <div class="rp-success-ref" style="padding:10px 16px;border-bottom:none;">
-            <span style="color:var(--rp-muted);">Total Paid</span>
-            <span style="font-weight:700;color:var(--rp-primary);">${total}</span>
-          </div>
-        </div>
-        <button class="rp-btn rp-btn-outline" style="margin-top:24px;width:auto;padding:0 24px;"
-          data-action="book-again">
-          Book Again
-        </button>
-      </div>
-    `
-  }
-
-  // ── Event handling ─────────────────────────────────────────────────────────
 
   private handleClick(e: Event) {
     const target = e.target as HTMLElement
@@ -457,20 +367,8 @@ export class BookingWidget {
       case 'back-to-details':
         this.go('details')
         break
-      case 'pick-payment': {
-        const method = btn.dataset.method as State['paymentMethod']
-        this.setState({ paymentMethod: method, error: '', stripeReady: false })
-        if (method === 'stripe') void this.initStripe()
-        break
-      }
       case 'confirm-payment':
-        void this.confirmPayment()
-        break
-      case 'pay-stripe':
-        void this.payWithStripe()
-        break
-      case 'book-again':
-        this.reset()
+        this.confirmPayment()
         break
     }
   }
@@ -571,8 +469,6 @@ export class BookingWidget {
         confirmationNo: result.confirmationNo,
         totalAmount: result.totalAmount,
         nights: result.nights,
-        paymentMethod: null,
-        stripeReady: false,
       })
       this.go('payment')
     } catch (err) {
@@ -580,98 +476,14 @@ export class BookingWidget {
     }
   }
 
-  private async initStripe() {
-    this.setState({ stripeReady: false, error: '' })
-    this.render()
-    try {
-      const { clientSecret } = await api.stripeIntent(this.state.bookingId)
-      await loadScript('https://js.stripe.com/v3/')
-
-      // Stripe public key — host site can set window.__STRIPE_PK__
-      const pk = (window as any).__STRIPE_PK__ || ''
-      if (!pk) throw new Error('Stripe public key not configured. Set window.__STRIPE_PK__.')
-
-      const stripe = Stripe(pk)
-      this.stripeElements = stripe.elements({ clientSecret })
-      this.stripePaymentEl = this.stripeElements.create('payment')
-      this.setState({ stripeReady: true })
-      // render() mounts the stripe element into the div
-    } catch (err) {
-      this.setState({ stripeReady: false, paymentMethod: null, error: errorMessage(err) })
-    }
+  private confirmPayment() {
+    // Hand over to the resort's hosted checkout — not a success screen. The
+    // booking is PENDING, and the worker cancels an unpaid PENDING booking once
+    // its hold expires. The pay-at-hotel option used to show "Booking
+    // Confirmed!" right here, telling a guest they had a room that would be
+    // gone half an hour later.
+    window.location.href = api.checkoutUrl(this.cfg.slug, this.state.bookingId)
   }
-
-  private async payWithStripe() {
-    if (!this.stripeElements) return
-    this.setState({ loading: true, error: '' })
-    try {
-      const { error } = await this.stripeElements.submit()
-      if (error) {
-        this.setState({ loading: false, error: error.message || 'Payment failed.' })
-        return
-      }
-      this.showSuccess()
-    } catch (err) {
-      this.setState({ loading: false, error: errorMessage(err) })
-    }
-  }
-
-  private async confirmPayment() {
-    const { paymentMethod, bookingId } = this.state
-    if (!paymentMethod) return
-
-    if (paymentMethod === 'manual') {
-      this.showSuccess()
-      return
-    }
-
-    this.setState({ loading: true, error: '' })
-    try {
-      if (paymentMethod === 'bkash') {
-        const { bkashURL } = await api.bkashInitiate(bookingId)
-        window.location.href = bkashURL
-        return
-      }
-      if (paymentMethod === 'ssl') {
-        const { gatewayUrl } = await api.sslInitiate(bookingId)
-        window.location.href = gatewayUrl
-        return
-      }
-    } catch (err) {
-      this.setState({ loading: false, error: errorMessage(err) })
-    }
-  }
-
-  private showSuccess() {
-    this.setState({ loading: false })
-    this.go('success')
-  }
-
-  private reset() {
-    const tomorrow = toDateStr(new Date(Date.now() + 86_400_000))
-    const dayAfter  = toDateStr(new Date(Date.now() + 2 * 86_400_000))
-    this.stripeElements = null
-    this.stripePaymentEl = null
-    this.state = {
-      step: 'dates',
-      checkIn: tomorrow,
-      checkOut: dayAfter,
-      adults: 2,
-      rooms: [],
-      selectedRoom: null,
-      bookingId: '',
-      confirmationNo: '',
-      totalAmount: 0,
-      nights: 0,
-      paymentMethod: null,
-      loading: false,
-      error: '',
-      stripeReady: false,
-    }
-    this.render()
-  }
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
 
   private go(step: Step) {
     this.setState({ step, error: '' })

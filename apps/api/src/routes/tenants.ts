@@ -8,10 +8,47 @@ import * as dns from 'dns/promises';
 import { FLAG_REGISTRY } from '../utils/feature-flags';
 import { resolveTenantEntitlement } from '../utils/entitlement';
 import { sendTestEmail } from '../utils/guest-emails';
-import { deliveryVerdict, notImplemented } from '../utils/delivery';
+import { deliveryVerdict } from '../utils/delivery';
 import crypto from 'crypto';
 import { ensureTenantReferralCode, referralRegistrationUrl } from '../utils/referral';
 import { createAdminNotification } from '../utils/notifications';
+import { type SendResult } from '../services/messaging';
+import { sendCountedMessage } from '../services/messaging-quota';
+import { encryptOrNull, decryptOrNull } from '../utils/secret-box';
+
+/** Only the columns messaging needs — never the whole tenant row. */
+const MESSAGING_SELECT = {
+  id: true,
+  name: true,
+  smsMode: true, smsProvider: true, smsApiKey: true, smsApiSecret: true, smsSenderId: true,
+  waMode: true, waApiToken: true, waPhoneNumberId: true,
+} as const;
+
+/**
+ * One mapping from a send attempt to an HTTP answer, so the two test buttons
+ * cannot drift apart. Each failure gets a status that says whose move it is:
+ * 503 nobody has configured it yet, 501 the chosen provider is not built,
+ * 502 the provider was reached and refused (its reason is passed through).
+ *
+ * A platform-mode test is a real message on ResortPro's account, so it is
+ * counted against the monthly allowance — sendCountedMessage reserves it before
+ * sending and gives it back if the send fails. 429 when the allowance is spent.
+ */
+function sendDeliveryResult(reply: import('fastify').FastifyReply, result: SendResult) {
+  if (result.delivered) {
+    return reply.send({ success: true, data: { sent: true, id: result.id ?? null, via: result.via } });
+  }
+  const [status, code] = {
+    not_configured:       [503, 'DELIVERY_NOT_CONFIGURED'],
+    unsupported_provider: [501, 'NOT_IMPLEMENTED'],
+    rejected:             [502, 'DELIVERY_FAILED'],
+    quota_exhausted:      [429, 'QUOTA_EXHAUSTED'],
+  }[result.reason] as [number, string];
+  // "Nothing was sent" is kept on every refusal: it is the sentence the owner
+  // needs, and the one the old { sent: true } answer was hiding.
+  return reply.status(status).send({ success: false, error: `${result.detail} Nothing was sent.`, code, via: result.via });
+}
+
 
 /**
  * What a Settings response may contain.
@@ -702,6 +739,9 @@ export async function tenantRoutes(app: FastifyInstance) {
           notifBookingConfirm: true, notifPaymentReceived: true,
           notifCheckinReminder: true, notifCheckoutRemind: true,
           notifCancellation: true, notifInvoiceSent: true,
+          waNotifBookingConfirm: true, waNotifPaymentReceived: true,
+          waNotifCheckinReminder: true, waNotifCheckoutRemind: true,
+          waNotifCancellation: true, waNotifInvoiceSent: true,
           notifLanguage: true,
           smsQuotaMonthly: true, smsUsedThisMonth: true, smsCredits: true,
           waQuotaMonthly: true,  waUsedThisMonth: true,  waCredits: true,
@@ -710,7 +750,13 @@ export async function tenantRoutes(app: FastifyInstance) {
       if (!tenant) return { success: false, error: 'Tenant not found' };
 
       // Mask API keys — only show last 4 chars if set
-      const mask = (v?: string | null) => v ? '••••••••' + v.slice(-4) : null;
+      // Decrypted only to be masked again. Masking the stored value directly
+      // would show the tail of a ciphertext, which tells the owner nothing
+      // about which key they pasted.
+      const mask = (v?: string | null) => {
+        const plain = decryptOrNull(v);
+        return plain ? '••••••••' + plain.slice(-4) : null;
+      };
       return ok({
         ...tenant,
         smsApiKey:    mask(tenant.smsApiKey),
@@ -732,6 +778,9 @@ export async function tenantRoutes(app: FastifyInstance) {
         notifBookingConfirm?: boolean; notifPaymentReceived?: boolean;
         notifCheckinReminder?: boolean; notifCheckoutRemind?: boolean;
         notifCancellation?: boolean; notifInvoiceSent?: boolean;
+        waNotifBookingConfirm?: boolean; waNotifPaymentReceived?: boolean;
+        waNotifCheckinReminder?: boolean; waNotifCheckoutRemind?: boolean;
+        waNotifCancellation?: boolean; waNotifInvoiceSent?: boolean;
         notifLanguage?: string;
       };
       const updated = await db.tenant.update({
@@ -745,6 +794,12 @@ export async function tenantRoutes(app: FastifyInstance) {
           ...(body.notifCheckoutRemind   !== undefined && { notifCheckoutRemind:  body.notifCheckoutRemind }),
           ...(body.notifCancellation     !== undefined && { notifCancellation:    body.notifCancellation }),
           ...(body.notifInvoiceSent      !== undefined && { notifInvoiceSent:     body.notifInvoiceSent }),
+          ...(body.waNotifBookingConfirm  !== undefined && { waNotifBookingConfirm:  body.waNotifBookingConfirm }),
+          ...(body.waNotifPaymentReceived !== undefined && { waNotifPaymentReceived: body.waNotifPaymentReceived }),
+          ...(body.waNotifCheckinReminder !== undefined && { waNotifCheckinReminder: body.waNotifCheckinReminder }),
+          ...(body.waNotifCheckoutRemind  !== undefined && { waNotifCheckoutRemind:  body.waNotifCheckoutRemind }),
+          ...(body.waNotifCancellation    !== undefined && { waNotifCancellation:    body.waNotifCancellation }),
+          ...(body.waNotifInvoiceSent     !== undefined && { waNotifInvoiceSent:     body.waNotifInvoiceSent }),
           ...(body.notifLanguage         !== undefined && { notifLanguage:        body.notifLanguage }),
         },
         select: {
@@ -752,6 +807,9 @@ export async function tenantRoutes(app: FastifyInstance) {
           notifBookingConfirm: true, notifPaymentReceived: true,
           notifCheckinReminder: true, notifCheckoutRemind: true,
           notifCancellation: true, notifInvoiceSent: true,
+          waNotifBookingConfirm: true, waNotifPaymentReceived: true,
+          waNotifCheckinReminder: true, waNotifCheckoutRemind: true,
+          waNotifCancellation: true, waNotifInvoiceSent: true,
           notifLanguage: true,
         },
       });
@@ -779,8 +837,8 @@ export async function tenantRoutes(app: FastifyInstance) {
         if (body.smsProvider) data.smsProvider = body.smsProvider;
         if (body.smsSenderId) data.smsSenderId = body.smsSenderId;
         // Only update keys if new value provided (not the masked placeholder)
-        if (body.smsApiKey    && !body.smsApiKey.startsWith('••••'))    data.smsApiKey    = body.smsApiKey;
-        if (body.smsApiSecret && !body.smsApiSecret.startsWith('••••')) data.smsApiSecret = body.smsApiSecret;
+        if (body.smsApiKey    && !body.smsApiKey.startsWith('••••'))    data.smsApiKey    = encryptOrNull(body.smsApiKey);
+        if (body.smsApiSecret && !body.smsApiSecret.startsWith('••••')) data.smsApiSecret = encryptOrNull(body.smsApiSecret);
       }
 
       await db.tenant.update({ where: { id: tenantId }, data });
@@ -806,7 +864,7 @@ export async function tenantRoutes(app: FastifyInstance) {
       if (body.waMode === 'own') {
         if (body.waPhoneNumberId) data.waPhoneNumberId = body.waPhoneNumberId;
         if (body.waBusinessAccId) data.waBusinessAccId = body.waBusinessAccId;
-        if (body.waApiToken && !body.waApiToken.startsWith('••••')) data.waApiToken = body.waApiToken;
+        if (body.waApiToken && !body.waApiToken.startsWith('••••')) data.waApiToken = encryptOrNull(body.waApiToken);
       }
 
       await db.tenant.update({ where: { id: tenantId }, data });
@@ -821,13 +879,12 @@ export async function tenantRoutes(app: FastifyInstance) {
     handler: async (request, reply) => {
       const { to } = request.body as { to: string };
       if (!to) return reply.status(400).send({ success: false, error: 'Phone number required' });
-      // No SMS provider is wired up yet. This used to answer `{ sent: true }`
-      // with "coming soon" tucked into a message the UI never displayed, so the
-      // owner was told a test message had reached their phone.
-      const outcome = notImplemented('SMS delivery');
-      return reply.status(outcome.status).send({
-        success: false, error: outcome.error, code: outcome.code,
-      });
+      const { tenantId } = request.user as JwtPayload;
+      const tenant = await request.db.tenant.findUnique({ where: { id: tenantId }, select: MESSAGING_SELECT });
+      if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
+
+      const result = await sendCountedMessage(tenant, 'sms', to, `Test message from ${tenant.name} via ResortPro. If you received this, SMS is working.`);
+      return sendDeliveryResult(reply, result);
     },
   });
 
@@ -838,10 +895,12 @@ export async function tenantRoutes(app: FastifyInstance) {
     handler: async (request, reply) => {
       const { to } = request.body as { to: string };
       if (!to) return reply.status(400).send({ success: false, error: 'Phone number required' });
-      const outcome = notImplemented('WhatsApp delivery');
-      return reply.status(outcome.status).send({
-        success: false, error: outcome.error, code: outcome.code,
-      });
+      const { tenantId } = request.user as JwtPayload;
+      const tenant = await request.db.tenant.findUnique({ where: { id: tenantId }, select: MESSAGING_SELECT });
+      if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
+
+      const result = await sendCountedMessage(tenant, 'whatsapp', to, `Test message from ${tenant.name} via ResortPro. If you received this, WhatsApp is working.`);
+      return sendDeliveryResult(reply, result);
     },
   });
 

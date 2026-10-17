@@ -5,6 +5,10 @@ import { PLAN_ORDER, PLAN_PRICING, PUBLIC_PLAN_ORDER, type PlanKey } from '@reso
 import { createAdminNotification } from '../utils/notifications';
 import { applyPlanFlagsToTenant, resolveTenantEntitlement, getPlanConfigs } from '../utils/entitlement';
 import { bkashGrantToken, bkashCreatePayment, bkashExecutePayment, type BkashConfig } from '../services/bkash';
+import {
+  GROUP_DISCOUNT_RATE, groupDiscountApplies, discounted, discountedUsd, discountedPrices,
+} from '../utils/group-discount';
+import { extendPeriod } from '../utils/billing-period';
 
 // ── Stripe client ──────────────────────────────────────────────────────────
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
@@ -96,6 +100,134 @@ export function getPlatformBkash(): BkashConfig | null {
   const { BKASH_APP_KEY, BKASH_APP_SECRET, BKASH_USERNAME, BKASH_PASSWORD } = process.env;
   if (!BKASH_APP_KEY || !BKASH_APP_SECRET || !BKASH_USERNAME || !BKASH_PASSWORD) return null;
   return { appKey: BKASH_APP_KEY, appSecret: BKASH_APP_SECRET, username: BKASH_USERNAME, password: BKASH_PASSWORD };
+}
+
+
+// ── One bill for several resorts (bKash) ─────────────────────────────────────
+//
+// bKash has no subscriptions — every payment is a one-off that pushes a
+// resort's period out. So "one combined bill" here means exactly one thing:
+// one payment for the sum of what each resort owes, instead of four payments.
+// Each resort keeps its own plan and its own price, discount included.
+//
+// Card is the other half, and it waits for a Stripe account: there the
+// recurring charge belongs to Stripe, so combining means one subscription with
+// a line per resort rather than a single summed payment. See
+// plan/multi-resort.md §9.
+
+interface GroupBillLine {
+  tenantId: string;
+  name: string;
+  slug: string;
+  plan: PlanKey;
+  listPrice: number;
+  /** What this resort actually owes — the list price less any group discount. */
+  amount: number;
+  currentPeriodEnd: Date | null;
+}
+
+/**
+ * What one combined payment would cover.
+ *
+ * Suspended and deleted resorts are left out: charging for a resort nobody can
+ * open would be taking money for nothing.
+ */
+async function groupBill(groupId: string, interval: 'month' | 'year'): Promise<
+  { ok: true; lines: GroupBillLine[]; total: number } | { ok: false; code: string; error: string }
+> {
+  const members = await prisma.resortGroupTenant.findMany({
+    where: { groupId },
+    orderBy: { tenant: { createdAt: 'asc' } },
+    include: {
+      tenant: {
+        select: {
+          id: true, name: true, slug: true, plan: true,
+          isActive: true, deletedAt: true, currentPeriodEnd: true,
+        },
+      },
+    },
+  });
+  const payable = members.filter((m) => m.tenant.isActive && !m.tenant.deletedAt);
+  if (payable.length < 2) {
+    return { ok: false, code: 'NOTHING_TO_COMBINE', error: 'There is only one resort to pay for.' };
+  }
+  // Enterprise is negotiated by hand and has no self-serve price. Quietly
+  // charging it the list figure would invent a number nobody agreed to.
+  const enterprise = payable.find((m) => !isSelfServePlanKey(m.tenant.plan));
+  if (enterprise) {
+    return {
+      ok: false, code: 'ENTERPRISE_IN_GROUP',
+      error: `${enterprise.tenant.name} is on a negotiated plan. Please contact support to bill these together.`,
+    };
+  }
+
+  const lines = await Promise.all(payable.map(async (m) => {
+    const plan = m.tenant.plan as PlanKey;
+    const listPrice = interval === 'year' ? BKASH_PLAN_ANNUAL_BDT[plan] : BKASH_PLAN_BDT[plan];
+    return {
+      tenantId: m.tenant.id,
+      name: m.tenant.name,
+      slug: m.tenant.slug,
+      plan,
+      listPrice,
+      amount: discounted(listPrice, await groupDiscountApplies(m.tenant.id)),
+      currentPeriodEnd: m.tenant.currentPeriodEnd,
+    };
+  }));
+
+  return { ok: true, lines, total: lines.reduce((sum, l) => sum + l.amount, 0) };
+}
+
+/**
+ * The group this person belongs to, from whichever resort they are in.
+ *
+ * Owning it is recorded against one user row, but the same person arrives in a
+ * connected resort as a different row — and a combined bill that vanishes the
+ * moment you switch resorts is worse than no combined bill.
+ */
+async function ownedGroup(userId: string, tenantId: string) {
+  const owned = await prisma.resortGroup.findFirst({
+    where: { ownerUserId: userId },
+    select: { id: true, name: true, payerTenantId: true },
+  });
+  if (owned) return owned;
+
+  const asMember = await prisma.resortGroupTenant.findFirst({
+    where: { tenantId, linkedUserId: userId },
+    select: { group: { select: { id: true, name: true, payerTenantId: true } } },
+  });
+  return asMember?.group ?? null;
+}
+
+
+/**
+ * A payment that was captured but could not be applied.
+ *
+ * Once bKash has taken the money, nothing that happens afterwards may end with
+ * the payer being told their payment failed — they would go looking for a
+ * refund of something the screen says never happened. So every path after
+ * capture lands here instead: the payment is recorded loudly for support and
+ * the payer is told the truth, which is that we have their money and are
+ * sorting it out.
+ */
+async function paymentHeldForReview(input: {
+  appUrl: string;
+  trxID?: string;
+  amount?: string | number;
+  reason: string;
+  detail: Record<string, unknown>;
+}) {
+  await createAdminNotification({
+    type: 'subscription_paid',
+    title: 'bKash payment received but NOT applied',
+    message: `৳${input.amount ?? '?'} was captured (trxID ${input.trxID ?? 'unknown'}) and could not be applied: ${input.reason}. Apply it by hand or refund it.`,
+    metadata: { ...input.detail, trxID: input.trxID, amount: input.amount, reason: input.reason, method: 'bkash' },
+    linkPath: '/admin/billing',
+  }).catch(() => { /* the alert failing must not hide the payment as well */ });
+
+  return `${input.appUrl}/dashboard/billing?paid=1&applied=0`
+    + `&ref=${encodeURIComponent(String(input.trxID ?? ''))}`
+    + `&reason=${encodeURIComponent(input.reason)}`;
 }
 
 // ── Auth helper ────────────────────────────────────────────────────────────
@@ -195,6 +327,11 @@ export async function billingRoutes(app: FastifyInstance) {
       resolveTenantEntitlement(tenantId),
       getPlanConfigs(),
     ]);
+    const groupPrice = await groupDiscountApplies(tenantId);
+    // A card is only really discounted once the coupon exists, because Stripe
+    // owns that charge. Showing a cheaper dollar price than the one about to be
+    // taken is the same failure as showing a dearer one.
+    const cardReady = !!process.env.STRIPE_COUPON_GROUP10;
 
     return reply.send({
       success: true,
@@ -215,7 +352,10 @@ export async function billingRoutes(app: FastifyInstance) {
         hasStripeCustomer: !!tenant.stripeCustomerId,
         hasSubscription: !!tenant.stripeSubscriptionId,
         bkashEnabled: !!getPlatformBkash(),
-        bkashPricesBdt: BKASH_PLAN_BDT,
+        // Already discounted. Showing the list price beside a cheaper charge —
+        // or the reverse — is the one thing a billing screen must never do.
+        bkashPricesBdt: discountedPrices(BKASH_PLAN_BDT, groupPrice),
+        groupDiscount: { applies: groupPrice, rate: GROUP_DISCOUNT_RATE, cardReady },
         entitlement: {
           propertyLimit: entitlement.propertyLimit,
           roomLimit: entitlement.roomLimit,
@@ -225,7 +365,18 @@ export async function billingRoutes(app: FastifyInstance) {
         },
         // The dashboard only receives plans that an owner can choose without
         // speaking to us. Legacy/custom Enterprise stays out of self-serve UI.
-        planConfigs: planConfigs.filter((plan) => isSelfServePlanKey(plan.key)),
+        // Priced here rather than on the page, so one answer covers the card
+        // price, the bKash price and whatever is actually charged.
+        planConfigs: planConfigs
+          .filter((plan) => isSelfServePlanKey(plan.key))
+          .map((plan) => (groupPrice && cardReady
+            ? {
+              ...plan,
+              price: discountedUsd(plan.price, true),
+              ...(plan.annualPrice !== undefined && { annualPrice: discountedUsd(plan.annualPrice, true) }),
+              listPrice: plan.price,
+            }
+            : { ...plan, listPrice: plan.price })),
       },
     });
   });
@@ -290,11 +441,27 @@ export async function billingRoutes(app: FastifyInstance) {
           : `${appUrl}/onboarding?success=1&plan=${planKey}&interval=${interval}`
         : `${appUrl}/dashboard/billing?success=1&plan=${planKey}&interval=${interval}`;
 
+      // The card half of the group price is a Stripe coupon, because Stripe
+      // owns the recurring charge and a one-off discount here would be
+      // forgotten at the first renewal. If the discount is due and no coupon
+      // id is configured, the session is still created — refusing checkout
+      // over a missing coupon would be worse — but it is logged loudly, since
+      // the owner is then being charged full price for a discounted resort.
+      const groupPrice = await groupDiscountApplies(tenantId);
+      const groupCoupon = process.env.STRIPE_COUPON_GROUP10;
+      if (groupPrice && !groupCoupon) {
+        request.log.error(
+          { tenantId },
+          'Group discount is due but STRIPE_COUPON_GROUP10 is unset — charging full price',
+        );
+      }
+
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
         mode: 'subscription',
         payment_method_types: ['card'],
         line_items: [{ price: priceId, quantity: 1 }],
+        ...(groupPrice && groupCoupon && { discounts: [{ coupon: groupCoupon }] }),
         success_url: successUrl,
         cancel_url: `${appUrl}/dashboard/billing?canceled=1`,
         subscription_data: {
@@ -363,7 +530,8 @@ export async function billingRoutes(app: FastifyInstance) {
         return reply.status(503).send({ success: false, error: 'bKash payments are not available yet. Please contact support.' });
       }
 
-      const amountNum = interval === 'year' ? BKASH_PLAN_ANNUAL_BDT[planKey] : BKASH_PLAN_BDT[planKey];
+      const listPrice = interval === 'year' ? BKASH_PLAN_ANNUAL_BDT[planKey] : BKASH_PLAN_BDT[planKey];
+      const amountNum = discounted(listPrice, await groupDiscountApplies(tenantId));
       const amount = amountNum.toFixed(2);
 
       // Same class of bug as file uploads: APP_URL/API_BASE_URL are often unset
@@ -414,19 +582,28 @@ export async function billingRoutes(app: FastifyInstance) {
         if (exec.transactionStatus !== 'Completed') return fail('payment_incomplete');
 
         // Re-verify the paid amount against what we expected (guards tampered callback params)
-        const expected = interval === 'year'
+        // Through the same helper as the charge itself. Verifying against the
+        // list price would reject every group resort's payment *after* their
+        // money had moved — they would have paid and been told it was wrong.
+        const listPrice = interval === 'year'
           ? BKASH_PLAN_ANNUAL_BDT[planKey]
           : BKASH_PLAN_BDT[planKey];
+        const expected = discounted(listPrice, await groupDiscountApplies(tenantId));
         if (expected && Math.abs(Number(exec.amount) - expected) > 0.5) return fail('amount_mismatch');
 
         const plan = planKey;
         const days = interval === 'year' ? 365 : 30;
-        const periodEnd = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
         // Same "first activation → onboarding wizard, later upgrade → billing
         // page" distinction as the Stripe /checkout path — captured before
         // the update below flips planStatus to 'active'.
-        const before = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { planStatus: true, onboardingCompletedAt: true } });
+        const before = await prisma.tenant.findUnique({
+          where: { id: tenantId },
+          select: { planStatus: true, onboardingCompletedAt: true, currentPeriodEnd: true },
+        });
+        // Through the same helper the combined bill uses. Renewing a week early
+        // used to start the new period today and throw that week away.
+        const periodEnd = extendPeriod(before?.currentPeriodEnd, days);
         const isFirstActivation = before?.planStatus === 'incomplete';
 
         await prisma.tenant.update({
@@ -460,6 +637,208 @@ export async function billingRoutes(app: FastifyInstance) {
         return fail('execute_failed');
       }
     }
+  );
+
+
+  // ── GET /billing/group — what one combined payment would cover ────────────
+  app.get<{ Querystring: { interval?: 'month' | 'year' } }>(
+    '/group',
+    async (request, reply) => {
+      await requireAuth(request, reply, { ownerOnly: true });
+      if (reply.sent) return;
+      const { sub, tenantId } = request.user as any;
+      const interval = request.query.interval === 'year' ? 'year' : 'month';
+
+      const group = await ownedGroup(sub, tenantId);
+      if (!group) return reply.send({ success: true, data: null });
+
+      const bill = await groupBill(group.id, interval);
+      if (!bill.ok) {
+        return reply.send({
+          success: true,
+          data: { groupName: group.name, payerTenantId: group.payerTenantId, available: false, reason: bill.code },
+        });
+      }
+
+      return reply.send({
+        success: true,
+        data: {
+          groupName: group.name,
+          payerTenantId: group.payerTenantId,
+          available: !!getPlatformBkash(),
+          interval,
+          currency: 'BDT',
+          lines: bill.lines,
+          total: bill.total,
+        },
+      });
+    },
+  );
+
+  // ── POST /billing/checkout/bkash-group — pay for every resort at once ─────
+  app.post<{ Body: { interval?: 'month' | 'year' } }>(
+    '/checkout/bkash-group',
+    async (request, reply) => {
+      await requireAuth(request, reply, { ownerOnly: true });
+      if (reply.sent) return;
+      const { sub, tenantId } = request.user as any;
+      const interval = request.body?.interval === 'year' ? 'year' : 'month';
+
+      const group = await ownedGroup(sub, tenantId);
+      if (!group) {
+        return reply.status(404).send({
+          success: false, error: 'You have no connected resorts.', code: 'NO_RESORT_GROUP',
+        });
+      }
+      // Paying from a resort that is not in the group would leave the receipt
+      // attached to an account the payment has nothing to do with.
+      const inGroup = await prisma.resortGroupTenant.findFirst({
+        where: { groupId: group.id, tenantId }, select: { id: true },
+      });
+      if (!inGroup) {
+        return reply.status(403).send({
+          success: false, error: 'Pay from one of the resorts in the group.',
+          code: 'RESORT_NOT_CONNECTED',
+        });
+      }
+
+      const bill = await groupBill(group.id, interval);
+      if (!bill.ok) {
+        return reply.status(400).send({ success: false, error: bill.error, code: bill.code });
+      }
+
+      const cfg = getPlatformBkash();
+      if (!cfg) {
+        return reply.status(503).send({ success: false, error: 'bKash payments are not available yet. Please contact support.' });
+      }
+
+      const apiUrl = process.env.API_BASE_URL || process.env.APP_URL || process.env.API_URL
+        || `${request.protocol}://${request.hostname}`;
+      const invoice = `GRP${Date.now().toString(36).toUpperCase()}`;
+      // Only the group and the interval travel on the callback. The amount is
+      // worked out again on the way back from the same helper, so a tampered
+      // parameter cannot buy a year of four resorts for the price of a month.
+      const callbackURL =
+        `${apiUrl}/api/billing/bkash/group-callback` +
+        `?groupId=${encodeURIComponent(group.id)}&interval=${interval}&payerTenantId=${encodeURIComponent(tenantId)}`;
+
+      try {
+        const idToken = await bkashGrantToken(cfg);
+        const created = await bkashCreatePayment(cfg, idToken, {
+          amount: bill.total.toFixed(2),
+          currency: 'BDT',
+          merchantInvoiceNumber: invoice,
+          callbackURL,
+        });
+        return reply.send({
+          success: true,
+          data: { url: created.bkashURL, paymentID: created.paymentID, total: bill.total, resorts: bill.lines.length },
+        });
+      } catch (err: any) {
+        request.log.error({ err }, 'bKash group subscription create failed');
+        return reply.status(502).send({ success: false, error: 'Could not start bKash payment. Please try again.' });
+      }
+    },
+  );
+
+  // ── GET /billing/bkash/group-callback ─────────────────────────────────────
+  // bKash redirects here. No auth: the payment id is the proof, and it is
+  // executed and re-priced against the group before anything is written.
+  app.get<{ Querystring: { paymentID?: string; status?: string; groupId?: string; interval?: string; payerTenantId?: string } }>(
+    '/bkash/group-callback',
+    async (request, reply) => {
+      const appUrl = process.env.WEB_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const { paymentID, status, groupId, payerTenantId } = request.query;
+      const interval = request.query.interval === 'year' ? 'year' : 'month';
+      const fail = (reason: string) =>
+        reply.redirect(`${appUrl}/dashboard/billing?canceled=1&reason=${encodeURIComponent(reason)}`);
+
+      if (!paymentID || status !== 'success' || !groupId) return fail('cancelled');
+
+      const cfg = getPlatformBkash();
+      if (!cfg) return fail('not_configured');
+
+      // ── Before the money moves ────────────────────────────────────────────
+      // Everything here may still answer "cancelled": nothing has been taken.
+      let exec: Awaited<ReturnType<typeof bkashExecutePayment>>;
+      try {
+        const idToken = await bkashGrantToken(cfg);
+        exec = await bkashExecutePayment(cfg, idToken, paymentID);
+      } catch (err: any) {
+        request.log.error({ err }, 'bKash group payment could not be executed');
+        return fail('execute_failed');
+      }
+      if (exec.transactionStatus !== 'Completed') return fail('payment_incomplete');
+
+      // ── The money is ours now ─────────────────────────────────────────────
+      // From this line on the payer has paid. No branch below may redirect to
+      // "cancelled": whatever goes wrong, they are owed either the service or
+      // an honest "we have it, we are looking".
+      const held = (reason: string, detail: Record<string, unknown> = {}) =>
+        paymentHeldForReview({
+          appUrl, trxID: exec.trxID, amount: exec.amount, reason,
+          detail: { groupId, interval, payerTenantId, ...detail },
+        }).then((url) => reply.redirect(url));
+
+      const bill = await groupBill(groupId, interval).catch(() => null);
+      if (!bill || !bill.ok) {
+        // The group changed between checkout and coming back — a resort was
+        // suspended, disconnected, or moved to a negotiated plan.
+        return held('the group could no longer be priced');
+      }
+      if (Math.abs(Number(exec.amount) - bill.total) > 0.5) {
+        return held('the amount paid no longer matches the group', { expected: bill.total });
+      }
+
+      const days = interval === 'year' ? 365 : 30;
+      const now = Date.now();
+      try {
+        // Each resort is extended from whichever is later: now, or the end of
+        // the period it has already paid for. Starting every one at "now" would
+        // quietly take back days a resort had already bought.
+        await prisma.$transaction(bill.lines.map((line) => prisma.tenant.update({
+          where: { id: line.tenantId },
+          data: {
+            planStatus: 'active',
+            currentPeriodEnd: extendPeriod(line.currentPeriodEnd, days, new Date(now)),
+            priceProtectedUntil: new Date(now + 365 * 24 * 60 * 60 * 1000),
+          },
+        })));
+      } catch (err: any) {
+        request.log.error({ err }, 'bKash group payment captured but periods not extended');
+        return held('the resorts could not be extended');
+      }
+
+      // ── Bookkeeping ───────────────────────────────────────────────────────
+      // Flags, the audit row, the payer, the admin note. The payer has their
+      // service; none of this may turn a paid subscription into a failure
+      // message on their screen.
+      try {
+        for (const line of bill.lines) {
+          await applyPlanFlagsToTenant(line.tenantId, line.plan);
+        }
+        if (payerTenantId) {
+          await prisma.resortGroup.update({ where: { id: groupId }, data: { payerTenantId } });
+        }
+        await prisma.resortGroupEvent.create({
+          data: {
+            groupId, tenantId: payerTenantId ?? null, action: 'billed_together',
+            metadata: { interval, total: bill.total, trxID: exec.trxID, resorts: bill.lines.length },
+          },
+        });
+        await createAdminNotification({
+          type: 'subscription_paid',
+          title: 'Subscription paid (bKash, several resorts)',
+          message: `৳${exec.amount} paid for ${bill.lines.length} resorts (${interval}) via bKash: ${bill.lines.map((l) => l.name).join(', ')}. trxID ${exec.trxID}.`,
+          metadata: { groupId, interval, trxID: exec.trxID, amount: exec.amount, method: 'bkash', tenantIds: bill.lines.map((l) => l.tenantId) },
+          linkPath: '/admin/billing',
+        });
+      } catch (err: any) {
+        request.log.error({ err, trxID: exec.trxID }, 'bKash group payment applied, bookkeeping failed');
+      }
+
+      return reply.redirect(`${appUrl}/dashboard/billing?success=1&method=bkash&resorts=${bill.lines.length}`);
+    },
   );
 
   // GET /billing/invoices — list recent invoices
@@ -538,7 +917,17 @@ export async function stripeWebhookRoute(app: FastifyInstance) {
         data: { processed: true },
       });
     } catch (err) {
-      app.log.info({ err, eventType: event.type }, 'Webhook handler error');
+      // This used to log at info level and fall through to 200. Stripe treats
+      // any 2xx as delivered and never sends that event again — so a database
+      // blip, or a timeout on the subscriptions.retrieve call below, while
+      // activating a subscription meant the customer had been charged and
+      // their plan would never switch on, with nothing left to retry it.
+      //
+      // A 500 makes Stripe redeliver with backoff for days. That is safe
+      // because the row above stays processed:false, and the idempotency check
+      // only short-circuits events that finished.
+      app.log.error({ err, eventType: event.type, eventId: event.id }, 'Stripe webhook handler failed; Stripe will retry');
+      return reply.status(500).send({ received: false });
     }
 
     return reply.send({ received: true });
@@ -567,14 +956,15 @@ async function handleStripeEvent(event: Stripe.Event) {
 
     case 'customer.subscription.deleted': {
       const sub = event.data.object as Stripe.Subscription;
-      await prisma.tenant.updateMany({
-        where: { stripeSubscriptionId: sub.id },
-        data: { planStatus: 'canceled', plan: 'FREE' },
-      });
-      // Find tenant for notification context
+      // Read before the downgrade. This used to run after it, so the admin
+      // notification always said the tenant had canceled a FREE subscription.
       const canceledTenant = await prisma.tenant.findFirst({
         where: { stripeSubscriptionId: sub.id },
         select: { id: true, name: true, slug: true, plan: true },
+      });
+      await prisma.tenant.updateMany({
+        where: { stripeSubscriptionId: sub.id },
+        data: { planStatus: 'canceled', plan: 'FREE' },
       });
       // Every upgrade path syncs the feature flags; this downgrade did not, so
       // a tenant who stopped paying kept every paid module switched on —

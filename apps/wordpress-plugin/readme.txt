@@ -54,7 +54,7 @@ The CDN script is loaded **only on pages that contain a ResortPro widget** — e
 
 = Privacy =
 
-ResortPro widgets are powered by JavaScript loaded from `https://cdn.resortpro.app/embed.js`. Booking transactions are handled directly by ResortPro's servers. Please update your privacy policy to reflect the use of this third-party service.
+ResortPro widgets are powered by JavaScript loaded from `https://resortpro.site/embed.js`. Booking transactions are handled directly by ResortPro's servers. Please update your privacy policy to reflect the use of this third-party service.
 
 == Installation ==
 
@@ -107,7 +107,7 @@ The CTA widget has its own behavior defined in `embed.js`. If no `whatsapp` numb
 = I added the shortcode but nothing appears. What's wrong? =
 
 1. Confirm your resort slug is saved under **Settings → ResortPro Embed**.
-2. Make sure your server can reach `https://cdn.resortpro.app/embed.js` (check for firewall or CSP restrictions).
+2. Make sure your server can reach `https://resortpro.site/embed.js` (check for firewall or CSP restrictions).
 3. View the page source and look for `data-resortpro` attributes in the HTML — if they are present, the PHP is working and the issue is with the CDN script or your browser.
 
 = Is this plugin compatible with page builders (Elementor, Divi, etc.)? =

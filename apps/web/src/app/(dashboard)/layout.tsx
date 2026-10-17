@@ -10,7 +10,9 @@ import { PlatformBanner } from '@/components/dashboard/PlatformBanner';
 import { DemoBanner } from '@/components/dashboard/DemoBanner';
 import { ImpersonationBanner } from '@/components/dashboard/ImpersonationBanner';
 import { OfflineBar } from '@/components/dashboard/OfflineBar';
+import { ResortLinkBanner } from '@/components/dashboard/ResortLinkBanner';
 import { MobileMoreSheet } from '@/components/dashboard/MobileMoreSheet';
+import { RouteGuard } from '@/components/dashboard/RouteGuard';
 import { billingApi } from '@/lib/api';
 
 // Pages that should always render regardless of billing status
@@ -127,7 +129,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <ImpersonationBanner />
           <DemoBanner />
           <PlatformBanner />
-          {children}
+          <ResortLinkBanner />
+          <RouteGuard>{children}</RouteGuard>
         </main>
       </div>
 

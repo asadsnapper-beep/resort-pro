@@ -4,6 +4,7 @@ import { prisma } from '@resort-pro/database';
 import { requireRole } from '../middleware/auth';
 import { ok, validate } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
+import { sendSms, sendWhatsApp } from '../services/messaging';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -376,9 +377,13 @@ async function processCampaignSend(
       let errorMsg: string | undefined;
 
       try {
-        success = ch === 'sms'
+        const result = ch === 'sms'
           ? await sendSms(tenant, recipient.phone, msg)
           : await sendWhatsApp(tenant, recipient.phone, msg);
+        success = result.delivered;
+        // Record why, not just that it failed: the campaign log is the only
+        // place an owner can find out their sender ID was rejected.
+        if (!result.delivered) errorMsg = result.detail;
       } catch (e: any) {
         errorMsg = e?.message ?? 'Unknown error';
       }
@@ -418,88 +423,3 @@ async function processCampaignSend(
   }
 }
 
-// ─── Gateway implementations ──────────────────────────────────────────────────
-
-async function sendSms(tenant: any, phone: string, message: string): Promise<boolean> {
-  if (tenant.smsMode === 'own' && tenant.smsApiKey) {
-    if (tenant.smsProvider === 'ssl_wireless') {
-      return sslWirelessSend(tenant.smsApiKey, tenant.smsSenderId ?? 'RESORT', phone, message);
-    }
-    if (tenant.smsProvider === 'twilio') {
-      return twilioSend(tenant.smsApiKey, tenant.smsApiSecret ?? '', tenant.smsSenderId ?? '', phone, message);
-    }
-  }
-  const apiKey   = process.env.SSL_WIRELESS_API_KEY;
-  const senderId = process.env.SSL_WIRELESS_SENDER_ID ?? 'ResortPro';
-  if (apiKey) return sslWirelessSend(apiKey, senderId, phone, message);
-  console.warn(`[Marketing] SMS skipped — no gateway configured. To: ${phone}`);
-  return false;
-}
-
-async function sendWhatsApp(tenant: any, phone: string, message: string): Promise<boolean> {
-  if (tenant.waMode === 'own' && tenant.waApiToken && tenant.waPhoneNumberId) {
-    return metaWaSend(tenant.waApiToken, tenant.waPhoneNumberId, phone, message);
-  }
-  const token   = process.env.META_WA_TOKEN;
-  const phoneId = process.env.META_WA_PHONE_NUMBER_ID;
-  if (token && phoneId) return metaWaSend(token, phoneId, phone, message);
-  console.warn(`[Marketing] WhatsApp skipped — no gateway configured. To: ${phone}`);
-  return false;
-}
-
-async function sslWirelessSend(apiKey: string, senderId: string, phone: string, message: string): Promise<boolean> {
-  try {
-    const res = await fetch('https://globalsms.sslwireless.com/api/v3/send-sms', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        api_token: apiKey,
-        sid:       senderId,
-        msisdn:    phone.replace(/^\+/, ''),
-        sms:       message,
-        csmsid:    `rp_${Date.now()}`,
-      }),
-    });
-    const data = await res.json() as any;
-    return data?.status === 'ACCEPTED' || data?.status_code === 200;
-  } catch (e) {
-    console.error('[SSL Wireless]', e);
-    return false;
-  }
-}
-
-async function twilioSend(sid: string, token: string, from: string, to: string, message: string): Promise<boolean> {
-  try {
-    const creds = Buffer.from(`${sid}:${token}`).toString('base64');
-    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
-      method: 'POST',
-      headers: { Authorization: `Basic ${creds}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ From: from, To: to, Body: message }).toString(),
-    });
-    const data = await res.json() as any;
-    return data?.status === 'queued' || data?.status === 'sent';
-  } catch (e) {
-    console.error('[Twilio]', e);
-    return false;
-  }
-}
-
-async function metaWaSend(token: string, phoneNumberId: string, to: string, message: string): Promise<boolean> {
-  try {
-    const res = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to: to.replace(/^\+/, ''),
-        type: 'text',
-        text: { body: message },
-      }),
-    });
-    const data = await res.json() as any;
-    return !!data?.messages?.[0]?.id;
-  } catch (e) {
-    console.error('[Meta WA]', e);
-    return false;
-  }
-}

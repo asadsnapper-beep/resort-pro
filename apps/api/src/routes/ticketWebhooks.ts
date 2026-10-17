@@ -42,6 +42,7 @@ import {
   setTelegramWebhook,
   validateTelegramToken,
 } from '../services/ticketChannels'
+import { encryptOrNull, decryptOrNull } from '../utils/secret-box';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -108,7 +109,7 @@ export async function ticketWebhookRoutes(app: FastifyInstance) {
       await db.tenant.update({
         where: { id: tenantId },
         data: {
-          telegramBotToken: botToken,
+          telegramBotToken: encryptOrNull(botToken),
           ...(notifChatId !== undefined && { telegramNotifChatId: notifChatId }),
         },
       })
@@ -143,8 +144,11 @@ export async function ticketWebhookRoutes(app: FastifyInstance) {
         : null
 
       // Mask token for display
-      const tokenMasked = tenant?.telegramBotToken
-        ? tenant.telegramBotToken.slice(0, 8) + '…' + tenant.telegramBotToken.slice(-4)
+      // Decrypted only to be masked. A ciphertext's first eight characters are
+      // the same for every token and say nothing about which bot this is.
+      const plainToken = decryptOrNull(tenant?.telegramBotToken);
+      const tokenMasked = plainToken
+        ? plainToken.slice(0, 8) + '…' + plainToken.slice(-4)
         : null
 
       return ok({ configured, tokenMasked, webhookUrl, notifChatId: tenant?.telegramNotifChatId ?? null })

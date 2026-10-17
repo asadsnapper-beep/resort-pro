@@ -391,8 +391,20 @@ model Tenant {
   notifCheckoutRemind     Boolean               @default(false)
   notifCancellation       Boolean               @default(true)
   notifInvoiceSent        Boolean               @default(false)
+  // WhatsApp's own switches. The six notif* fields above are SMS's; the
+  // Settings table used to draw both its columns from them, so ticking one
+  // ticked both (settings-deep-qa M-01).
+  waNotifBookingConfirm   Boolean               @default(true)
+  waNotifPaymentReceived  Boolean               @default(true)
+  waNotifCheckinReminder  Boolean               @default(true)
+  waNotifCheckoutRemind   Boolean               @default(false)
+  waNotifCancellation     Boolean               @default(true)
+  waNotifInvoiceSent      Boolean               @default(false)
   notifLanguage           String                @default("en") // "en" | "bn"
   // SMS quota & credits
+  // When sms/wa usage was last rolled over to a new month. Null means never,
+  // which the daily reset job treats as due.
+  messagingUsageResetAt   DateTime?
   smsQuotaMonthly         Int                   @default(100)
   smsUsedThisMonth        Int                   @default(0)
   smsCredits              Int                   @default(0)
@@ -478,6 +490,7 @@ model Tenant {
   emailTemplates         EmailTemplate[]
   campaigns              Campaign[]
   emailSends             EmailSend[]
+  guestNotifications     GuestNotification[]
   sequences              Sequence[]
   sequenceEnrollments    SequenceEnrollment[]
   staffInvites           StaffInvite[]
@@ -529,6 +542,9 @@ model Tenant {
   deletionRequests       TenantDeletionRequest[]
   stayTimePolicy         StayTimePolicy?
   stayTimeGrants         StayTimeGrant[]
+  // Connecting this resort to another owner's group — see plan/multi-resort.md
+  groupMembership        ResortGroupTenant?
+  linkRequests           ResortLinkRequest[]
 
   @@map("tenants")
 }
@@ -841,6 +857,7 @@ model Booking {
   supportTickets      SupportTicket[]
   invoiceExtras       InvoiceExtra[]
   stayTimeGrants      StayTimeGrant[]
+  guestNotifications  GuestNotification[]
   bookingPackages     BookingPackage[]
   bookingOffers       BookingOffer[]
   invoice             Invoice?
@@ -1727,6 +1744,9 @@ model AiKeys {
   id           String   @id @default(uuid())
   tenantId     String   @unique
   mode         String   @default("platform") // "platform" | "byok"
+  // Nothing writes these yet — BYOK has a reader and no save endpoint. When one
+  // is added it must encrypt, the way every other credential writer now does;
+  // the reader already decrypts and passes older plaintext through.
   dashboardKey String? // encrypted (AES-256-GCM) — BYOK dashboard/owner key
   guestKey     String? // encrypted — BYOK guest chatbot key (optional)
   updatedAt    DateTime @updatedAt
@@ -2172,6 +2192,11 @@ enum CampaignStatus {
   SCHEDULED
   SENDING
   SENT
+  // A send that did not go the way the word SENT implies. Without these two,
+  // a campaign where every delivery failed was still marked SENT, and a
+  // marketer had no way to tell (CRM QA 2026-10-07, finding 005).
+  PARTIAL // some recipients got it, some did not
+  FAILED // nobody got it
   PAUSED
   CANCELLED
 }
@@ -2457,8 +2482,11 @@ model PlatformSettings {
   id              String   @id @default("singleton")
   trialDays       Int      @default(14)
   plans           Json // Array of { key, name, price, features, roomLimit }
-  storageConfig   Json? // { driver, endpoint, region, bucket, publicUrl, accessKey, secretKey }
-  aiApiKey        String? // Encrypted API key for AI theme generation (Claude/GPT)
+  // { driver, endpoint, region, bucket, publicUrl, accessKey, secretKey }.
+  // accessKey and secretKey are encrypted (see utils/secret-box.ts); the rest
+  // is plain, because it is shown in the admin screen and is not secret.
+  storageConfig   Json?
+  aiApiKey        String? // encrypted — API key for AI theme generation (Claude/GPT)
   aiProvider      String? // "claude" | "gpt-4" — default provider
   aiEnabledGlobal Boolean  @default(false) // Master switch — all AI features off until super-admin flips this. See plan/ai/ROLLOUT-STRATEGY.md
   updatedAt       DateTime @updatedAt
@@ -2699,12 +2727,67 @@ model AdminUser {
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime?
   invitedBy    String? // email of admin who created this account
+  // Second factor (RFC 6238). The secret is encrypted with CREDENTIALS_KEY —
+  // see utils/secret-box.ts — because a plaintext TOTP secret in a database
+  // dump is the second factor, not a hint about it.
+  mfaSecret    String?
+  mfaEnabledAt DateTime? // null = enrolled but not confirmed, or not enrolled
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+
+  recoveryCodes AdminRecoveryCode[]
+  sessions      AdminSession[]
 
   @@index([role])
   @@index([isActive])
   @@map("admin_users")
+}
+
+// A sign-in that can be taken back.
+//
+// The admin token used to be a bearer JWT and nothing else: once issued there
+// was no way to stop it short of its eight hours, so a token lifted from a
+// laptop was eight hours of the whole platform and nobody could end it. The
+// token now names a row here, and this row can be revoked.
+model AdminSession {
+  id          String    @id @default(cuid())
+  adminUserId String
+  createdAt   DateTime  @default(now())
+  lastSeenAt  DateTime  @default(now())
+  expiresAt   DateTime
+  // When the password was last actually typed on this session. Signing in sets
+  // it; so does /admin/reauth. Destructive and credential-touching routes want
+  // it to be recent, so that a session someone walked away from cannot delete a
+  // resort on its own.
+  reauthAt    DateTime?
+  revokedAt   DateTime?
+  revokedBy   String? // email, when someone else ended it
+  ipAddress   String?
+  userAgent   String?
+
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([adminUserId])
+  @@index([expiresAt])
+  @@map("admin_sessions")
+}
+
+// The day the phone is lost.
+//
+// There is one admin account and one person holding it, so "use your other
+// device" is not an answer available here. Hashed like a password and marked
+// used rather than replayable, so a dump of this table is not a way in.
+model AdminRecoveryCode {
+  id          String    @id @default(cuid())
+  adminUserId String
+  codeHash    String
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([adminUserId])
+  @@map("admin_recovery_codes")
 }
 
 // ─── External Calendar Sync ───────────────────────────────────────────────────
@@ -3387,4 +3470,153 @@ model BillingAudit {
   @@index([tenantId, bookingId])
   @@index([tenantId, createdAt])
   @@map("billing_audits")
+}
+
+/// One SMS or WhatsApp message sent to a guest about a booking event.
+///
+/// The unique key is the point. A booking can be confirmed from more than one
+/// place — a payment's verify callback and its webhook both fire for the same
+/// payment — and each used to send its own confirmation. A row is claimed
+/// before sending, so the second trigger finds it and sends nothing. It also
+/// gives the resort a record of what went, what did not, and why.
+model GuestNotification {
+  id         String   @id @default(uuid())
+  tenantId   String
+  bookingId  String
+  event      String // "booking_confirmed"
+  channel    String // "sms" | "whatsapp"
+  status     String // "sending" | "sent" | "failed"
+  via        String? // "platform" | "own"
+  providerId String?
+  detail     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, event, channel])
+  @@index([tenantId, createdAt])
+  @@map("guest_notifications")
+}
+
+// ─── Connected resorts ────────────────────────────────────────────────────────
+//
+// An owner with four resorts buys four ResortPro accounts, and each one runs
+// exactly as a single-resort account does. These four tables are the only thing
+// that knows the four belong together: they let that owner switch between them
+// from the top bar and see every resort's numbers on one page.
+//
+// They deliberately hold no business data. Delete every row here and each
+// resort still works, untouched — which is what makes the group layer safe to
+// add to a system that is already live.
+//
+// Full design, including why one account with many properties was rejected:
+// plan/multi-resort.md
+
+enum ResortAccess {
+  FULL // can switch into this resort and work inside it
+  NUMBERS_ONLY // appears in the 360 view as figures only; cannot be opened
+}
+
+/// One person's collection of resorts.
+///
+/// Created the first time somebody connects a second resort; an owner with one
+/// resort never has a row here, and sees no new UI anywhere.
+model ResortGroup {
+  id            String   @id @default(uuid())
+  name          String // defaults to "<first resort> Group", editable
+  ownerUserId   String // the person who switches resorts and sees the 360 view
+  payerTenantId String? // combined billing, later — null until then
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  members  ResortGroupTenant[]
+  requests ResortLinkRequest[]
+  events   ResortGroupEvent[]
+
+  @@index([ownerUserId])
+  @@map("resort_groups")
+}
+
+/// A resort inside a group.
+///
+/// `tenantId` is unique, so a resort belongs to at most one group. Without that
+/// two owners could each connect the same resort and neither would know.
+model ResortGroupTenant {
+  id                String       @id @default(uuid())
+  groupId           String
+  tenantId          String       @unique
+  access            ResortAccess @default(FULL)
+  /// The User row created inside that tenant for FULL access. Switching issues
+  /// a token for this real user — nothing in this design impersonates anyone.
+  linkedUserId      String?      @unique
+  /// Whether that user row exists only because of this connection.
+  ///
+  /// It decides what disconnecting does. A same-email link reuses the owner's
+  /// own login on the other resort, and deactivating that would lock a person
+  /// out of an account that is entirely theirs; a user created by an approval
+  /// has no other purpose and must stop working the moment access is revoked.
+  linkedUserCreated Boolean      @default(false)
+  approvedById      String? // who approved; null when both accounts share one verified email
+  approvedAt        DateTime     @default(now())
+  createdAt         DateTime     @default(now())
+
+  group  ResortGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  tenant Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+  @@map("resort_group_tenants")
+}
+
+/// A pending "please let me connect your resort" request.
+///
+/// The emailed token is stored hashed, like PasswordResetToken and unlike
+/// StaffInvite: this one asks for access to somebody else's resort, and the
+/// approval screen additionally requires being signed in as that resort's
+/// owner, so a forwarded email grants nothing on its own.
+model ResortLinkRequest {
+  id            String    @id @default(uuid())
+  groupId       String
+  tenantId      String // the resort being asked for
+  requestedById String // the user who asked
+  tokenHash     String    @unique
+  expiresAt     DateTime
+  approvedAt    DateTime?
+  declinedAt    DateTime?
+  createdAt     DateTime  @default(now())
+
+  group  ResortGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  tenant Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([groupId])
+  @@map("resort_link_requests")
+}
+
+/// Every consequential thing that happened to a group.
+///
+/// Both sides can read the rows for their own resort, so "who gave that person
+/// access to my resort, and when?" always has an answer.
+model ResortGroupEvent {
+  id          String   @id @default(uuid())
+  /// Null once the group it belonged to is gone.
+  ///
+  /// It used to cascade, which quietly erased the whole audit trail the moment
+  /// a group dropped below two resorts — including the "unlinked" row written
+  /// a line earlier. "Who had access to my resort, and when?" is exactly the
+  /// question this table exists to answer, and it is asked most often after a
+  /// connection ends.
+  groupId     String?
+  tenantId    String?
+  actorUserId String?
+  action      String // link_requested | link_approved | link_declined | access_changed | unlinked | switched | resort_added
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  group ResortGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
+  @@index([groupId])
+  @@index([tenantId])
+  @@map("resort_group_events")
 }

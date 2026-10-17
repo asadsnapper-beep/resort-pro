@@ -44,7 +44,7 @@ export function ModalShell({
   const titleId = useId();
   const descriptionId = useId();
   const [isDark, setIsDark] = useState(false);
-  const closeRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -64,6 +64,33 @@ export function ModalShell({
     }
     return () => { document.body.style.overflow = ''; };
   }, [open]);
+
+  // Escape closes. Clicking the backdrop already did; the keyboard had no way
+  // out at all, which for a dialog covering the screen is a trap.
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open, onClose]);
+
+  // Focus moves into the dialog when it opens and back to whatever opened it
+  // when it closes. Without the second half, dismissing a modal dropped focus
+  // onto document.body and a keyboard user restarted from the top of the page.
+  //
+  // `mounted` is in the deps because the first render returns null: the panel
+  // does not exist until the render after it flips.
+  useEffect(() => {
+    if (!open || !mounted) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const panel = panelRef.current;
+    // Three consumers autoFocus a field inside the dialog. Taking focus away
+    // from them would be a regression dressed as an improvement.
+    if (panel && !panel.contains(document.activeElement)) panel.focus();
+    return () => {
+      if (previouslyFocused && document.contains(previouslyFocused)) previouslyFocused.focus();
+    };
+  }, [open, mounted]);
 
   if (!mounted || !open) return null;
 
@@ -87,10 +114,14 @@ export function ModalShell({
           takes over the screen was invisible as a modal. Every ModalShell
           consumer gets this, not just the one that surfaced it. */}
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
+        /* Focusable only programmatically, so opening the dialog can place
+           focus on it without adding a stop to the page's tab order. */
+        tabIndex={-1}
         style={{
           position: 'relative',
           width: '100%',
@@ -126,8 +157,11 @@ export function ModalShell({
           </div>
           {showCloseButton && (
             <button
-              ref={closeRef}
               onClick={onClose}
+              type="button"
+              /* An icon-only control with no text reads as just "button" to a
+                 screen reader. Every ModalShell in the app had one. */
+              aria-label="Close"
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 height: '28px', width: '28px', borderRadius: isAdmin ? 0 : '50%',
@@ -138,7 +172,7 @@ export function ModalShell({
               onMouseEnter={e => (e.currentTarget.style.background = isAdmin ? 'var(--rp-teal-bg)' : 'rgba(255,255,255,0.1)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
-              <X style={{ width: '16px', height: '16px' }} />
+              <X aria-hidden="true" style={{ width: '16px', height: '16px' }} />
             </button>
           )}
         </div>

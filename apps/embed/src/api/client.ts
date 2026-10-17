@@ -5,6 +5,10 @@
 
 const API_BASE = (window as any).__RESORTPRO_API__ || 'https://api.resortpro.site'
 
+// Where the resort's hosted pages live. Payment is completed there rather than
+// inside the widget — see checkoutUrl below.
+const WEB_BASE = ((window as any).__RESORTPRO_WEB__ || 'https://resortpro.site').replace(/\/$/, '')
+
 export interface EmbedConfig {
   tenantId: string
   slug: string
@@ -99,17 +103,24 @@ export const api = {
     guestName: string; guestEmail?: string; guestPhone?: string
     bookingRef?: string; tableNo?: string
     items: { menuItemId: string; quantity: number; notes?: string }[]
-  }) => post<{ orderId: string; total: number }>(`/site/${slug}/orders`, payload),
+  // /embed, not /site: the order route is registered by embedRoutes. The /site
+  // path this used to call has never existed, so every order 404ed.
+  }) => post<{ orderId: string; total: number }>(`/embed/${slug}/orders`, payload),
 
-  /** Initiate bKash payment */
-  bkashInitiate: (bookingId: string) =>
-    post<{ bkashURL: string; paymentID: string }>('/api/payments/bkash/initiate', { bookingId }),
-
-  /** Initiate SSL Commerce payment */
-  sslInitiate: (bookingId: string) =>
-    post<{ gatewayUrl: string }>('/api/payments/ssl/initiate', { bookingId }),
-
-  /** Create Stripe PaymentIntent */
-  stripeIntent: (bookingId: string) =>
-    post<{ clientSecret: string }>('/api/payments/stripe/intent', { bookingId }),
+  /**
+   * The resort's own checkout page for a booking this widget just created.
+   *
+   * The widget used to take payment itself, and none of it worked. bKash and
+   * SSL called /api/payments/{bkash,ssl}/initiate, which do not exist. Stripe
+   * called /api/payments/stripe/intent, which does not exist either, required
+   * the host page to set window.__STRIPE_PK__, and — had it got that far —
+   * showed "Booking Confirmed!" after elements.submit() without ever calling
+   * confirmPayment, so no card would have been charged.
+   *
+   * The hosted checkout already offers every gateway the resort has enabled,
+   * pay-at-hotel included, and is what the resort's own site uses. One payment
+   * path instead of two, and the maintained one.
+   */
+  checkoutUrl: (slug: string, bookingId: string) =>
+    `${WEB_BASE}/${encodeURIComponent(slug)}/checkout?bookingId=${encodeURIComponent(bookingId)}`,
 }

@@ -9,10 +9,13 @@ import {
   Building2, ExternalLink, Receipt, Loader2, Star, ArrowRight, MessageCircle,
 } from 'lucide-react';
 import { PageShell, PageHeader } from '@/components/patterns';
+import { GroupBillPanel } from '@/components/dashboard/GroupBillPanel';
 import { PLAN_PRICING, PUBLIC_PLAN_ORDER, type PlanKey } from '@resort-pro/types';
 
 type PlanConfig = {
   key: string; name: string; price: number; annualPrice?: number;
+  /** What the plan costs without the group discount, when one applies. */
+  listPrice?: number;
   roomLimit: number; staffLimit: number; aiMonthlyTokenCap: number;
   flags: string[]; features: string[];
 };
@@ -27,6 +30,7 @@ type BillingStatus = {
   isStripeTestMode?: boolean;
   bkashEnabled?: boolean;
   bkashPricesBdt?: Record<string, number>;
+  groupDiscount?: { applies: boolean; rate: number; cardReady: boolean };
   planConfigs?: PlanConfig[];
   entitlement?: { roomLimit: number; staffLimit: number; aiMonthlyTokenCap: number; flags: Record<string, boolean> };
 };
@@ -72,6 +76,10 @@ function PlanCard({ plan, onSelect, onBkash, loading, bkashEnabled, bkashPriceBd
   const isPro = planKey === 'PROFESSIONAL';
   const pricing = PLAN_PRICING[planKey];
   const Icon = isPro ? Star : Zap;
+  // From the API, never from PLAN_PRICING: an owner with several resorts pays
+  // a tenth less, and the page showing the list price beside a smaller charge
+  // is the one thing a billing screen must not do.
+  const discounted = plan.listPrice !== undefined && plan.price < plan.listPrice;
 
   return (
     <div className={`relative flex flex-col gap-4 rounded-rp-card border-2 bg-rp-surface p-6 ${isPro ? 'border-rp-brand shadow-rp-pop' : 'border-rp-border-md'}`}>
@@ -91,11 +99,19 @@ function PlanCard({ plan, onSelect, onBkash, loading, bkashEnabled, bkashPriceBd
           </p>
         </div>
       </div>
-      <div className="flex items-end gap-1">
+      <div className="flex flex-wrap items-end gap-x-2 gap-y-1">
         <span className="text-4xl font-bold leading-none text-rp-text">
-          ${pricing.monthlyUsd}
+          ${plan.price}
         </span>
         <span className="mb-1 text-rp-body text-rp-muted">/month</span>
+        {discounted && (
+          <span className="mb-1 flex items-baseline gap-1.5">
+            <span className="text-rp-body text-rp-muted line-through">${plan.listPrice}</span>
+            <span className="rounded-rp-xs bg-rp-teal-bg px-1.5 py-0.5 text-rp-micro font-semibold text-rp-brand">
+              group price
+            </span>
+          </span>
+        )}
       </div>
       <ul className="flex flex-1 flex-col gap-2">
         {plan.features.map(f => (
@@ -137,6 +153,13 @@ export default function BillingPage() {
     if (searchParams.get('success') === '1')  toast({ title: '🎉 Subscription activated!', description: 'Your plan has been upgraded successfully.' });
     if (searchParams.get('canceled') === '1') toast({ title: 'Checkout cancelled', description: 'No changes were made.', variant: 'destructive' });
   }, [searchParams]);
+
+  // Money arrived but could not be applied. Saying "cancelled" here would send
+  // an owner looking for a refund of something the screen claims never
+  // happened, so it says what is true and stays on the page.
+  const heldPayment = searchParams.get('paid') === '1' && searchParams.get('applied') === '0'
+    ? { ref: searchParams.get('ref') ?? '', reason: searchParams.get('reason') ?? '' }
+    : null;
 
   useEffect(() => {
     Promise.all([billingApi.getStatus(), billingApi.getInvoices()])
@@ -206,6 +229,27 @@ export default function BillingPage() {
         title="Billing & Subscription"
         subtitle="Manage your plan and payment details"
       />
+
+      {heldPayment && (
+        <div role="alert" className="rounded-rp-card border border-rp-border bg-rp-amber-bg p-4">
+          <p className="text-rp-body font-semibold text-rp-text">
+            We have your payment — it is not on your account yet
+          </p>
+          <p className="mt-1 text-rp-body text-rp-text">
+            The payment went through, but something changed while it was being made, so we
+            have not applied it automatically. Our team has been told and will sort it out.
+            Please do not pay again.
+          </p>
+          {heldPayment.ref && (
+            <p className="mt-2 text-rp-meta text-rp-muted">
+              Reference <span className="font-mono">{heldPayment.ref}</span>
+              {heldPayment.reason ? ` · ${heldPayment.reason}` : ''}
+            </p>
+          )}
+        </div>
+      )}
+
+      <GroupBillPanel />
 
       {/* Current plan card */}
       <div className="rounded-rp-card border border-rp-border bg-rp-surface p-6 shadow-rp-card">
@@ -285,6 +329,16 @@ export default function BillingPage() {
       <div>
         <h2 className="mb-1 text-xl font-semibold text-rp-text">Upgrade when you need more capacity</h2>
         <p className="mb-6 text-rp-body text-rp-muted">Your current plan stays in place. Choose a higher plan only when your operation needs it.</p>
+        {billing?.groupDiscount?.applies && !billing.groupDiscount.cardReady && (
+          // Honest rather than tidy: the discount is owed, bKash already gives
+          // it, and a card would take the full amount until the coupon exists.
+          <p className="rounded-rp-card border border-rp-border bg-rp-amber-bg px-4 py-3 text-rp-body text-rp-text">
+            Your resorts qualify for 10% off. bKash already charges the lower price;
+            card payment will until we finish setting it up — contact support to be
+            refunded the difference if you pay by card meanwhile.
+          </p>
+        )}
+
         {upgradePlans.length > 0 ? (
           <div className={`grid grid-cols-1 gap-5 ${upgradePlans.length === 1 ? 'max-w-md' : 'md:grid-cols-2'}`}>
             {upgradePlans.map(plan => (

@@ -1,0 +1,352 @@
+/**
+ * Changing what a connection gives, after it has been given.
+ *
+ * The founder asked for this explicitly — "eita poriborton korte parbe" — and
+ * the rule that makes it safe is who may do it. Only the resort's own owner,
+ * never the person who asked for access. If the asking side could raise its own
+ * level, the choice made when the request was approved would have been theatre.
+ *
+ * The other thing worth proving: dropping to figures only has to bite at once.
+ * A session already open on that resort must stop working on its next request,
+ * not whenever its token happens to run out.
+ */
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest';
+
+const sent: { to: string }[] = [];
+vi.mock('../../src/services/email', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/services/email')>()),
+  sendEmail: async (mail: { to: string }) => { sent.push(mail); return { sent: true }; },
+}));
+
+import { buildApp } from '../../src/app';
+import { prisma } from '@resort-pro/database';
+import { verifyOwnerAndLogin } from '../helpers/auth';
+import type { FastifyInstance } from 'fastify';
+
+let app: FastifyInstance;
+const run = `rg-acc-${Date.now()}`;
+const password = 'TestPass123!';
+const myEmail = `owner-${run}@test.com`;
+const theirEmail = `their-${run}@test.com`;
+
+let token: string;
+let theirToken: string;
+let ownerUserId: string;
+let passwordHash: string;
+let homeId: string;
+let hillId: string;
+
+const setAccess = (tenantId: string, access: string, bearer: string) => app.inject({
+  method: 'PATCH', url: `/api/resort-group/members/${tenantId}`,
+  headers: { Authorization: `Bearer ${bearer}` }, payload: { access },
+});
+const switchTo = (tenantId: string, bearer = token) => app.inject({
+  method: 'POST', url: '/api/auth/switch-resort',
+  headers: { Authorization: `Bearer ${bearer}` }, payload: { tenantId },
+});
+const connection = (bearer: string) => app.inject({
+  method: 'GET', url: '/api/resort-group/connection', headers: { Authorization: `Bearer ${bearer}` },
+});
+const events = (bearer: string) => app.inject({
+  method: 'GET', url: '/api/resort-group/events', headers: { Authorization: `Bearer ${bearer}` },
+});
+const whoAmI = (bearer: string) => app.inject({
+  method: 'GET', url: '/api/auth/me', headers: { Authorization: `Bearer ${bearer}` },
+});
+
+/** Ask, then have the other owner approve at the given level. */
+async function connectAt(access: 'FULL' | 'NUMBERS_ONLY') {
+  await app.inject({
+    method: 'POST', url: '/api/resort-group/links',
+    headers: { Authorization: `Bearer ${token}` }, payload: { slug: `${run}-hillview` },
+  });
+  const req = await prisma.resortLinkRequest.findFirstOrThrow({ where: { tenantId: hillId } });
+  const res = await app.inject({
+    method: 'POST', url: `/api/resort-group/requests/${req.id}/approve`,
+    headers: { Authorization: `Bearer ${theirToken}` }, payload: { access },
+  });
+  expect(res.statusCode, res.body).toBe(200);
+}
+
+const clearGroups = () => prisma.resortGroup.deleteMany({
+  where: { OR: [{ ownerUserId }, { name: { contains: run } }] },
+});
+
+beforeAll(async () => {
+  app = await buildApp();
+  await app.ready();
+
+  const reg = await app.inject({
+    method: 'POST', url: '/api/auth/register',
+    payload: { resortName: 'Sea Pearl', slug: run, firstName: 'Asha', lastName: 'Rahman', email: myEmail, password },
+  });
+  expect(reg.statusCode, reg.body).toBe(201);
+  homeId = JSON.parse(reg.body).data.tenant.id;
+  token = await verifyOwnerAndLogin(app, { tenantId: homeId, email: myEmail, password, slug: run });
+  await prisma.tenant.update({ where: { id: homeId }, data: { planStatus: 'active' } });
+
+  const me = await prisma.user.findUniqueOrThrow({
+    where: { tenantId_email: { tenantId: homeId, email: myEmail } },
+    select: { id: true, passwordHash: true },
+  });
+  ownerUserId = me.id;
+  passwordHash = me.passwordHash;
+
+  const hill = await prisma.tenant.create({
+    data: { name: 'Hill View', slug: `${run}-hillview`, planStatus: 'active' },
+  });
+  hillId = hill.id;
+  await prisma.user.create({
+    data: {
+      tenantId: hillId, email: theirEmail, passwordHash, firstName: 'Their', lastName: 'Owner',
+      role: 'OWNER', emailVerifiedAt: new Date(),
+    },
+  });
+  theirToken = await verifyOwnerAndLogin(app, {
+    tenantId: hillId, email: theirEmail, password, slug: `${run}-hillview`,
+  });
+}, 60000);
+
+beforeEach(async () => {
+  sent.length = 0;
+  await clearGroups();
+  await prisma.user.deleteMany({ where: { tenantId: hillId, email: myEmail } });
+});
+
+afterAll(async () => {
+  await clearGroups();
+  await prisma.tenant.deleteMany({ where: { slug: { startsWith: run } } });
+  await app.close();
+});
+
+describe('dropping to figures only', () => {
+  it('shuts the open session out on its very next request', async () => {
+    await connectAt('FULL');
+    const inside = JSON.parse((await switchTo(hillId)).body).data.token as string;
+    expect(JSON.parse((await whoAmI(inside)).body).data.tenantId).toBe(hillId);
+
+    const res = await setAccess(hillId, 'NUMBERS_ONLY', theirToken);
+    expect(res.statusCode, res.body).toBe(200);
+
+    // Not at expiry — now.
+    expect((await whoAmI(inside)).statusCode).toBe(401);
+    expect((await switchTo(hillId)).statusCode).toBe(403);
+  });
+
+  it('leaves the numbers flowing', async () => {
+    await connectAt('FULL');
+    await setAccess(hillId, 'NUMBERS_ONLY', theirToken);
+
+    const overview = JSON.parse((await app.inject({
+      method: 'GET', url: '/api/resort-group/overview',
+      headers: { Authorization: `Bearer ${token}` },
+    })).body).data;
+    const card = overview.resorts.find((r: { tenantId: string }) => r.tenantId === hillId);
+    expect(card).toMatchObject({ access: 'NUMBERS_ONLY', canOpen: false });
+    expect(card.numbers).not.toBeNull();
+  });
+
+  it('does not touch an account the resort was already using itself', async () => {
+    const theirs = await prisma.user.create({
+      data: {
+        tenantId: hillId, email: myEmail, passwordHash, firstName: 'Asha', lastName: 'Rahman',
+        role: 'MANAGER', emailVerifiedAt: new Date(),
+      },
+    });
+    await connectAt('FULL');
+    await setAccess(hillId, 'NUMBERS_ONLY', theirToken);
+
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: theirs.id } })).isActive).toBe(true);
+    // Reachable by its own password, but no longer by switching.
+    expect((await switchTo(hillId)).statusCode).toBe(403);
+  });
+});
+
+describe('raising it back', () => {
+  it('lets them in again, through the same account as before', async () => {
+    await connectAt('FULL');
+    const before = (await prisma.resortGroupTenant.findUniqueOrThrow({ where: { tenantId: hillId } })).linkedUserId;
+    await setAccess(hillId, 'NUMBERS_ONLY', theirToken);
+
+    expect((await setAccess(hillId, 'FULL', theirToken)).statusCode).toBe(200);
+    const after = await prisma.resortGroupTenant.findUniqueOrThrow({ where: { tenantId: hillId } });
+    expect(after.linkedUserId).toBe(before);
+    expect((await switchTo(hillId)).statusCode).toBe(200);
+  });
+
+  it('makes an account for a connection that never had one', async () => {
+    await connectAt('NUMBERS_ONLY');
+    expect((await prisma.resortGroupTenant.findUniqueOrThrow({ where: { tenantId: hillId } })).linkedUserId).toBeNull();
+
+    expect((await setAccess(hillId, 'FULL', theirToken)).statusCode).toBe(200);
+    const member = await prisma.resortGroupTenant.findUniqueOrThrow({ where: { tenantId: hillId } });
+    expect(member).toMatchObject({ access: 'FULL', linkedUserCreated: true });
+    expect((await switchTo(hillId)).statusCode).toBe(200);
+  });
+});
+
+describe('who is allowed to change it', () => {
+  it('refuses the person who asked for the access', async () => {
+    await connectAt('NUMBERS_ONLY');
+
+    const res = await setAccess(hillId, 'FULL', token);
+    expect(res.statusCode).toBe(403);
+    expect(JSON.parse(res.body).code).toBe('NOT_RESORT_OWNER');
+    expect((await prisma.resortGroupTenant.findUniqueOrThrow({ where: { tenantId: hillId } })).access)
+      .toBe('NUMBERS_ONLY');
+  });
+
+  it('refuses one owner reaching into another resort in the same group', async () => {
+    await connectAt('FULL');
+    // Hill View's owner has no say over Sea Pearl, group or no group.
+    expect((await setAccess(homeId, 'NUMBERS_ONLY', theirToken)).statusCode).toBe(403);
+  });
+
+  it('answers 404 for a resort that is not connected at all', async () => {
+    await connectAt('FULL');
+    const stranger = await prisma.tenant.create({
+      data: { name: 'Nowhere', slug: `${run}-nowhere`, planStatus: 'active' },
+    });
+    expect((await setAccess(stranger.id, 'FULL', theirToken)).statusCode).toBe(404);
+  });
+
+  it('treats setting the level it already has as nothing to do', async () => {
+    await connectAt('FULL');
+    const before = await prisma.resortGroupEvent.count({ where: { action: 'access_changed' } });
+
+    expect((await setAccess(hillId, 'FULL', theirToken)).statusCode).toBe(200);
+    expect(await prisma.resortGroupEvent.count({ where: { action: 'access_changed' } })).toBe(before);
+  });
+});
+
+describe('the history', () => {
+  it('tells the resort\'s owner who was given what, and when', async () => {
+    await connectAt('FULL');
+    await setAccess(hillId, 'NUMBERS_ONLY', theirToken);
+
+    const rows = JSON.parse((await events(theirToken)).body).data;
+    expect(rows[0]).toMatchObject({ action: 'access_changed', resortName: 'Hill View' });
+    expect(rows[0].metadata).toMatchObject({ from: 'FULL', to: 'NUMBERS_ONLY' });
+    expect(rows.some((r: { action: string }) => r.action === 'link_approved')).toBe(true);
+  });
+
+  it('shows the group\'s owner the whole group', async () => {
+    await connectAt('FULL');
+    const rows = JSON.parse((await events(token)).body).data;
+    expect(rows.some((r: { action: string }) => r.action === 'link_requested')).toBe(true);
+  });
+
+  it('shows a connected resort nothing about the group\'s other resorts', async () => {
+    await connectAt('FULL');
+    const other = await prisma.tenant.create({
+      data: { name: 'Elsewhere', slug: `${run}-elsewhere`, planStatus: 'active' },
+    });
+    const group = await prisma.resortGroup.findFirstOrThrow({ where: { ownerUserId } });
+    await prisma.resortGroupEvent.create({
+      data: { groupId: group.id, tenantId: other.id, action: 'link_approved' },
+    });
+
+    const rows = JSON.parse((await events(theirToken)).body).data;
+    expect(rows.every((r: { tenantId: string }) => r.tenantId === hillId)).toBe(true);
+  });
+
+  it('has nothing to show a resort that has never been connected to anything', async () => {
+    // A resort that once had a connection keeps that history even after the
+    // group ends — see "what survives a group ending" below. This is the other
+    // case: nothing has ever happened to it.
+    const fresh = await prisma.tenant.create({
+      data: { name: 'Untouched', slug: `${run}-untouched`, planStatus: 'active' },
+    });
+    await prisma.user.create({
+      data: {
+        tenantId: fresh.id, email: `fresh-${run}@test.com`, passwordHash,
+        firstName: 'Never', lastName: 'Linked', role: 'OWNER', emailVerifiedAt: new Date(),
+      },
+    });
+    const freshToken = await verifyOwnerAndLogin(app, {
+      tenantId: fresh.id, email: `fresh-${run}@test.com`, password, slug: `${run}-untouched`,
+    });
+
+    expect((await events(freshToken)).statusCode).toBe(404);
+  });
+});
+
+describe('what the connected resort is told', () => {
+  it('names the account that can see it, and at what level', async () => {
+    await connectAt('NUMBERS_ONLY');
+
+    const data = JSON.parse((await connection(theirToken)).body).data;
+    expect(data).toMatchObject({
+      ownerName: 'Asha Rahman', ownerEmail: myEmail, ownerResort: 'Sea Pearl',
+      access: 'NUMBERS_ONLY',
+    });
+  });
+
+  it('tells the group\'s own resort nothing, because that is the same person', async () => {
+    await connectAt('FULL');
+    // Sea Pearl is in Sea Pearl's own group. Calling that an outside party
+    // watching them would be a small lie.
+    expect(JSON.parse((await connection(token)).body).data).toBeNull();
+  });
+
+  it('answers null for a resort nobody is connected to', async () => {
+    expect(JSON.parse((await connection(theirToken)).body).data).toBeNull();
+  });
+
+  it('stops naming anyone once the connection is removed', async () => {
+    await connectAt('FULL');
+    await app.inject({
+      method: 'DELETE', url: `/api/resort-group/members/${hillId}`,
+      headers: { Authorization: `Bearer ${theirToken}` },
+    });
+    expect(JSON.parse((await connection(theirToken)).body).data).toBeNull();
+  });
+});
+
+describe('what survives a group ending', () => {
+  /**
+   * The audit trail used to cascade away with its group, so the moment a
+   * connection ended — which is when an owner is most likely to ask who had
+   * access — the answer disappeared, including the "unlinked" row written a
+   * line earlier.
+   */
+  it('leaves the resort its own history after the group is gone', async () => {
+    await connectAt('FULL');
+    await setAccess(hillId, 'NUMBERS_ONLY', theirToken);
+
+    // Disconnecting the only other resort dissolves the group.
+    const gone = await app.inject({
+      method: 'DELETE', url: `/api/resort-group/members/${hillId}`,
+      headers: { Authorization: `Bearer ${theirToken}` },
+    });
+    expect(gone.statusCode, gone.body).toBe(200);
+    expect(await prisma.resortGroup.count({ where: { ownerUserId } })).toBe(0);
+
+    const rows = JSON.parse((await events(theirToken)).body).data;
+    expect(rows.length, 'the history went with the group').toBeGreaterThan(0);
+    expect(rows.map((r: { action: string }) => r.action)).toContain('access_changed');
+    expect(rows.map((r: { action: string }) => r.action)).toContain('unlinked');
+  });
+});
+
+describe('a request that is refused', () => {
+  it('leaves no one-resort group behind when there is nobody to ask', async () => {
+    // A resort with no verified owner cannot be asked. Before, the group had
+    // already been created by the time we found that out, and the leftover
+    // blocked this resort from ever joining somebody else's.
+    const orphan = await prisma.tenant.create({
+      data: { name: 'No Owner', slug: `${run}-noowner`, planStatus: 'active' },
+    });
+
+    const res = await app.inject({
+      method: 'POST', url: '/api/resort-group/links',
+      headers: { Authorization: `Bearer ${token}` }, payload: { slug: `${run}-noowner` },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).code).toBe('RESORT_HAS_NO_OWNER');
+
+    expect(await prisma.resortGroup.count({ where: { ownerUserId } })).toBe(0);
+    expect(await prisma.resortGroupTenant.count({ where: { tenantId: homeId } })).toBe(0);
+    await prisma.tenant.delete({ where: { id: orphan.id } });
+  });
+});

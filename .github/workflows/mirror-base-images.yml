@@ -1,0 +1,91 @@
+name: Mirror base images to GHCR
+
+# Every registry we build from rate-limits anonymous pulls, and we kept finding
+# the next one:
+#
+#   Docker Hub        429 "unauthenticated pull rate limit"  (failed CI)
+#   public.ecr.aws    429 "Data limit exceeded"              (failed CI, then
+#                                                             the image builds)
+#
+# Each fix moved the problem rather than removing it, because both quotas are
+# per source IP on shared runners and neither is ours to raise. GHCR is: the
+# build jobs already authenticate to it with GITHUB_TOKEN to push our own
+# images, and pulls from it are not metered against us.
+#
+# So we keep our own copy of the base image and build from that. This workflow
+# makes the copy; apps/api/Dockerfile and apps/web/Dockerfile consume it,
+# pinned by digest.
+#
+# `imagetools create` copies the whole multi-arch index without pulling layers
+# into the runner, so this is one cheap request a week against the upstream
+# registry rather than one per build.
+
+on:
+  schedule:
+    # Mondays, 04:17 UTC. Off the hour because every cron on the hour competes
+    # for runners.
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+  # Also on a push that changes this file, which is what bootstraps it: the
+  # GHCR copy has to exist before the Dockerfiles can be pointed at it, and a
+  # workflow_dispatch is only offered once the workflow is on the default
+  # branch. Without this, the first run would have to wait for Monday.
+  push:
+    paths:
+      - .github/workflows/mirror-base-images.yml
+
+concurrency:
+  group: mirror-base-images
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    name: Copy node:20-alpine into GHCR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Copy the image and report its digest
+        env:
+          # Lower-cased because GHCR rejects an upper-case path, and
+          # github.repository_owner is whatever the account is spelled as.
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+          target="ghcr.io/${owner}/node:20-alpine"
+
+          # By tag, not by digest: the point of a weekly run is to pick up
+          # upstream's rebuilds, which is where Alpine security fixes arrive.
+          # The Dockerfiles pin a digest, so nothing we build moves until
+          # somebody updates that pin on purpose — this only makes the newer
+          # image available.
+          docker buildx imagetools create --tag "$target" docker.io/library/node:20-alpine
+
+          digest=$(docker buildx imagetools inspect "$target" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          echo "Mirrored to $target"
+          echo "Digest: $digest"
+
+          {
+            echo "## Base image mirrored"
+            echo
+            echo '```'
+            echo "$target@$digest"
+            echo '```'
+            echo
+            echo "To build against this, set \`NODE_IMAGE\` in both Dockerfiles to"
+            echo "the line above. They pin a digest on purpose, so updating is a"
+            echo "deliberate commit and not something this workflow does to you."
+          } >> "$GITHUB_STEP_SUMMARY"

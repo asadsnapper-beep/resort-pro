@@ -9,6 +9,15 @@
 import type { FastifyInstance } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { prisma, Prisma } from '@resort-pro/database';
+import { refreshTokenPayload } from '../utils/refresh-token';
+import { purgeGuestDocumentFiles } from '../utils/guest-documents';
+import { encryptOrNull, decryptOrNull } from '../utils/secret-box';
+import {
+  generateSecret, verifyTotp, otpauthUri, generateRecoveryCodes, normaliseRecoveryCode,
+} from '../utils/totp';
+import {
+  isNewLocation, alertNewSignInLocation, alertTwoFactorDisabled,
+} from '../services/admin-alerts';
 import { PLAN_PRICING } from '@resort-pro/types';
 import { ok } from '../utils/response';
 
@@ -60,6 +69,81 @@ const ROUTE_PERMISSIONS: Record<string, AdminRole[]> = {
   read:           ['SUPER_ADMIN', 'SUPPORT', 'FINANCE', 'VIEWER'],
 };
 
+/** How long an admin sign-in lasts, in the token and in the session row alike. */
+const ADMIN_SESSION_HOURS = 8;
+
+/**
+ * Don't write `lastSeenAt` on every request. The panel fires several calls per
+ * page; a minute's resolution is plenty for "is this session still in use".
+ */
+const LAST_SEEN_RESOLUTION_MS = 60_000;
+
+/**
+ * Check that the session the token names is still one we honour.
+ *
+ * This is the part a bearer JWT cannot do by itself: revoking a row here stops
+ * every token naming it, at once, rather than waiting out its eight hours.
+ */
+async function liveSession(sessionId: string): Promise<{ ok: boolean; reason?: string }> {
+  const session = await prisma.adminSession.findUnique({
+    where: { id: sessionId },
+    select: { revokedAt: true, expiresAt: true, lastSeenAt: true },
+  });
+
+  if (!session) return { ok: false, reason: 'This session no longer exists. Sign in again.' };
+  if (session.revokedAt) return { ok: false, reason: 'This session was signed out. Sign in again.' };
+  if (session.expiresAt <= new Date()) return { ok: false, reason: 'This session has expired. Sign in again.' };
+
+  if (Date.now() - session.lastSeenAt.getTime() > LAST_SEEN_RESOLUTION_MS) {
+    await prisma.adminSession.update({
+      where: { id: sessionId },
+      data: { lastSeenAt: new Date() },
+    }).catch(() => { /* a missed heartbeat is not worth failing a request over */ });
+  }
+
+  return { ok: true };
+}
+
+/**
+ * How recently the password must have been typed for a destructive action.
+ *
+ * Long enough to do a piece of work without being asked twice; short enough
+ * that a session left open on an unlocked laptop is not a delete button.
+ */
+const REAUTH_WINDOW_MS = 10 * 60 * 1000;
+
+/**
+ * Guard for actions that cannot be undone, or that write credentials.
+ *
+ * An admin token is eight hours long. Revoking it is possible now, but
+ * revocation is a reaction — it needs someone to notice. This is the other
+ * half: for the small set of actions where being wrong is permanent, having the
+ * session is not enough, the password has to have been typed recently.
+ *
+ * Goes after requireAdminRole in the preHandler list, so role is still decided
+ * first and this only ever adds a condition.
+ */
+async function requireRecentAuth(request: any, reply: any) {
+  const sessionId = request.user?.sid as string | undefined;
+  if (!sessionId) {
+    return reply.status(401).send({ success: false, error: 'Sign in again.', code: 'SESSION_REQUIRED' });
+  }
+
+  const session = await prisma.adminSession.findUnique({
+    where: { id: sessionId },
+    select: { reauthAt: true },
+  });
+
+  const lastTyped = session?.reauthAt?.getTime() ?? 0;
+  if (Date.now() - lastTyped > REAUTH_WINDOW_MS) {
+    return reply.status(403).send({
+      success: false,
+      error: 'Confirm your password to continue — this action cannot be undone.',
+      code: 'REAUTH_REQUIRED',
+    });
+  }
+}
+
 /** Verify JWT and check role. Pass no roles arg to require any valid admin. */
 function requireAdminRole(roles: AdminRole[] = ['SUPER_ADMIN', 'SUPPORT', 'FINANCE', 'VIEWER']) {
   return async (request: any, reply: any) => {
@@ -77,6 +161,24 @@ function requireAdminRole(roles: AdminRole[] = ['SUPER_ADMIN', 'SUPPORT', 'FINAN
     if (!roles.includes(adminRole)) {
       return reply.status(403).send({ success: false, error: `Requires role: ${roles.join(' or ')}` });
     }
+
+    // A token issued before sessions existed names no session, and there is no
+    // row to revoke for it — so it is refused rather than quietly trusted. The
+    // cost is one sign-in on the day this deploys; the alternative is a
+    // permanent way around revocation.
+    const sessionId = request.user?.sid as string | undefined;
+    if (!sessionId) {
+      return reply.status(401).send({
+        success: false,
+        error: 'Sign in again — this session predates revocable sessions.',
+        code: 'SESSION_REQUIRED',
+      });
+    }
+
+    const live = await liveSession(sessionId);
+    if (!live.ok) {
+      return reply.status(401).send({ success: false, error: live.reason, code: 'SESSION_ENDED' });
+    }
   };
 }
 
@@ -84,6 +186,27 @@ function requireAdminRole(roles: AdminRole[] = ['SUPER_ADMIN', 'SUPPORT', 'FINAN
 const requireSuperAdmin = requireAdminRole(['SUPER_ADMIN']);
 
 // ── Audit Log Helper ──────────────────────────────────────────────────────────
+/**
+ * Record a privileged admin action.
+ *
+ * The failure path used to be an empty `catch` with a comment saying logging
+ * must never break the main operation. That half is still true — the mutation
+ * has already happened by the time this runs, so throwing here would report a
+ * failure for work that succeeded. What was wrong is that it said nothing at
+ * all: the moment the audit store is unhealthy is exactly the moment privileged
+ * actions stop being recorded, and nothing anywhere would have shown it
+ * (release-readiness review M-02).
+ *
+ * So it stays non-fatal and becomes loud, and it returns whether the row was
+ * written so a caller can decide for itself.
+ *
+ * What this is not: the audit row is still written after the mutation and
+ * outside its transaction, so a crash in between still loses it. Making the
+ * highest-risk actions atomic with their audit entry means moving both into one
+ * transaction, at each site, and is its own piece of work.
+ *
+ * @returns true if the audit row was written.
+ */
 async function logAdminAction({
   adminEmail,
   action,
@@ -105,15 +228,62 @@ async function logAdminAction({
     await prisma.auditLog.create({
       data: { adminEmail, action, targetType, targetId, targetName, metadata: (metadata ?? undefined) as any, ipAddress },
     });
-  } catch {
-    // Never let logging failure break the main operation
+    return true;
+  } catch (err) {
+    // Deliberately without the metadata, which carries whatever the call site
+    // passed — including, at some sites, the values being changed.
+    console.error(
+      `AUDIT WRITE FAILED — "${action}" on ${targetType}`
+      + `${targetId ? ` ${targetId}` : ''} by ${adminEmail} was carried out but`
+      + ` not recorded: ${err instanceof Error ? err.message : 'unknown error'}`,
+    );
+    return false;
   }
+}
+
+// ── Second factor ─────────────────────────────────────────────────────────────
+/**
+ * Accept a TOTP code, or spend a recovery code.
+ *
+ * Recovery codes are tried only when the input is not six digits, so a mistyped
+ * authenticator code never burns one. A spent code is marked used rather than
+ * deleted: "this code was used at 03:14" is worth keeping.
+ */
+async function consumeSecondFactor(
+  adminUserId: string,
+  storedSecret: string | null,
+  input: string,
+): Promise<boolean> {
+  const given = input.trim();
+
+  if (/^\d{6}$/.test(given.replace(/\s/g, ''))) {
+    const secret = decryptOrNull(storedSecret);
+    return !!secret && verifyTotp(secret, given);
+  }
+
+  const candidate = normaliseRecoveryCode(given);
+  if (candidate.length < 8) return false;
+
+  const codes = await prisma.adminRecoveryCode.findMany({
+    where: { adminUserId, usedAt: null },
+    select: { id: true, codeHash: true },
+  });
+  for (const code of codes) {
+    if (await bcrypt.compare(candidate, code.codeHash)) {
+      await prisma.adminRecoveryCode.update({
+        where: { id: code.id },
+        data: { usedAt: new Date() },
+      });
+      return true;
+    }
+  }
+  return false;
 }
 
 export async function adminRoutes(app: FastifyInstance) {
   // ── POST /api/admin/login ──────────────────────────────────────────────
   // DB-based admin auth — queries AdminUser table, not tenant users
-  app.post<{ Body: { email: string; password: string } }>('/login', {
+  app.post<{ Body: { email: string; password: string; code?: string } }>('/login', {
     // Admin login is a single high-value target — cap brute-force attempts.
     config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
   }, async (request, reply) => {
@@ -135,11 +305,68 @@ export async function adminRoutes(app: FastifyInstance) {
       return reply.status(401).send({ success: false, error: 'Invalid admin credentials' });
     }
 
+    // Second factor, when the account has one. A password alone stops here —
+    // no token is signed, so a stolen password is not a session.
+    if (adminUser.mfaEnabledAt) {
+      const { code } = (request.body ?? {}) as { code?: string };
+      if (!code) {
+        return reply.status(401).send({
+          success: false,
+          error: 'Enter the six-digit code from your authenticator app.',
+          code: 'MFA_REQUIRED',
+        });
+      }
+
+      const accepted = await consumeSecondFactor(adminUser.id, adminUser.mfaSecret, code);
+      if (!accepted) {
+        await logAdminAction({
+          adminEmail: adminUser.email,
+          action: 'admin_mfa_failed',
+          targetType: 'admin_user',
+          targetId: adminUser.id,
+          ipAddress: request.ip,
+        });
+        return reply.status(401).send({
+          success: false,
+          error: 'That code is not right. Check the app, or use a recovery code.',
+          code: 'MFA_INVALID',
+        });
+      }
+    }
+
     // Update lastLoginAt
     await prisma.adminUser.update({
       where: { id: adminUser.id },
       data: { lastLoginAt: new Date() },
     });
+
+    const session = await prisma.adminSession.create({
+      data: {
+        adminUserId: adminUser.id,
+        expiresAt: new Date(Date.now() + ADMIN_SESSION_HOURS * 60 * 60 * 1000),
+        // Signing in is typing the password, so the window starts open.
+        reauthAt: new Date(),
+        ipAddress: request.ip,
+        // Truncated: a user-agent is for telling two sign-ins apart, not for
+        // keeping a full fingerprint of the person's browser.
+        userAgent: (request.headers['user-agent'] ?? '').toString().slice(0, 200) || null,
+      },
+      select: { id: true },
+    });
+
+    // Told about, not waited for. A sign-in does not fail because an email did,
+    // and the person signing in should not watch a spinner for it.
+    isNewLocation(adminUser.id, request.ip, session.id)
+      .then((isNew) => {
+        if (!isNew) return undefined;
+        return alertNewSignInLocation({
+          adminUserId: adminUser.id,
+          email: adminUser.email,
+          ipAddress: request.ip,
+          userAgent: request.headers['user-agent']?.toString(),
+        });
+      })
+      .catch((err) => console.error('[admin-alerts] new sign-in check failed:', err?.message));
 
     const token = app.jwt.sign(
       {
@@ -147,8 +374,9 @@ export async function adminRoutes(app: FastifyInstance) {
         email: adminUser.email,
         adminRole: adminUser.role,  // new field — replaces isSuperAdmin bool
         isSuperAdmin: adminUser.role === 'SUPER_ADMIN', // backward compat
+        sid: session.id, // the row that makes this token revocable
       },
-      { expiresIn: '8h' }
+      { expiresIn: `${ADMIN_SESSION_HOURS}h` }
     );
 
     return reply.send({
@@ -165,6 +393,273 @@ export async function adminRoutes(app: FastifyInstance) {
       },
     });
   });
+
+  // ── POST /api/admin/reauth ─────────────────────────────────────────────
+  // Type the password again, without signing out and back in. Opens the window
+  // that requireRecentAuth checks.
+  app.post<{ Body: { password: string; code?: string } }>(
+    '/reauth',
+    {
+      preHandler: requireAdminRole(),
+      // The same cap as signing in: this takes a password, so it is another
+      // door to try one against.
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    },
+    async (request, reply) => {
+      const me = request.user as any;
+      const admin = await prisma.adminUser.findUnique({ where: { id: me.sub } });
+      if (!admin || !admin.isActive) {
+        return reply.status(401).send({ success: false, error: 'Unauthorized' });
+      }
+
+      const password = String(request.body?.password ?? '');
+      if (!password || !(await bcrypt.compare(password, admin.passwordHash))) {
+        return reply.status(401).send({ success: false, error: 'Password is not right.' });
+      }
+
+      // With two-factor on it is asked for here too. Confirming an irreversible
+      // action with one of the two factors would make the second one optional
+      // exactly where it matters most.
+      if (admin.mfaEnabledAt) {
+        const code = String(request.body?.code ?? '');
+        if (!code || !(await consumeSecondFactor(admin.id, admin.mfaSecret, code))) {
+          return reply.status(401).send({
+            success: false,
+            error: 'That code is not right.',
+            code: 'MFA_INVALID',
+          });
+        }
+      }
+
+      await prisma.adminSession.update({
+        where: { id: me.sid },
+        data: { reauthAt: new Date() },
+      });
+
+      return reply.send(ok({ minutes: Math.round(REAUTH_WINDOW_MS / 60000) }, 'Confirmed.'));
+    },
+  );
+
+  // ── POST /api/admin/logout ─────────────────────────────────────────────
+  // Signing out now means something on the server, not just a cleared
+  // localStorage: the token stops working everywhere it was copied to.
+  app.post('/logout', { preHandler: requireAdminRole() }, async (request, reply) => {
+    const me = request.user as any;
+    await prisma.adminSession.updateMany({
+      where: { id: me.sid, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return reply.send(ok(null, 'Signed out.'));
+  });
+
+  // ── GET /api/admin/sessions ────────────────────────────────────────────
+  // Where this account is signed in. Answering "is someone else using my
+  // account" needs somewhere to look, and there was nowhere.
+  app.get('/sessions', { preHandler: requireAdminRole() }, async (request, reply) => {
+    const me = request.user as any;
+    const sessions = await prisma.adminSession.findMany({
+      where: { adminUserId: me.sub, revokedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { lastSeenAt: 'desc' },
+      select: {
+        id: true, createdAt: true, lastSeenAt: true, expiresAt: true,
+        ipAddress: true, userAgent: true,
+      },
+    });
+    return reply.send(ok({
+      sessions: sessions.map((s) => ({ ...s, current: s.id === me.sid })),
+    }));
+  });
+
+  // ── POST /api/admin/sessions/revoke ────────────────────────────────────
+  // One session by id, or every other one. "Sign out everywhere else" is the
+  // thing a person wants the moment they suspect a laptop is gone.
+  app.post<{ Body: { sessionId?: string; others?: boolean } }>(
+    '/sessions/revoke',
+    { preHandler: requireAdminRole() },
+    async (request, reply) => {
+      const me = request.user as any;
+      const { sessionId, others } = request.body ?? {};
+
+      if (!sessionId && !others) {
+        return reply.status(400).send({
+          success: false,
+          error: 'Send a sessionId, or others: true.',
+        });
+      }
+
+      const { count } = await prisma.adminSession.updateMany({
+        // Scoped to this admin's own sessions: an id from somewhere else
+        // revokes nothing rather than someone else's sign-in.
+        where: others
+          ? { adminUserId: me.sub, id: { not: me.sid }, revokedAt: null }
+          : { adminUserId: me.sub, id: sessionId, revokedAt: null },
+        data: { revokedAt: new Date(), revokedBy: me.email },
+      });
+
+      await logAdminAction({
+        adminEmail: me.email,
+        action: 'admin_session_revoke',
+        targetType: 'admin_user',
+        targetId: me.sub,
+        metadata: { others: !!others, sessionId, revoked: count },
+        ipAddress: request.ip,
+      });
+
+      return reply.send(ok({ revoked: count }));
+    },
+  );
+
+  // ── GET /api/admin/mfa ─────────────────────────────────────────────────
+  // Whether this account has a second factor, and how many recovery codes are
+  // left. Never the secret.
+  app.get('/mfa', { preHandler: requireAdminRole() }, async (request, reply) => {
+    const me = request.user as any;
+    const admin = await prisma.adminUser.findUnique({
+      where: { id: me.sub },
+      select: { mfaEnabledAt: true, mfaSecret: true },
+    });
+    const remaining = await prisma.adminRecoveryCode.count({
+      where: { adminUserId: me.sub, usedAt: null },
+    });
+    return reply.send(ok({
+      enabled: !!admin?.mfaEnabledAt,
+      enrolmentStarted: !!admin?.mfaSecret && !admin?.mfaEnabledAt,
+      recoveryCodesRemaining: remaining,
+    }));
+  });
+
+  // ── POST /api/admin/mfa/setup ──────────────────────────────────────────
+  // Start enrolment: a new secret and the URI an authenticator reads. It is not
+  // in force until /mfa/enable proves a code can be read from the app — so a
+  // half-finished enrolment cannot lock anybody out.
+  app.post('/mfa/setup', { preHandler: requireAdminRole() }, async (request, reply) => {
+    const me = request.user as any;
+    const admin = await prisma.adminUser.findUnique({
+      where: { id: me.sub }, select: { email: true, mfaEnabledAt: true },
+    });
+    if (!admin) return reply.status(404).send({ success: false, error: 'Admin not found' });
+    if (admin.mfaEnabledAt) {
+      return reply.status(400).send({
+        success: false,
+        error: 'Two-factor is already on. Turn it off before setting it up again.',
+      });
+    }
+
+    const secret = generateSecret();
+    await prisma.adminUser.update({
+      where: { id: me.sub },
+      data: { mfaSecret: encryptOrNull(secret), mfaEnabledAt: null },
+    });
+
+    // The secret is returned exactly once, to the person enrolling. There is no
+    // way to read it back afterwards; losing it means starting setup again.
+    return reply.send(ok({ secret, otpauthUri: otpauthUri(secret, admin.email) }));
+  });
+
+  // ── POST /api/admin/mfa/enable ─────────────────────────────────────────
+  app.post<{ Body: { code: string } }>(
+    '/mfa/enable',
+    { preHandler: requireAdminRole() },
+    async (request, reply) => {
+      const me = request.user as any;
+      const admin = await prisma.adminUser.findUnique({
+        where: { id: me.sub }, select: { email: true, mfaSecret: true, mfaEnabledAt: true },
+      });
+      if (!admin?.mfaSecret) {
+        return reply.status(400).send({ success: false, error: 'Start with /mfa/setup.' });
+      }
+      if (admin.mfaEnabledAt) {
+        return reply.status(400).send({ success: false, error: 'Two-factor is already on.' });
+      }
+
+      const secret = decryptOrNull(admin.mfaSecret);
+      if (!secret || !verifyTotp(secret, String(request.body?.code ?? ''))) {
+        return reply.status(400).send({
+          success: false,
+          error: 'That code is not right. Check the app and try the next one.',
+        });
+      }
+
+      // Codes are shown once and stored hashed, so this replaces any left over
+      // from an earlier enrolment rather than adding to them.
+      const codes = generateRecoveryCodes();
+      await prisma.$transaction([
+        prisma.adminRecoveryCode.deleteMany({ where: { adminUserId: me.sub } }),
+        prisma.adminRecoveryCode.createMany({
+          data: await Promise.all(codes.map(async (code) => ({
+            adminUserId: me.sub,
+            codeHash: await bcrypt.hash(normaliseRecoveryCode(code), 12),
+          }))),
+        }),
+        prisma.adminUser.update({
+          where: { id: me.sub }, data: { mfaEnabledAt: new Date() },
+        }),
+      ]);
+
+      await logAdminAction({
+        adminEmail: admin.email,
+        action: 'admin_mfa_enabled',
+        targetType: 'admin_user',
+        targetId: me.sub,
+        ipAddress: request.ip,
+      });
+
+      return reply.send(ok(
+        { recoveryCodes: codes },
+        'Two-factor is on. Save these recovery codes — they are shown once.',
+      ));
+    },
+  );
+
+  // ── POST /api/admin/mfa/disable ────────────────────────────────────────
+  // Needs the password again. Turning off a second factor is exactly the action
+  // a stolen session would want, and a session alone should not be enough.
+  app.post<{ Body: { password: string; code?: string } }>(
+    '/mfa/disable',
+    { preHandler: requireAdminRole() },
+    async (request, reply) => {
+      const me = request.user as any;
+      const admin = await prisma.adminUser.findUnique({ where: { id: me.sub } });
+      if (!admin?.mfaEnabledAt) {
+        return reply.status(400).send({ success: false, error: 'Two-factor is not on.' });
+      }
+
+      const password = String(request.body?.password ?? '');
+      if (!password || !(await bcrypt.compare(password, admin.passwordHash))) {
+        return reply.status(401).send({ success: false, error: 'Password is not right.' });
+      }
+      const code = String(request.body?.code ?? '');
+      if (!code || !(await consumeSecondFactor(admin.id, admin.mfaSecret, code))) {
+        return reply.status(401).send({ success: false, error: 'That code is not right.' });
+      }
+
+      await prisma.$transaction([
+        prisma.adminRecoveryCode.deleteMany({ where: { adminUserId: me.sub } }),
+        prisma.adminUser.update({
+          where: { id: me.sub }, data: { mfaSecret: null, mfaEnabledAt: null },
+        }),
+      ]);
+
+      await logAdminAction({
+        adminEmail: admin.email,
+        action: 'admin_mfa_disabled',
+        targetType: 'admin_user',
+        targetId: me.sub,
+        ipAddress: request.ip,
+      });
+
+      // The audit log records it for whoever goes looking. This is for the
+      // person whose account it is, who would otherwise find out by noticing
+      // that nothing asks for a code any more.
+      alertTwoFactorDisabled({
+        adminUserId: me.sub,
+        email: admin.email,
+        ipAddress: request.ip,
+      }).catch((err) => console.error('[admin-alerts] two-factor-off email failed:', err?.message));
+
+      return reply.send(ok(null, 'Two-factor is off.'));
+    },
+  );
 
   // ── GET /api/admin/stats ───────────────────────────────────────────────
   app.get('/stats', { preHandler: requireAdminRole() }, async (_req, reply) => {
@@ -342,7 +837,57 @@ export async function adminRoutes(app: FastifyInstance) {
 
       if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
 
-      return reply.send({ success: true, data: tenant });
+      /**
+       * Which other account can see this resort, and which resorts it can see.
+       *
+       * Support gets asked "why is somebody else's name on my staff list?" and
+       * "who can see my revenue?", and until this was here the only way to
+       * answer was to read four tables by hand. Read-only on purpose: a
+       * connection is between two owners, and an admin unpicking it from the
+       * outside would be a decision neither of them made.
+       */
+      const membership = await prisma.resortGroupTenant.findUnique({
+        where: { tenantId: tenant.id },
+        include: { group: { select: { id: true, name: true, ownerUserId: true } } },
+      });
+
+      let resortGroup = null;
+      if (membership) {
+        const [owner, siblings] = await Promise.all([
+          prisma.user.findUnique({
+            where: { id: membership.group.ownerUserId },
+            select: {
+              firstName: true, lastName: true, email: true,
+              tenant: { select: { id: true, name: true } },
+            },
+          }),
+          prisma.resortGroupTenant.findMany({
+            where: { groupId: membership.group.id, tenantId: { not: tenant.id } },
+            orderBy: { createdAt: 'asc' },
+            include: { tenant: { select: { id: true, name: true, slug: true } } },
+          }),
+        ]);
+        resortGroup = {
+          name: membership.group.name,
+          access: membership.access,
+          since: membership.approvedAt,
+          linkedUserCreated: membership.linkedUserCreated,
+          owner: owner && {
+            name: `${owner.firstName} ${owner.lastName}`.trim(),
+            email: owner.email,
+            resortId: owner.tenant?.id ?? null,
+            resortName: owner.tenant?.name ?? null,
+          },
+          siblings: siblings.map((m) => ({
+            tenantId: m.tenant.id,
+            name: m.tenant.name,
+            slug: m.tenant.slug,
+            access: m.access,
+          })),
+        };
+      }
+
+      return reply.send({ success: true, data: { ...tenant, resortGroup } });
     }
   );
 
@@ -416,6 +961,11 @@ export async function adminRoutes(app: FastifyInstance) {
       ipAddress,
     });
 
+    // The rows cascade; the passport and NID photographs they name do not.
+    // Deleting the tenant without this leaves its guests' identity documents
+    // on disk with nothing left that knows they exist.
+    await purgeGuestDocumentFiles({ tenantId: tenant.id });
+
     await prisma.tenant.delete({ where: { id: tenant.id } });
 
     await createAdminNotification({
@@ -436,7 +986,7 @@ export async function adminRoutes(app: FastifyInstance) {
   // name — cheap insurance against a stray click or a scripted mistake.
   app.delete<{ Params: { id: string }; Body: { confirmName?: string } }>(
     '/tenants/:id',
-    { preHandler: requireSuperAdmin },
+    { preHandler: [requireSuperAdmin, requireRecentAuth] },
     async (request, reply) => {
       const tenant = await prisma.tenant.findUnique({
         where: { id: request.params.id },
@@ -484,7 +1034,7 @@ export async function adminRoutes(app: FastifyInstance) {
   // POST /api/admin/tenant-deletion-requests/:id/approve — approve + hard-delete
   app.post<{ Params: { id: string } }>(
     '/tenant-deletion-requests/:id/approve',
-    { preHandler: requireSuperAdmin },
+    { preHandler: [requireSuperAdmin, requireRecentAuth] },
     async (request, reply) => {
       const deletionRequest = await prisma.tenantDeletionRequest.findUnique({
         where: { id: request.params.id },
@@ -581,7 +1131,7 @@ export async function adminRoutes(app: FastifyInstance) {
       );
 
       // Also create a refresh token so the impersonated session works
-      const refreshToken = app.jwt.sign({ sub: owner.id, type: 'refresh' }, { expiresIn: '2h' });
+      const refreshToken = app.jwt.sign(refreshTokenPayload(owner.id), { expiresIn: '2h' });
       await prisma.refreshToken.create({
         data: {
           userId: owner.id,
@@ -1479,7 +2029,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
       // Get stored AI API key from settings
       const settings = await getOrCreateSettings();
-      const apiKey = (settings as any).aiApiKey as string | undefined;
+      const apiKey = decryptOrNull((settings as any).aiApiKey as string | undefined) ?? undefined;
       if (!apiKey) {
         return reply.status(400).send({ success: false, error: 'AI API key not configured. Go to Admin → Settings → AI Integration.' });
       }
@@ -1707,16 +2257,19 @@ Rules:
   // ── PUT /api/admin/settings/ai — save AI API key ──────────────────────────
   app.put<{ Body: { apiKey: string; provider?: string } }>(
     '/settings/ai',
-    { preHandler: requireSuperAdmin },
+    { preHandler: [requireSuperAdmin, requireRecentAuth] },
     async (request, reply) => {
       const { apiKey, provider = 'claude' } = request.body;
       if (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length < 10) {
         return reply.status(400).send({ success: false, error: 'API key is required (min 10 chars)' });
       }
+      // One key for the whole platform, and it bills us. `schema.prisma` has
+      // called this column "Encrypted API key" since it was added; now it is.
+      const stored = encryptOrNull(apiKey.trim());
       await prisma.platformSettings.upsert({
         where:  { id: 'singleton' },
-        update: { aiApiKey: apiKey.trim(), aiProvider: provider },
-        create: { id: 'singleton', trialDays: 14, plans: DEFAULT_PLAN_CONFIGS as unknown as Prisma.InputJsonValue, aiApiKey: apiKey.trim(), aiProvider: provider },
+        update: { aiApiKey: stored, aiProvider: provider },
+        create: { id: 'singleton', trialDays: 14, plans: DEFAULT_PLAN_CONFIGS as unknown as Prisma.InputJsonValue, aiApiKey: stored, aiProvider: provider },
       });
       const adminUser = request.user as any;
       await logAdminAction({
@@ -1748,7 +2301,7 @@ Rules:
   // ── DELETE /api/admin/settings/ai — remove AI API key ────────────────────
   app.delete(
     '/settings/ai',
-    { preHandler: requireSuperAdmin },
+    { preHandler: [requireSuperAdmin, requireRecentAuth] },
     async (request, reply) => {
       await prisma.platformSettings.upsert({
         where:  { id: 'singleton' },
@@ -1835,6 +2388,19 @@ Rules:
         rewardedAt: new Date(),
         rewardedBy: admin.email,
       },
+    });
+
+    // This route moves money — account credit, or a paid plan granted free.
+    // `rewardedBy` on the referral row says who, but only for as long as nobody
+    // rewards it again; the audit log is the record that does not get rewritten.
+    await logAdminAction({
+      adminEmail: admin.email,
+      action: 'referral_reward',
+      targetType: 'tenant',
+      targetId: referral.referrerId,
+      targetName: referral.referrer.name,
+      metadata: { referralId: id, type, amount, plan, months, note },
+      ipAddress: request.ip,
     });
 
     // Notify referrer
@@ -2134,7 +2700,7 @@ Rules:
   // ── POST /api/admin/team — create new admin user ──────────────────────────
   app.post<{
     Body: { email: string; password: string; role: string; firstName?: string; lastName?: string };
-  }>('/team', { preHandler: requireAdminRole(['SUPER_ADMIN']) }, async (request, reply) => {
+  }>('/team', { preHandler: [requireAdminRole(['SUPER_ADMIN']), requireRecentAuth] }, async (request, reply) => {
     const { email, password, role, firstName = '', lastName = '' } = request.body || {};
     if (!email || !password || !role) {
       return reply.status(400).send({ success: false, error: 'email, password, and role required' });
@@ -2188,7 +2754,7 @@ Rules:
   app.patch<{
     Params: { id: string };
     Body: { role?: string; isActive?: boolean; firstName?: string; lastName?: string };
-  }>('/team/:id', { preHandler: requireAdminRole(['SUPER_ADMIN']) }, async (request, reply) => {
+  }>('/team/:id', { preHandler: [requireAdminRole(['SUPER_ADMIN']), requireRecentAuth] }, async (request, reply) => {
     const { id } = request.params;
     const { role, isActive, firstName, lastName } = request.body || {};
     const requester = request.user as any;
@@ -2237,7 +2803,7 @@ Rules:
   // ── DELETE /api/admin/team/:id — deactivate (soft delete) ────────────────
   app.delete<{ Params: { id: string } }>(
     '/team/:id',
-    { preHandler: requireAdminRole(['SUPER_ADMIN']) },
+    { preHandler: [requireAdminRole(['SUPER_ADMIN']), requireRecentAuth] },
     async (request, reply) => {
       const { id } = request.params;
       const requester = request.user as any;
@@ -2507,7 +3073,7 @@ Rules:
   // Immediate anonymization — bypasses 30-day grace (SUPER_ADMIN only, irreversible)
   app.post<{ Params: { id: string } }>(
     '/tenants/:id/gdpr/anonymize-now',
-    { preHandler: requireAdminRole(['SUPER_ADMIN']) },
+    { preHandler: [requireAdminRole(['SUPER_ADMIN']), requireRecentAuth] },
     async (request, reply) => {
       const { id } = request.params;
       const adminUser = request.user as any;
@@ -2789,6 +3355,18 @@ Rules:
         })
       );
 
+      // Which flags, not just how many: a feature flag decides whether a resort
+      // can reach a paid module, and "someone changed some flags" is not an
+      // answer to who turned this one on.
+      await logAdminAction({
+        adminEmail: adminUser.email,
+        action: 'feature_flags_update',
+        targetType: 'tenant',
+        targetId: id,
+        metadata: { flags },
+        ipAddress: request.ip,
+      });
+
       return reply.send(ok({ updated: Object.keys(flags).length }));
     }
   );
@@ -2901,6 +3479,18 @@ Rules:
         },
         select: { id: true, customDomain: true, sslStatus: true, sslProvisionedAt: true, sslExpiresAt: true },
       });
+
+      const adminUser = request.user as any;
+      await logAdminAction({
+        adminEmail: adminUser.email,
+        action: 'ssl_status_update',
+        targetType: 'tenant',
+        targetId: id,
+        targetName: updated.customDomain ?? undefined,
+        metadata: { sslStatus, sslExpiresAt, sslError },
+        ipAddress: request.ip,
+      });
+
       return reply.send(ok(updated, 'SSL status updated'));
     }
   );
@@ -3120,7 +3710,8 @@ Rules:
           ...(body.ssoEnabled !== undefined && { ssoEnabled: body.ssoEnabled }),
           ...(body.ssoProvider !== undefined && { ssoProvider: body.ssoProvider }),
           ...(body.ssoClientId !== undefined && { ssoClientId: body.ssoClientId }),
-          ...(body.ssoClientSecret !== undefined && { ssoClientSecret: body.ssoClientSecret }),
+          ...(body.ssoClientSecret !== undefined
+            && { ssoClientSecret: encryptOrNull(body.ssoClientSecret) }),
           ...(body.ssoConfig !== undefined && { ssoConfig: body.ssoConfig as any }),
         },
       });
@@ -3174,7 +3765,7 @@ Rules:
   // ── PATCH /api/admin/storage ───────────────────────────────────────────────
   app.patch<{ Body: Partial<StorageConfig> }>(
     '/storage',
-    { preHandler: requireAdminRole(['SUPER_ADMIN']) },
+    { preHandler: [requireAdminRole(['SUPER_ADMIN']), requireRecentAuth] },
     async (request, reply) => {
       const adminUser = request.user as any;
       const body = request.body ?? {};
@@ -3193,10 +3784,20 @@ Rules:
           : existing.secretKey,
       };
 
+      // Only the two credentials are encrypted, not the whole object: the
+      // bucket, endpoint and public URL are shown in this screen and are not
+      // secret, and keeping them readable keeps the row diagnosable. The
+      // matching decrypt is in getStorageConfig(), which is the only reader.
+      const atRest = {
+        ...updated,
+        accessKey: encryptOrNull(updated.accessKey) ?? undefined,
+        secretKey: encryptOrNull(updated.secretKey) ?? undefined,
+      };
+
       await prisma.platformSettings.upsert({
         where:  { id: 'singleton' },
-        create: { id: 'singleton', plans: [], storageConfig: updated as any },
-        update: { storageConfig: updated as any },
+        create: { id: 'singleton', plans: [], storageConfig: atRest as any },
+        update: { storageConfig: atRest as any },
       });
 
       invalidateStorageCache();

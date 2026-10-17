@@ -9,7 +9,7 @@ import Link from 'next/link';
 import {
   Loader2, ArrowLeft, Building2, Flag,
   ToggleLeft, ToggleRight, Clock, User,
-  CheckCircle2, AlertTriangle, Layers, Star,
+  CheckCircle2, AlertTriangle, Layers, Star, Link2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -30,6 +30,90 @@ interface TenantFlagData {
   tenantId: string;
   tenantName: string;
   flags: FlagRow[];
+}
+
+interface ResortGroupInfo {
+  name: string;
+  access: 'FULL' | 'NUMBERS_ONLY';
+  since: string;
+  linkedUserCreated: boolean;
+  owner: { name: string; email: string; resortId: string | null; resortName: string | null } | null;
+  siblings: { tenantId: string; name: string; slug: string; access: string }[];
+}
+
+/**
+ * Who else can see this resort.
+ *
+ * The two questions support actually gets are "why is somebody else's name on
+ * my staff list?" and "who can see my revenue?". Both are answered here, and
+ * neither can be acted on from here: a connection is an agreement between two
+ * owners, and an admin unpicking it from outside would be a decision neither of
+ * them made. It renders nothing for the resorts — nearly all of them — that
+ * stand alone.
+ */
+function ConnectionCard({ tenantId }: { tenantId: string }) {
+  const [info, setInfo] = useState<ResortGroupInfo | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    adminEndpoints.tenant(tenantId)
+      .then((res) => { if (alive) setInfo(res.data?.data?.resortGroup ?? null); })
+      .catch(() => { /* the flags page must still render */ });
+    return () => { alive = false; };
+  }, [tenantId]);
+
+  if (!info) return null;
+
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
+      <div className="flex items-center gap-2">
+        <Link2 className="w-3.5 h-3.5 text-gray-600" />
+        <h2 className="text-gray-300 text-sm font-semibold">Connected resorts</h2>
+        <span className="text-xs text-gray-600 ml-auto">read-only</span>
+      </div>
+
+      <p className="text-sm text-gray-400">
+        Part of <span className="text-white font-medium">{info.name}</span>
+        {info.owner && (
+          <>
+            , owned by <span className="text-white">{info.owner.name}</span>{' '}
+            <span className="text-gray-500">({info.owner.email})</span>
+            {info.owner.resortName && <> of <span className="text-white">{info.owner.resortName}</span></>}
+          </>
+        )}
+        .
+      </p>
+
+      <p className="text-sm text-gray-400">
+        That account {info.access === 'FULL'
+          ? 'can do everything an owner can here, including billing.'
+          : 'sees this resort\'s totals only — it cannot open it or see a guest.'}
+        {info.access === 'FULL' && (
+          <span className="text-gray-500">
+            {' '}The login it uses was {info.linkedUserCreated
+              ? 'created for this connection, and is switched off if it ends.'
+              : 'already an account here, and is left alone if it ends.'}
+          </span>
+        )}
+      </p>
+
+      {info.siblings.length > 0 && (
+        <div className="text-sm text-gray-400">
+          <p className="text-gray-500 text-xs uppercase tracking-wide mb-1">Also in this group</p>
+          <ul className="space-y-0.5">
+            {info.siblings.map((s) => (
+              <li key={s.tenantId}>
+                <Link href={`/admin/tenants/${s.tenantId}`} className="text-indigo-400 hover:text-indigo-300">
+                  {s.name}
+                </Link>
+                <span className="text-gray-600"> · {s.access === 'FULL' ? 'full access' : 'figures only'}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -215,6 +299,8 @@ export default function TenantFlagsPage({ params }: { params: { id: string } }) 
           <p className="text-amber-300 text-sm">You have read-only access. SUPER_ADMIN or SUPPORT role required to toggle flags.</p>
         </div>
       )}
+
+      <ConnectionCard tenantId={id} />
 
       {/* Summary strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

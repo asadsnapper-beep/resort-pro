@@ -1,6 +1,8 @@
 import cron from 'node-cron';
+import { SUBSCRIBED_GUEST, SUBSCRIBED_GUEST_RELATION } from '../utils/email-consent';
 import { prisma } from '@resort-pro/database';
 import { sendEmail, wrapEmail, SEQUENCE_TEMPLATES } from './email';
+import { sendCampaign } from './campaign-sender';
 
 // ─── Send next due sequence steps ────────────────────────────────────────────
 async function processSequenceEnrollments() {
@@ -134,7 +136,7 @@ async function processWinBackTrigger() {
     const guests = await prisma.guest.findMany({
       where: {
         tenantId: seq.tenantId,
-        consent:  { subscribed: true },
+        ...SUBSCRIBED_GUEST,
         bookings: { none: { createdAt: { gte: ninetyDaysAgo } } },
         enrollments: { none: { sequenceId: seq.id, status: { in: ['ACTIVE', 'COMPLETED'] } } },
       },
@@ -150,40 +152,95 @@ async function processWinBackTrigger() {
   }
 }
 
-// ─── Auto-enroll guests for BIRTHDAY sequences ───────────────────────────────
-async function processBirthdayTrigger() {
-  const birthdaySequences = await prisma.sequence.findMany({
-    where: { trigger: 'BIRTHDAY', status: 'ACTIVE' },
-    select: { id: true, tenantId: true, triggerMeta: true },
+/**
+ * Guests with a date coming up, for the two sequences that run off one.
+ *
+ * Both used to be broken in their own way. BIRTHDAY searched `notes` for the
+ * string `birthday:MM-DD`, with a comment saying "in a real implementation
+ * you'd have a dob field on Guest" — and `Guest.dateOfBirth` has existed all
+ * along, so the sequence enrolled nobody while the daily runner, reading the
+ * real column, mailed people (CRM QA finding 011's two incompatible sources).
+ * ANNIVERSARY was not offered to the API at all: the UI listed it, the
+ * validator rejected it, and the form swallowed the 400 (finding 007).
+ *
+ * Raw SQL because the match is on the month and day of a date, which Prisma's
+ * `where` cannot express. The consent rule is spelled out here rather than
+ * imported, for the same reason — it is the SQL form of SUBSCRIBED_GUEST: a
+ * guest with no consent row has not opted out.
+ */
+async function enrolOnUpcomingDate(
+  trigger: 'BIRTHDAY' | 'ANNIVERSARY',
+  daysAhead = 3,
+) {
+  const sequences = await prisma.sequence.findMany({
+    where: { trigger, status: 'ACTIVE' },
+    select: { id: true, tenantId: true },
   });
+  if (sequences.length === 0) return;
 
-  const today   = new Date();
-  const target  = new Date(today.getTime() + 3 * 86400000); // 3 days ahead
+  const target = new Date(Date.now() + daysAhead * 86400000);
+  const month = target.getUTCMonth() + 1;
+  const day = target.getUTCDate();
+  const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1));
 
-  for (const seq of birthdaySequences) {
-    // Guests whose birthday is in 3 days (if dateOfBirth stored in notes — simplified)
-    // In a real implementation you'd have a dob field on Guest
-    // Here we check the notes field for "birthday:MM-DD" pattern
-    const month = String(target.getMonth() + 1).padStart(2, '0');
-    const day   = String(target.getDate()).padStart(2, '0');
-
-    const guests = await prisma.guest.findMany({
-      where: {
-        tenantId: seq.tenantId,
-        consent:  { subscribed: true },
-        notes:    { contains: `birthday:${month}-${day}` },
-        enrollments: { none: { sequenceId: seq.id, status: { in: ['ACTIVE', 'COMPLETED'] }, enrolledAt: { gte: new Date(today.getFullYear(), 0, 1) } } },
-      },
-      select: { id: true },
-    });
+  for (const seq of sequences) {
+    const guests = trigger === 'BIRTHDAY'
+      ? await prisma.$queryRaw<{ id: string }[]>`
+          SELECT g.id
+          FROM guests g
+          LEFT JOIN email_consents c ON c."guestId" = g.id
+          WHERE g."tenantId" = ${seq.tenantId}
+            AND g."dateOfBirth" IS NOT NULL
+            AND EXTRACT(MONTH FROM g."dateOfBirth") = ${month}
+            AND EXTRACT(DAY   FROM g."dateOfBirth") = ${day}
+            AND (c."subscribed" IS NULL OR c."subscribed" = true)
+        `
+      // The anniversary of a guest's first stay, which is what the daily
+      // runner has always meant by the word.
+      : await prisma.$queryRaw<{ id: string }[]>`
+          SELECT g.id
+          FROM guests g
+          LEFT JOIN email_consents c ON c."guestId" = g.id
+          JOIN (
+            SELECT b."guestId", MIN(b."checkOut") AS first_stay
+            FROM bookings b
+            WHERE b.status = 'CHECKED_OUT'
+            GROUP BY b."guestId"
+          ) f ON f."guestId" = g.id
+          WHERE g."tenantId" = ${seq.tenantId}
+            AND EXTRACT(MONTH FROM f.first_stay) = ${month}
+            AND EXTRACT(DAY   FROM f.first_stay) = ${day}
+            AND f.first_stay < ${target}
+            AND (c."subscribed" IS NULL OR c."subscribed" = true)
+        `;
 
     for (const guest of guests) {
+      // Once a year, not once a run: the sequence fires on a date that comes
+      // round annually, so the window is the calendar year.
+      const already = await prisma.sequenceEnrollment.count({
+        where: {
+          sequenceId: seq.id,
+          guestId: guest.id,
+          enrolledAt: { gte: yearStart },
+          status: { in: ['ACTIVE', 'COMPLETED'] },
+        },
+      });
+      if (already > 0) continue;
+
       await prisma.sequenceEnrollment.create({
-        data: { tenantId: seq.tenantId, sequenceId: seq.id, guestId: guest.id, triggerMeta: { birthdayDate: `${target.getFullYear()}-${month}-${day}` } },
+        data: {
+          tenantId: seq.tenantId,
+          sequenceId: seq.id,
+          guestId: guest.id,
+          triggerMeta: { on: target.toISOString().slice(0, 10) },
+        },
       }).catch(() => {});
     }
   }
 }
+
+const processBirthdayTrigger = () => enrolOnUpcomingDate('BIRTHDAY');
+const processAnniversaryTrigger = () => enrolOnUpcomingDate('ANNIVERSARY');
 
 // ─── Auto-enroll for PRE_ARRIVAL (3 days before check-in) ───────────────────
 async function processPreArrivalTrigger() {
@@ -202,7 +259,7 @@ async function processPreArrivalTrigger() {
         tenantId: seq.tenantId,
         status:   { in: ['CONFIRMED'] },
         checkIn:  { equals: new Date(dateStr) },
-        guest:    { consent: { subscribed: true } },
+        guest:    SUBSCRIBED_GUEST_RELATION,
       },
       include: { guest: { select: { id: true } }, room: { select: { name: true } } },
     });
@@ -237,7 +294,7 @@ async function processPostStayTrigger() {
         tenantId: seq.tenantId,
         status:   'CHECKED_OUT',
         checkOut: { equals: new Date(dateStr) },
-        guest:    { consent: { subscribed: true } },
+        guest:    SUBSCRIBED_GUEST_RELATION,
       },
       include: { guest: { select: { id: true } } },
     });
@@ -252,6 +309,61 @@ async function processPostStayTrigger() {
   }
 }
 
+/**
+ * Campaigns whose scheduled time has arrived.
+ *
+ * The API has accepted `scheduledAt` and stored the status SCHEDULED for a
+ * long time, and nothing ever came back for those rows (CRM QA finding 009).
+ * An owner could schedule a campaign for Friday and discover on Saturday that
+ * Friday had not happened — with the campaign still sitting there saying
+ * SCHEDULED, which is the most convincing way to be wrong.
+ *
+ * Due means `scheduledAt <= now`, so a worker that was down for an hour sends
+ * the hour's campaigns when it comes back rather than skipping them. One at a
+ * time, and a campaign that throws does not stop the ones behind it.
+ */
+export async function dispatchScheduledCampaigns(): Promise<void> {
+  const due = await prisma.campaign.findMany({
+    where: { status: 'SCHEDULED', scheduledAt: { lte: new Date() } },
+    select: { id: true, tenantId: true, name: true },
+    orderBy: { scheduledAt: 'asc' },
+    take: 25,
+  });
+
+  for (const campaign of due) {
+    try {
+      const outcome = await sendCampaign(campaign.tenantId, campaign.id);
+      if (outcome.ok) {
+        console.log(`[Automation] "${campaign.name}" → ${outcome.status} (${outcome.sent}/${outcome.total})`);
+      } else {
+        // The campaign keeps its SCHEDULED status when there is nobody to send
+        // to, so it goes out if the audience appears before someone cancels it.
+        // Every other refusal is terminal and says so in the log.
+        console.warn(`[Automation] "${campaign.name}" not sent: ${outcome.reason}`);
+      }
+    } catch (err) {
+      console.error(`[Automation] "${campaign.name}" failed:`, err instanceof Error ? err.message : err);
+    }
+  }
+}
+
+/**
+ * Every trigger that fires once a day, in one callable place.
+ *
+ * It used to live inside the cron callback, which meant the only way to
+ * exercise it was to wait until 08:00 — so a trigger that enrolled nobody
+ * looked exactly like a quiet night.
+ */
+export async function runDailyTriggers(): Promise<void> {
+  await Promise.all([
+    processPreArrivalTrigger(),
+    processPostStayTrigger(),
+    processBirthdayTrigger(),
+    processAnniversaryTrigger(),
+    processWinBackTrigger(),
+  ]);
+}
+
 // ─── Main: start all cron jobs ────────────────────────────────────────────────
 export function startAutomationEngine() {
   console.log('[Automation] Starting CRM automation engine...');
@@ -262,15 +374,17 @@ export function startAutomationEngine() {
     catch (e) { console.error('[Automation] processSequenceEnrollments error:', e); }
   });
 
+  // Scheduled campaigns on the same cadence. Daily would mean a campaign set
+  // for 09:00 going out at 08:00 the next morning, which is not scheduling.
+  cron.schedule('*/15 * * * *', async () => {
+    try { await dispatchScheduledCampaigns(); }
+    catch (e) { console.error('[Automation] dispatchScheduledCampaigns error:', e); }
+  });
+
   // Trigger checks run daily at 08:00
   cron.schedule('0 8 * * *', async () => {
     try {
-      await Promise.all([
-        processPreArrivalTrigger(),
-        processPostStayTrigger(),
-        processBirthdayTrigger(),
-        processWinBackTrigger(),
-      ]);
+      await runDailyTriggers();
       console.log('[Automation] Daily triggers processed');
     } catch (e) { console.error('[Automation] Daily trigger error:', e); }
   });
@@ -278,14 +392,40 @@ export function startAutomationEngine() {
   console.log('[Automation] Cron jobs registered ✓');
 }
 
-// ─── On-demand: enroll on booking confirmed ───────────────────────────────────
-export async function enrollOnBookingConfirmed(tenantId: string, guestId: string, meta: {
-  confirmationNo: string; roomName: string; checkIn: string; checkOut: string;
-}) {
+// ─── On-demand: the two triggers that fire on something a person did ─────────
+/**
+ * Enrol a guest in the sequences waiting on one event.
+ *
+ * Both of these were offered by the UI and processed by nothing (CRM QA
+ * 2026-10-07, finding 010). `enrollOnBookingConfirmed` existed and had no
+ * caller anywhere in the codebase; CHECK_IN was selectable, accepted, and had
+ * no processor at all. So an owner could build a welcome sequence on either,
+ * see it listed as ACTIVE, and watch it never enrol a soul — the same shape as
+ * the Anniversary trigger, one screen along.
+ *
+ * Unlike the date triggers, these are called from the request that caused them
+ * rather than from a nightly sweep, because "when the booking is confirmed"
+ * means then and not at 08:00 tomorrow.
+ */
+async function enrolOnEvent(
+  trigger: 'BOOKING_CONFIRMED' | 'CHECK_IN',
+  tenantId: string,
+  guestId: string,
+  meta: Record<string, string>,
+): Promise<void> {
   const sequences = await prisma.sequence.findMany({
-    where: { tenantId, trigger: 'BOOKING_CONFIRMED', status: 'ACTIVE' },
+    where: { tenantId, trigger, status: 'ACTIVE' },
     select: { id: true },
   });
+  if (sequences.length === 0) return;
+
+  // A guest who has opted out is not enrolled. The sender checks again before
+  // each step, but enrolling them anyway would leave rows that exist only to
+  // be skipped, and make "enrolled" mean two different things in the UI.
+  const consent = await prisma.emailConsent.findUnique({
+    where: { guestId }, select: { subscribed: true },
+  });
+  if (consent && !consent.subscribed) return;
 
   for (const seq of sequences) {
     await prisma.sequenceEnrollment.upsert({
@@ -294,11 +434,44 @@ export async function enrollOnBookingConfirmed(tenantId: string, guestId: string
       update: { status: 'ACTIVE', currentStep: 0, completedAt: null, triggerMeta: meta },
     }).catch(() => {});
   }
+}
 
-  // Ensure consent record exists (opted in by booking)
-  await prisma.emailConsent.upsert({
-    where:  { guestId },
-    create: { tenantId, guestId, subscribed: true },
-    update: {},
+/**
+ * Both callers pass a booking id rather than the details.
+ *
+ * The details are only needed to fill in an email, and only if a sequence is
+ * actually waiting on the event — so the lookup happens after that check,
+ * inside here, instead of on every booking whether anyone is listening or not.
+ */
+async function enrolOnBookingEvent(
+  trigger: 'BOOKING_CONFIRMED' | 'CHECK_IN',
+  tenantId: string,
+  bookingId: string,
+): Promise<void> {
+  const waiting = await prisma.sequence.count({
+    where: { tenantId, trigger, status: 'ACTIVE' },
+  });
+  if (waiting === 0) return;
+
+  const booking = await prisma.booking.findFirst({
+    where: { id: bookingId, tenantId },
+    select: {
+      guestId: true, confirmationNo: true, checkIn: true, checkOut: true,
+      room: { select: { name: true, number: true } },
+    },
+  });
+  if (!booking) return;
+
+  await enrolOnEvent(trigger, tenantId, booking.guestId, {
+    confirmationNo: booking.confirmationNo,
+    roomName: booking.room?.name || booking.room?.number || '',
+    checkIn: booking.checkIn.toISOString(),
+    checkOut: booking.checkOut.toISOString(),
   });
 }
+
+export const enrollOnBookingConfirmed = (tenantId: string, bookingId: string) =>
+  enrolOnBookingEvent('BOOKING_CONFIRMED', tenantId, bookingId);
+
+export const enrollOnCheckIn = (tenantId: string, bookingId: string) =>
+  enrolOnBookingEvent('CHECK_IN', tenantId, bookingId);
