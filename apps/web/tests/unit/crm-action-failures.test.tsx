@@ -168,3 +168,35 @@ describe('a cancelled confirm', () => {
     expect(alerted).toHaveLength(0);
   });
 });
+
+describe('recalculating a guest score', () => {
+  // The fifth handler 6bfeb46 gave a catch to, and the only one it never
+  // covered — found by checking which CRM endpoints no test touches rather
+  // than by anything going wrong.
+  const guest = {
+    id: 'g1', firstName: 'Rafiq', lastName: 'Islam', email: 'rafiq@example.com',
+    score: { score: 70, tier: 'GOLD', totalStays: 3, totalSpend: 1000 },
+    tags: [], _count: { bookings: 3 },
+  };
+
+  it('posts, then re-reads so the new score is on screen', async () => {
+    get.mockResolvedValue({ data: { data: { guests: [guest], total: 1, pages: 1 } } });
+    render(<CRMPage />);
+    fireEvent.click(await screen.findByTitle('Recalculate score'));
+
+    await waitFor(() => expect(post).toHaveBeenCalledWith(
+      '/crm/contacts/g1/recalc-score', {}, expect.anything(),
+    ));
+    // Without the re-read the row keeps showing the old number.
+    await waitFor(() => expect(get.mock.calls.length).toBeGreaterThan(1));
+  });
+
+  it('reports a failure instead of leaving the old score looking current', async () => {
+    get.mockResolvedValue({ data: { data: { guests: [guest], total: 1, pages: 1 } } });
+    post.mockImplementation(() => rejectWith('Guest not found'));
+    render(<CRMPage />);
+    fireEvent.click(await screen.findByTitle('Recalculate score'));
+
+    await waitFor(() => expect(alerted).toContain('Guest not found'));
+  });
+});
