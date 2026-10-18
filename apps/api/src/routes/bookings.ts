@@ -25,6 +25,8 @@ import { createAdminNotification } from '../utils/notifications';
 import { nextDocumentNumber } from '../utils/sequence';
 import type { JwtPayload } from '@resort-pro/types';
 import { matchAllTerms } from '../utils/search-terms';
+import { notifyBookingConfirmed } from '../services/guest-notifications';
+import { enrollOnBookingConfirmed, enrollOnCheckIn } from '../services/automation';
 
 /* ── Auto-create invoice when a booking is confirmed ────────────────────── */
 async function autoCreateInvoice(bookingId: string, tenantId: string) {
@@ -542,12 +544,26 @@ export async function bookingRoutes(app: FastifyInstance) {
       }
 
       // Send confirmation email (skip for walk-in if opted out)
-      if (!body.skipEmail) {
-        trackGuestEmail('confirmation', booking.id, tenantId, sendBookingConfirmation(booking.id));
-      }
+      // Email, SMS and WhatsApp, each at most once per booking. skipEmail only
+      // stops the email. Fire-and-forget: it never throws.
+      void notifyBookingConfirmed(booking.id, { email: !body.skipEmail });
 
       // Auto-generate invoice draft (fire-and-forget)
       autoCreateInvoice(booking.id, tenantId).catch(() => {});
+
+      // CRM sequences waiting on this. The helper has existed for a long time
+      // with no caller anywhere, so a BOOKING_CONFIRMED sequence sat ACTIVE and
+      // enrolled nobody (CRM QA finding 010). Fire-and-forget: a booking does
+      // not fail because a marketing sequence did.
+      enrollOnBookingConfirmed(tenantId, booking.id)
+        .catch((e) => console.error('[crm] booking-confirmed enrolment failed:', e?.message));
+
+      // A walk-in is created already checked in, so the check-in sequence fires
+      // here too — the guest has arrived, which is what that trigger means.
+      if (body.autoCheckIn) {
+        enrollOnCheckIn(tenantId, booking.id)
+          .catch((e) => console.error('[crm] check-in enrolment failed:', e?.message));
+      }
 
       return reply.status(201).send(ok(booking, 'Booking created'));
     },
@@ -849,7 +865,7 @@ export async function bookingRoutes(app: FastifyInstance) {
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { db } = request;
-      const { sub: checkedInByStaff } = request.user as JwtPayload;
+      const { sub: checkedInByStaff, tenantId } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
       const body = z.object({
         deposit:   z.number().optional(),
@@ -898,6 +914,12 @@ export async function bookingRoutes(app: FastifyInstance) {
             })]
           : []),
       ]);
+
+      // The CHECK_IN trigger's actual moment. It was selectable in the UI and
+      // accepted by the API with nothing anywhere to process it, so a sequence
+      // built on it enrolled nobody (CRM QA finding 010).
+      enrollOnCheckIn(tenantId, id)
+        .catch((e) => console.error('[crm] check-in enrolment failed:', e?.message));
 
       return ok(updated, 'Guest checked in');
     },

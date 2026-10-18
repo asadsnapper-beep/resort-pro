@@ -12,6 +12,7 @@ import {
   VehicleType, VehicleAvailability, RentalStatus,
 } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { purgeGuestDocumentFiles } from '../utils/guest-documents';
 
 const prisma = new PrismaClient();
 
@@ -201,6 +202,9 @@ export async function seedDemo(opts: { refresh?: boolean } = {}) {
     // Relations cascade from Tenant (migration 20260809000000_tenant_delete_cascade_relations),
     // so this clears operational data, config rows and users in one step —
     // everything below recreates them.
+    // Staging is left holding orphaned ID scans otherwise — it already had
+    // four against zero guest_documents rows.
+    await purgeGuestDocumentFiles({ tenantId: existing.id });
     await prisma.tenant.delete({ where: { id: existing.id } });
     console.log('♻️  Refresh: previous demo tenant removed, rebuilding with today\'s dates…');
   } else if (existing) {
@@ -496,17 +500,37 @@ export async function seedDemo(opts: { refresh?: boolean } = {}) {
   console.log(`✅ Vehicles + ${rentalsData.length} rentals`);
 
   // ── Guests ───────────────────────────────────────────────────────────────────
+  // `dateOfBirth` is set because without it the CRM's birthday trigger can
+  // never fire here: its audience query matches on the month and day of this
+  // column, so ten guests with none meant "Nothing to send today" on every day
+  // of the year and a feature that reads as broken rather than unfed.
+  //
+  // `bornToday` is relative to seed time, the same way the bookings below are.
+  // Seed data chosen to exercise a real feature is not a claim that something
+  // happened — the sends themselves are still only what the sender records.
+  const bornToday = (year: number) => {
+    const n = new Date();
+    return new Date(Date.UTC(year, n.getMonth(), n.getDate(), 12));
+  };
+  const born = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d, 12));
+
   const guestData = [
-    { firstName: 'Karim',   lastName: 'Hossain',   email: 'karim@example.com',   phone: '+8801711111111', nationality: 'BD', address: "Cox's Bazar" },
-    { firstName: 'Rina',    lastName: 'Begum',     email: 'rina@example.com',    phone: '+8801811111112', nationality: 'BD', address: 'Dhaka' },
-    { firstName: 'James',   lastName: 'Miller',    email: 'james@example.com',   phone: '+447911111111',  nationality: 'GB', address: 'London' },
-    { firstName: 'Priya',   lastName: 'Sharma',    email: 'priya@example.com',   phone: '+919811111111',  nationality: 'IN', address: 'Mumbai' },
-    { firstName: 'Ahmed',   lastName: 'Rahman',    email: 'ahmed@example.com',   phone: '+8801911111113', nationality: 'BD', address: 'Chittagong' },
-    { firstName: 'Sara',    lastName: 'Khan',      email: 'sara@example.com',    phone: '+8801611111114', nationality: 'BD', address: 'Sylhet' },
-    { firstName: 'Michael', lastName: 'Chen',      email: 'michael@example.com', phone: '+6591111111',    nationality: 'SG', address: 'Singapore' },
-    { firstName: 'Fatema',  lastName: 'Akter',     email: 'fatema@example.com',  phone: '+8801511111115', nationality: 'BD', address: 'Dhaka' },
-    { firstName: 'Tanvir',  lastName: 'Islam',     email: 'tanvir@example.com',  phone: '+8801311111116', nationality: 'BD', address: 'Rajshahi' },
-    { firstName: 'Nadia',   lastName: 'Chowdhury', email: 'nadia@example.com',   phone: '+8801211111117', nationality: 'BD', address: 'Dhaka' },
+    { firstName: 'Karim',   lastName: 'Hossain',   email: 'karim@example.com',   phone: '+8801711111111', nationality: 'BD', address: "Cox's Bazar", dateOfBirth: bornToday(1986) },
+    { firstName: 'Rina',    lastName: 'Begum',     email: 'rina@example.com',    phone: '+8801811111112', nationality: 'BD', address: 'Dhaka', dateOfBirth: born(1991, 4, 18) },
+    { firstName: 'James',   lastName: 'Miller',    email: 'james@example.com',   phone: '+447911111111',  nationality: 'GB', address: 'London', dateOfBirth: born(1979, 9, 2) },
+    { firstName: 'Priya',   lastName: 'Sharma',    email: 'priya@example.com',   phone: '+919811111111',  nationality: 'IN', address: 'Mumbai', dateOfBirth: born(1994, 1, 23) },
+    { firstName: 'Ahmed',   lastName: 'Rahman',    email: 'ahmed@example.com',   phone: '+8801911111113', nationality: 'BD', address: 'Chittagong', dateOfBirth: born(1983, 11, 7) },
+    { firstName: 'Sara',    lastName: 'Khan',      email: 'sara@example.com',    phone: '+8801611111114', nationality: 'BD', address: 'Sylhet', dateOfBirth: born(1996, 6, 30) },
+    { firstName: 'Michael', lastName: 'Chen',      email: 'michael@example.com', phone: '+6591111111',    nationality: 'SG', address: 'Singapore', dateOfBirth: born(1974, 3, 11) },
+    { firstName: 'Fatema',  lastName: 'Akter',     email: 'fatema@example.com',  phone: '+8801511111115', nationality: 'BD', address: 'Dhaka', dateOfBirth: born(1988, 8, 5) },
+    { firstName: 'Tanvir',  lastName: 'Islam',     email: 'tanvir@example.com',  phone: '+8801311111116', nationality: 'BD', address: 'Rajshahi', dateOfBirth: born(1992, 12, 19) },
+    { firstName: 'Nadia',   lastName: 'Chowdhury', email: 'nadia@example.com',   phone: '+8801211111117', nationality: 'BD', address: 'Dhaka', dateOfBirth: born(1981, 2, 14) },
+    // Guest 10 exists for the ANNIVERSARY trigger and nothing else. It wants a
+    // first checkout 355–375 days ago AND nothing in the last 60, and none of
+    // the ten above can be both — every one of them has a stay inside the last
+    // month, because the rest of this file is built around today's board. So
+    // the trigger had no candidate at all.
+    { firstName: 'Shireen', lastName: 'Kabir',     email: 'shireen@example.com', phone: '+8801711111119', nationality: 'BD', address: 'Khulna', dateOfBirth: born(1984, 6, 12) },
   ];
 
   const createdGuests: any[] = [];
@@ -622,6 +646,11 @@ export async function seedDemo(opts: { refresh?: boolean } = {}) {
     past(42, 1, 9, 1, 24, 2, 19000,  'DIRECT'),
     past(43, 3, 0, 1, 26, 3, 13500,  'BOOKING_COM'),
     past(44, 5, 7, 1, 25, 2, 56000,  'DIRECT'),
+
+    // Her only stay, a year back. Twelve months ago plus three nights lands
+    // between 355 and 375 days whichever day the demo is refreshed, so she
+    // stays a candidate for about three weeks rather than one exact date.
+    past(45, 10, 0, 12, 15, 3, 9500, 'DIRECT'),
 
     // ── The honest bits — a real resort loses some too ───────────────────────
     { g: 8, r: 1, ci: d(-5), co: d(-2), status: BookingStatus.CANCELLED, total: 9000,  paid: 0, adults: 2, ch: 0, cn: 'CBR-2026-090', src: 'BOOKING_COM', notes: 'Guest requested cancellation' },
@@ -954,11 +983,19 @@ export async function seedDemo(opts: { refresh?: boolean } = {}) {
   console.log(`✅ ${inventory.length} inventory items`);
 
   // ── Guest Tags (CRM) ──────────────────────────────────────────────────────────
+  const TAG_COLOURS: Record<string, string> = {
+    VIP: '#b89040', 'Repeat Guest': '#2f8f7a', Honeymoon: '#c43c3c',
+    Corporate: '#183153', Family: '#7c5cbf', International: '#3c7fc4',
+  };
   const tagNames = ['VIP', 'Repeat Guest', 'Honeymoon', 'Corporate', 'Family', 'International'];
   const createdTags: any[] = [];
   for (const name of tagNames) {
     const t = await prisma.guestTag.create({
-      data: { tenantId: demo.id, name, color: name === 'VIP' ? '#gold' : '#3b82f6' },
+      // `#gold` was not a colour. CSS rejects it, so the VIP tag rendered with
+      // no fill at all — invisible until the CRM grew a Tags tab that draws
+      // the dot from this value. One colour per tag now, from the same palette
+      // the dashboard offers when you create one by hand.
+      data: { tenantId: demo.id, name, color: TAG_COLOURS[name] ?? '#6b7280' },
     }).catch(softFail);
     if (t) createdTags.push(t);
   }

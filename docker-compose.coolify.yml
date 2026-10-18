@@ -1,4 +1,19 @@
 # ─────────────────────────────────────────────────────────────────────────────
+# ⚠ HISTORICAL — this file is NOT what production runs.
+#
+# Production left Coolify on 2026-10-15/16 and is now a plain docker compose
+# stack in /opt/resortpro on the host, with containers rp-postgres, rp-redis,
+# rp-api, rp-web, rp-worker and rp-backup. That compose is not in git yet; see
+# plan/production-compose-in-git.md.
+#
+# Editing this file changes nothing on production. The old Coolify service is
+# stopped and renamed ARCHIVED-resortpro-DO-NOT-START — starting it would put a
+# second stack with stale data behind the same hostnames.
+#
+# scripts/check-backup-credentials.mjs still reads this file, so it is a
+# template that must stay internally consistent, not a live description.
+# ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 # ResortPro — Coolify deployment (pre-built images from GHCR)
 #
 # Images are built by GitHub Actions (.github/workflows/docker-build.yml)
@@ -24,8 +39,30 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-resortpro}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # `coolify` is an EXTERNAL network shared by every Coolify project on the
+    # host, and a compose service is reachable there under its own service name.
+    # Coolify's own database container also carries the alias `postgres`, so
+    # that name is ambiguous: Docker's DNS returns both addresses and each
+    # lookup can land on either.
+    #
+    # It happened. From 10 September the production backup resolved `postgres`
+    # to Coolify's own database and failed every night with "password
+    # authentication failed for user resortpro" — with the password, the
+    # pg_hba rules and password_encryption all perfectly correct, because the
+    # problem was never the credential. The API resolved the same name to the
+    # wrong host too; it survived only because it holds the pool it opened at
+    # startup, so every restart was a coin flip.
+    #
+    # It failed safely only by luck: the two databases have different
+    # passwords, so authentication stopped it. Had they matched,
+    # `prisma migrate deploy` would have run this schema into Coolify's own
+    # database.
+    #
+    # So this project addresses its database by a name no other project uses.
     networks:
-      - coolify
+      coolify:
+        aliases:
+          - resortpro-postgres
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-resortpro}']
       interval: 10s
@@ -58,7 +95,7 @@ services:
       NODE_ENV: production
       PORT: 4000
       HOST: 0.0.0.0
-      DATABASE_URL: postgresql://${POSTGRES_USER:-resortpro}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-resortpro}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-resortpro}:${POSTGRES_PASSWORD}@resortpro-postgres:5432/${POSTGRES_DB:-resortpro}
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
@@ -67,6 +104,9 @@ services:
       APP_IP: ${APP_IP:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       SUPER_ADMIN_EMAILS: ${SUPER_ADMIN_EMAILS:-}
+      # No default on purpose. Without it the seeder refuses to create the
+      # account rather than inventing a password — see seed-admin.ts.
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       STRIPE_PRICE_FREE: ${STRIPE_PRICE_FREE:-}
@@ -77,6 +117,20 @@ services:
       STRIPE_PRICE_PRO_ANNUAL: ${STRIPE_PRICE_PRO_ANNUAL:-}
       STRIPE_PRICE_ENTERPRISE: ${STRIPE_PRICE_ENTERPRISE:-}
       STRIPE_PRICE_ENTERPRISE_ANNUAL: ${STRIPE_PRICE_ENTERPRISE_ANNUAL:-}
+      # ResortPro's own bKash merchant account — what subscription payments are
+      # taken through. getPlatformBkash() needs all four; with any of them unset
+      # /billing/checkout/bkash answers 503 and the "Pay with bKash" button is
+      # not rendered at all, so no customer can subscribe.
+      #
+      # These were missing everywhere on 2026-09-27: not in this file, not in
+      # Coolify's variable list, not in Coolify's stored compose. Remember that
+      # Coolify keeps its own copy of this compose in its database and the
+      # deploy only rewrites the image tags in it — adding lines here does not
+      # put them on production. They have to be typed into Coolify as well.
+      BKASH_APP_KEY: ${BKASH_APP_KEY:-}
+      BKASH_APP_SECRET: ${BKASH_APP_SECRET:-}
+      BKASH_USERNAME: ${BKASH_USERNAME:-}
+      BKASH_PASSWORD: ${BKASH_PASSWORD:-}
       BKASH_PRICE_FREE: ${BKASH_PRICE_FREE:-}
       BKASH_PRICE_FREE_ANNUAL: ${BKASH_PRICE_FREE_ANNUAL:-}
       LAUNCH_PROMOTION_ENABLED: ${LAUNCH_PROMOTION_ENABLED:-false}
@@ -129,11 +183,22 @@ services:
     pull_policy: always
     restart: unless-stopped
     environment:
-      POSTGRES_HOST: postgres
+      POSTGRES_HOST: resortpro-postgres
       POSTGRES_USER: ${POSTGRES_USER:-resortpro}
       PGPASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-resortpro}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      # Off-site copies. Without these four the nightly backup still runs and
+      # says, once a night, that everything it produced is on this machine —
+      # which is the honest state until a bucket exists.
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      BACKUP_S3_ACCESS_KEY: ${BACKUP_S3_ACCESS_KEY:-}
+      BACKUP_S3_SECRET_KEY: ${BACKUP_S3_SECRET_KEY:-}
+      # A key of its own, not CREDENTIALS_KEY: the thing it protects is a copy
+      # of the database, so a key stored in that database would be no use.
+      BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:-}
+      BACKUP_OFFSITE_RETENTION_DAYS: ${BACKUP_OFFSITE_RETENTION_DAYS:-30}
     # Every other service in this file is on the external `coolify` network.
     # Without this the sidecar lands on the default network instead and cannot
     # resolve `postgres` at all — it would start, fail to connect, and report a

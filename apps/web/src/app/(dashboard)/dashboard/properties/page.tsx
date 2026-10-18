@@ -110,19 +110,18 @@ export default function PropertiesPage() {
         )}
       </div>
 
-      {/* Enterprise gate */}
+      {/* Access refused. The API answers 403 here for a role, never for a plan —
+          this used to say "Enterprise Only" and offer an upgrade to a plan that
+          cannot be bought. */}
       {isForbidden && (
         <div style={{ textAlign: 'center', padding: '60px 24px', background: 'var(--rp-surface)', border: '1px solid var(--rp-border)', borderRadius: 12 }}>
           <div style={{ width: 56, height: 56, background: 'var(--rp-surface-2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
             <Lock size={24} color="var(--rp-text-muted)" />
           </div>
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--rp-text)', margin: '0 0 8px' }}>Multi-Property — Enterprise Only</h2>
-          <p style={{ fontSize: 14, color: 'var(--rp-text-muted)', marginBottom: 24 }}>
-            Manage multiple resort locations from one account. Upgrade to Enterprise to unlock.
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--rp-text)', margin: '0 0 8px' }}>You don&apos;t have access to properties</h2>
+          <p style={{ fontSize: 14, color: 'var(--rp-text-muted)', marginBottom: 0 }}>
+            Only the owner or a manager can manage properties. Ask the resort owner if you need this.
           </p>
-          <a href="/dashboard/billing" style={{ display: 'inline-block', padding: '10px 24px', background: '#183153', color: '#fff', borderRadius: 8, fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>
-            Upgrade to Enterprise
-          </a>
         </div>
       )}
 

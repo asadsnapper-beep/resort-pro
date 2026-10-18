@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { selectedPropertyFor } from '@/store/property';
 
 declare module 'axios' {
   export interface AxiosRequestConfig {
@@ -41,8 +42,14 @@ function setAuthToken(token: string) {
 
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
-    const token = getAuthState()?.token;
+    const auth = getAuthState();
+    const token = auth?.token;
     if (token) config.headers.Authorization = `Bearer ${token}`;
+    // The property chosen in the top bar travels with every request, so a page
+    // narrows to it without each page having to remember to ask. The API
+    // treats a missing header as "all properties". See utils/property-scope.ts.
+    const propertyId = selectedPropertyFor(auth?.tenant?.id);
+    if (propertyId) config.headers['X-Property-Id'] = propertyId;
   }
   return config;
 });
@@ -97,6 +104,8 @@ export const authApi = {
   resendVerification: (data: { email: string; slug: string }) => api.post('/auth/resend-verification', data),
   login: (data: { email: string; password: string; slug: string }) =>
     api.post('/auth/login', data),
+  /** Move to another resort in the same group — see components/dashboard/ResortSwitcher. */
+  switchResort: (tenantId: string) => api.post('/auth/switch-resort', { tenantId }),
   me: () => api.get('/auth/me'),
   logout: () => api.post('/auth/logout', {}),
   updateProfile: (data: { firstName?: string; lastName?: string; phone?: string | null; avatarUrl?: string | null }) =>
@@ -590,11 +599,39 @@ export const propertyApi = {
   getRooms: (id: string) => api.get(`/properties/${id}/rooms`),
 };
 
+// ── Connected resorts ─────────────────────────────────────────────────────────
+// An owner whose resorts are separate accounts. `get` answers null for
+// everyone else, which is nearly everyone. See plan/multi-resort.md.
+export const resortGroupApi = {
+  get:        () => api.get('/resort-group'),
+  overview:   () => api.get('/resort-group/overview', { suppressUpgradeRedirect: true }),
+  // Requests to connect THIS resort to somebody else's account.
+  incoming:   () => api.get('/resort-group/requests/incoming', { suppressUpgradeRedirect: true }),
+  byToken:    (token: string) =>
+    api.get(`/resort-group/requests/by-token/${encodeURIComponent(token)}`, { suppressUpgradeRedirect: true }),
+  approve:    (id: string, access: 'FULL' | 'NUMBERS_ONLY') =>
+    api.post(`/resort-group/requests/${id}/approve`, { access }),
+  decline:    (id: string) => api.post(`/resort-group/requests/${id}/decline`),
+  // The mirror of `get`: which outside account can see THIS resort.
+  connection: () => api.get('/resort-group/connection', { suppressUpgradeRedirect: true }),
+  events:     () => api.get('/resort-group/events', { suppressUpgradeRedirect: true }),
+  setAccess:  (tenantId: string, access: 'FULL' | 'NUMBERS_ONLY') =>
+    api.patch(`/resort-group/members/${tenantId}`, { access }),
+  newResort:  (data: { name: string; slug: string }) => api.post('/resort-group/new-resort', data),
+  link:       (slug: string) => api.post('/resort-group/links', { slug }),
+  disconnect: (tenantId: string) => api.delete(`/resort-group/members/${tenantId}`),
+};
+
 // ── Billing ───────────────────────────────────────────────────────────────────
 export const billingApi = {
   getStatus: () => api.get('/billing/status'),
   getInvoices: () => api.get('/billing/invoices'),
   createCheckout: (planKey: string) => api.post('/billing/checkout', { planKey }),
+  // One bKash payment covering every resort in the owner's group.
+  group: (interval: 'month' | 'year' = 'month') =>
+    api.get('/billing/group', { params: { interval }, suppressUpgradeRedirect: true }),
+  createBkashGroupCheckout: (interval: 'month' | 'year' = 'month') =>
+    api.post('/billing/checkout/bkash-group', { interval }),
   createBkashCheckout: (planKey: string, interval: 'month' | 'year' = 'month') =>
     api.post('/billing/checkout/bkash', { planKey, interval }),
   createPortal: () => api.post('/billing/portal'),

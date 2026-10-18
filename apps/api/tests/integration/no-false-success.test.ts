@@ -84,25 +84,57 @@ describe('email that cannot be sent', () => {
   });
 });
 
-describe('channels that are not built', () => {
+describe('SMS and WhatsApp tests on a server with no platform account', () => {
+  // These used to answer 501 because nothing was wired up. They send for real
+  // now (services/messaging.ts). CI has no SSL_WIRELESS_API_KEY or META_WA_*,
+  // and a new tenant defaults to platform mode, so the honest answer here is
+  // "not configured" — and never { sent: true }.
   for (const [what, url] of [
     ['SMS', '/api/tenant/sms-settings/test-sms'],
     ['WhatsApp', '/api/tenant/sms-settings/test-whatsapp'],
   ] as const) {
-    it(`answers 501 for a ${what} test instead of pretending`, async () => {
+    it(`answers 503 for a ${what} test instead of pretending`, async () => {
       const res = await app.inject({
         method: 'POST', url, headers: auth(), payload: { to: '+8801712345678' },
       });
 
-      // 501: the request was understood and this server does not implement it.
+      expect(res.statusCode).toBe(503);
+      const body = JSON.parse(res.body);
+      expect(body.code).toBe('DELIVERY_NOT_CONFIGURED');
+      expect(body.via).toBe('platform');
+      expect(body.error).toContain('Nothing was sent');
+      expect(body.data?.sent).toBeUndefined();
+    });
+  }
+});
+
+describe('an SMS provider offered in Settings but not built', () => {
+  it('says so, rather than quietly using ResortPro\'s own account', async () => {
+    // Alpha.Net is in the provider list with no implementation. It used to
+    // fall through to the platform account, uncounted against any quota.
+    const tenantId = (await prisma.tenant.findFirst({ where: { slug }, select: { id: true } }))!.id;
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: { smsMode: 'own', smsProvider: 'alpha_net', smsApiKey: 'alpha-key' },
+    });
+    try {
+      const res = await app.inject({
+        method: 'POST', url: '/api/tenant/sms-settings/test-sms', headers: auth(), payload: { to: '+8801712345678' },
+      });
       expect(res.statusCode).toBe(501);
       const body = JSON.parse(res.body);
       expect(body.code).toBe('NOT_IMPLEMENTED');
-      expect(body.error).toContain('nothing was sent');
-      expect(body.sent).toBeUndefined();
-    });
-  }
+      expect(body.via).toBe('own');
+    } finally {
+      await prisma.tenant.update({
+        where: { id: tenantId },
+        data: { smsMode: 'platform', smsProvider: null, smsApiKey: null },
+      });
+    }
+  });
+});
 
+describe('input validation', () => {
   it('still validates its input before saying anything about delivery', async () => {
     // A missing number is the caller's mistake and must not be reported as a
     // delivery problem.

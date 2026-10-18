@@ -8,7 +8,7 @@
 
 import type { FastifyInstance } from 'fastify';
 import { requireRole } from '../middleware/auth';
-import { uploadToStorage, deleteFromStorage } from '../services/storage';
+import { uploadToStorage, deleteFromStorage, storageKeyFromUrl } from '../services/storage';
 import { signUploadUrl } from '../utils/signed-upload-url';
 import type { JwtPayload } from '@resort-pro/types';
 
@@ -171,14 +171,12 @@ export async function guestDocumentRoutes(app: FastifyInstance) {
         return reply.status(404).send({ success: false, error: 'Document not found' });
       }
 
-      // Delete from storage (best-effort)
-      try {
-        // Extract key from URL: last two path segments = folder/filename
-        const url = new URL(doc.imageUrl);
-        const key = url.pathname.replace(/^\/uploads\//, '');
-        await deleteFromStorage(key);
-      } catch {
-        // Non-fatal — just remove the DB record
+      // Delete the file too, best-effort. This used to strip a literal
+      // '/uploads/' prefix, which only ever matched the local driver: an S3
+      // URL kept its leading slash and the delete quietly hit nothing.
+      const key = storageKeyFromUrl(doc.imageUrl, doc.tenantId);
+      if (key) {
+        try { await deleteFromStorage(key); } catch { /* row still goes */ }
       }
 
       await db.guestDocument.delete({ where: { id: docId } });

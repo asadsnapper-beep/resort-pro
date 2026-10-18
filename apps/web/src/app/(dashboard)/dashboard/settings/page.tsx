@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tenantApi, api } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,10 +12,11 @@ import {
   Building2, Globe, Phone, Mail, MapPin, Clock, Banknote, Save, Info,
   ExternalLink, CheckCircle, XCircle, AlertTriangle, Copy, RefreshCw, Trash2, ShieldCheck, Star,
   FileText, Palette, Lock, CheckCircle2, Circle, Loader2, Shield, Send, ToggleLeft, ToggleRight,
-  CreditCard, Eye, EyeOff, ChevronDown, ChevronRight, Bell, LayoutGrid,
+  CreditCard, Eye, EyeOff, ChevronDown, ChevronRight, Bell, LayoutGrid, Link2,
 } from 'lucide-react'
 import { PageShell, PageHeader } from '@/components/patterns';
 import { ModalShell } from '@/components/ui/modal-shell';
+import { ConnectedResortsTab } from '@/components/dashboard/ConnectedResortsTab';
 import { paymentGatewayApi } from '@/lib/api';
 import { RoomTypeSettings } from '@/components/settings/RoomTypeSettings';
 
@@ -64,7 +65,8 @@ type TabId =
   | 'general' | 'contact' | 'operations' | 'modules'
   | 'email' | 'notifications'
   | 'payments' | 'embed' | 'discovery'
-  | 'domain' | 'gdpr' | 'enterprise';
+  | 'domain' | 'gdpr' | 'enterprise'
+  | 'connections';
 
 type Tab = TabId;
 
@@ -106,6 +108,7 @@ const TAB_GROUPS: Array<{ group: string; items: TabItem[] }> = [
       { id: 'domain',     label: 'Custom Domain',   icon: Globe },
       { id: 'gdpr',       label: 'Privacy & GDPR',  icon: ShieldCheck },
       { id: 'enterprise', label: 'Enterprise',      icon: Star },
+      { id: 'connections', label: 'Your Resorts',    icon: Link2 },
     ],
   },
 ];
@@ -113,10 +116,29 @@ const TAB_GROUPS: Array<{ group: string; items: TabItem[] }> = [
 // Flat list for easy lookup
 const TABS = TAB_GROUPS.flatMap(g => g.items);
 
+/**
+ * Every owner gets this tab; staff never do.
+ *
+ * It was going to appear only once something was connected, on the grounds
+ * that an empty section about accounts that can see your books invites the
+ * question it cannot answer. Opening another resort lives here now, which is
+ * the thing a single-resort owner would come looking for — so the tab has a
+ * reason to exist before anything is connected, and the sections about
+ * connections still keep themselves hidden until there are any.
+ */
+function useConnectionTabVisible() {
+  return useAuthStore((state) => state.user?.role) === 'OWNER';
+}
+
 export default function SettingsPage() {
   const queryClient = useQueryClient();
   const { tenant, token, user } = useAuthStore();
   const [tab, setTab] = useState<Tab>('general');
+  const connectionsVisible = useConnectionTabVisible();
+  const visibleGroups = TAB_GROUPS.map(g => ({
+    ...g,
+    items: g.items.filter(i => i.id !== 'connections' || connectionsVisible),
+  })).filter(g => g.items.length > 0);
   const [form, setForm] = useState<TenantSettings>({
     name: '',
     email: '',
@@ -402,7 +424,7 @@ export default function SettingsPage() {
 
         {/* ── Left sidebar nav ───────────────────────────────────────────── */}
         <aside className="hidden md:flex flex-col gap-5 w-48 flex-shrink-0 sticky top-4">
-          {TAB_GROUPS.map(({ group, items }) => (
+          {visibleGroups.map(({ group, items }) => (
             <div key={group}>
               <p className="mb-1.5 px-3 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">
                 {group}
@@ -429,12 +451,12 @@ export default function SettingsPage() {
 
         {/* ── Mobile tab selector ────────────────────────────────────────── */}
         <div className="md:hidden w-full">
-          <select
+          <select aria-label="Settings section"
             value={tab}
             onChange={e => setTab(e.target.value as Tab)}
             className="w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-2 text-[13px] font-medium focus:outline-none focus:ring-1 focus:ring-resort-600/20"
           >
-            {TAB_GROUPS.map(({ group, items }) => (
+            {visibleGroups.map(({ group, items }) => (
               <optgroup key={group} label={group}>
                 {items.map(({ id, label }) => (
                   <option key={id} value={id}>{label}</option>
@@ -454,8 +476,8 @@ export default function SettingsPage() {
             <CardContent className="p-6 space-y-4">
               <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Building2 className="h-4 w-4 text-resort-600" /> Resort Identity</h3>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Resort Name *</label>
-                <Input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Palm Paradise Resort" />
+                <label htmlFor="settings-resort-name" className="mb-1 block text-sm font-medium text-gray-700">Resort Name *</label>
+                <Input id="settings-resort-name" value={form.name} onChange={e => set('name', e.target.value)} placeholder="Palm Paradise Resort" />
               </div>
               {/* Read-only, and no longer part of what Save submits. It was an
                   editable input that nothing could ever store — the API's
@@ -474,10 +496,10 @@ export default function SettingsPage() {
                 </p>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Website URL</label>
+                <label htmlFor="settings-website" className="mb-1 block text-sm font-medium text-gray-700">Website URL</label>
                 <div className="relative">
                   <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input value={form.website ?? ''} onChange={e => set('website', e.target.value)} className="pl-9" placeholder="https://palmparadise.com" type="url" />
+                  <Input id="settings-website" value={form.website ?? ''} onChange={e => set('website', e.target.value)} className="pl-9" placeholder="https://palmparadise.com" type="url" />
                 </div>
               </div>
             </CardContent>
@@ -487,8 +509,8 @@ export default function SettingsPage() {
             <CardContent className="p-6 space-y-4">
               <h3 className="font-semibold text-gray-900 flex items-center gap-2"><MapPin className="h-4 w-4 text-resort-600" /> Location</h3>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Address</label>
-                <Input value={form.address ?? ''} onChange={e => set('address', e.target.value)} placeholder="123 Beach Road" />
+                <label htmlFor="settings-address" className="mb-1 block text-sm font-medium text-gray-700">Address</label>
+                <Input id="settings-address" value={form.address ?? ''} onChange={e => set('address', e.target.value)} placeholder="123 Beach Road" />
               </div>
               {/* City is gone, not hidden: there is no city column on Tenant, so
                   the input could never save. It also broke the whole form — the
@@ -498,8 +520,8 @@ export default function SettingsPage() {
                   migration, which is a decision rather than a gap to paper
                   over. Country is a real column and stays. */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Country</label>
-                <Input value={form.country ?? ''} onChange={e => set('country', e.target.value)} placeholder="Bangladesh" />
+                <label htmlFor="settings-country" className="mb-1 block text-sm font-medium text-gray-700">Country</label>
+                <Input id="settings-country" value={form.country ?? ''} onChange={e => set('country', e.target.value)} placeholder="Bangladesh" />
               </div>
             </CardContent>
           </Card>
@@ -513,17 +535,17 @@ export default function SettingsPage() {
             <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Phone className="h-4 w-4 text-resort-600" /> Contact Details</h3>
             <div className="grid grid-cols-2 gap-4 max-w-2xl">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+                <label htmlFor="settings-email" className="mb-1 block text-sm font-medium text-gray-700">Email</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input value={form.email ?? ''} onChange={e => set('email', e.target.value)} className="pl-9" placeholder="hello@resort.com" type="email" />
+                  <Input id="settings-email" value={form.email ?? ''} onChange={e => set('email', e.target.value)} className="pl-9" placeholder="hello@resort.com" type="email" />
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Phone</label>
+                <label htmlFor="settings-phone" className="mb-1 block text-sm font-medium text-gray-700">Phone</label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input value={form.phone ?? ''} onChange={e => set('phone', e.target.value)} className="pl-9" placeholder="+62 361 000 0000" />
+                  <Input id="settings-phone" value={form.phone ?? ''} onChange={e => set('phone', e.target.value)} className="pl-9" placeholder="+62 361 000 0000" />
                 </div>
               </div>
             </div>
@@ -539,12 +561,12 @@ export default function SettingsPage() {
               <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Clock className="h-4 w-4 text-resort-600" /> Check-In / Check-Out Times</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Check-In Time</label>
-                  <Input value={form.checkInTime ?? '14:00'} onChange={e => set('checkInTime', e.target.value)} type="time" />
+                  <label htmlFor="settings-checkin-time" className="mb-1 block text-sm font-medium text-gray-700">Check-In Time</label>
+                  <Input id="settings-checkin-time" value={form.checkInTime ?? '14:00'} onChange={e => set('checkInTime', e.target.value)} type="time" />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Check-Out Time</label>
-                  <Input value={form.checkOutTime ?? '11:00'} onChange={e => set('checkOutTime', e.target.value)} type="time" />
+                  <label htmlFor="settings-checkout-time" className="mb-1 block text-sm font-medium text-gray-700">Check-Out Time</label>
+                  <Input id="settings-checkout-time" value={form.checkOutTime ?? '11:00'} onChange={e => set('checkOutTime', e.target.value)} type="time" />
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">These times are shown to guests and used for booking calculations</p>
@@ -555,15 +577,15 @@ export default function SettingsPage() {
             <CardContent className="p-6 space-y-4">
               <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Banknote className="h-4 w-4 text-resort-600" /> Locale & Currency</h3>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Currency</label>
-                <select value={form.currency} onChange={e => set('currency', e.target.value)}
+                <label htmlFor="settings-currency" className="mb-1 block text-sm font-medium text-gray-700">Currency</label>
+                <select id="settings-currency" value={form.currency} onChange={e => set('currency', e.target.value)}
                   className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
                   {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Timezone</label>
-                <select value={form.timezone} onChange={e => set('timezone', e.target.value)}
+                <label htmlFor="settings-timezone" className="mb-1 block text-sm font-medium text-gray-700">Timezone</label>
+                <select id="settings-timezone" value={form.timezone} onChange={e => set('timezone', e.target.value)}
                   className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
                   {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz.replace('/', ' / ').replace('_', ' ')}</option>)}
                 </select>
@@ -584,7 +606,13 @@ export default function SettingsPage() {
                     While this is off the desk still sees how early or late a guest is, and no fee is proposed.
                   </p>
                 </div>
-                <button type="button" onClick={() => setStayTime(s => ({ ...s, enabled: !s.enabled }))}>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={stayTime.enabled}
+                  aria-label="Early check-in and late checkout"
+                  onClick={() => setStayTime(s => ({ ...s, enabled: !s.enabled }))}
+                >
                   {stayTime.enabled
                     ? <ToggleRight className="h-7 w-7 text-rp-brand" />
                     : <ToggleLeft className="h-7 w-7 text-rp-faint" />}
@@ -600,13 +628,13 @@ export default function SettingsPage() {
                       </p>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="mb-1 block text-rp-meta text-rp-muted">Free from</label>
-                          <Input type="time" value={stayTime.earlyFreeAfter}
+                          <label htmlFor="settings-early-free-after" className="mb-1 block text-rp-meta text-rp-muted">Free from</label>
+                          <Input id="settings-early-free-after" type="time" value={stayTime.earlyFreeAfter}
                             onChange={e => setStayTime(s => ({ ...s, earlyFreeAfter: e.target.value }))} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-rp-meta text-rp-muted">Half rate from</label>
-                          <Input type="time" value={stayTime.earlyHalfAfter}
+                          <label htmlFor="settings-early-half-after" className="mb-1 block text-rp-meta text-rp-muted">Half rate from</label>
+                          <Input id="settings-early-half-after" type="time" value={stayTime.earlyHalfAfter}
                             onChange={e => setStayTime(s => ({ ...s, earlyHalfAfter: e.target.value }))} />
                         </div>
                       </div>
@@ -621,13 +649,13 @@ export default function SettingsPage() {
                       </p>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="mb-1 block text-rp-meta text-rp-muted">Free until</label>
-                          <Input type="time" value={stayTime.lateFreeUntil}
+                          <label htmlFor="settings-late-free-until" className="mb-1 block text-rp-meta text-rp-muted">Free until</label>
+                          <Input id="settings-late-free-until" type="time" value={stayTime.lateFreeUntil}
                             onChange={e => setStayTime(s => ({ ...s, lateFreeUntil: e.target.value }))} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-rp-meta text-rp-muted">Half rate until</label>
-                          <Input type="time" value={stayTime.lateHalfUntil}
+                          <label htmlFor="settings-late-half-until" className="mb-1 block text-rp-meta text-rp-muted">Half rate until</label>
+                          <Input id="settings-late-half-until" type="time" value={stayTime.lateHalfUntil}
                             onChange={e => setStayTime(s => ({ ...s, lateHalfUntil: e.target.value }))} />
                         </div>
                       </div>
@@ -639,16 +667,16 @@ export default function SettingsPage() {
 
                   <div className="grid gap-5 md:grid-cols-2">
                     <div>
-                      <label className="mb-1 block text-rp-meta text-rp-muted">Half rate is</label>
+                      <label htmlFor="settings-half-rate-percent" className="mb-1 block text-rp-meta text-rp-muted">Half rate is</label>
                       <div className="flex items-center gap-2">
-                        <Input type="number" min={0} max={100} value={stayTime.halfRatePercent}
+                        <Input id="settings-half-rate-percent" type="number" min={0} max={100} value={stayTime.halfRatePercent}
                           onChange={e => setStayTime(s => ({ ...s, halfRatePercent: Number(e.target.value) }))} />
                         <span className="text-rp-body text-rp-muted">% of a night</span>
                       </div>
                     </div>
                     <div>
-                      <label className="mb-1 block text-rp-meta text-rp-muted">Charged on</label>
-                      <select value={stayTime.chargeBasis}
+                      <label htmlFor="settings-charge-basis" className="mb-1 block text-rp-meta text-rp-muted">Charged on</label>
+                      <select id="settings-charge-basis" value={stayTime.chargeBasis}
                         onChange={e => setStayTime(s => ({ ...s, chargeBasis: e.target.value }))}
                         className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
                         <option value="EFFECTIVE">This guest&rsquo;s own nightly rate</option>
@@ -667,8 +695,13 @@ export default function SettingsPage() {
                         Either way it takes a reason, and the audit trail names who decided.
                       </p>
                     </div>
-                    <button type="button"
-                      onClick={() => setStayTime(s => ({ ...s, waiverRequiresManager: !s.waiverRequiresManager }))}>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={stayTime.waiverRequiresManager}
+                      aria-label="Only a manager may waive the fee"
+                      onClick={() => setStayTime(s => ({ ...s, waiverRequiresManager: !s.waiverRequiresManager }))}
+                    >
                       {stayTime.waiverRequiresManager
                         ? <ToggleRight className="h-7 w-7 text-rp-brand" />
                         : <ToggleLeft className="h-7 w-7 text-rp-faint" />}
@@ -711,6 +744,9 @@ export default function SettingsPage() {
                   </div>
                   <button
                     type="button"
+                    role="switch"
+                    aria-checked={emailSettings[key]}
+                    aria-label={label}
                     onClick={() => setEmailSettings(s => ({ ...s, [key]: !s[key] }))}
                   >
                     {emailSettings[key]
@@ -726,8 +762,8 @@ export default function SettingsPage() {
             <CardContent className="p-6 space-y-4">
               <h3 className="font-semibold text-gray-900 dark:text-white">Email Branding</h3>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reply-to Email</label>
-                <Input
+                <label htmlFor="settings-reply-to-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reply-to Email</label>
+                <Input id="settings-reply-to-email"
                   type="email"
                   placeholder="reservations@yourresort.com"
                   value={emailSettings.replyToEmail}
@@ -736,8 +772,8 @@ export default function SettingsPage() {
                 <p className="text-xs text-muted-foreground mt-1">Guests will reply to this address. Defaults to your resort email.</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Footer Text</label>
-                <textarea
+                <label htmlFor="settings-footer-text" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Footer Text</label>
+                <textarea id="settings-footer-text"
                   rows={2}
                   placeholder="Thank you for choosing us. We look forward to your next visit!"
                   value={emailSettings.footerText}
@@ -763,7 +799,7 @@ export default function SettingsPage() {
                 <p className="text-sm text-muted-foreground">Send a test email to verify your settings look correct.</p>
               </div>
               <div className="flex gap-2">
-                <Input
+                <Input aria-label="Send the test email to"
                   type="email"
                   placeholder={user?.email ?? 'you@example.com'}
                   value={testEmailAddr}
@@ -831,11 +867,11 @@ export default function SettingsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Your Domain</label>
+                <label htmlFor="settings-custom-domain" className="block text-sm font-medium text-gray-700 mb-1.5">Your Domain</label>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
+                    <Input id="settings-custom-domain"
                       value={domainInput}
                       onChange={e => setDomainInput(e.target.value.toLowerCase().trim())}
                       className="pl-9"
@@ -949,7 +985,7 @@ export default function SettingsPage() {
                             {domainStatus.cnameTarget ?? `${tenantData?.slug}.resortpro.site`}
                           </td>
                           <td className="py-2">
-                            <button onClick={() => copyToClipboard(domainStatus.cnameTarget ?? '')}
+                            <button aria-label="Copy the CNAME target" onClick={() => copyToClipboard(domainStatus.cnameTarget ?? '')}
                               className="text-gray-400 hover:text-gray-600 transition-colors">
                               <Copy className="h-3.5 w-3.5" />
                             </button>
@@ -1012,6 +1048,10 @@ export default function SettingsPage() {
             </Card>
           )}
         </div>
+      )}
+
+      {tab === 'connections' && (
+        <ConnectedResortsTab />
       )}
 
       {tab === 'modules' && (
@@ -1116,6 +1156,8 @@ function GatewayCard({
 }) {
   const [open, setOpen] = useState(false);
   const [showPass, setShowPass] = useState<Record<string, boolean>>({});
+  // One prefix per card instance: this component is rendered once per gateway.
+  const fieldIds = useId();
   const ui = GATEWAY_UI[gw.id] ?? { bg: 'bg-gray-50', accent: 'text-gray-600', description: gw.name };
   const isComingSoon = gw.status === 'coming_soon' || gw.status === 'stub';
 
@@ -1137,14 +1179,27 @@ function GatewayCard({
             <p className="text-xs text-gray-500 truncate">{ui.description}</p>
           </div>
           {!isComingSoon && (
-            <button type="button" onClick={onToggle} className="flex-shrink-0">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isEnabled}
+              aria-label={`Enable ${gw.name}`}
+              onClick={onToggle}
+              className="flex-shrink-0"
+            >
               {isEnabled
                 ? <ToggleRight className={`h-7 w-7 ${ui.accent}`} />
                 : <ToggleLeft  className="h-7 w-7 text-gray-300" />}
             </button>
           )}
           {!isComingSoon && gw.credentialFields.length > 0 && (
-            <button type="button" onClick={() => setOpen(o => !o)} className="text-gray-400 ml-1 flex-shrink-0">
+            <button
+              type="button"
+              aria-expanded={open}
+              aria-label={`${gw.name} credentials`}
+              onClick={() => setOpen(o => !o)}
+              className="text-gray-400 ml-1 flex-shrink-0"
+            >
               {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </button>
           )}
@@ -1156,12 +1211,12 @@ function GatewayCard({
             <div className="grid grid-cols-2 gap-3">
               {gw.credentialFields.map(field => (
                 <div key={field.key}>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                  <label htmlFor={`${fieldIds}-${field.key}`} className="block text-xs font-medium text-gray-600 mb-1">
                     {field.label}
                     {field.required && <span className="text-red-400 ml-0.5">*</span>}
                   </label>
                   <div className="relative">
-                    <Input
+                    <Input id={`${fieldIds}-${field.key}`}
                       type={field.type === 'password' && !showPass[field.key] ? 'password' : 'text'}
                       value={credentials[field.key] ?? ''}
                       onChange={e => onCredentialChange(field.key, e.target.value)}
@@ -1173,7 +1228,9 @@ function GatewayCard({
                       className={field.type === 'password' ? 'pr-9' : ''}
                     />
                     {field.type === 'password' && (
-                      <button type="button"
+                      <button
+                        type="button"
+                        aria-label={showPass[field.key] ? `Hide ${field.label}` : `Show ${field.label}`}
                         onClick={() => setShowPass(s => ({ ...s, [field.key]: !s[field.key] }))}
                         className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                         {showPass[field.key] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -1191,7 +1248,14 @@ function GatewayCard({
                   <p className="text-sm font-medium text-gray-800">Live Mode</p>
                   <p className="text-xs text-gray-500">Sandbox for testing — enable Live Mode for real payments</p>
                 </div>
-                <button type="button" onClick={() => onTestModeChange(!testMode)}>
+                <button
+                  type="button"
+                  role="switch"
+                  // Live is the ON state; testMode is the sandbox.
+                  aria-checked={!testMode}
+                  aria-label="Live Mode"
+                  onClick={() => onTestModeChange(!testMode)}
+                >
                   {!testMode
                     ? <ToggleRight className="h-7 w-7 text-emerald-600" />
                     : <ToggleLeft  className="h-7 w-7 text-gray-300" />}
@@ -1402,8 +1466,8 @@ function PaymentGatewaysTab() {
               </div>
               <p className="text-xs text-gray-500 mb-3">Guest selects "Pay at Hotel" — booking saved as Pending until you confirm payment.</p>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Payment Instructions (shown to guest)</label>
-                <textarea
+                <label htmlFor="settings-manual-instructions" className="block text-xs font-medium text-gray-600 mb-1">Payment Instructions (shown to guest)</label>
+                <textarea id="settings-manual-instructions"
                   value={manualInstructions}
                   onChange={e => setManualInstructions(e.target.value)}
                   rows={2}
@@ -1729,7 +1793,7 @@ function GdprTab() {
             </div>
           }
         >
-          <textarea
+          <textarea aria-label="Why you are requesting deletion"
             autoFocus
             value={deleteReason}
             onChange={(e) => setDeleteReason(e.target.value)}
@@ -1980,7 +2044,9 @@ function EnterpriseTab() {
 function EmbedTab() {
   const { tenant } = useAuthStore()
   const slug = tenant?.slug || ''
-  const cdnBase = 'https://cdn.resortpro.site'
+  // Served from the web app's own public/ — see apps/web/scripts/bundle-embed.mjs.
+  // cdn.resortpro.site, which this used to name, has never served either file.
+  const cdnBase = 'https://resortpro.site'
   const [copied, setCopied] = useState<string | null>(null)
 
   const copy = async (text: string, key: string) => {
@@ -2182,6 +2248,7 @@ function EmbedTab() {
                   <div key={sc} className="flex items-center justify-between gap-2">
                     <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-700 flex-1 truncate">{sc}</code>
                     <button
+                      aria-label={`Copy shortcode ${sc}`}
                       onClick={() => copy(sc, sc)}
                       className="shrink-0 p-1 text-gray-400 hover:text-gray-700"
                     >
@@ -2304,6 +2371,9 @@ function NotificationsTab() {
     notifBookingConfirm: true, notifPaymentReceived: true,
     notifCheckinReminder: true, notifCheckoutRemind: false,
     notifCancellation: true, notifInvoiceSent: false,
+    waNotifBookingConfirm: true, waNotifPaymentReceived: true,
+    waNotifCheckinReminder: true, waNotifCheckoutRemind: false,
+    waNotifCancellation: true, waNotifInvoiceSent: false,
     notifLanguage: 'en',
   });
 
@@ -2333,6 +2403,12 @@ function NotificationsTab() {
       notifCheckoutRemind: d.notifCheckoutRemind ?? false,
       notifCancellation: d.notifCancellation ?? true,
       notifInvoiceSent: d.notifInvoiceSent ?? false,
+      waNotifBookingConfirm: d.waNotifBookingConfirm ?? true,
+      waNotifPaymentReceived: d.waNotifPaymentReceived ?? true,
+      waNotifCheckinReminder: d.waNotifCheckinReminder ?? true,
+      waNotifCheckoutRemind: d.waNotifCheckoutRemind ?? false,
+      waNotifCancellation: d.waNotifCancellation ?? true,
+      waNotifInvoiceSent: d.waNotifInvoiceSent ?? false,
       notifLanguage: d.notifLanguage || 'en',
     });
   }, [data]);
@@ -2417,7 +2493,11 @@ function NotificationsTab() {
               <p className="font-semibold text-gray-900">SMS Notifications</p>
               <p className="text-sm text-gray-500 mt-0.5">Booking confirmations, payment receipts, check-in reminders via SMS</p>
             </div>
-            <button onClick={() => {
+            <button
+              role="switch"
+              aria-checked={triggers.smsEnabled}
+              aria-label="SMS Notifications"
+              onClick={() => {
                 const newTriggers = { ...triggers, smsEnabled: !triggers.smsEnabled };
                 setTriggers(newTriggers);
                 triggerMut.mutate(newTriggers);
@@ -2465,8 +2545,8 @@ function NotificationsTab() {
             {smsMode === 'own' && (
               <div className="space-y-3 pt-2 border-t border-gray-100">
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Provider</label>
-                  <select value={smsProvider} onChange={e => setSmsProvider(e.target.value)}
+                  <label htmlFor="settings-sms-provider" className="text-sm font-medium text-gray-700">Provider</label>
+                  <select id="settings-sms-provider" value={smsProvider} onChange={e => setSmsProvider(e.target.value)}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-resort-500">
                     <option value="ssl_wireless">SSL Wireless (Bangladesh)</option>
                     <option value="alpha_net">Alpha.Net (Bangladesh)</option>
@@ -2475,10 +2555,11 @@ function NotificationsTab() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-sm font-medium text-gray-700">API Key</label>
+                    <label htmlFor="settings-sms-api-key" className="text-sm font-medium text-gray-700">API Key</label>
                     <div className="relative">
-                      <Input type={showSmsKey ? 'text' : 'password'} value={smsApiKey} onChange={e => setSmsApiKey(e.target.value)} placeholder="Your API key" />
+                      <Input id="settings-sms-api-key" type={showSmsKey ? 'text' : 'password'} value={smsApiKey} onChange={e => setSmsApiKey(e.target.value)} placeholder="Your API key" />
                       <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        aria-label={showSmsKey ? 'Hide API key' : 'Show API key'}
                         onClick={() => setShowSmsKey(v => !v)}>
                         {showSmsKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
@@ -2486,14 +2567,14 @@ function NotificationsTab() {
                   </div>
                   {smsProvider === 'twilio' && (
                     <div className="space-y-1">
-                      <label className="text-sm font-medium text-gray-700">Auth Token</label>
-                      <Input type="password" value={smsApiSecret} onChange={e => setSmsApiSecret(e.target.value)} placeholder="Auth token" />
+                      <label htmlFor="settings-sms-auth-token" className="text-sm font-medium text-gray-700">Auth Token</label>
+                      <Input id="settings-sms-auth-token" type="password" value={smsApiSecret} onChange={e => setSmsApiSecret(e.target.value)} placeholder="Auth token" />
                     </div>
                   )}
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Sender ID <span className="text-gray-400 text-xs">(max 11 chars)</span></label>
-                  <Input value={smsSenderId} onChange={e => setSmsSenderId(e.target.value.slice(0, 11))} placeholder="e.g. RESORT" maxLength={11} />
+                  <label htmlFor="settings-sms-sender-id" className="text-sm font-medium text-gray-700">Sender ID <span className="text-gray-400 text-xs">(max 11 chars)</span></label>
+                  <Input id="settings-sms-sender-id" value={smsSenderId} onChange={e => setSmsSenderId(e.target.value.slice(0, 11))} placeholder="e.g. RESORT" maxLength={11} />
                   <p className="text-xs text-gray-400">This name appears as the sender on guest's phone</p>
                 </div>
               </div>
@@ -2510,7 +2591,7 @@ function NotificationsTab() {
           <div className="bg-white rounded-2xl border p-5 space-y-3">
             <p className="font-semibold text-gray-800">Send Test SMS</p>
             <div className="flex gap-2">
-              <Input value={testPhone} onChange={e => setTestPhone(e.target.value)} placeholder="+8801XXXXXXXXX" className="flex-1" />
+              <Input aria-label="Send the test SMS to" value={testPhone} onChange={e => setTestPhone(e.target.value)} placeholder="+8801XXXXXXXXX" className="flex-1" />
               <Button onClick={() => testSmsMut.mutate()} loading={testSmsMut.isPending} disabled={!testPhone} variant="outline" className="gap-2 shrink-0">
                 <Send className="h-3.5 w-3.5" /> Send Test
               </Button>
@@ -2529,7 +2610,11 @@ function NotificationsTab() {
               <p className="font-semibold text-gray-900">WhatsApp Notifications</p>
               <p className="text-sm text-gray-500 mt-0.5">Booking confirmations, invoices, reminders via WhatsApp</p>
             </div>
-            <button onClick={() => { const newTriggers = { ...triggers, waEnabled: !triggers.waEnabled }; setTriggers(newTriggers); triggerMut.mutate(newTriggers); }}
+            <button
+              role="switch"
+              aria-checked={triggers.waEnabled}
+              aria-label="WhatsApp Notifications"
+              onClick={() => { const newTriggers = { ...triggers, waEnabled: !triggers.waEnabled }; setTriggers(newTriggers); triggerMut.mutate(newTriggers); }}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${triggers.waEnabled ? 'bg-green-500' : 'bg-gray-300'}`}>
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${triggers.waEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
@@ -2576,18 +2661,19 @@ function NotificationsTab() {
                   <strong>How to get these:</strong> Meta Business Manager → WhatsApp → API Setup
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Phone Number ID</label>
-                  <Input value={waPhoneNumberId} onChange={e => setWaPhoneNumberId(e.target.value)} placeholder="e.g. 123456789012345" />
+                  <label htmlFor="settings-wa-phone-number-id" className="text-sm font-medium text-gray-700">Phone Number ID</label>
+                  <Input id="settings-wa-phone-number-id" value={waPhoneNumberId} onChange={e => setWaPhoneNumberId(e.target.value)} placeholder="e.g. 123456789012345" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Business Account ID</label>
-                  <Input value={waBusinessAccId} onChange={e => setWaBusinessAccId(e.target.value)} placeholder="e.g. 987654321098765" />
+                  <label htmlFor="settings-wa-business-account-id" className="text-sm font-medium text-gray-700">Business Account ID</label>
+                  <Input id="settings-wa-business-account-id" value={waBusinessAccId} onChange={e => setWaBusinessAccId(e.target.value)} placeholder="e.g. 987654321098765" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">API Token (Permanent)</label>
+                  <label htmlFor="settings-wa-api-token" className="text-sm font-medium text-gray-700">API Token (Permanent)</label>
                   <div className="relative">
-                    <Input type={showWaToken ? 'text' : 'password'} value={waApiToken} onChange={e => setWaApiToken(e.target.value)} placeholder="EAAxxxxx..." />
+                    <Input id="settings-wa-api-token" type={showWaToken ? 'text' : 'password'} value={waApiToken} onChange={e => setWaApiToken(e.target.value)} placeholder="EAAxxxxx..." />
                     <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      aria-label={showWaToken ? 'Hide access token' : 'Show access token'}
                       onClick={() => setShowWaToken(v => !v)}>
                       {showWaToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -2608,7 +2694,7 @@ function NotificationsTab() {
           <div className="bg-white rounded-2xl border p-5 space-y-3">
             <p className="font-semibold text-gray-800">Send Test WhatsApp</p>
             <div className="flex gap-2">
-              <Input value={testWaPhone} onChange={e => setTestWaPhone(e.target.value)} placeholder="+8801XXXXXXXXX" className="flex-1" />
+              <Input aria-label="Send the test WhatsApp message to" value={testWaPhone} onChange={e => setTestWaPhone(e.target.value)} placeholder="+8801XXXXXXXXX" className="flex-1" />
               <Button onClick={() => testWaMut.mutate()} loading={testWaMut.isPending} disabled={!testWaPhone}
                 className="gap-2 shrink-0 bg-green-600 hover:bg-green-700">
                 <Send className="h-3.5 w-3.5" /> Send Test
@@ -2642,23 +2728,28 @@ function NotificationsTab() {
                   { key: 'notifCheckoutRemind',    label: 'Check-out Reminder',         emoji: '🛎️' },
                   { key: 'notifCancellation',      label: 'Booking Cancelled',          emoji: '❌' },
                   { key: 'notifInvoiceSent',       label: 'Invoice Sent',              emoji: '🧾' },
-                ].map(({ key, label, emoji }) => (
+                ].map(({ key, label, emoji }) => {
+                  // Each channel has its own field. Both columns used to read
+                  // and write `key`, so ticking SMS also ticked WhatsApp.
+                  const waKey = `wa${key[0].toUpperCase()}${key.slice(1)}`;
+                  return (
                   <tr key={key} className="hover:bg-gray-50">
                     <td className="px-5 py-3.5 font-medium text-gray-700">{emoji} {label}</td>
                     <td className="px-4 py-3.5 text-center">
-                      <input type="checkbox"
+                      <input aria-label={`SMS — ${label}`} type="checkbox"
                         checked={!!triggers[key as keyof typeof triggers]}
                         onChange={e => setTriggers(p => ({ ...p, [key]: e.target.checked }))}
                         className="h-4 w-4 rounded accent-resort-600" />
                     </td>
                     <td className="px-4 py-3.5 text-center">
-                      <input type="checkbox"
-                        checked={!!triggers[key as keyof typeof triggers]}
-                        onChange={e => setTriggers(p => ({ ...p, [key]: e.target.checked }))}
+                      <input aria-label={`WhatsApp — ${label}`} type="checkbox"
+                        checked={!!triggers[waKey as keyof typeof triggers]}
+                        onChange={e => setTriggers(p => ({ ...p, [waKey]: e.target.checked }))}
                         className="h-4 w-4 rounded accent-green-600" />
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -2845,6 +2936,9 @@ function DiscoveryMapTab() {
           <p className="text-xs text-gray-500 mt-0.5">Make your resort visible to travelers on stay.resortpro.site</p>
         </div>
         <button
+          role="switch"
+          aria-checked={form.mapVisible}
+          aria-label="List this resort on the discovery map"
           onClick={() => setForm(f => ({ ...f, mapVisible: !f.mapVisible }))}
           className={`flex items-center gap-2 text-sm font-semibold transition-colors ${
             form.mapVisible ? 'text-[#183153]' : 'text-gray-400'
@@ -2871,16 +2965,16 @@ function DiscoveryMapTab() {
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Latitude</label>
-                  <Input
+                  <label htmlFor="settings-latitude" className="text-xs text-gray-500 mb-1 block">Latitude</label>
+                  <Input id="settings-latitude"
                     placeholder="e.g. 22.3569"
                     value={form.latitude}
                     onChange={e => setForm(f => ({ ...f, latitude: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Longitude</label>
-                  <Input
+                  <label htmlFor="settings-longitude" className="text-xs text-gray-500 mb-1 block">Longitude</label>
+                  <Input id="settings-longitude"
                     placeholder="e.g. 91.7832"
                     value={form.longitude}
                     onChange={e => setForm(f => ({ ...f, longitude: e.target.value }))}
@@ -2897,8 +2991,8 @@ function DiscoveryMapTab() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Category</label>
-                  <select
+                  <label htmlFor="settings-resort-category" className="text-xs text-gray-500 mb-1 block">Category</label>
+                  <select id="settings-resort-category"
                     value={form.resortCategory}
                     onChange={e => setForm(f => ({ ...f, resortCategory: e.target.value }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#183153]/30">
@@ -2909,8 +3003,8 @@ function DiscoveryMapTab() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Starting Price / Night</label>
-                  <Input
+                  <label htmlFor="settings-price-from" className="text-xs text-gray-500 mb-1 block">Starting Price / Night</label>
+                  <Input id="settings-price-from"
                     placeholder="e.g. 5000"
                     value={form.priceFrom}
                     onChange={e => setForm(f => ({ ...f, priceFrom: e.target.value }))}
@@ -2919,8 +3013,8 @@ function DiscoveryMapTab() {
               </div>
 
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Short Description (1-2 lines)</label>
-                <textarea
+                <label htmlFor="settings-short-description" className="text-xs text-gray-500 mb-1 block">Short Description (1-2 lines)</label>
+                <textarea id="settings-short-description"
                   rows={2}
                   placeholder="A peaceful eco resort nestled in the hills of Bandarban..."
                   value={form.shortDescription}
@@ -2930,8 +3024,8 @@ function DiscoveryMapTab() {
               </div>
 
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Cover Image URL</label>
-                <Input
+                <label htmlFor="settings-cover-image-url" className="text-xs text-gray-500 mb-1 block">Cover Image URL</label>
+                <Input id="settings-cover-image-url"
                   placeholder="https://..."
                   value={form.coverImageUrl}
                   onChange={e => setForm(f => ({ ...f, coverImageUrl: e.target.value }))}
@@ -2956,18 +3050,18 @@ function DiscoveryMapTab() {
               </h3>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Booking Phone / WhatsApp</label>
-                  <Input
+                  <label htmlFor="settings-booking-phone" className="text-xs text-gray-500 mb-1 block">Booking Phone / WhatsApp</label>
+                  <Input id="settings-booking-phone"
                     placeholder="+880 1XXX-XXXXXX"
                     value={form.bookingPhone}
                     onChange={e => setForm(f => ({ ...f, bookingPhone: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Instagram Handle</label>
+                  <label htmlFor="settings-instagram-handle" className="text-xs text-gray-500 mb-1 block">Instagram Handle</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">@</span>
-                    <Input
+                    <Input id="settings-instagram-handle"
                       className="pl-7"
                       placeholder="yourresort"
                       value={form.instagramHandle}
@@ -2995,8 +3089,8 @@ function DiscoveryMapTab() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Booking Source</label>
-                  <select
+                  <label htmlFor="settings-affiliate-source" className="text-xs text-gray-500 mb-1 block">Booking Source</label>
+                  <select id="settings-affiliate-source"
                     value={form.affiliateSource}
                     onChange={e => setForm(f => ({ ...f, affiliateSource: e.target.value }))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#183153]/30">
@@ -3007,8 +3101,8 @@ function DiscoveryMapTab() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Booking URL</label>
-                  <Input
+                  <label htmlFor="settings-affiliate-url" className="text-xs text-gray-500 mb-1 block">Booking URL</label>
+                  <Input id="settings-affiliate-url"
                     placeholder="https://booking.com/hotel/..."
                     value={form.affiliateUrl}
                     onChange={e => setForm(f => ({ ...f, affiliateUrl: e.target.value }))}
@@ -3049,6 +3143,7 @@ function DiscoveryMapTab() {
                         onError={e => { (e.target as HTMLImageElement).style.opacity = '0.3'; }}
                       />
                       <button
+                        aria-label={`Remove gallery image ${i + 1}`}
                         onClick={() => removeGallery(url)}
                         className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         ×
@@ -3061,7 +3156,7 @@ function DiscoveryMapTab() {
               {/* Add new */}
               {galleryArr.length < 8 && (
                 <div className="flex gap-2">
-                  <Input
+                  <Input aria-label="New gallery image URL"
                     placeholder="https://... (image URL)"
                     value={newGalleryUrl}
                     onChange={e => setNewGalleryUrl(e.target.value)}
@@ -3094,7 +3189,7 @@ function DiscoveryMapTab() {
                   {amenitiesArr.map((item, i) => (
                     <span key={i} className="inline-flex items-center gap-1 bg-[#f2f7fb] border border-[#d4e4ef] text-[#183153] text-xs font-medium px-2.5 py-1 rounded-full">
                       {item}
-                      <button onClick={() => removeAmenity(item)} className="ml-0.5 hover:text-red-500 transition-colors">×</button>
+                      <button aria-label={`Remove ${item}`} onClick={() => removeAmenity(item)} className="ml-0.5 hover:text-red-500 transition-colors">×</button>
                     </span>
                   ))}
                 </div>
@@ -3102,7 +3197,7 @@ function DiscoveryMapTab() {
 
               {amenitiesArr.length < 12 && (
                 <div className="flex gap-2">
-                  <Input
+                  <Input aria-label="New amenity"
                     placeholder="e.g. Swimming Pool, Free WiFi, Restaurant…"
                     value={newAmenity}
                     onChange={e => setNewAmenity(e.target.value)}

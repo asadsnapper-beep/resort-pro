@@ -9,6 +9,7 @@
  */
 import { createHash } from 'crypto';
 import { prisma } from '@resort-pro/database';
+import { purgeGuestDocumentFiles } from './guest-documents';
 
 /** One-way hash of a string — used for email anonymization */
 function sha256(s: string): string {
@@ -53,6 +54,15 @@ export async function anonymizeTenant(tenantId: string): Promise<AnonymizeResult
 
   const now = new Date();
   const shortId = tenantId.slice(-6).toUpperCase();
+
+  // 0. The identity documents, before anything else.
+  //
+  // Renaming a guest to "Guest #1234" while their passport photograph stays
+  // readable on disk is not anonymisation, it is a change of label. The files
+  // go first and the rows after, so a failure here leaves something to retry
+  // rather than an untraceable file.
+  await purgeGuestDocumentFiles({ tenantId });
+  await prisma.guestDocument.deleteMany({ where: { tenantId } });
 
   // 1. Anonymize tenant
   await prisma.tenant.update({

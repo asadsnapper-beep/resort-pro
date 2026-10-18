@@ -74,25 +74,33 @@ jobs:
     name: Schema Drift Check
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: resortpro
-          POSTGRES_PASSWORD: resortpro
-          POSTGRES_DB: resortpro_drift
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     env:
       DATABASE_URL: postgresql://resortpro:resortpro@localhost:5432/resortpro_drift
 
     steps:
+      # The database comes from the runner's own PostgreSQL, not a service
+      # container, because every registry we tried rate-limits anonymous
+      # pulls. Docker Hub refused with 429 ("unauthenticated pull rate
+      # limit"), so 0fa6fa9 moved these to AWS public ECR — and ECR then
+      # refused the third pull of one CI run with "Data limit exceeded",
+      # failing E2E at "Initialize containers" before a test could run.
+      #
+      # The runner image ships PostgreSQL already, stopped. Starting it costs
+      # no pull, no quota and no credential. It is also 16 rather than the 15
+      # these jobs asked Docker for, which matches what production actually
+      # runs (postgres:16-alpine in the compose files) — so CI was testing
+      # against the older major until now.
+      - name: Start PostgreSQL and create the database
+        run: |
+          sudo systemctl start postgresql
+          psql --version
+          for _ in $(seq 1 30); do pg_isready -h localhost -p 5432 && break; sleep 1; done
+          pg_isready -h localhost -p 5432
+          sudo -u postgres psql -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE resortpro LOGIN PASSWORD 'resortpro' SUPERUSER;"
+          sudo -u postgres createdb -O resortpro resortpro_drift
+          PGPASSWORD=resortpro psql -h localhost -U resortpro -d resortpro_drift -c 'SELECT version();'
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -131,27 +139,35 @@ jobs:
     name: API Permission Tests
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: resortpro
-          POSTGRES_PASSWORD: resortpro
-          POSTGRES_DB: resortpro_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     env:
       DATABASE_URL: postgresql://resortpro:resortpro@localhost:5432/resortpro_test
       JWT_SECRET: ci-test-secret-do-not-use-in-prod
       NODE_ENV: test
 
     steps:
+      # The database comes from the runner's own PostgreSQL, not a service
+      # container, because every registry we tried rate-limits anonymous
+      # pulls. Docker Hub refused with 429 ("unauthenticated pull rate
+      # limit"), so 0fa6fa9 moved these to AWS public ECR — and ECR then
+      # refused the third pull of one CI run with "Data limit exceeded",
+      # failing E2E at "Initialize containers" before a test could run.
+      #
+      # The runner image ships PostgreSQL already, stopped. Starting it costs
+      # no pull, no quota and no credential. It is also 16 rather than the 15
+      # these jobs asked Docker for, which matches what production actually
+      # runs (postgres:16-alpine in the compose files) — so CI was testing
+      # against the older major until now.
+      - name: Start PostgreSQL and create the database
+        run: |
+          sudo systemctl start postgresql
+          psql --version
+          for _ in $(seq 1 30); do pg_isready -h localhost -p 5432 && break; sleep 1; done
+          pg_isready -h localhost -p 5432
+          sudo -u postgres psql -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE resortpro LOGIN PASSWORD 'resortpro' SUPERUSER;"
+          sudo -u postgres createdb -O resortpro resortpro_test
+          PGPASSWORD=resortpro psql -h localhost -U resortpro -d resortpro_test -c 'SELECT version();'
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -198,20 +214,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: api-tests          # only run E2E if API tests pass
 
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: resortpro
-          POSTGRES_PASSWORD: resortpro
-          POSTGRES_DB: resortpro_e2e
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     env:
       DATABASE_URL: postgresql://resortpro:resortpro@localhost:5432/resortpro_e2e
@@ -221,6 +223,29 @@ jobs:
       PORT: 3000
 
     steps:
+      # The database comes from the runner's own PostgreSQL, not a service
+      # container, because every registry we tried rate-limits anonymous
+      # pulls. Docker Hub refused with 429 ("unauthenticated pull rate
+      # limit"), so 0fa6fa9 moved these to AWS public ECR — and ECR then
+      # refused the third pull of one CI run with "Data limit exceeded",
+      # failing E2E at "Initialize containers" before a test could run.
+      #
+      # The runner image ships PostgreSQL already, stopped. Starting it costs
+      # no pull, no quota and no credential. It is also 16 rather than the 15
+      # these jobs asked Docker for, which matches what production actually
+      # runs (postgres:16-alpine in the compose files) — so CI was testing
+      # against the older major until now.
+      - name: Start PostgreSQL and create the database
+        run: |
+          sudo systemctl start postgresql
+          psql --version
+          for _ in $(seq 1 30); do pg_isready -h localhost -p 5432 && break; sleep 1; done
+          pg_isready -h localhost -p 5432
+          sudo -u postgres psql -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE resortpro LOGIN PASSWORD 'resortpro' SUPERUSER;"
+          sudo -u postgres createdb -O resortpro resortpro_e2e
+          PGPASSWORD=resortpro psql -h localhost -U resortpro -d resortpro_e2e -c 'SELECT version();'
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -293,7 +318,11 @@ jobs:
 
       - name: Run E2E role tests
         working-directory: apps/web
-        run: pnpm exec playwright test tests/e2e/roles.spec.ts --reporter=github
+        # landing.spec.ts is here too now. It was excluded while its assertions
+        # described copy that had been replaced, so it failed on every run and
+        # nobody could have told a real break from the rot. Rewritten against
+        # the page that is served, so it can hold the gate again.
+        run: pnpm exec playwright test tests/e2e/roles.spec.ts tests/e2e/landing.spec.ts --reporter=github
 
       - name: Upload Playwright report on failure
         if: failure()
@@ -328,6 +357,23 @@ jobs:
         env:
           DATABASE_URL: postgresql://resortpro:resortpro@localhost:5432/resortpro
           JWT_SECRET: ci-build-secret
+
+      # apps/web has a vitest suite that no CI job ever ran, so a failing web
+      # unit test could only be seen on whoever's laptop happened to run it.
+      # It goes after the build step because the suite imports
+      # @resort-pro/types, which that step compiles.
+      - name: Run web unit tests
+        working-directory: apps/web
+        run: pnpm exec vitest run
+
+      # Settings hands resorts a <script> tag and a plugin download. For as long
+      # as they were offered both were 404s, because nothing produced them. The
+      # web build does now; this fails CI if it ever stops.
+      - name: Embed widget and WordPress plugin were built
+        run: |
+          test -s apps/web/public/embed.js
+          test -s apps/web/public/resortpro-wp-plugin.zip
+          unzip -t apps/web/public/resortpro-wp-plugin.zip
 
   # ── Typecheck (advisory) ─────────────────────────────────────────────────────
   # eslint was never actually installed in this repo, so the old Lint job could

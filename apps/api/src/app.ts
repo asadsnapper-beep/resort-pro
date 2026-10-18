@@ -10,6 +10,7 @@ import swaggerUi from '@fastify/swagger-ui';
 import websocket from '@fastify/websocket';
 import staticPlugin from '@fastify/static';
 import { isPrivateUploadKey, verifyUploadSignature } from './utils/signed-upload-url';
+import { corsDecision } from './utils/cors-policy';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
 
@@ -17,6 +18,7 @@ import { authRoutes } from './routes/auth';
 import { tenantRoutes } from './routes/tenants';
 import { roomRoutes } from './routes/rooms';
 import { propertyRoutes } from './routes/properties';
+import { resortGroupRoutes } from './routes/resortGroup';
 import { bookingRoutes } from './routes/bookings';
 import { guestRoutes } from './routes/guests';
 import { staffRoutes } from './routes/staff';
@@ -89,7 +91,7 @@ export async function buildApp() {
   }
 
   const app = Fastify({
-    // Behind Coolify/Traefik: without this, request.protocol/hostname reflect
+    // Behind Traefik: without this, request.protocol/hostname reflect
     // the internal http connection instead of the real public https domain —
     // this silently broke every upload URL (defaulted to http://localhost:4000).
     trustProxy: true,
@@ -162,15 +164,12 @@ export async function buildApp() {
   const envOrigins = (process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000'])
     .map((s) => s.trim())
     .filter(Boolean);
-  const RESORTPRO_ORIGIN = /^https?:\/\/([a-z0-9-]+\.)*resortpro\.site$/i;
+  // Per request, because the embed widget runs on a resort's own domain and
+  // needs the public routes from there — without credentials. See cors-policy.ts.
   await app.register(cors, {
-    origin: (origin, cb) => {
-      // No Origin header = same-origin / server-to-server (curl, health checks)
-      if (!origin) return cb(null, true);
-      if (RESORTPRO_ORIGIN.test(origin) || envOrigins.includes(origin)) return cb(null, true);
-      return cb(null, false);
+    delegator: (req, cb) => {
+      cb(null, corsDecision(req.headers.origin, req.url, envOrigins));
     },
-    credentials: true,
   });
 
   await app.register(rateLimit, {
@@ -333,6 +332,7 @@ export async function buildApp() {
   await app.register(tenantRoutes, { prefix: '/api/tenant' });
   await app.register(roomRoutes, { prefix: '/api/rooms' });
   await app.register(propertyRoutes, { prefix: '/api/properties' });
+  await app.register(resortGroupRoutes, { prefix: '/api/resort-group' });
   await app.register(bookingRoutes, { prefix: '/api/bookings' });
   await app.register(guestRoutes,         { prefix: '/api/guests' });
   await app.register(guestDocumentRoutes, { prefix: '/api/guests' });

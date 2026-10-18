@@ -1,3 +1,23 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// ⚠ THIS IS NOT THE SEED CI OR PRODUCTION RUNS.
+//
+// Two demo seeds exist and they are easy to confuse — this one cost a session's
+// work before the difference was noticed:
+//
+//   apps/api/src/scripts/seed-demo.ts   tenant slug 'demo', "Coral Bay Resort",
+//                                       10 guests. Run by CI (`pnpm seed:demo`
+//                                       from apps/api) and by the API container
+//                                       at startup. THAT ONE IS LIVE.
+//
+//   this file                           tenant slug 'palm-paradise-resort',
+//                                       19 guests. Nothing automated runs it;
+//                                       only `pnpm seed:demo` from
+//                                       packages/database, by hand.
+//
+// So a fix made here reaches no environment on its own, and CI passing says
+// nothing about it. Check which file you are in before concluding anything
+// about what the demo does.
+// ─────────────────────────────────────────────────────────────────────────────
 /**
  * ResortPro — Full Demo Seed
  * Run: cd packages/database && npx ts-node --compiler-options '{"module":"CommonJS"}' prisma/demo-seed.ts
@@ -44,6 +64,26 @@ function daysFromNow(n: number): Date {
   d.setHours(12, 0, 0, 0);
   return d;
 }
+/**
+ * A birthday, as month/day in a given year.
+ *
+ * `bornToday` is relative to seed time on purpose, the same way the seed's
+ * bookings are. Without at least one guest due today, the CRM's Daily
+ * Automation panel reads "Nothing to send today" on every day of the year and
+ * the feature looks broken — which is what staging showed: eighteen guests,
+ * not one `dateOfBirth` between them (CRM QA finding 011's neighbourhood).
+ *
+ * This is seed data chosen to exercise a real feature, not a claim about
+ * something that happened — unlike the 87 opens and 34 clicks this file used
+ * to assert for tracking that does not exist.
+ */
+function born(year: number, month: number, day: number): Date {
+  return new Date(Date.UTC(year, month - 1, day, 12));
+}
+function bornToday(year: number): Date {
+  const now = new Date();
+  return new Date(Date.UTC(year, now.getMonth(), now.getDate(), 12));
+}
 function dateOnly(d: Date): Date {
   return new Date(d.toISOString().split('T')[0]);
 }
@@ -85,6 +125,59 @@ async function main() {
   });
   const tid = tenant.id;
   console.log(`✅ Tenant: ${tenant.name} (${tid})`);
+
+  // ════════════════════════════════════════════════════════════════
+  // 1b. RESET THE TRANSACTIONAL DATA
+  //
+  // Seventeen of the blocks below call `create`, not `upsert`, because most of
+  // what they write has no natural key to upsert on. So running this file
+  // twice used to double the demo: seventy-two bookings on the same rooms,
+  // twelve campaigns, two of every menu item — occupancy and revenue that mean
+  // nothing, and a demo nobody should show anyone. CI reseeds on every run and
+  // the staging host has been seeded more than once.
+  //
+  // Clearing first makes the whole file idempotent without touching the index
+  // arithmetic the later blocks depend on (`bookingIds[od.bookingIdx]` and
+  // friends), which is what made the alternative — skip-if-exists, loading the
+  // ids back in defs order — the more fragile fix.
+  //
+  // What is NOT cleared, because every one of these is already an upsert and
+  // re-running it converges: the tenant, its users and staff (the documented
+  // demo logins keep working), rooms, guests, the loyalty programme shell,
+  // website content, and the global themes.
+  //
+  // Scoped to this tenant by id throughout. The slug is a literal above, so
+  // this cannot reach another resort's data.
+  // ════════════════════════════════════════════════════════════════
+  const scope = { tenantId: tid };
+  // Order is children-before-parents. Most of these cascade from Tenant
+  // anyway, but the SetNull relations (a food order's booking, an email send's
+  // campaign) are tidier cleared in this order than left to flap to null
+  // mid-wipe.
+  const cleared = {
+    foodOrders:         (await prisma.foodOrder.deleteMany({ where: scope })).count,
+    emailSends:         (await prisma.emailSend.deleteMany({ where: scope })).count,
+    enrollments:        (await prisma.sequenceEnrollment.deleteMany({ where: scope })).count,
+    sequences:          (await prisma.sequence.deleteMany({ where: scope })).count,  // cascades steps
+    campaigns:          (await prisma.campaign.deleteMany({ where: scope })).count,  // cascades stats
+    emailTemplates:     (await prisma.emailTemplate.deleteMany({ where: scope })).count,
+    loyaltyAccounts:    (await prisma.loyaltyAccount.deleteMany({ where: scope })).count, // cascades txns
+    bookings:           (await prisma.booking.deleteMany({ where: scope })).count,
+    housekeepingTasks:  (await prisma.housekeepingTask.deleteMany({ where: scope })).count,
+    maintenanceTickets: (await prisma.maintenanceTicket.deleteMany({ where: scope })).count,
+    supportTickets:     (await prisma.supportTicket.deleteMany({ where: scope })).count,
+    expenses:           (await prisma.expense.deleteMany({ where: scope })).count,
+    inventoryItems:     (await prisma.inventoryItem.deleteMany({ where: scope })).count,
+    menuItems:          (await prisma.menuItem.deleteMany({ where: scope })).count,
+    ratePlans:          (await prisma.ratePlan.deleteMany({ where: scope })).count,
+  };
+  const clearedTotal = Object.values(cleared).reduce((a, b) => a + b, 0);
+  if (clearedTotal === 0) {
+    console.log('✅ Nothing to clear — first run on this tenant');
+  } else {
+    console.log(`✅ Cleared ${clearedTotal} rows from a previous run:`);
+    for (const [k, n] of Object.entries(cleared)) if (n) console.log(`     ${n} ${k}`);
+  }
 
   // ════════════════════════════════════════════════════════════════
   // 2. USERS + STAFF
@@ -223,26 +316,77 @@ async function main() {
   // ════════════════════════════════════════════════════════════════
   // 6. GUESTS
   // ════════════════════════════════════════════════════════════════
+  // Addresses are all @example.com, which RFC 2606 reserves and which cannot
+  // receive mail. They used to be gmail.com, yahoo.com, outlook.com and
+  // hotmail.com — eighteen plausible real addresses. The seed writes no
+  // EmailConsent rows, and a guest with no consent row counts as subscribed,
+  // so every demo campaign and every date trigger had all eighteen in its
+  // audience. Nothing was ever sent from staging, but the day RESEND_API_KEY
+  // is configured, one press of "Send Now" on a demo tenant mails a resort
+  // promotion to eighteen strangers.
   const guestDefs = [
-    { firstName: 'Ahmed',   lastName: 'Rahman',    email: 'ahmed.rahman@gmail.com',    phone: '+8801711111001', nationality: 'Bangladeshi', notes: 'Prefers high floor, vegetarian meals' },
-    { firstName: 'Fatima',  lastName: 'Begum',     email: 'fatima.begum@yahoo.com',    phone: '+8801811111002', nationality: 'Bangladeshi', notes: 'Anniversary couple — arrange flowers' },
-    { firstName: 'Tanvir',  lastName: 'Ahmed',     email: 'tanvir.ahmed@hotmail.com',  phone: '+8801911111003', nationality: 'Bangladeshi', notes: '' },
-    { firstName: 'Nasreen', lastName: 'Khatun',    email: 'nasreen.k@gmail.com',       phone: '+8801611111004', nationality: 'Bangladeshi', notes: 'Requires extra pillow' },
-    { firstName: 'Rafiq',   lastName: 'Islam',     email: 'rafiq.islam@gmail.com',     phone: '+8801511111005', nationality: 'Bangladeshi', notes: '' },
-    { firstName: 'Priya',   lastName: 'Sharma',    email: 'priya.sharma@gmail.com',    phone: '+919811111006', nationality: 'Indian',       notes: 'Jain food required' },
-    { firstName: 'David',   lastName: 'Chen',      email: 'david.chen@outlook.com',    phone: '+8562011111007', nationality: 'Malaysian',    notes: 'Halal food preference' },
-    { firstName: 'Sarah',   lastName: 'Johnson',   email: 'sarah.j@gmail.com',         phone: '+447911111008', nationality: 'British',      notes: 'Gluten intolerant' },
-    { firstName: 'Omar',    lastName: 'Abdullah',  email: 'omar.abdl@gmail.com',       phone: '+971501111009', nationality: 'Emirati',      notes: 'VIP guest, suite preferred' },
-    { firstName: 'Mia',     lastName: 'Tanaka',    email: 'mia.tanaka@gmail.com',      phone: '+8190111110010', nationality: 'Japanese',     notes: '' },
-    { firstName: 'Kabir',   lastName: 'Hossain',   email: 'kabir.h@yahoo.com',         phone: '+8801711111011', nationality: 'Bangladeshi', notes: 'Corporate client — Apex Group' },
-    { firstName: 'Ritu',    lastName: 'Das',       email: 'ritu.das@gmail.com',        phone: '+8801911111012', nationality: 'Bangladeshi', notes: '' },
-    { firstName: 'James',   lastName: 'Wilson',    email: 'james.w@gmail.com',         phone: '+12121111013',  nationality: 'American',     notes: 'Frequent traveler' },
-    { firstName: 'Ayesha',  lastName: 'Siddiqui',  email: 'ayesha.s@gmail.com',        phone: '+923001111014', nationality: 'Pakistani',    notes: '' },
-    { firstName: 'Sumon',   lastName: 'Biswas',    email: 'sumon.b@gmail.com',         phone: '+8801811111015', nationality: 'Bangladeshi', notes: 'Group leader — family reunion' },
-    { firstName: 'Nila',    lastName: 'Chowdhury', email: 'nila.c@gmail.com',          phone: '+8801611111016', nationality: 'Bangladeshi', notes: '' },
-    { firstName: 'Rashed',  lastName: 'Mahmud',    email: 'rashed.m@gmail.com',        phone: '+8801511111017', nationality: 'Bangladeshi', notes: 'Honeymoon trip' },
-    { firstName: 'Tasneem', lastName: 'Akter',     email: 'tasneem.a@gmail.com',       phone: '+8801711111018', nationality: 'Bangladeshi', notes: '' },
+    { firstName: 'Ahmed',   lastName: 'Rahman',    email: 'ahmed.rahman@example.com',    phone: '+8801711111001', nationality: 'Bangladeshi', notes: 'Prefers high floor, vegetarian meals', dateOfBirth: born(1985, 3, 14) },
+    { firstName: 'Fatima',  lastName: 'Begum',     email: 'fatima.begum@example.com',    phone: '+8801811111002', nationality: 'Bangladeshi', notes: 'Anniversary couple — arrange flowers', dateOfBirth: born(1990, 7, 2) },
+    { firstName: 'Tanvir',  lastName: 'Ahmed',     email: 'tanvir.ahmed@example.com',  phone: '+8801911111003', nationality: 'Bangladeshi', notes: '', dateOfBirth: born(1978, 11, 23) },
+    { firstName: 'Nasreen', lastName: 'Khatun',    email: 'nasreen.k@example.com',       phone: '+8801611111004', nationality: 'Bangladeshi', notes: 'Requires extra pillow', dateOfBirth: born(1982, 1, 9) },
+    { firstName: 'Rafiq',   lastName: 'Islam',     email: 'rafiq.islam@example.com',     phone: '+8801511111005', nationality: 'Bangladeshi', notes: '', dateOfBirth: bornToday(1988) },
+    { firstName: 'Priya',   lastName: 'Sharma',    email: 'priya.sharma@example.com',    phone: '+919811111006', nationality: 'Indian',       notes: 'Jain food required', dateOfBirth: born(1995, 5, 30) },
+    { firstName: 'David',   lastName: 'Chen',      email: 'david.chen@example.com',    phone: '+8562011111007', nationality: 'Malaysian',    notes: 'Halal food preference', dateOfBirth: born(1973, 9, 17) },
+    { firstName: 'Sarah',   lastName: 'Johnson',   email: 'sarah.j@example.com',         phone: '+447911111008', nationality: 'British',      notes: 'Gluten intolerant', dateOfBirth: born(1991, 2, 11) },
+    { firstName: 'Omar',    lastName: 'Abdullah',  email: 'omar.abdl@example.com',       phone: '+971501111009', nationality: 'Emirati',      notes: 'VIP guest, suite preferred', dateOfBirth: born(1968, 12, 5) },
+    { firstName: 'Mia',     lastName: 'Tanaka',    email: 'mia.tanaka@example.com',      phone: '+8190111110010', nationality: 'Japanese',     notes: '', dateOfBirth: born(1997, 4, 21) },
+    { firstName: 'Kabir',   lastName: 'Hossain',   email: 'kabir.h@example.com',         phone: '+8801711111011', nationality: 'Bangladeshi', notes: 'Corporate client — Apex Group', dateOfBirth: born(1980, 6, 8) },
+    { firstName: 'Ritu',    lastName: 'Das',       email: 'ritu.das@example.com',        phone: '+8801911111012', nationality: 'Bangladeshi', notes: '', dateOfBirth: born(1993, 10, 2) },
+    { firstName: 'James',   lastName: 'Wilson',    email: 'james.w@example.com',         phone: '+12121111013',  nationality: 'American',     notes: 'Frequent traveler', dateOfBirth: born(1975, 8, 19) },
+    { firstName: 'Ayesha',  lastName: 'Siddiqui',  email: 'ayesha.s@example.com',        phone: '+923001111014', nationality: 'Pakistani',    notes: '', dateOfBirth: born(1989, 1, 27) },
+    { firstName: 'Sumon',   lastName: 'Biswas',    email: 'sumon.b@example.com',         phone: '+8801811111015', nationality: 'Bangladeshi', notes: 'Group leader — family reunion', dateOfBirth: born(1965, 5, 3) },
+    { firstName: 'Nila',    lastName: 'Chowdhury', email: 'nila.c@example.com',          phone: '+8801611111016', nationality: 'Bangladeshi', notes: '', dateOfBirth: born(1998, 3, 25) },
+    { firstName: 'Rashed',  lastName: 'Mahmud',    email: 'rashed.m@example.com',        phone: '+8801511111017', nationality: 'Bangladeshi', notes: 'Honeymoon trip', dateOfBirth: born(1986, 12, 14) },
+    { firstName: 'Tasneem', lastName: 'Akter',     email: 'tasneem.a@example.com',       phone: '+8801711111018', nationality: 'Bangladeshi', notes: '', dateOfBirth: born(1992, 9, 6) },
+    // Guest 18 exists for the ANNIVERSARY trigger and nothing else. It needs a
+    // first checkout 355–375 days ago AND no checkout in the last 60 days, and
+    // no existing demo guest can satisfy both: all eighteen have a booking
+    // inside the last 60 days, so every one of them is excluded. Without her
+    // the trigger has never had a single candidate in the demo.
+    { firstName: 'Shireen', lastName: 'Kabir',     email: 'shireen.k@example.com',     phone: '+8801711111019', nationality: 'Bangladeshi', notes: 'Stayed once last year — anniversary candidate', dateOfBirth: born(1983, 6, 12) },
   ];
+
+  // Re-point anyone already seeded under the old address, scoped to this
+  // tenant. The upsert below keys on email, so without this a reseed would
+  // leave the eighteen gmail.com rows in place — still subscribed, still in
+  // every campaign audience — and add eighteen @example.com duplicates beside
+  // them. Which would mean the fix protected new environments and left the
+  // ones that already exist exactly as they were.
+  for (const g of guestDefs) {
+    const local = g.email.split('@')[0];
+    try {
+      await prisma.guest.updateMany({
+        where: {
+          tenantId: tid,
+          email: { startsWith: `${local}@`, not: g.email },
+        },
+        data: { email: g.email },
+      });
+    } catch {
+      // (tenantId, email) is unique, so this throws if a row already holds the
+      // new address while a stale one holds the old. Say so rather than
+      // failing the seed — but say it, because that guest is then still
+      // sitting in the audience under a deliverable address.
+      console.warn(`[seed] could not re-point ${local}@… to ${g.email} — resolve by hand`);
+    }
+  }
+
+  // Backfill the birthday on guests that already exist. The upsert below
+  // passes `update: {}`, so a guest seeded before this change keeps whatever
+  // it had — which is how a reseed produced nineteen guests and exactly one
+  // dateOfBirth: only the new row got the new field. Scoped to rows where it
+  // is still null, so a date typed into the dashboard by hand survives.
+  for (const g of guestDefs) {
+    await prisma.guest.updateMany({
+      where: { tenantId: tid, email: g.email, dateOfBirth: null },
+      data: { dateOfBirth: g.dateOfBirth },
+    });
+  }
 
   const guestIds: string[] = [];
   for (const g of guestDefs) {
@@ -254,6 +398,48 @@ async function main() {
     guestIds.push(guest.id);
   }
   console.log(`✅ ${guestIds.length} Guests created`);
+
+  // ════════════════════════════════════════════════════════════════
+  // 6b. GUEST TAGS
+  //
+  // The seed created none, so the CRM's Tags tab was empty in the demo and
+  // the campaign segments could not name one. Two of those segments used to
+  // claim an audience the sender cannot express — see the note on `segment`
+  // below — and the honest way to say "these guests" is a tag, so the demo
+  // needs real ones.
+  //
+  // Names are matched by the segments above, so changing one here means
+  // changing it there.
+  // ════════════════════════════════════════════════════════════════
+  const tagDefs = [
+    { name: 'Corporate',    color: '#183153', guests: [10] },
+    { name: 'Win-Back',     color: '#c4733c', guests: [18] },
+    { name: 'Honeymoon',    color: '#c43c3c', guests: [16] },
+    { name: 'VIP',          color: '#b89040', guests: [8] },
+    { name: 'Repeat Guest', color: '#2f8f7a', guests: [0, 1, 4] },
+  ];
+
+  let tagRelations = 0;
+  for (const t of tagDefs) {
+    const tag = await prisma.guestTag.upsert({
+      where:  { tenantId_name: { tenantId: tid, name: t.name } },
+      update: {},
+      create: { tenantId: tid, name: t.name, color: t.color },
+    }).catch(() => null);
+    if (!tag) continue;
+
+    for (const idx of t.guests) {
+      const guestId = guestIds[idx];
+      if (!guestId) continue;
+      await prisma.guestTagRelation.upsert({
+        where:  { guestId_tagId: { guestId, tagId: tag.id } },
+        create: { guestId, tagId: tag.id },
+        update: {},
+      }).catch(() => {});
+      tagRelations += 1;
+    }
+  }
+  console.log(`✅ ${tagDefs.length} Guest tags created (${tagRelations} assignments)`);
 
   // ════════════════════════════════════════════════════════════════
   // 7. BOOKINGS
@@ -271,6 +457,10 @@ async function main() {
 
   const bookingDefs: BookingDef[] = [
     // ── Checked-out (past) ─────────────────────────────────────────────────
+    // Her only stay. 365 days back sits in the middle of the 355–375 day
+    // window the anniversary query looks in, so it stays a candidate for about
+    // three weeks rather than for one exact day.
+    { roomNumber: '101', guestIdx: 18, checkIn: daysAgo(368), checkOut: daysAgo(365), status: 'CHECKED_OUT', paymentStatus: 'PAID', adults: 2, children: 0, totalAmount: 9500, paidAmount: 9500, actualCheckIn: daysAgo(368), actualCheckOut: daysAgo(365), source: 'ONLINE' },
     { roomNumber: '101', guestIdx: 0,  checkIn: daysAgo(60), checkOut: daysAgo(57), status: 'CHECKED_OUT', paymentStatus: 'PAID',    adults: 2, children: 0, totalAmount: 10500, paidAmount: 10500, actualCheckIn: daysAgo(60), actualCheckOut: daysAgo(57), source: 'ONLINE' },
     { roomNumber: '201', guestIdx: 1,  checkIn: daysAgo(55), checkOut: daysAgo(52), status: 'CHECKED_OUT', paymentStatus: 'PAID',    adults: 2, children: 0, totalAmount: 19500, paidAmount: 19500, actualCheckIn: daysAgo(55), actualCheckOut: daysAgo(52), source: 'ONLINE', specialRequests: 'Anniversary arrangement' },
     { roomNumber: '301', guestIdx: 8,  checkIn: daysAgo(50), checkOut: daysAgo(46), status: 'CHECKED_OUT', paymentStatus: 'PAID',    adults: 2, children: 2, totalAmount: 48000, paidAmount: 48000, actualCheckIn: daysAgo(50), actualCheckOut: daysAgo(46), source: 'DIRECT' },
@@ -864,6 +1054,15 @@ async function main() {
   console.log(`✅ ${templateDefs.length} Email templates created`);
 
   // ── Campaigns ────────────────────────────────────────────────────
+  // Only `sent` and `bounced` are seeded. The demo used to ship 87 opens and
+  // 34 clicks on 142 sends — a 61% open rate — for tracking that does not
+  // exist: there is no open pixel, click redirect or Resend webhook anywhere
+  // in the API, so nothing writes opened, clicked, delivered or unsubscribed.
+  // Seeding them meant the demo demonstrated a feature the product does not
+  // have, to prospects as well as to us (CRM QA 2026-10-07, finding 008).
+  //
+  // `sent` is now the former `delivered` figure, so the arithmetic still holds:
+  // recipientCount = sent + bounced.
   const campaignDefs = [
     {
       name: 'Eid-ul-Fitr 2026 Promotion',
@@ -873,7 +1072,7 @@ async function main() {
       sentAt: daysAgo(14),
       scheduledAt: daysAgo(15),
       recipientCount: 142,
-      statsData: { sent: 142, delivered: 138, opened: 87, clicked: 34, bounced: 4, unsubscribed: 2 },
+      statsData: { sent: 138, bounced: 4 },
     },
     {
       name: 'Win-Back — Guests Inactive 90+ Days',
@@ -883,7 +1082,7 @@ async function main() {
       sentAt: daysAgo(7),
       scheduledAt: daysAgo(8),
       recipientCount: 63,
-      statsData: { sent: 63, delivered: 61, opened: 28, clicked: 12, bounced: 2, unsubscribed: 1 },
+      statsData: { sent: 61, bounced: 2 },
     },
     {
       name: 'Monthly Newsletter — May 2026',
@@ -893,7 +1092,7 @@ async function main() {
       sentAt: daysAgo(3),
       scheduledAt: daysAgo(4),
       recipientCount: 218,
-      statsData: { sent: 218, delivered: 212, opened: 104, clicked: 41, bounced: 6, unsubscribed: 3 },
+      statsData: { sent: 212, bounced: 6 },
     },
     {
       name: 'Summer Package Launch',
@@ -942,13 +1141,29 @@ async function main() {
         scheduledAt: c.scheduledAt,
         sentAt: c.sentAt,
         recipientCount: c.recipientCount,
+        // Only `tier` and `tag` exist as far as the sender is concerned:
+        // campaign-sender.ts reads `segment.tier` and `segment.tag` and
+        // ignores every other key. Three of the four shapes here were
+        // therefore fiction —
+        //
+        //   { tier: 'VIP' }        VIP is not a GuestTier (STANDARD, SILVER,
+        //                          GOLD, PLATINUM), so this matched nobody
+        //   { inactiveDays: 90 }   not read at all → sent to everyone
+        //   { tags: ['Corporate'] } the key is `tag`, singular, and a name →
+        //                          not read → sent to everyone
+        //
+        // So two demo campaigns advertised a narrow audience and would have
+        // mailed the whole list, and one could never find a recipient. Same
+        // class of thing as the 87 fake opens this file used to carry.
         segment: c.name.includes('VIP')
-          ? { tier: 'VIP' }
+          ? { tier: 'PLATINUM' }
           : c.name.includes('Win-Back')
-          ? { inactiveDays: 90 }
+          // The sender has no inactivity filter. A tag is the honest way to
+          // express "these guests", and the Tags tab can now make one.
+          ? { tag: 'Win-Back' }
           : c.name.includes('Corporate')
-          ? { tags: ['Corporate'] }
-          : { all: true },
+          ? { tag: 'Corporate' }
+          : {},
       },
     }).catch(() => null);
 
@@ -960,10 +1175,17 @@ async function main() {
         }).catch(() => {});
       }
 
-      // Add some EmailSend records for sent campaigns
+      // Add some EmailSend records for sent campaigns.
+      //
+      // Only SENT and FAILED, because those are the only two statuses any
+      // code path writes — campaign-sender.ts and automation.ts both set
+      // `error ? 'FAILED' : 'SENT'` and nothing else ever touches the row.
+      // This block used to cycle through DELIVERED / OPENED / CLICKED and
+      // stamp deliveredAt and openedAt, none of which the product can
+      // produce. The EmailSendStatus enum keeps those values for the
+      // tracking that should exist; the demo should not pretend it does.
       if (c.status === 'SENT' && c.sentAt) {
         const sampleGuests = guestIds.slice(0, Math.min(8, c.recipientCount));
-        const statuses = ['DELIVERED', 'OPENED', 'CLICKED', 'DELIVERED', 'OPENED', 'BOUNCED', 'DELIVERED', 'OPENED'] as const;
         for (let i = 0; i < sampleGuests.length; i++) {
           await prisma.emailSend.create({
             data: {
@@ -971,11 +1193,8 @@ async function main() {
               guestId: sampleGuests[i],
               campaignId: campaign.id,
               subject: c.subject,
-              status: statuses[i % statuses.length],
-              deliveredAt: c.sentAt,
-              openedAt: statuses[i % statuses.length] === 'OPENED' || statuses[i % statuses.length] === 'CLICKED'
-                ? new Date(c.sentAt.getTime() + 3600_000)
-                : null,
+              // One in eight failed, which matches the bounced counts above.
+              status: i % 8 === 5 ? 'FAILED' : 'SENT',
             },
           }).catch(() => {});
         }

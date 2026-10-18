@@ -14,6 +14,10 @@ on:
 env:
   REGISTRY: ghcr.io
   OWNER: asadsnapper-beep
+  # Lifted to env because the `secrets` context is not available in a step's
+  # `if`, only in `with`/`env`. `env` is, so the login step can skip itself
+  # when the secret is absent.
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
 
 concurrency:
   group: deploy-production
@@ -40,6 +44,23 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      # setup-buildx-action pulls moby/buildkit from Docker Hub to run the
+      # docker-container driver, and that pull is what failed the staging
+      # deploy on 0fa6fa9 — a timeout on auth.docker.io, after the same
+      # registry's 429 had already failed CI on 9e0cfe8. Authenticating lifts
+      # the anonymous per-IP limit that shared runners are subject to.
+      #
+      # Skipped when the secrets are absent, so a fork or a checkout without
+      # them still builds — it just builds anonymously, as before. moby/buildkit
+      # is not on public.ecr.aws or ghcr.io, so the mirror trick used for the
+      # base images is not available here.
+      - name: Log in to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -76,9 +97,9 @@ jobs:
   # The production DB is not reachable from GitHub runners (docker-internal
   # host `postgres`), so a runner-side migrate job can never work.
 
-  # ─── Step 2: Deploy via Coolify API ────────────────────────────────────────
+  # ─── Step 2: Deploy to the production server (Tailscale + restricted SSH) ──
   deploy:
-    name: Deploy via Coolify
+    name: Deploy to production server
     runs-on: ubuntu-latest
     needs: build
     environment:
@@ -86,85 +107,45 @@ jobs:
       url: https://resortpro.site
 
     steps:
-      # Root cause (confirmed live, 2026-07-28 via direct Coolify-side debugging):
-      # this service's Docker Compose config lives as a raw copy in Coolify's own
-      # DB (NOT git-linked to docker-compose.coolify.yml in this repo — editing
-      # that file does nothing by itself). The old webhook trigger asked Coolify
-      # to redeploy whatever compose it already had stored, with both images
-      # pinned to the floating `:latest` tag. Whether that redeploy actually
-      # pulled a fresh image depended on `--force-recreate` + `pull_policy: always`
-      # cache semantics inside Coolify's queued deploy job — proven unreliable:
-      # a fully green run left production running yesterday's image with today's
-      # security fixes and routes completely absent.
+      # Production no longer runs under Coolify: it is a plain docker compose stack on the
+      # Hetzner server. This job joins our private Tailscale network as the restricted
+      # `tag:ci` node (its ACL allows exactly one thing: the deploy-SSH port of that server)
+      # and runs ONE command over SSH:   <40-hex commit sha>
       #
-      # Fix: stamp this commit's SHA onto both image tags and PATCH Coolify's
-      # stored compose directly before deploying. A tag Coolify has never pulled
-      # before forces a real registry fetch — no dependency on pull_policy,
-      # recreate-cache semantics, or any other Coolify internal quirk. (Digest
-      # pinning was tried first and rejected: GHCR images from
-      # docker/build-push-action are multi-arch manifest lists, and pinning the
-      # list digest instead of the platform-specific one fails pull with
-      # "manifest unknown" — tags resolve the right platform automatically.)
-      - name: Deploy via Coolify API (SHA-tagged, guaranteed fresh)
+      # The server side validates the tag, checks that both images exist in the registry,
+      # takes a fresh database dump, switches the image tag, waits for health, and rolls back
+      # automatically (and emails the owners) if the new version is not healthy.
+      # The SSH key can run nothing else (forced command, tailnet source only).
+      #
+      # Needs these repository secrets/variables (no addresses or emails live in this file):
+      #   secrets (all of them, so the address is masked in public logs):
+      #     TS_OAUTH_CLIENT_ID, TS_OAUTH_SECRET, DEPLOY_SSH_KEY, DEPLOY_HOST, DEPLOY_KNOWN_HOSTS
+      - name: Connect to Tailscale (tag:ci)
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Deploy this commit on the server
+        timeout-minutes: 12
         env:
-          COOLIFY_API: https://manage.musafir.co.za/api/v1/services/b48m2cix8odgfuvlyr8zr31p
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
-
-          # GET returns docker_compose_raw as plain YAML text — NOT base64. Only
-          # the PATCH body needs base64. Treating GET/PATCH as symmetric here was
-          # the bug that broke the first version of this step: base64-decoding
-          # already-plain text produced garbage that matched nothing below.
-          #
-          # Also: this field is only visible on a GET at all if COOLIFY_TOKEN has
-          # the `read:sensitive` ability (not just `read`/`deploy`) — otherwise
-          # it's silently absent from the response with no error, which is why
-          # the "missing token scope" case gets its own explicit check below
-          # instead of surfacing as a confusing jq/sed failure.
-          GET_STATUS=$(curl -s -o /tmp/coolify-get.txt -w "%{http_code}" "$COOLIFY_API" \
-            -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}")
-
-          if [ "$GET_STATUS" != "200" ]; then
-            echo "Refusing to deploy: GET $COOLIFY_API returned HTTP $GET_STATUS, expected 200. Response body:"
-            cat /tmp/coolify-get.txt || true
-            exit 1
-          fi
-
-          CURRENT=$(jq -r '.docker_compose_raw' /tmp/coolify-get.txt)
-
-          if [ -z "$CURRENT" ] || [ "$CURRENT" = "null" ]; then
-            echo "Refusing to deploy: docker_compose_raw missing from GET response — COOLIFY_TOKEN likely needs the 'read:sensitive' ability added in Coolify (Keys & Tokens), not just read/deploy. Full response:"
-            cat /tmp/coolify-get.txt || true
-            exit 1
-          fi
-
-          # Match the tag on resort-pro-api/-web regardless of what it currently
-          # is (:latest on the first stamped deploy, :<previous-sha> on every
-          # deploy after that) — pinning the sed pattern to :latest alone would
-          # only work once, then find nothing to replace on deploy #2 onward.
-          NEW=$(echo "$CURRENT" | sed -E \
-            -e "s#(resort-pro-api):[A-Za-z0-9_.-]+#\1:${GITHUB_SHA}#" \
-            -e "s#(resort-pro-web):[A-Za-z0-9_.-]+#\1:${GITHUB_SHA}#")
-
-          if [ "$NEW" = "$CURRENT" ]; then
-            echo "Refusing to deploy: no resort-pro-api/resort-pro-web image lines found to stamp — compose format may have changed, check manually."
-            exit 1
-          fi
-
-          NEW_B64=$(echo "$NEW" | base64 -w0)
-
-          HTTP_STATUS=$(curl -s -o /tmp/coolify-resp.txt -w "%{http_code}" -X PATCH "$COOLIFY_API" \
-            -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"docker_compose_raw\": \"$NEW_B64\", \"instant_deploy\": true}")
-
-          echo "Coolify PATCH responded: HTTP $HTTP_STATUS"
-          cat /tmp/coolify-resp.txt || true
-
-          case "$HTTP_STATUS" in
-            2*) ;;
-            *) echo "Refusing to continue: PATCH returned HTTP $HTTP_STATUS (body above)."; exit 1 ;;
-          esac
+          for v in DEPLOY_SSH_KEY DEPLOY_HOST DEPLOY_KNOWN_HOSTS; do
+            [ -n "${!v}" ] || { echo "::error::$v is not set (repository secret/variable missing)"; exit 1; }
+          done
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -p 2222 -i ~/.ssh/deploy_key \
+              -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+              -o ConnectTimeout=20 -o ServerAliveInterval=15 \
+              "deploy@${DEPLOY_HOST}" "${GITHUB_SHA}"
 
       - name: Wait for health check — API
         run: |

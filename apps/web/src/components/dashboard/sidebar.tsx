@@ -14,6 +14,8 @@ import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
 import { authApi, tenantApi, dashboardApi } from '@/lib/api';
 import { useAiStatus } from '@/hooks/use-ai-status';
+import { useResortGroup } from '@/hooks/use-resort-group';
+import { ResortSwitcher } from './ResortSwitcher';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -25,7 +27,7 @@ import { PLAN_FEATURES } from '@resort-pro/types';
 // ─────────────────────────────────────────────────────────────────
 // Role type
 // ─────────────────────────────────────────────────────────────────
-type Role = 'OWNER' | 'MANAGER' | 'SHAREHOLDER' | 'RECEPTIONIST' | 'MARKETER' | 'DEVELOPER' | 'STAFF' | 'CHEF' | 'GUEST';
+export type Role = 'OWNER' | 'MANAGER' | 'SHAREHOLDER' | 'RECEPTIONIST' | 'MARKETER' | 'DEVELOPER' | 'STAFF' | 'CHEF' | 'GUEST';
 
 // ─────────────────────────────────────────────────────────────────
 // Role badge config
@@ -58,11 +60,15 @@ export type NavItem = {
   featureFlag?: string;
   aiFeature?: 'ai_content' | 'ai_chatbot' | 'ai_business_insights'; // hide unless this AI feature is live
   daily?: boolean; // always-visible top tier — the owner's everyday-use items
+  /** Only for an owner whose account is connected to other resorts. */
+  multiResortOnly?: boolean;
 };
 
 export const NAV_ITEMS: NavItem[] = [
   // ── Overview ──────────────────────────────────────────────
   { href: '/dashboard',            labelKey: 'nav.dashboard',    labelFallback: 'Dashboard',       icon: LayoutDashboard, group: 'Overview',         groupKey: 'groups.overview', daily: true },
+  { href: '/dashboard/resorts',    labelKey: 'nav.allResorts',   labelFallback: 'All Resorts',     icon: Building2,       group: 'Overview',         groupKey: 'groups.overview',
+    roles: ['OWNER'], multiResortOnly: true },
   { href: '/dashboard/analytics',  labelKey: 'nav.analytics',    labelFallback: 'Analytics',       icon: BarChart2,       group: 'Overview',         groupKey: 'groups.overview',
     roles: ['OWNER', 'MANAGER', 'SHAREHOLDER', 'MARKETER'] },
   { href: '/dashboard/invoices',   labelKey: 'nav.invoices',     labelFallback: 'Invoices',        icon: FileText,        group: 'Overview',         groupKey: 'groups.overview',
@@ -175,6 +181,61 @@ export function groupItems(items: NavItem[]) {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Entitlement filter — shared, deliberately
+// ─────────────────────────────────────────────────────────────────
+/**
+ * The nav items a user may actually reach: role first, then the tenant's
+ * module entitlements, then AI availability.
+ *
+ * These three rules used to live inline in the Sidebar, so the mobile More
+ * sheet applied only the first of them. A phone therefore listed paid modules
+ * the tenant had never enabled, and AI Content while AI was switched off, and
+ * every one of those tiles navigated successfully. The 2026-09-09 sidebar QA
+ * measured the gap on the same account: 36 destinations on desktop, 37 on
+ * mobile.
+ *
+ * So the rules live in one hook that both surfaces call. A second copy is
+ * precisely how the two drifted apart.
+ *
+ * Neither query is duplicated by the second caller: `tenant-modules` is one
+ * react-query key with a 5-minute staleTime, and useAiStatus keeps a
+ * module-level cache.
+ */
+export function useEntitledNavItems(role: Role): NavItem[] {
+  const { tenant } = useAuthStore();
+  const canReadModuleFlags = ['OWNER', 'MANAGER'].includes(role);
+  const canReadAiStatus = ['OWNER', 'MANAGER'].includes(role);
+
+  const { data: modulesRes } = useQuery({
+    queryKey: ['tenant-modules'],
+    queryFn: () => tenantApi.getModules(),
+    staleTime: 5 * 60 * 1000,
+    enabled: canReadModuleFlags,
+  });
+
+  const { status: aiStatus } = useAiStatus(canReadAiStatus);
+  // The 360 view is meaningless with one resort, so its entry does not exist
+  // until a second is connected.
+  const { data: resortGroup } = useResortGroup();
+  const hasConnectedResorts = (resortGroup?.resorts.length ?? 0) > 1;
+
+  const enabledModules: Record<string, boolean> = Object.fromEntries(
+    ((modulesRes?.data?.data ?? []) as { flag: string; enabled: boolean }[])
+      .map((m) => [m.flag, m.enabled])
+  );
+  const planFeatures = new Set(PLAN_FEATURES[(tenant?.plan ?? 'FREE') as keyof typeof PLAN_FEATURES] ?? []);
+  const hasFeature = (flag: string) => flag in enabledModules ? enabledModules[flag] : planFeatures.has(flag);
+
+  return getVisibleItems(role).filter((item) => {
+    if (item.featureFlag && !hasFeature(item.featureFlag)) return false;
+    // AI nav items hide unless that AI feature is live (master switch + tenant flag)
+    if (item.aiFeature && !aiStatus[item.aiFeature]) return false;
+    if (item.multiResortOnly && !hasConnectedResorts) return false;
+    return true;
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────
 // Sidebar Component
 // ─────────────────────────────────────────────────────────────────
 const EXPANDED_GROUPS_KEY = 'resort-pro-sidebar-expanded-groups';
@@ -189,8 +250,8 @@ export function Sidebar() {
   const t = useTranslations('common') as (key: string, ...args: any[]) => string;
   const locale = useLocale() as Locale;
   const role = (user?.role ?? 'STAFF') as Role;
-  const canReadModuleFlags = ['OWNER', 'MANAGER'].includes(role);
-  const canReadAiStatus = ['OWNER', 'MANAGER'].includes(role);
+  const { data: resortGroup } = useResortGroup();
+  const manyResorts = (resortGroup?.resorts.length ?? 0) > 1;
 
   useEffect(() => {
     try {
@@ -199,13 +260,6 @@ export function Sidebar() {
     } catch { /* ignore malformed/unavailable storage */ }
   }, []);
 
-  const { data: modulesRes } = useQuery({
-    queryKey: ['tenant-modules'],
-    queryFn: () => tenantApi.getModules(),
-    staleTime: 5 * 60 * 1000,
-    enabled: canReadModuleFlags,
-  });
-
   const { data: statsRes } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: () => dashboardApi.getStats(),
@@ -213,22 +267,8 @@ export function Sidebar() {
   });
   const todayCheckIns: number = statsRes?.data?.data?.stats?.todayCheckIns ?? 0;
 
-  const enabledModules: Record<string, boolean> = Object.fromEntries(
-    ((modulesRes?.data?.data ?? []) as { flag: string; enabled: boolean }[])
-      .map((m) => [m.flag, m.enabled])
-  );
-  const planFeatures = new Set(PLAN_FEATURES[(tenant?.plan ?? 'FREE') as keyof typeof PLAN_FEATURES] ?? []);
-  const hasFeature = (flag: string) => flag in enabledModules ? enabledModules[flag] : planFeatures.has(flag);
-
-  const { status: aiStatus } = useAiStatus(canReadAiStatus);
-
   const roleConfig = ROLE_LABELS[role] ?? ROLE_LABELS.STAFF;
-  const visibleItems = getVisibleItems(role).filter((item) => {
-    if (item.featureFlag && !hasFeature(item.featureFlag)) return false;
-    // AI nav items hide unless that AI feature is live (master switch + tenant flag)
-    if (item.aiFeature && !aiStatus[item.aiFeature]) return false;
-    return true;
-  });
+  const visibleItems = useEntitledNavItems(role);
   const dailyItems = visibleItems.filter((item) => item.daily);
   const grouped = groupItems(visibleItems.filter((item) => !item.daily));
 
@@ -255,9 +295,15 @@ export function Sidebar() {
           <span className="h-[11px] w-[11px] rounded-full border-[1.5px] border-gold-500" />
         </span>
         <div className="min-w-0">
-          <p className="truncate font-display text-[14px] font-medium text-[#ece7df]">
-            {tenant?.name || 'ResortPro'}
-          </p>
+          {/* An owner with several connected resorts picks one here; everyone
+              else sees the name exactly as before. */}
+          {manyResorts ? (
+            <ResortSwitcher />
+          ) : (
+            <p className="truncate font-display text-[14px] font-medium text-[#ece7df]">
+              {tenant?.name || 'ResortPro'}
+            </p>
+          )}
           <p className="text-[10.5px] text-[#698599] capitalize">
             {role === 'OWNER' ? `${tenant?.plan?.toLowerCase() || 'free'} plan` : roleConfig.label}
           </p>

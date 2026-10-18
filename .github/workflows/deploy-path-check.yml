@@ -1,0 +1,79 @@
+name: Deploy path check (dry run, changes nothing)
+
+# Proves the production deploy path works WITHOUT deploying anything:
+#   1. the CI runner can join the tailnet as `tag:ci`
+#   2. it can reach the server's deploy-SSH port and NOTHING else (the ACL boundary actually holds)
+#   3. the deploy key can run only the deploy script (arbitrary commands are refused)
+# Run it after changing Tailscale ACLs, the OAuth client, the deploy key, or the deploy workflow.
+# Needs repository secrets: TS_OAUTH_CLIENT_ID, TS_OAUTH_SECRET, DEPLOY_SSH_KEY, DEPLOY_HOST, DEPLOY_KNOWN_HOSTS.
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/deploy.yml
+      - .github/workflows/deploy-path-check.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-path-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Tailscale + restricted SSH reach the server, and nothing else
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Pull requests from forks never receive secrets; skip them instead of failing.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      - name: Connect to Tailscale (tag:ci)
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Network boundary (deploy port reachable, admin ports blocked)
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          set -u
+          [ -n "$DEPLOY_HOST" ] || { echo "::error::DEPLOY_HOST secret is missing"; exit 1; }
+          reach() { timeout 6 bash -c "exec 3<>/dev/tcp/${DEPLOY_HOST}/$1" 2>/dev/null; }
+          if reach 2222; then echo "port 2222 (deploy ssh): reachable - expected"
+          else echo "::error::deploy port 2222 is NOT reachable from tag:ci"; exit 1; fi
+          bad=0
+          for p in 22 8000 443; do
+            if reach "$p"; then echo "::error::port $p IS reachable from tag:ci - the ACL boundary is broken"; bad=1
+            else echo "port $p: blocked - expected"; fi
+          done
+          exit $bad
+
+      - name: Deploy key can run only the deploy script
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -u
+          for v in DEPLOY_SSH_KEY DEPLOY_HOST DEPLOY_KNOWN_HOSTS; do
+            [ -n "${!v}" ] || { echo "::error::$v secret is missing"; exit 1; }
+          done
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key; chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          S() { ssh -p 2222 -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+                    -o BatchMode=yes -o ConnectTimeout=20 "deploy@${DEPLOY_HOST}" "$@"; }
+
+          out=$(S "id" 2>&1 || true)
+          echo "$out" | grep -q "refused" || { echo "::error::an arbitrary command was NOT refused"; exit 1; }
+          echo "arbitrary command refused - expected"
+
+          out=$(S "dryrun 0000000000000000000000000000000000000000" 2>&1 || true)
+          echo "$out" | grep -q "deploy requested" || { echo "::error::the deploy script did not run"; exit 1; }
+          echo "$out" | grep -qE "image not found|DRYRUN OK" || { echo "::error::unexpected dry-run result"; exit 1; }
+          echo "deploy script reachable and validating the tag - expected (nothing was deployed)"

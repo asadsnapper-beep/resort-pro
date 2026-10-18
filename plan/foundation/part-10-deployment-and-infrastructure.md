@@ -1,3 +1,16 @@
+> **Superseded 2026-10-16.** Production left Coolify on 2026-10-15/16. It is now
+> a plain `docker compose` stack in `/opt/resortpro` on the host, containers
+> `rp-postgres` / `rp-redis` / `rp-api` / `rp-web` / `rp-worker` / `rp-backup`,
+> deployed by `.github/workflows/deploy.yml` over Tailscale + restricted SSH.
+>
+> **Do not follow any Coolify step below.** The old service is stopped and
+> renamed `ARCHIVED-resortpro-DO-NOT-START`; starting it would put a second
+> stack with stale data behind the same hostnames. Config changes are now a
+> diff for `/opt/resortpro/.env` or the server's compose.
+>
+> Kept as a record of what was wrong and how it was found. For what is true
+> now, read the Delivery section of `memory/projects/resortpro.md`.
+
 # Part 10 — Deployment & Infrastructure
 
 ## Overview

@@ -61,107 +61,120 @@ export function LandingPage({ isBn = false }: { isBn?: boolean }) {
   }, []);
 
   const navLinks = [
-    { label: isBn ? 'কীভাবে কাজ করে' : 'How it works', href: '#how' },
     { label: isBn ? 'ফিচার' : 'Features', href: '#features' },
     { label: isBn ? 'প্রাইসিং' : 'Pricing', href: '#pricing' },
   ];
 
   const tryLabel = isBn ? 'ResortPro ব্যবহার করে দেখুন' : 'Try ResortPro';
 
-  const problems = [
-    {
-      icon: (
-        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-          <rect x="12" y="4" width="16" height="32" rx="3" stroke={NAVY} strokeWidth="2" />
-          <circle cx="20" cy="30" r="1.5" fill={NAVY} />
-        </svg>
-      ),
-      text: isBn ? 'কল আর মেসেজে বুকিং ডিটেইলস হারিয়ে যায়' : 'Booking details are lost in calls and messages',
-    },
-    {
-      icon: (
-        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-          <rect x="6" y="6" width="28" height="28" rx="3" stroke={NAVY} strokeWidth="2" />
-          <line x1="6" y1="14" x2="34" y2="14" stroke={NAVY} strokeWidth="2" />
-        </svg>
-      ),
-      text: isBn ? 'কোন রুম খালি আছে সবসময় জানা থাকে না' : 'You do not always know which room is available',
-    },
-    {
-      icon: (
-        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-          <rect x="7" y="10" width="26" height="22" rx="2" stroke={NAVY} strokeWidth="2" />
-          <line x1="7" y1="17" x2="33" y2="17" stroke={NAVY} strokeWidth="2" />
-        </svg>
-      ),
-      text: isBn ? 'গেস্ট পেমেন্ট আর হিসাব গুলিয়ে যায়' : 'Guest payments and records become confusing',
-    },
-  ];
+  // Nine, in a 3×3 grid. Four cards spread over a full-width band said less
+  // than the product does; this is the same section carrying the real list.
+  // Each icon is drawn here in the same plain stroke style rather than pulled
+  // from an icon set, so the row reads as one hand.
+  const icon = (paths: React.ReactNode) => (
+    <svg width="34" height="34" viewBox="0 0 40 40" fill="none" aria-hidden="true">{paths}</svg>
+  );
 
   const features = [
     {
-      icon: (
-        <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
-          <rect x="5" y="16" width="12" height="18" rx="2" stroke={NAVY} strokeWidth="2" />
-          <rect x="23" y="8" width="12" height="26" rx="2" stroke={NAVY} strokeWidth="2" />
-        </svg>
-      ),
-      title: isBn ? 'রুম ও হাউসকিপিং' : 'Rooms & housekeeping',
+      icon: icon(<>
+        <rect x="4" y="10" width="32" height="24" rx="3" stroke={NAVY} strokeWidth="2" />
+        <line x1="4" y1="18" x2="36" y2="18" stroke={NAVY} strokeWidth="2" />
+        <line x1="12" y1="6" x2="12" y2="14" stroke={NAVY} strokeWidth="2" />
+        <line x1="28" y1="6" x2="28" y2="14" stroke={NAVY} strokeWidth="2" />
+      </>),
+      title: isBn ? 'বুকিং এখন সহজ' : 'Bookings made simple',
       desc: isBn
-        ? 'খালি, দখলকৃত ও পরিষ্কারের রুম দেখুন, এক ট্যাপে চেক-ইন/চেক-আউট করুন।'
-        : 'See available, occupied and cleaning rooms, and check guests in or out in one tap.',
+        ? 'এক জায়গা থেকে প্রতিটা বুকিং তৈরি, ম্যানেজ আর ট্র্যাক করুন।'
+        : 'Create, manage and track every booking from one clear place.',
     },
     {
-      icon: (
-        <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
-          <rect x="4" y="10" width="32" height="24" rx="3" stroke={NAVY} strokeWidth="2" />
-          <line x1="4" y1="18" x2="36" y2="18" stroke={NAVY} strokeWidth="2" />
-          <line x1="12" y1="6" x2="12" y2="14" stroke={NAVY} strokeWidth="2" />
-          <line x1="28" y1="6" x2="28" y2="14" stroke={NAVY} strokeWidth="2" />
-        </svg>
-      ),
-      title: isBn ? 'বুকিং' : 'Bookings',
+      icon: icon(<>
+        <path d="M8 34V6h16v28" stroke={NAVY} strokeWidth="2" strokeLinejoin="round" />
+        <path d="M24 20h10m0 0-4-4m4 4-4 4" stroke={NAVY} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </>),
+      title: isBn ? 'দ্রুত চেক-ইন ও চেক-আউট' : 'Faster check-in and check-out',
       desc: isBn
-        ? 'কল, ওয়াক-ইন বা নিজের ওয়েবসাইট থেকে মিনিটে বুকিং তৈরি ও ম্যানেজ করুন।'
-        : 'Create and manage bookings in minutes — from calls, walk-ins or your own website.',
+        ? 'অতিথিকে দ্রুত বরণ করুন, ওয়াক-ইন সামলান, আর নিশ্চিন্তে থাকা শেষ করুন।'
+        : 'Welcome guests quickly, handle walk-ins, and close stays with confidence.',
     },
     {
-      icon: (
-        <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
-          <circle cx="20" cy="14" r="7" stroke={NAVY} strokeWidth="2" />
-          <path d="M6 34c0-8 6-12 14-12s14 4 14 12" stroke={NAVY} strokeWidth="2" />
-        </svg>
-      ),
-      title: isBn ? 'গেস্ট' : 'Guests',
+      icon: icon(<>
+        <rect x="5" y="16" width="12" height="18" rx="2" stroke={NAVY} strokeWidth="2" />
+        <rect x="23" y="8" width="12" height="26" rx="2" stroke={NAVY} strokeWidth="2" />
+      </>),
+      title: isBn ? 'রুম ও হাউসকিপিং' : 'Room and housekeeping control',
       desc: isBn
-        ? 'গেস্টের তথ্য, ডকুমেন্ট ও থাকার ইতিহাস এক জায়গায় রাখুন।'
-        : 'Keep guest details, documents and stay history together.',
+        ? 'কোন রুম প্রস্তুত, দখলে, পরিষ্কার হচ্ছে বা নজর দরকার — সবসময় জানুন।'
+        : 'Always know which rooms are ready, occupied, cleaning, or need attention.',
     },
     {
-      icon: (
-        <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
-          <rect x="4" y="9" width="32" height="22" rx="3" stroke={NAVY} strokeWidth="2" />
-          <line x1="4" y1="16" x2="36" y2="16" stroke={NAVY} strokeWidth="2" />
-        </svg>
-      ),
-      title: isBn ? 'পেমেন্ট' : 'Payments',
+      icon: icon(<>
+        <rect x="4" y="8" width="32" height="24" rx="3" stroke={NAVY} strokeWidth="2" />
+        <line x1="4" y1="15" x2="36" y2="15" stroke={NAVY} strokeWidth="2" />
+        <circle cx="9" cy="11.5" r="1.4" fill={NAVY} />
+        <circle cx="14" cy="11.5" r="1.4" fill={NAVY} />
+      </>),
+      title: isBn ? 'নিজের বুকিং ওয়েবসাইট' : 'Your own booking website',
       desc: isBn
-        ? 'ইনভয়েস, পেমেন্ট ও আয় স্বয়ংক্রিয়ভাবে ট্র্যাক করুন।'
-        : 'Track invoices, payments and revenue automatically.',
+        ? 'অতিথিরা আপনার রিসোর্টের ওয়েবসাইট থেকেই খালি রুম দেখে সরাসরি বুক করতে পারবেন।'
+        : 'Let guests check availability and book directly from your resort website.',
     },
-  ];
-
-  const steps = [
-    isBn ? 'আপনার রুম যোগ করুন' : 'Add your rooms',
-    isBn ? 'বুকিং নেওয়া শুরু করুন' : 'Start taking bookings',
-    isBn ? 'স্বচ্ছতার সাথে রিসোর্ট চালান' : 'Run your resort with clarity',
-  ];
-
-  const trustBullets = [
-    isBn ? 'কোনো টেকনিক্যাল অভিজ্ঞতা লাগবে না' : 'No technical experience needed',
-    isBn ? 'কম্পিউটার বা ফোন যেকোনো জায়গা থেকে ব্যবহার করুন' : 'Use it from your computer or phone',
-    isBn ? 'আপনার রিসোর্টের তথ্য থাকে সম্পূর্ণ গোপন' : 'Your resort data stays private',
-    isBn ? 'প্রয়োজনে বন্ধুত্বপূর্ণ সাপোর্ট পাবেন' : 'Friendly support when you need help',
+    {
+      icon: icon(<>
+        <circle cx="20" cy="14" r="7" stroke={NAVY} strokeWidth="2" />
+        <path d="M6 34c0-8 6-12 14-12s14 4 14 12" stroke={NAVY} strokeWidth="2" />
+      </>),
+      title: isBn ? 'গেস্ট হিস্ট্রি ও CRM' : 'Guest history and CRM',
+      desc: isBn
+        ? 'প্রতিটি অতিথি, তাঁদের থাকা, পছন্দ আর বুকিংয়ের ইতিহাস মনে রাখুন।'
+        : 'Remember every guest, their stays, preferences, and booking history.',
+    },
+    {
+      icon: icon(<>
+        <rect x="4" y="9" width="32" height="22" rx="3" stroke={NAVY} strokeWidth="2" />
+        <line x1="4" y1="16" x2="36" y2="16" stroke={NAVY} strokeWidth="2" />
+      </>),
+      title: isBn ? 'পেমেন্ট ও ইনভয়েস' : 'Payments and invoices',
+      desc: isBn
+        ? 'কাগজপত্রের পেছনে না ছুটে পেমেন্ট, বাকি আর ইনভয়েস ট্র্যাক করুন।'
+        : 'Track payments, balances and invoices without chasing paperwork.',
+    },
+    {
+      icon: icon(<>
+        <path d="M12 6v12a4 4 0 0 0 8 0V6" stroke={NAVY} strokeWidth="2" strokeLinecap="round" />
+        <line x1="16" y1="18" x2="16" y2="34" stroke={NAVY} strokeWidth="2" strokeLinecap="round" />
+        <path d="M28 6c-3 3-3 12 0 12v16" stroke={NAVY} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </>),
+      title: isBn ? 'রেস্টুরেন্ট ও খাবারের অর্ডার' : 'Restaurant and food orders',
+      desc: isBn
+        ? 'প্রতিদিনের রিসোর্ট কাজের পাশাপাশি রেস্টুরেন্টের অর্ডারও সামলান।'
+        : 'Manage restaurant orders alongside your daily resort operations.',
+    },
+    {
+      icon: icon(<>
+        <line x1="6" y1="34" x2="34" y2="34" stroke={NAVY} strokeWidth="2" strokeLinecap="round" />
+        <rect x="9" y="20" width="6" height="12" rx="1.5" stroke={NAVY} strokeWidth="2" />
+        <rect x="18" y="12" width="6" height="20" rx="1.5" stroke={NAVY} strokeWidth="2" />
+        <rect x="27" y="24" width="6" height="8" rx="1.5" stroke={NAVY} strokeWidth="2" />
+      </>),
+      title: isBn ? 'প্রতিদিনের ব্যবসার রিপোর্ট' : 'Daily business reports',
+      desc: isBn
+        ? 'অকুপেন্সি, আগমন, প্রস্থান, পেমেন্ট আর পারফরম্যান্স এক নজরে দেখুন।'
+        : 'See occupancy, arrivals, departures, payments and performance at a glance.',
+    },
+    {
+      icon: icon(<>
+        <rect x="5" y="5" width="13" height="13" rx="2" stroke={NAVY} strokeWidth="2" />
+        <rect x="22" y="5" width="13" height="13" rx="2" stroke={NAVY} strokeWidth="2" />
+        <rect x="5" y="22" width="13" height="13" rx="2" stroke={NAVY} strokeWidth="2" />
+        <rect x="22" y="22" width="13" height="13" rx="2" stroke={NAVY} strokeWidth="2" />
+      </>),
+      title: isBn ? 'এক টিম, এক ড্যাশবোর্ড' : 'One team, one dashboard',
+      desc: isBn
+        ? 'ফ্রন্ট ডেস্ক, রুম, স্টাফ, মেইনটেন্যান্স আর অপারেশন — সব একসাথে যুক্ত রাখুন।'
+        : 'Keep front desk, rooms, staff, maintenance and operations connected.',
+    },
   ];
 
   const pricingTiers = [
@@ -292,45 +305,53 @@ export function LandingPage({ isBn = false }: { isBn?: boolean }) {
         )}
       </header>
 
-      {/* HERO */}
-      <section className="mx-auto grid max-w-[1240px] gap-12 px-5 py-16 sm:px-8 lg:grid-cols-2 lg:items-center lg:gap-16 lg:py-24">
-        <div className="min-w-0">
-          <Eyebrow>{isBn ? 'বাংলাদেশ ও দক্ষিণ এশিয়ার রিসোর্ট মালিকদের জন্য' : 'For resort owners in Bangladesh & South Asia'}</Eyebrow>
-          <h1 className="mt-4 text-[clamp(2.6rem,5.5vw,3.5rem)] font-extrabold leading-[1.12]">
+      {/* HERO
+          A dark band, centred, one button, and the dashboard shot starting
+          inside it and running past its lower edge into the section below.
+          The overlap is the whole idea: the page opens on the product rather
+          than on a column of text beside it. */}
+      <section className="relative" style={{ background: NAVY }}>
+        <div className="mx-auto max-w-[820px] px-5 pt-20 text-center sm:px-8 sm:pt-28">
+          <span className="font-bitcount text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: GOLD }}>
+            {isBn ? 'বাংলাদেশ ও দক্ষিণ এশিয়ার রিসোর্ট মালিকদের জন্য' : 'For resort owners in Bangladesh & South Asia'}
+          </span>
+          <h1 className="mt-5 text-[clamp(2.3rem,5vw,3.3rem)] font-extrabold leading-[1.15] text-white">
             {isBn ? 'প্রতিদিনের ঝামেলা ছাড়াই আপনার রিসোর্ট চালান।' : 'Run your resort without the daily confusion.'}
           </h1>
-          <p className="mt-5 max-w-[520px] text-lg leading-[1.6]" style={{ color: MUTED }}>
+          <p className="mx-auto mt-5 max-w-[620px] text-lg leading-[1.6] text-white/70">
             {isBn
               ? 'রুম, বুকিং, গেস্ট আর পেমেন্ট — সবকিছু এক জায়গা থেকে সহজে ম্যানেজ করুন। কোনো খাতা না, এক্সেলের ঝামেলা না, কোনো বুকিং মিস না।'
               : 'Manage rooms, bookings, guests and payments in one simple place. No notebook, no Excel mess, no missed booking.'}
           </p>
-          <div className="mt-9 flex flex-wrap items-center gap-4">
+
+          {/* One button. A second one of equal weight asks a visitor to choose
+              before they know enough to choose; the quiet link below does not. */}
+          <div className="mt-9 flex flex-col items-center gap-4">
             <Link
               href="/try"
-              className="rounded-lg px-8 py-4 text-[17px] font-bold text-white transition-colors"
+              className="rounded-lg px-9 py-4 text-[17px] font-bold text-white transition-colors"
               style={{ background: GOLD }}
               onMouseEnter={(e) => { e.currentTarget.style.background = GOLD_HOVER; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = GOLD; }}
             >
               {tryLabel}
             </Link>
-            <a
-              href="#how"
-              className="rounded-lg border-2 px-8 py-4 text-[17px] font-bold transition-colors hover:bg-black/[.03]"
-              style={{ borderColor: NAVY }}
-            >
-              {isBn ? 'কীভাবে কাজ করে দেখুন' : 'See how it works'}
+            <a href="#features" className="text-sm font-bold text-white/70 underline-offset-4 hover:text-white hover:underline">
+              {isBn ? 'কী কী আছে দেখুন' : 'See what it does'}
             </a>
             {launchOfferActive && (
               <span className="font-bitcount text-xs font-semibold uppercase tracking-[0.1em]" style={{ color: GOLD }}>
-                · {isBn ? 'লঞ্চ অফার: ৩ মাস ফ্রি' : 'Launch offer: 3 months free'}
+                {isBn ? 'লঞ্চ অফার: ৩ মাস ফ্রি' : 'Launch offer: 3 months free'}
               </span>
             )}
           </div>
         </div>
 
-        <div className="min-w-0">
-          <div className="relative overflow-hidden rounded-2xl shadow-[0_24px_60px_-20px_rgba(20,49,77,0.3)]">
+        {/* The screenshot sits in the hero and hangs below it. The spacer under
+            it is the part that hangs over, so the next section starts behind
+            the image instead of after it. */}
+        <div className="mx-auto mt-14 max-w-[1040px] px-5 sm:px-8">
+          <div className="relative -mb-[22%] overflow-hidden rounded-2xl shadow-[0_30px_70px_-20px_rgba(0,0,0,0.45)] sm:-mb-[16%]">
             <Image
               src="/brand/hero-dashboard-preview.png"
               alt={isBn ? 'ResortPro ড্যাশবোর্ড — আজকের বুকিং, রুম ও আয় এক নজরে' : "ResortPro dashboard — today's bookings, rooms, and revenue at a glance"}
@@ -340,49 +361,21 @@ export function LandingPage({ isBn = false }: { isBn?: boolean }) {
               className="h-auto w-full object-cover"
             />
           </div>
-          <div className="mt-4 grid grid-cols-3 divide-x overflow-hidden rounded-xl border text-center" style={{ borderColor: BORDER }}>
-            {[
-              isBn ? 'আজকের বুকিং' : "Today's bookings",
-              isBn ? 'খালি রুম' : 'Available rooms',
-              isBn ? 'আজকের আয়' : 'Revenue today',
-            ].map((label) => (
-              <span key={label} className="px-2 py-3 text-[11px] font-bold uppercase tracking-[0.06em] sm:text-xs" style={{ borderColor: BORDER }}>
-                {label}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* PROBLEM */}
-      <section className="py-20 sm:py-24" style={{ background: CREAM }}>
-        <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
-          <h2 className="mx-auto max-w-[700px] text-center text-[clamp(1.8rem,3.5vw,2.4rem)] font-extrabold leading-[1.3]">
-            {isBn
-              ? 'রিসোর্ট চালানো এমনিতেই কঠিন। এটা ম্যানেজ করা কঠিন হওয়া উচিত না।'
-              : 'Running a resort is already hard. Managing it should not be.'}
-          </h2>
-          <div className="mt-14 grid gap-6 sm:grid-cols-3">
-            {problems.map((p) => (
-              <div key={p.text} className="rounded-2xl border bg-white p-8" style={{ borderColor: BORDER }}>
-                {p.icon}
-                <p className="mt-5 text-lg font-bold leading-[1.5]">{p.text}</p>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 
       {/* SOLUTION / FEATURES */}
-      <section id="features" className="py-20 sm:py-24">
+      <section id="features" className="pb-20 pt-[26%] sm:pb-24 sm:pt-[20%]">
         <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
           <h2 className="text-center text-[clamp(1.8rem,3.5vw,2.4rem)] font-extrabold">
-            {isBn ? 'আপনার প্রতিদিনের রিসোর্ট কাজের জন্য এক জায়গা।' : 'One place for your daily resort work.'}
+            {isBn ? 'আমাদের ফিচার' : 'Our features'}
           </h2>
           <p className="mt-4 text-center text-lg" style={{ color: MUTED }}>
-            {isBn ? 'ফ্রন্ট ডেস্কের যা যা লাগে, ঠিক ততটুকুই — বাড়তি কিছু না।' : "Everything a front desk needs — nothing you don't."}
+            {isBn
+              ? 'রিসোর্ট চালাতে যা যা লাগে — প্রতিদিনের ঝামেলা ছাড়াই।'
+              : 'Everything you need to run your resort — without the daily chaos.'}
           </p>
-          <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {features.map((f) => (
               <div key={f.title} className="rounded-2xl p-7" style={{ background: CREAM }}>
                 {f.icon}
@@ -391,65 +384,40 @@ export function LandingPage({ isBn = false }: { isBn?: boolean }) {
               </div>
             ))}
           </div>
-        </div>
-      </section>
 
-      {/* HOW IT WORKS */}
-      <section id="how" className="py-20 sm:py-24" style={{ background: CREAM }}>
-        <div className="mx-auto max-w-[900px] px-5 text-center sm:px-8">
-          <h2 className="text-[clamp(1.8rem,3.5vw,2.4rem)] font-extrabold">
-            {isBn ? 'প্রথম দিন থেকেই সহজ।' : 'Simple from day one.'}
-          </h2>
-          <div className="mt-14 grid gap-10 sm:grid-cols-3">
-            {steps.map((step, index) => (
-              <div key={step}>
-                <div className="font-bitcount text-4xl font-normal" style={{ color: GOLD }}>{index + 1}</div>
-                <p className="mt-3 text-lg font-bold">{step}</p>
+          {/* The one thing here that is not a list of modules. It used to be a
+              section of its own with its own heading, which gave a single
+              feature the same weight as the whole product. */}
+          <div className="mx-auto mt-14 grid max-w-[900px] gap-8 rounded-2xl p-8 lg:grid-cols-2 lg:items-center" style={{ background: CREAM }}>
+            <div>
+              <h3 className="text-xl font-extrabold leading-[1.4]">
+                {isBn ? 'প্রশ্ন আছে? শুধু জিজ্ঞেস করুন।' : 'Have a question? Just ask.'}
+              </h3>
+              <p className="mt-3 text-[15px] leading-[1.6]" style={{ color: MUTED }}>
+                {isBn
+                  ? 'বুকিং, রুম আর গেস্ট নিয়ে প্রশ্নের উত্তর সহজ ভাষায় — মেনুতে খোঁজাখুঁজি লাগে না।'
+                  : 'Answers about your bookings, rooms and guests in plain language — no searching through menus.'}
+              </p>
+            </div>
+            <div className="flex flex-col gap-3">
+              <div className="self-end max-w-[85%] rounded-xl px-4 py-3 text-[15px] text-white" style={{ background: NAVY }}>
+                {isBn ? 'আজ রাতে কোন রুম খালি আছে?' : 'Which rooms are free tonight?'}
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CHAT HELPER */}
-      <section className="py-20 sm:py-24">
-        <div className="mx-auto grid max-w-[900px] gap-12 px-5 sm:px-8 lg:grid-cols-2 lg:items-center">
-          <div>
-            <h2 className="text-[clamp(1.8rem,3.5vw,2.4rem)] font-extrabold leading-[1.3]">
-              {isBn ? 'প্রশ্ন আছে? শুধু জিজ্ঞেস করুন।' : 'Have a question? Just ask.'}
-            </h2>
-            <p className="mt-5 text-lg leading-[1.6]" style={{ color: MUTED }}>
-              {isBn
-                ? 'ResortPro-এর ভেতরেই একটা সহজ চ্যাট হেল্পার আছে যা আপনার বুকিং, রুম আর গেস্ট নিয়ে প্রশ্নের সহজ ভাষায় উত্তর দেয় — কোনো ম্যানুয়াল পড়া বা মেনুতে খোঁজাখুঁজি লাগে না।'
-                : 'A simple chat helper inside ResortPro answers questions about your bookings, rooms and guests in plain language — no manuals, no searching through menus.'}
-            </p>
-          </div>
-          <div className="flex flex-col gap-3.5 rounded-2xl p-7" style={{ background: CREAM }}>
-            <div className="self-end max-w-[85%] rounded-xl px-4.5 py-3.5 text-[15px] text-white" style={{ background: NAVY }}>
-              {isBn ? 'আজ রাতে কোন রুম খালি আছে?' : 'Which rooms are free tonight?'}
-            </div>
-            <div className="self-start max-w-[85%] rounded-xl border bg-white px-4.5 py-3.5 text-[15px]" style={{ borderColor: BORDER }}>
-              {isBn ? 'আজ রাতে আপনার ৬টা রুম খালি আছে — ৩টা ডাবল আর ৩টা ফ্যামিলি রুম।' : 'You have 6 rooms free tonight — 3 doubles and 3 family rooms.'}
+              <div className="self-start max-w-[85%] rounded-xl border bg-white px-4 py-3 text-[15px]" style={{ borderColor: BORDER }}>
+                {isBn ? 'আজ রাতে ৬টা রুম খালি — ৩টা ডাবল, ৩টা ফ্যামিলি।' : 'Six rooms free tonight — 3 doubles, 3 family.'}
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* TRUST + TESTIMONIAL */}
+      {/* TESTIMONIAL */}
       <section className="py-20 sm:py-24">
+        {/* One resort owner saying one thing beats four bullets claiming it.
+            "No technical experience needed", "your data stays private" and the
+            other two were assertions about ourselves; this is not. */}
         <div className="mx-auto max-w-[1240px] px-5 text-center sm:px-8">
-          <h2 className="text-[clamp(1.8rem,3.5vw,2.4rem)] font-extrabold">
-            {isBn ? 'প্রকৃত রিসোর্ট মালিকদের জন্য তৈরি।' : 'Built for real resort owners.'}
-          </h2>
-          <div className="mt-12 grid grid-cols-2 gap-6 sm:grid-cols-4">
-            {trustBullets.map((b) => (
-              <div key={b} className="flex flex-col items-center gap-3">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ background: NAVY }} />
-                <p className="text-[15px] font-bold leading-[1.4]">{b}</p>
-              </div>
-            ))}
-          </div>
-          <div className="mx-auto mt-14 flex max-w-[640px] items-center gap-5 rounded-2xl p-8 text-left" style={{ background: CREAM }}>
+          <div className="mx-auto flex max-w-[640px] items-center gap-5 rounded-2xl p-8 text-left" style={{ background: CREAM }}>
             <span
               className="flex h-16 w-16 flex-none items-center justify-center rounded-full font-bitcount text-lg font-bold"
               style={{ background: GOLD, color: '#fff' }}
@@ -478,8 +446,8 @@ export function LandingPage({ isBn = false }: { isBn?: boolean }) {
           </h2>
           <p className="mt-4 text-lg" style={{ color: MUTED }}>
             {isBn
-              ? 'যখন প্রস্তুত, তখন মার্কেটিং, লয়্যালটি ও মাল্টি-প্রপার্টি টুলস যোগ করুন।'
-              : "Add marketing, loyalty and multi-property tools whenever you're ready."}
+              ? 'যখন প্রস্তুত, তখন মার্কেটিং, লয়্যালটি ও আরও প্রপার্টি যোগ করুন।'
+              : "Add marketing, loyalty and more properties whenever you're ready."}
           </p>
           <div className="mt-12 grid gap-5 sm:grid-cols-3">
             {pricingTiers.map((tier) => (

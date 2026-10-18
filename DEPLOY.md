@@ -1,3 +1,19 @@
+> # ⚠ HISTORICAL — this is not how ResortPro is deployed
+>
+> Production left Coolify on 2026-10-15/16. It is now a plain `docker compose`
+> stack in `/opt/resortpro` on the Hetzner host, deployed by
+> `.github/workflows/deploy.yml` over Tailscale + restricted SSH, which runs
+> `/opt/resortpro/ops/deploy.sh <sha>`. Traefik still fronts it and still comes
+> from Coolify, but nothing else about ResortPro is in Coolify.
+>
+> **Do not follow the steps below.** The old Coolify service is stopped and
+> renamed `ARCHIVED-resortpro-DO-NOT-START`; starting it would put a second
+> stack with stale data behind the same hostnames. For what is true now, read
+> the Delivery section of `memory/projects/resortpro.md`.
+>
+> Kept because the reasoning and the problems hit along the way are still worth
+> reading.
+
 # ResortPro — Coolify Deployment Guide
 
 ## Architecture

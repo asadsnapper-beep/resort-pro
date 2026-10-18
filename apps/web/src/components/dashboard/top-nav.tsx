@@ -3,6 +3,7 @@
 import { Search, Moon, Sun, AlertTriangle, ArrowRight, X, PanelLeft, PanelLeftClose } from 'lucide-react';
 import { ElectronStatusBadge } from './ElectronStatusBadge';
 import { NotificationBell } from './NotificationBell';
+import { PropertySwitcher } from './PropertySwitcher';
 import { useTheme } from 'next-themes';
 import { useQuery } from '@tanstack/react-query';
 import { billingApi } from '@/lib/api';
@@ -116,6 +117,7 @@ export function TopNav() {
         </div>
 
         <div className="flex items-center gap-1">
+          <PropertySwitcher />
           <ElectronStatusBadge />
 
           <Button

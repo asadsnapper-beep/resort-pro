@@ -20,7 +20,7 @@ import { createAdminNotification } from './notifications';
  * Wrap each call site with this instead of a blank catch so a real send
  * failure creates an admin notification instead of disappearing.
  */
-export function trackGuestEmail(kind: string, bookingId: string, tenantId: string, promise: Promise<void>) {
+export function trackGuestEmail(kind: string, bookingId: string, tenantId: string, promise: Promise<unknown>) {
   promise.catch(err => {
     createAdminNotification({
       type: 'guest_email_failed',
@@ -142,7 +142,12 @@ function bookingTable({
 
 // ── Email senders ──────────────────────────────────────────────────────────
 
-export async function sendBookingConfirmation(bookingId: string) {
+/**
+ * Returns the provider's answer, or null when nothing was attempted (no such
+ * booking, or the resort has confirmation emails switched off). It used to
+ * return nothing, so a caller could not tell a sent email from a skipped one.
+ */
+export async function sendBookingConfirmation(bookingId: string): Promise<{ id: string | null; error: string | null } | null> {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
     include: {
@@ -151,10 +156,10 @@ export async function sendBookingConfirmation(bookingId: string) {
       tenant: { select: { name: true, email: true, phone: true, currency: true, logoUrl: true, brandPrimaryColor: true } },
     },
   });
-  if (!booking) return;
+  if (!booking) return null;
 
   const settings = await getEmailSettings(booking.tenantId);
-  if (!settings.sendConfirmation) return;
+  if (!settings.sendConfirmation) return null;
 
   const nights = calculateNights(booking.checkIn, booking.checkOut);
   const primary = booking.tenant.brandPrimaryColor ?? '#1a6b5e';
@@ -177,7 +182,7 @@ export async function sendBookingConfirmation(bookingId: string) {
     <p style="color:#555;font-size:14px">If you have any questions, please don't hesitate to contact us${booking.tenant.email ? ` at <a href="mailto:${booking.tenant.email}" style="color:${primary}">${booking.tenant.email}</a>` : ''}.</p>
   `;
 
-  await sendEmail({
+  return sendEmail({
     to: booking.guest.email,
     subject: `Booking Confirmed — ${booking.tenant.name}`,
     html: wrapGuest({
