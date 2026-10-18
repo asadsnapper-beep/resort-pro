@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">ResortPro symbol</title>
+  <desc id="desc">A geometric letter R with a gold resort roof in its open doorway.</desc>
+  <path fill="#183153" fill-rule="evenodd" d="M96 432V104c0-35.35 28.65-64 64-64h108c94.99 0 156 52.2 156 137.5 0 57.61-29.66 101.68-82.52 124.68L432 432h-97.58l-80.35-116H192v116H96Zm96-201h69c41.43 0 67-19.17 67-52.5S302.43 126 261 126h-69v105Z"/>
+  <path fill="#D4A853" d="m154 236 102-78 102 78-24 31-78-60-78 60-24-31Z"/>
+</svg>

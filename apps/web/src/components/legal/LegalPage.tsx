@@ -1,6 +1,6 @@
-import Image from 'next/image';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { BrandLogo } from '@/components/brand/BrandLogo';
 
 // Palette matches the landing page's design system
 // (claude.ai/design/p/d56b55b0-882c-44d6-aecd-3667a5499d43 — "ResortPro Landing.dc.html").
@@ -29,20 +29,8 @@ export function LegalPage({
       {/* Header */}
       <header className="border-b bg-white" style={{ borderColor: BORDER }}>
         <div className="mx-auto flex min-h-[72px] max-w-[900px] items-center justify-between px-5 sm:px-8">
-          <Link href="/" className="flex items-center gap-2.5" aria-label="ResortPro home">
-            <span
-              className="relative flex h-9 w-9 flex-none items-center justify-center overflow-hidden rounded-lg"
-              style={{ background: NAVY }}
-            >
-              <Image
-                src="/brand/resortpro-icon-mark.png"
-                alt="ResortPro"
-                fill
-                sizes="36px"
-                className="scale-125 object-cover mix-blend-screen"
-              />
-            </span>
-            <span className="text-lg font-extrabold">ResortPro</span>
+          <Link href="/" className="flex items-center" aria-label="ResortPro home">
+            <BrandLogo />
           </Link>
           <Link href="/" className="text-sm font-semibold transition-colors hover:opacity-70">
             ← Back to home
@@ -79,20 +67,8 @@ export function LegalPage({
       {/* Footer — matches apps/web/src/components/landing/LandingPage.tsx */}
       <footer style={{ background: NAVY }} className="text-white">
         <div className="mx-auto flex max-w-[900px] flex-col items-center gap-6 px-5 py-10 sm:flex-row sm:justify-between sm:px-8">
-          <Link href="/" className="flex items-center gap-2.5">
-            <span
-              className="relative flex h-9 w-9 flex-none items-center justify-center overflow-hidden rounded-lg"
-              style={{ background: '#fff' }}
-            >
-              <Image
-                src="/brand/resortpro-icon-mark.png"
-                alt="ResortPro"
-                fill
-                sizes="36px"
-                className="scale-125 object-cover"
-              />
-            </span>
-            <span className="text-base font-extrabold">ResortPro</span>
+          <Link href="/" className="flex items-center">
+            <BrandLogo inverse />
           </Link>
           <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm font-semibold">
             <Link href="/terms" className="transition-colors hover:opacity-70" style={{ color: GOLD }}>Terms</Link>

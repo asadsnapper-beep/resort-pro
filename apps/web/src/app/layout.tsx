@@ -16,18 +16,27 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://resortpro.site'),
   title: { template: '%s | ResortPro', default: 'ResortPro – Resort Management Platform' },
   description: 'All-in-one resort management software for small resort owners',
-  icons: { icon: '/favicon.ico' },
+  manifest: '/site.webmanifest',
+  icons: {
+    icon: [
+      { url: '/logo/favicon-16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/logo/favicon-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/logo/favicon-48.png', sizes: '48x48', type: 'image/png' },
+    ],
+    shortcut: '/logo/favicon.ico',
+    apple: '/logo/apple-touch-icon.png',
+  },
   openGraph: {
     title: 'ResortPro – Resort Management, Simplified',
     description: 'All-in-one resort management software for small resort owners',
-    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'ResortPro' }],
+    images: [{ url: '/logo/resortpro-logo-banner-1200x630.png', width: 1200, height: 630, alt: 'ResortPro' }],
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
     title: 'ResortPro – Resort Management, Simplified',
     description: 'All-in-one resort management software for small resort owners',
-    images: ['/og-image.png'],
+    images: ['/logo/resortpro-logo-banner-1200x630.png'],
   },
 };
 

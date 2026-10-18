@@ -3,7 +3,6 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,11 +12,13 @@ import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { Gift, Zap, Crown, ArrowLeft, CreditCard } from 'lucide-react';
 import { PLAN_PRICING } from '@resort-pro/types';
+import { BrandLogo } from '@/components/brand/BrandLogo';
+import { MarketingAuthShell } from '@/components/auth/MarketingAuthShell';
 
-const PLAN_META: Record<string, { label: string; color: string; icon: React.ElementType; desc: string }> = {
-  FREE:          { label: PLAN_PRICING.FREE.displayName,         color: '#64748b', icon: CreditCard, desc: `$${PLAN_PRICING.FREE.monthlyUsd}/mo · Up to ${PLAN_PRICING.FREE.roomLimit} rooms` },
-  STARTER:       { label: PLAN_PRICING.STARTER.displayName,      color: '#1a6b5e', icon: Zap,        desc: `$${PLAN_PRICING.STARTER.monthlyUsd}/mo · Up to ${PLAN_PRICING.STARTER.roomLimit} rooms` },
-  PROFESSIONAL:  { label: PLAN_PRICING.PROFESSIONAL.displayName, color: '#d4a853', icon: Crown,      desc: `$${PLAN_PRICING.PROFESSIONAL.monthlyUsd}/mo · Up to ${PLAN_PRICING.PROFESSIONAL.roomLimit} rooms` },
+const PLAN_META: Record<string, { label: string; icon: React.ElementType; desc: string }> = {
+  FREE:          { label: PLAN_PRICING.FREE.displayName,         icon: CreditCard, desc: `$${PLAN_PRICING.FREE.monthlyUsd}/mo · Up to ${PLAN_PRICING.FREE.roomLimit} rooms` },
+  STARTER:       { label: PLAN_PRICING.STARTER.displayName,      icon: Zap,        desc: `$${PLAN_PRICING.STARTER.monthlyUsd}/mo · Up to ${PLAN_PRICING.STARTER.roomLimit} rooms` },
+  PROFESSIONAL:  { label: PLAN_PRICING.PROFESSIONAL.displayName, icon: Crown,      desc: `$${PLAN_PRICING.PROFESSIONAL.monthlyUsd}/mo · Up to ${PLAN_PRICING.PROFESSIONAL.roomLimit} rooms` },
 };
 
 const schema = z.object({
@@ -156,82 +157,88 @@ function RegisterForm() {
   const PlanIcon = planMeta.icon;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-resort-900 to-resort-700 flex items-center justify-center p-4">
-      <div className="w-full max-w-lg">
+    <MarketingAuthShell
+      eyebrow="Start simple. Grow without switching."
+      title="Your resort deserves a calmer way to work."
+      description="Create one workspace for bookings, rooms, guests and payments—then invite your team when you are ready."
+      points={['Set up your resort in minutes', 'Choose only the capacity you need', 'Keep every guest detail together']}
+    >
+      <div className="w-full max-w-xl py-4 lg:py-8">
 
         {/* Back to plans */}
-        <div className="mb-6 flex items-center justify-between">
-          <a href="/plans" className="flex items-center gap-1.5 text-white/50 hover:text-white/80 text-sm transition-colors">
+        <div className="mb-8 flex items-center justify-between">
+          <a href="/plans" className="flex items-center gap-1.5 text-sm font-bold text-slate-500 transition-colors hover:text-resort-900">
             <ArrowLeft className="h-4 w-4" />
             Change plan
           </a>
-          <a href="/auth/login" className="text-white/50 hover:text-white/80 text-sm transition-colors">
+          <a href="/auth/login" className="text-sm font-bold text-slate-500 transition-colors hover:text-resort-900">
             Sign in
           </a>
         </div>
 
-        <div className="mb-6 text-center">
-          <Link href="/" className="relative mx-auto mb-4 block h-14 w-14 overflow-hidden rounded-2xl bg-white">
-            <Image src="/brand/resortpro-icon-mark.png" alt="ResortPro" fill sizes="56px" className="object-cover" />
+        <div className="mb-7">
+          <Link href="/" className="mb-8 inline-flex lg:hidden" aria-label="ResortPro home">
+            <BrandLogo />
           </Link>
-          <h1 className="font-display text-3xl font-bold text-white">Create your resort</h1>
-          <p className="mt-2 text-white/60">Create your workspace, then complete secure checkout.</p>
+          <span className="block text-xs font-extrabold uppercase tracking-[0.18em] text-lime-700">Create your workspace</span>
+          <h1 className="font-editorial mt-3 text-5xl font-medium leading-none tracking-[-0.035em] text-resort-900">Create your resort</h1>
+          <p className="mt-3 text-slate-600">Create your workspace, then complete secure checkout.</p>
         </div>
 
         {/* Selected plan badge */}
-        <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-white/10 border border-white/20">
-          <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-white/15 flex-shrink-0">
-            <PlanIcon className="h-4 w-4 text-white" />
+        <div className="mb-4 flex items-center gap-3 rounded-2xl border border-lime-300 bg-lime-50 px-4 py-3">
+          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-resort-900">
+            <PlanIcon className="h-4 w-4 text-lime-300" />
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-white text-sm font-semibold">{planMeta.label} Plan</p>
-            <p className="text-white/50 text-xs">{planMeta.desc}</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-extrabold text-resort-900">{planMeta.label} Plan</p>
+            <p className="text-xs text-slate-500">{planMeta.desc}</p>
           </div>
-          <a href="/plans" className="text-white/40 hover:text-white/70 text-xs transition-colors flex-shrink-0">
+          <a href="/plans" className="flex-shrink-0 text-xs font-bold text-slate-500 transition-colors hover:text-resort-900">
             Change
           </a>
         </div>
 
         {/* Referral banner */}
         {referralCode && (
-          <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/15 border border-amber-500/30">
-            <Gift className="w-4 h-4 text-amber-400 shrink-0" />
+          <div className="mb-4 flex items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3">
+            <Gift className="h-4 w-4 shrink-0 text-amber-700" />
             <div>
-              <p className="text-amber-300 text-sm font-medium">
+              <p className="text-sm font-bold text-amber-900">
                 {referrerName ? `Referred by: ${referrerName}` : `Referral code: ${referralCode}`}
               </p>
-              <p className="text-amber-400/70 text-xs mt-0.5">You were invited by a ResortPro member.</p>
+              <p className="mt-0.5 text-xs text-amber-700">You were invited by a ResortPro member.</p>
             </div>
-            <button onClick={() => { setReferralCode(''); setReferrerName(''); }} className="ml-auto text-amber-500/60 hover:text-amber-300 text-xs">✕</button>
+            <button onClick={() => { setReferralCode(''); setReferrerName(''); }} className="ml-auto text-xs text-amber-700 hover:text-amber-900">✕</button>
           </div>
         )}
 
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-sm">
+        <div className="rounded-3xl border border-resort-900/10 bg-white p-6 shadow-[0_24px_70px_-42px_rgba(14,34,60,0.45)] sm:p-8">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-white/80">Resort name</label>
+              <label className="mb-1.5 block text-sm font-bold text-resort-900">Resort name</label>
               <Input
                 {...register('resortName')}
                 onChange={handleResortNameChange}
                 placeholder="Palm Paradise Resort"
-                className="border-white/10 bg-white/10 text-white placeholder:text-white/30 focus-visible:ring-gold-500"
+                className="h-11 rounded-xl border-resort-900/10 bg-[#f8f6f1] px-4 text-resort-900 placeholder:text-slate-400 focus-visible:ring-lime-400"
               />
               {errors.resortName && <p className="mt-1 text-xs text-red-400">{errors.resortName.message}</p>}
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-white/80">
+              <label className="mb-1.5 block text-sm font-bold text-resort-900">
                 Resort URL slug
-                <span className="ml-2 text-white/40 font-normal text-xs">your-resort.resortpro.site</span>
+                <span className="ml-2 text-xs font-normal text-slate-400">your-resort.resortpro.site</span>
               </label>
               <Input
                 {...register('slug')}
                 placeholder="palm-paradise-resort"
-                className="border-white/10 bg-white/10 text-white placeholder:text-white/30 focus-visible:ring-gold-500 font-mono"
+                className="h-11 rounded-xl border-resort-900/10 bg-[#f8f6f1] px-4 font-mono text-resort-900 placeholder:text-slate-400 focus-visible:ring-lime-400"
               />
               {errors.slug && <p className="mt-1 text-xs text-red-400">{errors.slug.message}</p>}
               {!errors.slug && slugStatus === 'checking' && (
-                <p className="mt-1 text-xs text-white/40">Checking availability…</p>
+                <p className="mt-1 text-xs text-slate-400">Checking availability…</p>
               )}
               {!errors.slug && slugStatus === 'available' && (
                 <p className="mt-1 text-xs text-emerald-400">✓ Available</p>
@@ -242,7 +249,7 @@ function RegisterForm() {
                   {slugSuggestion && (
                     <>
                       {' '}Try{' '}
-                      <button type="button" onClick={useSuggestedSlug} className="underline font-mono text-gold-400 hover:text-gold-300">
+                      <button type="button" onClick={useSuggestedSlug} className="font-mono font-bold text-resort-900 underline decoration-lime-400 decoration-2">
                         {slugSuggestion}
                       </button>{' '}
                       instead?
@@ -254,53 +261,53 @@ function RegisterForm() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-white/80">First name</label>
-                <Input {...register('firstName')} placeholder="Alex" className="border-white/10 bg-white/10 text-white placeholder:text-white/30 focus-visible:ring-gold-500" />
+                <label className="mb-1.5 block text-sm font-bold text-resort-900">First name</label>
+                <Input {...register('firstName')} placeholder="Alex" className="h-11 rounded-xl border-resort-900/10 bg-[#f8f6f1] px-4 text-resort-900 placeholder:text-slate-400 focus-visible:ring-lime-400" />
                 {errors.firstName && <p className="mt-1 text-xs text-red-400">{errors.firstName.message}</p>}
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-white/80">Last name</label>
-                <Input {...register('lastName')} placeholder="Johnson" className="border-white/10 bg-white/10 text-white placeholder:text-white/30 focus-visible:ring-gold-500" />
+                <label className="mb-1.5 block text-sm font-bold text-resort-900">Last name</label>
+                <Input {...register('lastName')} placeholder="Johnson" className="h-11 rounded-xl border-resort-900/10 bg-[#f8f6f1] px-4 text-resort-900 placeholder:text-slate-400 focus-visible:ring-lime-400" />
                 {errors.lastName && <p className="mt-1 text-xs text-red-400">{errors.lastName.message}</p>}
               </div>
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-white/80">Email</label>
-              <Input {...register('email')} type="email" placeholder="you@yourresort.com" className="border-white/10 bg-white/10 text-white placeholder:text-white/30 focus-visible:ring-gold-500" />
+              <label className="mb-1.5 block text-sm font-bold text-resort-900">Email</label>
+              <Input {...register('email')} type="email" placeholder="you@yourresort.com" className="h-11 rounded-xl border-resort-900/10 bg-[#f8f6f1] px-4 text-resort-900 placeholder:text-slate-400 focus-visible:ring-lime-400" />
               {errors.email && <p className="mt-1 text-xs text-red-400">{errors.email.message}</p>}
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-white/80">Password</label>
-              <Input {...register('password')} type="password" placeholder="••••••••" className="border-white/10 bg-white/10 text-white placeholder:text-white/30 focus-visible:ring-gold-500" />
+              <label className="mb-1.5 block text-sm font-bold text-resort-900">Password</label>
+              <Input {...register('password')} type="password" placeholder="••••••••" className="h-11 rounded-xl border-resort-900/10 bg-[#f8f6f1] px-4 text-resort-900 placeholder:text-slate-400 focus-visible:ring-lime-400" />
               {errors.password && <p className="mt-1 text-xs text-red-400">{errors.password.message}</p>}
-              <p className="mt-1 text-xs text-white/40">Min. 8 chars, one uppercase, one number</p>
+              <p className="mt-1 text-xs text-slate-400">Min. 8 chars, one uppercase, one number</p>
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-white/80">Confirm password</label>
-              <Input {...register('confirmPassword')} type="password" placeholder="Repeat your password" className="border-white/10 bg-white/10 text-white placeholder:text-white/30 focus-visible:ring-gold-500" />
+              <label className="mb-1.5 block text-sm font-bold text-resort-900">Confirm password</label>
+              <Input {...register('confirmPassword')} type="password" placeholder="Repeat your password" className="h-11 rounded-xl border-resort-900/10 bg-[#f8f6f1] px-4 text-resort-900 placeholder:text-slate-400 focus-visible:ring-lime-400" />
               {errors.confirmPassword && <p className="mt-1 text-xs text-red-400">{errors.confirmPassword.message}</p>}
             </div>
 
-            <Button type="submit" variant="gold" size="lg" className="w-full mt-2" loading={loading}>
+            <Button type="submit" size="lg" className="mt-2 h-12 w-full rounded-full bg-resort-900 font-extrabold text-white shadow-none hover:bg-resort-800" loading={loading}>
               Continue to secure checkout
             </Button>
-            <p className="mt-3 text-center text-xs leading-relaxed text-white/40">
+            <p className="mt-3 text-center text-xs leading-relaxed text-slate-400">
               By creating an account you agree to our{' '}
-              <Link href="/terms" className="text-white/60 underline hover:text-white/80">Terms</Link>{' '}
+              <Link href="/terms" className="font-bold text-slate-600 underline hover:text-resort-900">Terms</Link>{' '}
               and{' '}
-              <Link href="/privacy" className="text-white/60 underline hover:text-white/80">Privacy Policy</Link>.
+              <Link href="/privacy" className="font-bold text-slate-600 underline hover:text-resort-900">Privacy Policy</Link>.
             </p>
           </form>
-          <p className="mt-6 text-center text-sm text-white/50">
+          <p className="mt-6 text-center text-sm text-slate-500">
             Already have an account?{' '}
-            <Link href="/auth/login" className="text-gold-400 hover:text-gold-300 font-medium">Sign in</Link>
+            <Link href="/auth/login" className="font-extrabold text-resort-900 underline decoration-lime-400 decoration-2 underline-offset-4">Sign in</Link>
           </p>
         </div>
       </div>
-    </div>
+    </MarketingAuthShell>
   );
 }
 
