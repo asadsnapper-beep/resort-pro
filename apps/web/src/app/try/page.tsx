@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
@@ -23,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { api } from '@/lib/api';
+import { BrandLogo } from '@/components/brand/BrandLogo';
 
 // Palette matches the landing page's design system
 // (claude.ai/design/p/d56b55b0-882c-44d6-aecd-3667a5499d43 — "ResortPro Landing.dc.html").
@@ -145,23 +145,6 @@ const ROLES = [
   },
 ];
 
-function BrandMark() {
-  return (
-    <span
-      className="relative flex h-9 w-9 flex-none items-center justify-center overflow-hidden rounded-lg"
-      style={{ background: NAVY }}
-    >
-      <Image
-        src="/brand/resortpro-icon-mark.png"
-        alt="ResortPro"
-        fill
-        sizes="36px"
-        className="scale-125 object-cover mix-blend-screen"
-      />
-    </span>
-  );
-}
-
 export default function DemoPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -234,9 +217,8 @@ export default function DemoPage() {
     <main className="min-h-screen overflow-hidden bg-white font-sans" style={{ color: NAVY }}>
       <header className="border-b bg-white" style={{ borderColor: BORDER }}>
         <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-5 sm:px-8">
-          <Link href="/" className="flex items-center gap-2.5" aria-label="ResortPro home">
-            <BrandMark />
-            <span className="text-lg font-extrabold tracking-[-0.02px]">ResortPro</span>
+          <Link href="/" className="flex items-center" aria-label="ResortPro home">
+            <BrandLogo />
           </Link>
           <div className="flex items-center gap-2 text-sm font-bold">
             <button

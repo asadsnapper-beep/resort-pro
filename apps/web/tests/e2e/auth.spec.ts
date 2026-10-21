@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Authentication', () => {
   test('login page renders correctly', async ({ page }) => {
     await page.goto('/auth/login');
-    await expect(page.getByText('Welcome back')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Welcome back', exact: true })).toBeVisible();
     await expect(page.getByPlaceholder('your-resort-name')).toBeVisible();
     await expect(page.getByPlaceholder('owner@yourresort.com')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
@@ -15,7 +15,7 @@ test.describe('Authentication', () => {
     await page.getByPlaceholder('owner@yourresort.com').fill('bad@email.com');
     await page.getByPlaceholder('••••••••').fill('wrongpassword');
     await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page.getByRole('alert').filter({ hasText: /Login failed|Invalid credentials/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('alert').filter({ hasText: /Login failed|Invalid credentials|Invalid email or password/i })).toBeVisible({ timeout: 10000 });
   });
 
   test('register page renders correctly', async ({ page }) => {

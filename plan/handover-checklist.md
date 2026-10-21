@@ -171,26 +171,40 @@ It is here, rather than in the deferred table, because every resort onboarded
 before it is done adds more plain text to the database — and the pilot resorts
 are the next thing to happen.
 
-### 6. Push `dev` → `main` — **founder decides, Claude runs it**
+### 6. ~~Push `dev` → `main`~~ — **done, 2026-10-18**
 
-`dev` is 112 commits ahead of `main`, whose newest commit is from 13 September.
-Everything since — multi-resort, guest SMS/WhatsApp, the embed widget, the group
-bill, the review fixes, the privacy fix, credential encryption, the admin
-control-plane work — is on staging only.
+Released as [PR #3](https://github.com/asadsnapper-beep/resort-pro/pull/3),
+merged by the founder: **144 commits, 10 migrations**, `main` now at `fd2ea04`.
+Production had been running `6a5090f` from 13 September and had not had a
+deploy since the 12th.
 
-**This does not wait for bKash.** It waits only for items 4 and 5, because the
-new code refuses to save a credential without a key — see
-[fixes/set-production-secrets-before-main-push.md](fixes/set-production-secrets-before-main-push.md),
-which is the whole procedure in one page.
+Verified rather than assumed, because a green deploy has meant a stale
+production in this project before:
 
-Nine migrations go with it, including admin two-factor, sessions and
-re-authentication. Two things change for whoever is signed in to production:
-the admin session ends and needs one fresh login, and the first irreversible
-action after that asks for the password.
+- `pre-deploy backup ok` — the dump was taken, which is the only restore point
+  a migration has
+- `rp-api` healthy in 17s, `rp-web` in 6s; `rp-postgres` and `rp-redis`
+  untouched at `Up 2 days`
+- migrations ran, proved by the api starting at all: its CMD chains
+  `migrate deploy && … && index.js`, so a failed migration means no API
+- `resortpro.site` serves a line only the new landing page has
+- `/admin/security`, `/dashboard/resorts` and `/resort-link/...` all answer
+  200, and none of the three existed on production that morning
 
-The deploy job now verifies that Portainer stored the commit, so a green staging
-deploy means the commit is deployed. Production's own deploy does not check that
-yet — see the deferred table.
+**It did not wait for items 4 and 5, and the earlier claim that it had to was
+too strong.** Without `CREDENTIALS_KEY` the API starts, reads what is already
+stored and warns at boot — only *saving* a gateway or SMS credential errors,
+and nobody does that before a resort is onboarded. Without
+`SUPER_ADMIN_PASSWORD` an existing admin account is untouched. So those two
+are a **pilot** precondition, not a release one, and they are still open.
+
+Two things changed for anyone signed in to production: the admin session ended
+and needs one fresh login, and the first irreversible action after that asks
+for the password.
+
+Future releases go the same way — a PR the founder merges. Pushing straight to
+`main` is refused, and that is the right shape for it: the merge is also what
+runs the deploy-path dry-run, which a direct push would skip.
 
 ---
 
