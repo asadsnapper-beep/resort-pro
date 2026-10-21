@@ -163,7 +163,21 @@ export function LandingPage({ isBn = false }: { isBn?: boolean }) {
               <a key={link.href} href={link.href} onClick={() => setMenuOpen(false)} className="border-b border-resort-900/10 py-5 text-lg font-bold">{link.label}</a>
             ))}
           </div>
-          <Link href="/try" className="mt-auto rounded-full bg-resort-600 px-5 py-3.5 text-center text-sm font-extrabold text-white">{isBn ? 'Demo দেখুন' : 'View demo'}</Link>
+          {/* The menu held the three section anchors and the demo, and nothing
+              else — so on a phone there was no way to sign in and no way to
+              open an account, because both live in the header, which is
+              `lg:` only. Most visitors here are on a phone. */}
+          <div className="mt-auto flex flex-col gap-3">
+            <Link href="/auth/register" onClick={() => setMenuOpen(false)} className="rounded-full bg-resort-600 px-5 py-3.5 text-center text-sm font-extrabold text-white">
+              {isBn ? 'অ্যাকাউন্ট খুলুন' : 'Sign up'}
+            </Link>
+            <Link href="/try" onClick={() => setMenuOpen(false)} className="rounded-full border border-resort-900/15 px-5 py-3.5 text-center text-sm font-extrabold text-resort-900">
+              {isBn ? 'Demo দেখুন' : 'View demo'}
+            </Link>
+            <Link href="/auth/login" onClick={() => setMenuOpen(false)} className="py-1 text-center text-sm font-bold text-resort-700">
+              {isBn ? 'লগ ইন' : 'Log in'}
+            </Link>
+          </div>
         </div>
       </div>
 
