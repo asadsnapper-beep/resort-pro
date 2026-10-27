@@ -337,7 +337,7 @@ jobs:
         # listing it here would have left the gate exactly as open as before.
         # It reads the seeded demo tenant, which is why the seed step above
         # must stay without continue-on-error in this job.
-        run: pnpm exec playwright test tests/e2e/roles.spec.ts tests/e2e/landing.spec.ts tests/e2e/crm.spec.ts --reporter=github
+        run: pnpm exec playwright test tests/e2e/roles.spec.ts tests/e2e/landing.spec.ts tests/e2e/crm.spec.ts tests/e2e/website-builder.spec.ts --reporter=github
 
       - name: Upload Playwright report on failure
         if: failure()

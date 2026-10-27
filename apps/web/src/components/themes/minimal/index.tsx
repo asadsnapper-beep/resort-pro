@@ -4,6 +4,10 @@ import { Menu, X } from 'lucide-react'
 
 import type { ThemeProps, ResortRoom } from '../types'
 import { orderSections } from '../_utils/sections'
+
+/** The sections this theme actually renders. Exported because the builder
+ *  needs the same list the renderer uses — see ../capabilities.ts. */
+export const MINIMAL_SECTIONS = ['about', 'rooms', 'menu', 'venues', 'vehicles', 'availability', 'booking', 'contact'] as const
 import { toLocalDateKey } from '../_utils/date'
 import {
   HeroSection, AboutSection, RoomsSection,
@@ -139,7 +143,7 @@ export function MinimalTheme({ data }: ThemeProps) {
             booking:      <BookingSection data={data} initialCheckIn={calendarCheckIn} initialCheckOut={calendarCheckOut} initialRoomId={calendarRoomId} />,
             contact:      show('contact')      && <ContactSection data={data} />,
           }
-          const order = orderSections(['about', 'rooms', 'menu', 'venues', 'vehicles', 'availability', 'booking', 'contact'], website.sectionOrder)
+          const order = orderSections(MINIMAL_SECTIONS, website.sectionOrder)
           return (
             <>
               <HeroSection data={data} scrollTo={scrollTo} />
