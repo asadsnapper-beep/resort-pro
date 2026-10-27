@@ -10,6 +10,11 @@ This directory is the permanent archive for quality-assurance reports produced f
 | 2026-09-09 | [Settings deep QA audit](./2026-09-09-settings-deep-qa.md) | Every Settings tab, persistence, roles, integrations, desktop/mobile | Not production-ready |
 | 2026-09-09 | [Dashboard Overview deep QA](./2026-09-09-dashboard-overview-deep-qa.md) | Sidebar inventory plus Dashboard, Analytics, Invoices, Expenses, Reports | Passed with major gaps |
 | 2026-09-09 | [Dashboard sidebar comprehensive QA](./2026-09-09-dashboard-sidebar-comprehensive-qa.md) | All desktop/mobile sidebar destinations, groups, roles, authorization, core interactions | Navigation passed; critical authorization issue found |
+| 2026-09-29 | [Super Admin release-readiness review](./2026-09-29-super-admin-release-readiness.md) | Admin control plane, RBAC, security, auditability, deployment, mobile, automated checks, next-week handoff | **NO-GO:** two Critical blockers plus Major control gaps |
+| 2026-09-30 | [Full release-candidate QA audit](./2026-09-30-full-release-candidate-qa.md) | Super Admin, resort roles, guest flow, business integrity, security, accessibility, performance, build and operations | **NO-GO:** core works, but Critical security and production-readiness gates remain |
+| 2026-10-07 | [CRM deep functional QA](./2026-10-07-crm-deep-functional-qa.md) | Contacts, tags, campaigns, templates, sequences, automation, analytics, consent, roles, and persistence | **NO-GO:** multiple core workflows return 500 or report false success |
+| 2026-10-08 | [CRM remediation verification](./2026-10-08-crm-remediation-verification.md) | First blocker-fix batch, CRM API integration, booking events, browser and persistence retest | Core runtime failures fixed; **NO-GO remains** for delivery/tracking/compliance gaps |
+| 2026-10-28 | [Website Builder deep functional QA](./2026-10-28-website-builder-deep-functional-qa.md) | All builder controls, themes, preview, publish/persistence, public site, roles, uploads, domain/SSL, mobile, and conversion paths | **NO-GO as a complete builder:** core works, but visible no-effect controls and preview/publish/domain gaps remain |
 
 ## What has been fixed since
 
@@ -26,6 +31,14 @@ and the git history.
 | C-02 — URL Slug reported success but never changed | Settings deep QA, Critical | ✅ 2026-09-13 — read-only was the founder's call. The field displays the URL and is no longer submitted; the API refuses a *different* slug with `SLUG_IMMUTABLE` while accepting an identical one, so an older cached bundle does not lose the ability to save |
 | M-01 — SMS and WhatsApp trigger checkboxes were the same field | Settings deep QA, Major | ✅ 2026-09-14 — WhatsApp has its own six fields; the migration copied each tenant's visible values across |
 | C-04 — embed script and WordPress plugin returned 404 | Settings deep QA, Critical | ✅ 2026-09-14, and the finding was **understated**: publishing the files alone would not have made the widget work. CORS refused every resort's own domain; the stylesheet was never injected; food orders posted to a route that does not exist; bKash, SSL and Stripe called endpoints that do not exist, and Stripe showed success without charging; "Pay at Hotel" announced a confirmed booking the worker would cancel. All fixed; payment now hands over to the hosted checkout. The web build writes `embed.js` and the plugin zip into `public/`, verified live on staging (200, new bundle, cross-origin preflight answered, private routes still refused) |
+
+| CRM-001/002/003/006 — Templates, Analytics, sequence steps and tag assignment returned 500 | CRM deep QA, Critical | ✅ 2026-10-08 — three broken screens had one cause: relation tables reached without validating their tenant-owned parent |
+| CRM-004/005 — a campaign reported SENT when nobody received it, and missing consent was drawn as subscribed | CRM deep QA, Critical | ✅ 2026-10-08 — `PARTIAL` and `FAILED` states, zero-recipient sends refused, `No consent` shown honestly |
+| CRM-009 — scheduled campaigns were stored and never dispatched | CRM deep QA, Major | ✅ 2026-10-08 — `dispatchScheduledCampaigns()` runs on the automation cadence |
+| CRM-013 — unsubscribe was an unsigned state-changing GET | CRM deep QA, Major | ✅ 2026-10-08 — signed token, confirmation on GET, the change on POST |
+| CRM-016 — tags, contact detail, template editing, campaign audience and manual enrolment had no UI | CRM deep QA, Major | ✅ 2026-10-17 |
+| CRM-008 — the Open Rate and Click Rate were arithmetic on columns nothing writes | CRM deep QA, Critical | ◐ Partly. The claim is gone from the page and the demo no longer seeds 87 opens on 142 sends. Tracking itself — open pixel, click redirect, provider webhook — still does not exist |
+| CRM-014 — no CRM regression tests | CRM deep QA, Major | ✅ 2026-10-28 — ten API integration suites, plus `crm.spec.ts` in CI on Desktop Chrome and Mobile Safari |
 
 Everything else below is, as far as anyone has checked, still open. In
 particular the Settings audit's "not production-ready" verdict has not been
