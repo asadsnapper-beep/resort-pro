@@ -1037,6 +1037,157 @@ export async function seedDemo(opts: { refresh?: boolean } = {}) {
   }
   console.log('✅ CRM: guest tags + scores');
 
+  // ── CRM Campaigns + Sequences ────────────────────────────────────────────────
+  // Campaigns and Sequences were the two CRM tabs the demo left empty. A
+  // prospect who clicked them saw "no campaigns yet", which reads as a feature
+  // that does not exist rather than one nobody has used yet.
+  //
+  // Templates are deliberately not seeded: `GET /crm/templates` creates the
+  // defaults on first load, so that tab fills itself and seeding it here would
+  // only risk a duplicate set.
+  //
+  // Nothing is written to the open or click columns. There is no open pixel,
+  // no click redirect and no provider webhook in the API, so any number there
+  // would be invented — which is what an earlier demo did (87 opens and 34
+  // clicks on 142 sends, a 61% open rate for a feature that records nothing)
+  // and what CRM QA 2026-10-07 finding 008 called out. `sent` and `bounced`
+  // are the two the sender actually writes, so they are the two shown.
+  const mailStyle = 'font-family:sans-serif;max-width:600px;margin:0 auto;color:#1f2937';
+  const mailHeader = (line: string) =>
+    `<div style="background:#1a6b5e;padding:28px 24px;text-align:center">` +
+    `<h1 style="color:#d4a853;font-size:22px;margin:0">{{tenantName}}</h1>` +
+    `<p style="color:#a7f3d0;margin:8px 0 0">${line}</p></div>`;
+  const mailBody = (body: string) =>
+    `<div style="padding:28px 24px;background:#ffffff">${body}` +
+    `<p style="color:#6b7280;font-size:14px;margin-top:28px">{{tenantName}}<br>{{tenantPhone}} | {{tenantEmail}}</p></div>`;
+  const mail = (line: string, body: string) =>
+    `<div style="${mailStyle}">${mailHeader(line)}${mailBody(body)}</div>`;
+
+  const sentCampaign = await prisma.campaign.create({
+    data: {
+      tenantId:       demo.id,
+      name:           'Monsoon Weekend Getaway',
+      subject:        'Two nights by the water, 20% off this monsoon',
+      html:           mail('A monsoon offer for you', '<p>Dear <strong>{{guestName}}</strong>,</p><p>The garden is at its greenest and the weekends are quiet. Stay two nights this month and the second is 20% off.</p>'),
+      segment:        { tags: ['Repeat Guest'] },
+      status:         'SENT',
+      sentAt:         d(-12),
+      recipientCount: 24,
+    },
+  }).catch(softFail);
+
+  if (sentCampaign) {
+    // One bounce, because a campaign where every address is perfect is not what
+    // a real list looks like — and `bounced` is a column the sender does write.
+    await prisma.campaignStats.create({
+      data: { campaignId: sentCampaign.id, sent: 24, bounced: 1 },
+    }).catch(softFail);
+  }
+
+  await prisma.campaign.create({
+    data: {
+      tenantId:    demo.id,
+      name:        'Eid Package — Early Access',
+      subject:     'Our Eid packages open to you first',
+      html:        mail('Eid packages, early', '<p>Dear <strong>{{guestName}}</strong>,</p><p>Our Eid packages go on sale next week. As a returning guest you can book yours today.</p>'),
+      segment:     { tiers: ['GOLD', 'PLATINUM'] },
+      status:      'SCHEDULED',
+      scheduledAt: d(6, 9),
+    },
+  }).catch(softFail);
+
+  await prisma.campaign.create({
+    data: {
+      tenantId: demo.id,
+      name:     'Winter Season Preview',
+      subject:  'Winter dates are open',
+      html:     mail('Winter is opening', '<p>Dear <strong>{{guestName}}</strong>,</p><p>December and January are now open for booking.</p>'),
+      status:   'DRAFT',
+    },
+  }).catch(softFail);
+
+  const seededSequences: any[] = [];
+  const sequenceSpecs = [
+    {
+      name: 'Pre-arrival welcome', trigger: 'PRE_ARRIVAL', status: 'ACTIVE',
+      triggerMeta: { daysOffset: -3 },
+      steps: [
+        { stepOrder: 1, delayDays: 0, subject: 'Your stay is almost here', body: '<p>We are looking forward to welcoming you on {{checkInDate}}.</p>' },
+        { stepOrder: 2, delayDays: 2, subject: 'Getting here, and what to bring', body: '<p>Directions, check-in time and a short list of what is worth packing.</p>' },
+      ],
+    },
+    {
+      name: 'After the stay', trigger: 'POST_STAY', status: 'ACTIVE',
+      triggerMeta: null,
+      steps: [
+        { stepOrder: 1, delayDays: 1, subject: 'Thank you for staying with us', body: '<p>It was a pleasure having you. We hope the journey home was easy.</p>' },
+        { stepOrder: 2, delayDays: 3, subject: 'How did we do?', body: '<p>If you have two minutes, we would value hearing what we could do better.</p>' },
+      ],
+    },
+    {
+      name: 'Birthday wish', trigger: 'BIRTHDAY', status: 'ACTIVE',
+      triggerMeta: null,
+      steps: [
+        { stepOrder: 1, delayDays: 0, subject: 'Happy birthday from all of us', body: '<p>Many happy returns. Your next stay comes with a complimentary dinner for two.</p>' },
+      ],
+    },
+    {
+      // Paused on purpose: the Sequences tab should show that a sequence can be
+      // off without being deleted, which is the state most of them sit in.
+      name: 'Win back a quiet guest', trigger: 'WIN_BACK', status: 'PAUSED',
+      triggerMeta: { inactiveDays: 180 },
+      steps: [
+        { stepOrder: 1, delayDays: 0, subject: 'It has been a while', body: '<p>We have changed a few things since your last visit, and we would love to show you.</p>' },
+      ],
+    },
+  ];
+
+  for (const spec of sequenceSpecs) {
+    const seq = await prisma.sequence.create({
+      data: {
+        tenantId:    demo.id,
+        name:        spec.name,
+        trigger:     spec.trigger as any,
+        status:      spec.status as any,
+        triggerMeta: spec.triggerMeta ?? undefined,
+        steps: {
+          create: spec.steps.map((st) => ({
+            stepOrder: st.stepOrder,
+            delayDays: st.delayDays,
+            subject:   st.subject,
+            html:      mail(st.subject, st.body),
+          })),
+        },
+      },
+    }).catch(softFail);
+    if (seq) seededSequences.push(seq);
+  }
+
+  // A couple of enrolments, so the contact sheet's "Sequences" list is not
+  // empty on the first guest a visitor opens. One finished, one still running.
+  const seqByName = Object.fromEntries(seededSequences.map((q: any) => [q.name, q]));
+  const enrolments = [
+    { seq: 'After the stay',      g: 0, status: 'COMPLETED', currentStep: 2, completedAt: d(-4) },
+    { seq: 'Pre-arrival welcome', g: 5, status: 'ACTIVE',    currentStep: 1, completedAt: null },
+  ];
+  for (const e of enrolments) {
+    const seq = seqByName[e.seq];
+    const guest = createdGuests[e.g];
+    if (!seq || !guest) continue;
+    await prisma.sequenceEnrollment.create({
+      data: {
+        tenantId:    demo.id,
+        sequenceId:  seq.id,
+        guestId:     guest.id,
+        status:      e.status as any,
+        currentStep: e.currentStep,
+        completedAt: e.completedAt ?? undefined,
+      },
+    }).catch(softFail);
+  }
+
+  console.log(`✅ CRM: 3 campaigns, ${seededSequences.length} sequences, ${enrolments.length} enrolments`);
+
   // ── Amenities ─────────────────────────────────────────────────────────────────
   const amenities = [
     { name: 'Infinity Pool',      category: 'POOL',          icon: '🏊' },
