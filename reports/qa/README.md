@@ -15,7 +15,7 @@ This directory is the permanent archive for quality-assurance reports produced f
 | 2026-10-07 | [CRM deep functional QA](./2026-10-07-crm-deep-functional-qa.md) | Contacts, tags, campaigns, templates, sequences, automation, analytics, consent, roles, and persistence | **NO-GO:** multiple core workflows return 500 or report false success |
 | 2026-10-08 | [CRM remediation verification](./2026-10-08-crm-remediation-verification.md) | First blocker-fix batch, CRM API integration, booking events, browser and persistence retest | Core runtime failures fixed; **NO-GO remains** for delivery/tracking/compliance gaps |
 | 2026-10-28 | [Website Builder deep functional QA](./2026-10-28-website-builder-deep-functional-qa.md) | All builder controls, themes, preview, publish/persistence, public site, roles, uploads, domain/SSL, mobile, and conversion paths | **NO-GO as a complete builder:** core works, but visible no-effect controls and preview/publish/domain gaps remain |
-| ongoing | [Website Builder remediation progress](./website-builder-remediation-progress.md) | Live record of which builder findings are fixed, with files, tests and verification | 2 of 8 P0 gates closed; **NO-GO remains** |
+| ongoing | [Website Builder remediation progress](./website-builder-remediation-progress.md) | Live record of which builder findings are fixed, with files, tests and verification | 3 of 8 P0 gates closed; **NO-GO remains** |
 
 ## What has been fixed since
 
@@ -44,6 +44,7 @@ and the git history.
 | WB-001 — the builder offered sections the chosen theme does not render | Website Builder QA, Critical | ✅ 2026-10-28 — one capability list per theme, living with the theme; what a theme cannot draw is named rather than hidden |
 | WB-005 — an unknown theme key could be stored, and the site silently fell back | Website Builder QA, Major | ✅ 2026-10-28 — refused when it is a change; a tenant already on a stale key can still save everything else |
 | WB-006 — section arrays took unknown and duplicated ids | Website Builder QA, Major | ✅ 2026-10-28 — cleaned on the way in, and the renderer dedupes as a second line |
+| WB-009 — required fields, complete testimonials, the gallery cap and the WhatsApp number were enforced only by the form | Website Builder QA, Major | ✅ 2026-10-28 — all four hold on the server now |
 
 Everything else below is, as far as anyone has checked, still open. In
 particular the Settings audit's "not production-ready" verdict has not been

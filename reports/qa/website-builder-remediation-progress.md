@@ -3,9 +3,9 @@
 **Started:** 2026-10-28
 **Parent audit:** [2026-10-28 Website Builder deep functional QA](./2026-10-28-website-builder-deep-functional-qa.md)
 **Branch:** `fix/e2e-rate-limit` (not pushed — pushes wait for the owner)
-**Status:** two P0 gates closed, one dependency closed first. **Customer handoff remains NO-GO.**
+**Status:** three P0 gates closed, one dependency closed first. **Customer handoff remains NO-GO.**
 
-The audit's own minimum handoff gate lists eight items. Two are done. This file
+The audit's own minimum handoff gate lists eight items. Three are done. This file
 records what was actually changed and verified, and is updated as the rest land.
 
 ---
@@ -95,6 +95,25 @@ without declaring it fails there; a mutation confirms it does.
 The section vocabulary moved to `@resort-pro/types` so the editor and the API
 validate against one list rather than two that could drift.
 
+### WB-009 — Required and quality constraints were presentation-only
+
+**Status:** fixed · `bde4e2d`
+
+| | |
+|---|---|
+| Files | `apps/api/src/routes/website.ts` |
+| Migration | none |
+| API behaviour | Hero Title must not be blank; a testimonial needs a name and words; the gallery is capped at 20 server-side; WhatsApp must be a plausible E.164 number, with typed punctuation normalised rather than refused; generous length caps on the free-text and SEO fields |
+| Browser behaviour | unchanged — the form already showed these rules, which was the problem |
+| Tests added | 15 more integration tests (25 in that file) |
+| Verified | full API suite **981/981** across 85 files; mutating the hero-title guard to accept empty fails the test that covers it |
+| Remaining risk | a tenant whose stored hero title is already blank must type one before their next save. Deliberate: the field is marked required and a website with no headline is broken |
+| Rollback | revert; no stored value becomes invalid |
+
+`+880 1712-345678` and `008801712345678` both become `+8801712345678`. A resort
+owner typing their own number the way they say it is not an error; text that
+could not be a phone number is.
+
 ---
 
 ## Verification run for the work above
@@ -103,7 +122,7 @@ validate against one list rather than two that could drift.
 |---|---|
 | API TypeScript | pass |
 | Web TypeScript | pass |
-| Full API suite | **966/966**, 85 files |
+| Full API suite | **981/981**, 85 files |
 | Full web unit suite | **219/219**, 23 files |
 | Every e2e spec, four workers, retries off | 83/84 — see below |
 | `website-builder.spec.ts` on both projects | 10/10 |
@@ -156,7 +175,6 @@ is the part that turns a cache into a support call.
 | WB-004 | Config/TEMPLATE theme preview is incomplete | the differentiator, and the largest of the P0s |
 | WB-007 | Roles see actions they cannot use | needs capability flags from the API, then the UI |
 | WB-008 | "Verified & live" from DNS alone | needs an HTTPS check and the production SSL path documented; part of it is infrastructure, not code |
-| WB-009 | Required fields are presentation-only | shared validation; small, and overdue |
 | WB-012 | Error states and accessibility | smallest of these |
 | — | Draft, publish and rollback | item 8 of the spec: a versioning model with migrations. A feature in its own right, not a gate that can be slipped in |
 
@@ -170,7 +188,7 @@ product of its own and none should start before the P0 list is closed.
 
 **NO-GO**, unchanged from the audit.
 
-What changed is that two of its eight gates are closed with tests that fail when
+What changed is that three of its eight gates are closed with tests that fail when
 the behaviour comes back, and the test suite can now carry the rest. The single
 most visible remaining problem is WB-002: an owner who publishes and sees no
 change on their own website will not trust anything else the builder says.
