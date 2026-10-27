@@ -18,12 +18,21 @@ cd apps/web && pnpm dev
 
 **⚠️ Gotcha:** `tsx watch` মাঝে মাঝে edit reload করে না → route বদলালে **API restart** করো (`lsof -ti:4000 | xargs kill -9` তারপর আবার `pnpm dev`)।
 
-**Credentials (local demo):**
-| Role | Login |
-|------|-------|
-| Super-admin | `asadsnapper@gmail.com` / `Admin@123456` → /admin |
-| Owner (demo) | slug `demo` · `demo@resortpro.app` / `Demo@ResortPro2026!` → /auth/login |
-| Demo tenant id | `bc068f1a-d3b4-42e8-a27e-f6068ed16ba9` |
+**Credentials:**
+
+এই repository **public**, তাই এখানে কোনো login লেখা নেই — আগে ছিল, এবং সেটাই
+ভুল ছিল। super-admin-এর ঠিকানা আর password একসাথে লেখা থাকলে যে কেউ পড়ে
+`/admin/login`-এ চেষ্টা করতে পারত।
+
+| কী | কোথায় |
+|---|---|
+| Super-admin | `SUPER_ADMIN_EMAILS` + `SUPER_ADMIN_PASSWORD`, deploy-এর env-এ। seeder এখন password ছাড়া account বানাতেই রাজি নয় (`apps/api/src/scripts/seed-admin.ts`) |
+| Owner (demo) | slug `demo`, user `demo@resortpro.app`। password টা demo seed নিজেই বসায় — `apps/api/src/scripts/seed-demo.ts` |
+| Demo tenant id | লিখে রাখার জিনিস নয়: seed প্রতিবার tenant টা মুছে নতুন করে বানায়, তাই id ও বদলায় |
+
+> পুরোনো built-in default `Admin@123456` আর কাজ করে না নতুন deploy-তে, কিন্তু
+> তার আগে তৈরি হওয়া account-এ এখনো থাকতে পারে —
+> [plan/handover-checklist.md](plan/handover-checklist.md)-এর প্রথম কাজটা সেটাই।
 
 ---
 
