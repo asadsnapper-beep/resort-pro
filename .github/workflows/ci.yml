@@ -316,13 +316,19 @@ jobs:
         # enough to actually run.
         run: pnpm exec playwright install --with-deps chromium webkit
 
-      - name: Run E2E role tests
+      - name: Run E2E tests
         working-directory: apps/web
         # landing.spec.ts is here too now. It was excluded while its assertions
         # described copy that had been replaced, so it failed on every run and
         # nobody could have told a real break from the rot. Rewritten against
         # the page that is served, so it can hold the gate again.
-        run: pnpm exec playwright test tests/e2e/roles.spec.ts tests/e2e/landing.spec.ts --reporter=github
+        #
+        # crm.spec.ts joins them because the CRM had no browser coverage in CI
+        # at all (CRM QA 2026-10-07, finding 014) — writing the spec without
+        # listing it here would have left the gate exactly as open as before.
+        # It reads the seeded demo tenant, which is why the seed step above
+        # must stay without continue-on-error in this job.
+        run: pnpm exec playwright test tests/e2e/roles.spec.ts tests/e2e/landing.spec.ts tests/e2e/crm.spec.ts --reporter=github
 
       - name: Upload Playwright report on failure
         if: failure()
