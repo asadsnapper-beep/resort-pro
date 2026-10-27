@@ -1,0 +1,176 @@
+# Website Builder Remediation — Progress
+
+**Started:** 2026-10-28
+**Parent audit:** [2026-10-28 Website Builder deep functional QA](./2026-10-28-website-builder-deep-functional-qa.md)
+**Branch:** `fix/e2e-rate-limit` (not pushed — pushes wait for the owner)
+**Status:** two P0 gates closed, one dependency closed first. **Customer handoff remains NO-GO.**
+
+The audit's own minimum handoff gate lists eight items. Two are done. This file
+records what was actually changed and verified, and is updated as the rest land.
+
+---
+
+## Done
+
+### 0 — The E2E suite stopped throttling itself (dependency, not an audit finding)
+
+**Status:** fixed · `61923c6`
+
+Not in the audit, but everything the audit asks for is more browser tests, and
+the suite could not carry them. It was being refused by the API's own rate
+limiter: 972 responses with status 429 in one local run, 139 even at CI's
+single worker. They mostly landed on dashboard widgets no test asserted on, so
+the suite stayed green by luck — until a CRM test asserted on data whose
+request was the one refused and CI failed on its first attempt, which CI's two
+retries then turned back into a green.
+
+| | |
+|---|---|
+| Files | `apps/web/tests/e2e/helpers.ts`, `roles.spec.ts`, `crm.spec.ts`, `apps/api/src/app.ts`, `.github/workflows/ci.yml`, `apps/api/tests/unit/rate-limit-max.test.ts` |
+| Migration | none |
+| API behaviour | the global ceiling reads `RATE_LIMIT_MAX`, default unchanged at 300; an unset, unparseable, zero or negative value is 300 |
+| Browser behaviour | unchanged |
+| Tests added | 10 unit tests on the ceiling |
+| Verified | three consecutive full runs at four local workers, retries disabled: 58/58 each, **zero 429s**, wall clock 2.0 → 1.0 min. Mutating the guard to accept zero fails three tests |
+| Remaining risk | none known |
+| Rollback | revert the commit; the default was never changed |
+
+`useRole` gives a describe block one login instead of one per test. That alone
+took 972 throttled responses to 272; the rest are the dashboard shell reloading
+on every navigation, which is what the configurable ceiling covers.
+
+### WB-001 — Visible controls that the theme ignores
+
+**Status:** fixed · `b26da27`
+
+The builder offered one universal set of section controls and the themes
+disagreed without saying so. On Minimal an owner could add photos and reviews,
+reorder them, publish, open the site and find neither. Amenities was offered
+everywhere and drawn only by Coastal. Offers was drawn by Coastal and Tea
+Garden and offered by nobody, so it could not be hidden or moved at all.
+
+| | |
+|---|---|
+| Files | `apps/web/src/components/themes/capabilities.ts` (new), the four theme `index.tsx`, `_utils/sections.ts`, `apps/web/src/app/(dashboard)/dashboard/website/page.tsx` |
+| Migration | none |
+| API behaviour | unchanged in this commit |
+| Browser behaviour | the section list is the chosen theme's own order; Offers is controllable; what a theme cannot draw is **named**, not hidden; the Gallery and Testimonials tabs say so above the fields |
+| Tests added | 22 unit (`theme-capabilities.test.ts`), 5 browser × 2 projects (`website-builder.spec.ts`, listed in CI) |
+| Verified | see below |
+| Remaining risk | config and template themes are given the full set, because their capability is not known here — accurate for them is part of WB-004 |
+| Rollback | revert; nothing persisted changes shape |
+
+One list per theme, living in that theme's own file beside the sections it
+renders. `capabilities.ts` only collects them — a second hand-written list
+there would have been free to drift, which is the bug rather than its fix.
+
+The test that matters reads each renderer's source and compares the keys of its
+section map against the list the theme exports. Adding a section to a theme
+without declaring it fails there; a mutation confirms it does.
+
+**Truth table, as the code now states it:**
+
+| | luxe | minimal | coastal | tea-garden |
+|---|---|---|---|---|
+| gallery | yes | **no** | yes | yes |
+| testimonials | yes | **no** | yes | yes |
+| amenities | no | no | **yes** | no |
+| offers | no | no | **yes** | **yes** |
+
+### WB-005 and the storage half of WB-006
+
+**Status:** fixed · `4ce08d7`
+
+| | |
+|---|---|
+| Files | `apps/api/src/routes/website.ts`, `packages/types/src/website-sections.ts` (new), `packages/types/src/index.ts`, `apps/web/src/components/themes/capabilities.ts` |
+| Migration | none |
+| API behaviour | an unknown `templateId` is refused with `UNKNOWN_TEMPLATE` (400) **when it is a change**; `sectionOrder` and `hiddenSections` are cleaned — unknown ids dropped, repeats kept once, the owner's order preserved |
+| Browser behaviour | unchanged |
+| Tests added | 10 integration (`website-section-validation.test.ts`) |
+| Verified | each guard mutation-tested alone: removing the template refusal fails two tests, storing section ids unchecked fails two more. Full API suite 966/966 across 85 files |
+| Remaining risk | a tenant already on a stale key keeps it until they choose a real one. Deliberate, and pinned open by a test — refusing every save would lock them in behind their own bad state |
+| Rollback | revert; cleaned values already stored stay valid |
+
+The section vocabulary moved to `@resort-pro/types` so the editor and the API
+validate against one list rather than two that could drift.
+
+---
+
+## Verification run for the work above
+
+| Check | Result |
+|---|---|
+| API TypeScript | pass |
+| Web TypeScript | pass |
+| Full API suite | **966/966**, 85 files |
+| Full web unit suite | **219/219**, 23 files |
+| Every e2e spec, four workers, retries off | 83/84 — see below |
+| `website-builder.spec.ts` on both projects | 10/10 |
+| Design-system ratchet | no regressions; no baseline moved |
+| `git diff --check` | clean |
+| 429s during a full e2e run | **0** |
+
+The one e2e failure is `auth.spec.ts` "slug auto-generates from resort name" on
+Mobile Safari under four local workers. It passes alone, twice; it is in a spec
+CI does not run; nothing in this work touches auth or the register page.
+Recorded rather than hidden — it is a flake that predates this.
+
+Databases: all of the above ran against throwaway databases created and dropped
+for the purpose. No demo, staging or production data was touched, nothing was
+published, and no email, payment, DNS or SSL action was taken.
+
+---
+
+## Open, in the order they are worth doing
+
+### WB-002 — "Live immediately" is false · **needs an owner decision**
+
+`apps/web/src/app/(public)/[slug]/page.tsx` fetches with `revalidate: 60`, and
+`layout.tsx` — which carries the metadata and the GA id — with `revalidate:
+3600`. Publishing writes to the database at once, so the dashboard is right and
+the website is wrong for up to a minute, or an hour for analytics.
+
+This is the one a pilot resort owner meets on their first day: they publish,
+open the site, see no change, and conclude it did not work.
+
+It cannot be finished without a decision, which is why it stopped here:
+
+1. **Tag the fetches and have the publish route invalidate them.** Correct, and
+   keeps the cache. The API is Fastify and the cache is Next's, so the API has
+   to call a revalidation endpoint in the web app, which needs a shared secret
+   in both deployments. That is an environment variable only the owner can set,
+   and until it is set the behaviour is exactly as broken as today.
+2. **Stop caching website content.** One API call per page view instead of one
+   per minute. Correct immediately, no secret, no deployment change — and a
+   real cost on a busy site.
+
+Until one is chosen, the builder should not say "live immediately". Saying so
+is the part that turns a cache into a support call.
+
+### Remaining P0 gates from the audit
+
+| | Finding | Why it is not done |
+|---|---|---|
+| WB-003 | Preview has a startup race | needs a ready handshake both sides honour; mechanical, next after WB-002 |
+| WB-004 | Config/TEMPLATE theme preview is incomplete | the differentiator, and the largest of the P0s |
+| WB-007 | Roles see actions they cannot use | needs capability flags from the API, then the UI |
+| WB-008 | "Verified & live" from DNS alone | needs an HTTPS check and the production SSL path documented; part of it is infrastructure, not code |
+| WB-009 | Required fields are presentation-only | shared validation; small, and overdue |
+| WB-012 | Error states and accessibility | smallest of these |
+| — | Draft, publish and rollback | item 8 of the spec: a versioning model with migrations. A feature in its own right, not a gate that can be slipped in |
+
+Phase 1 and Phase 2 of the brief — multi-page sites, media library, SEO suite,
+analytics, lead inbox, multilingual, smart blocks — are untouched. Each is a
+product of its own and none should start before the P0 list is closed.
+
+---
+
+## Handoff verdict
+
+**NO-GO**, unchanged from the audit.
+
+What changed is that two of its eight gates are closed with tests that fail when
+the behaviour comes back, and the test suite can now carry the rest. The single
+most visible remaining problem is WB-002: an owner who publishes and sees no
+change on their own website will not trust anything else the builder says.
