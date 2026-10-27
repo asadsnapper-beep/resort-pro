@@ -3,38 +3,35 @@
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { XCircle } from 'lucide-react';
+import { PublicStatusShell } from '@/components/brand/PublicStatusShell';
 
 function CancelContent() {
   const params = useSearchParams();
   const booking = params.get('booking');
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1a6b5e] via-[#145a4f] to-[#0d3d36] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl p-10 max-w-md w-full text-center">
-        <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <XCircle className="w-10 h-10 text-red-400" />
-        </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Payment Cancelled</h1>
+    <PublicStatusShell eyebrow="Payment cancelled" title="No charge was made." description="Your booking is still on hold. Contact the resort whenever you’re ready to continue." icon={<XCircle className="h-6 w-6" />}>
+      <div className="text-center">
         {booking && (
           <p className="text-gray-500 mb-1">
             Booking reference: <strong className="text-gray-800 font-mono">{booking}</strong>
           </p>
         )}
-        <p className="text-gray-500 text-sm mb-8">
+        <p className="mb-8 text-sm leading-6 text-slate-500">
           No payment was made. Your booking is still on hold. Please contact the resort if you need assistance.
         </p>
-        <div className="p-4 bg-gray-50 rounded-xl text-sm text-gray-600">
+        <div className="rounded-2xl border border-black/5 bg-[#f8f6f1] p-4 text-sm text-slate-600">
           If you'd like to complete your payment, please ask the resort to send you a new payment link.
         </div>
       </div>
-    </div>
+    </PublicStatusShell>
   );
 }
 
 export default function PayCancelPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#1a6b5e] flex items-center justify-center">
-      <div className="text-white">Loading...</div>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-resort-900">
+      <div className="text-white">Loading…</div>
     </div>}>
       <CancelContent />
     </Suspense>

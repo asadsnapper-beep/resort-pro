@@ -92,12 +92,12 @@ export default async function ResortDetailPage({ params }: { params: { slug: str
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
       {/* Back */}
-      <Link href="/discover" className="inline-flex items-center gap-1.5 text-sm text-[#1a6b5e] hover:underline mb-5">
+      <Link href="/discover" className="inline-flex items-center gap-1.5 text-sm text-[#0e223c] hover:underline mb-5">
         <ChevronLeft className="w-4 h-4" /> Back to Discovery
       </Link>
 
       {/* Cover */}
-      <div className="rounded-2xl overflow-hidden h-56 sm:h-72 bg-gradient-to-br from-[#1a6b5e] to-[#145a4f] mb-6 relative">
+      <div className="relative mb-8 h-56 overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#0e223c] to-[#122846] sm:h-80">
         {resort.coverImageUrl ? (
           <img src={resort.coverImageUrl} alt={resort.name} className="w-full h-full object-cover" />
         ) : (
@@ -107,13 +107,13 @@ export default async function ResortDetailPage({ params }: { params: { slug: str
         )}
 
         {/* Category chip */}
-        <span className="absolute top-3 left-3 bg-white/90 text-[#1a6b5e] text-xs font-semibold px-2.5 py-1 rounded-full">
+        <span className="absolute top-3 left-3 bg-white/90 text-[#0e223c] text-xs font-semibold px-2.5 py-1 rounded-full">
           {CATEGORY_LABELS[resort.category] ?? resort.category}
         </span>
 
         {/* Featured badge */}
         {resort.isFeatured && resort.featuredBadge && (
-          <span className="absolute top-3 right-3 flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full bg-[#d4a853] text-white shadow-md">
+          <span className="absolute top-3 right-3 flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full bg-[#84cc16] text-white shadow-md">
             <Star className="w-3 h-3 fill-white" />
             {resort.featuredBadge}
           </span>
@@ -142,7 +142,7 @@ export default async function ResortDetailPage({ params }: { params: { slug: str
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">{resort.name}</h1>
+          <h1 className="font-editorial text-4xl font-medium leading-none text-resort-900 sm:text-5xl">{resort.name}</h1>
           {resort.shortDescription && (
             <p className="text-gray-500 mt-1">{resort.shortDescription}</p>
           )}
@@ -153,9 +153,9 @@ export default async function ResortDetailPage({ params }: { params: { slug: str
         </div>
 
         {resort.priceFrom && (
-          <div className="bg-[#f0faf8] border border-[#b2ddd6] rounded-xl px-4 py-3 text-center flex-shrink-0">
+          <div className="bg-[#f7fee7] border border-[#d9f99d] rounded-xl px-4 py-3 text-center flex-shrink-0">
             <p className="text-xs text-gray-500">Starting from</p>
-            <p className="text-xl font-bold text-[#1a6b5e]">৳{resort.priceFrom.toLocaleString()}</p>
+            <p className="text-xl font-bold text-[#0e223c]">৳{resort.priceFrom.toLocaleString()}</p>
             <p className="text-xs text-gray-400">per night</p>
           </div>
         )}
@@ -167,7 +167,7 @@ export default async function ResortDetailPage({ params }: { params: { slug: str
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Amenities</h2>
           <div className="flex flex-wrap gap-2">
             {resort.amenitiesHighlights.map((item, i) => (
-              <span key={i} className="inline-flex items-center text-xs font-medium bg-[#f0faf8] border border-[#b2ddd6] text-[#1a6b5e] px-3 py-1.5 rounded-full">
+              <span key={i} className="inline-flex items-center text-xs font-medium bg-[#f7fee7] border border-[#d9f99d] text-[#0e223c] px-3 py-1.5 rounded-full">
                 {item}
               </span>
             ))}
@@ -182,7 +182,7 @@ export default async function ResortDetailPage({ params }: { params: { slug: str
           { icon: Globe, label: 'Country', value: resort.country },
         ].map(item => (
           <div key={item.label} className="bg-white rounded-xl border border-gray-100 p-3 text-center">
-            <item.icon className="w-5 h-5 text-[#1a6b5e] mx-auto mb-1" />
+            <item.icon className="w-5 h-5 text-[#0e223c] mx-auto mb-1" />
             <p className="text-xs text-gray-400">{item.label}</p>
             <p className="text-sm font-semibold text-gray-700">{item.value}</p>
           </div>
@@ -195,21 +195,21 @@ export default async function ResortDetailPage({ params }: { params: { slug: str
 
         {/* Booking phone */}
         {resort.bookingPhone && (
-          <a href={`tel:${resort.bookingPhone}`} className="flex items-center gap-2 text-sm text-gray-600 hover:text-[#1a6b5e]">
-            <Phone className="w-4 h-4 text-[#1a6b5e]" /> {resort.bookingPhone}
+          <a href={`tel:${resort.bookingPhone}`} className="flex items-center gap-2 text-sm text-gray-600 hover:text-[#0e223c]">
+            <Phone className="w-4 h-4 text-[#0e223c]" /> {resort.bookingPhone}
             <span className="text-xs text-gray-400">(Booking)</span>
           </a>
         )}
 
         {resort.phone && resort.phone !== resort.bookingPhone && (
-          <a href={`tel:${resort.phone}`} className="flex items-center gap-2 text-sm text-gray-600 hover:text-[#1a6b5e]">
-            <Phone className="w-4 h-4 text-[#1a6b5e]" /> {resort.phone}
+          <a href={`tel:${resort.phone}`} className="flex items-center gap-2 text-sm text-gray-600 hover:text-[#0e223c]">
+            <Phone className="w-4 h-4 text-[#0e223c]" /> {resort.phone}
           </a>
         )}
 
         {resort.email && (
-          <a href={`mailto:${resort.email}`} className="flex items-center gap-2 text-sm text-gray-600 hover:text-[#1a6b5e]">
-            <Mail className="w-4 h-4 text-[#1a6b5e]" /> {resort.email}
+          <a href={`mailto:${resort.email}`} className="flex items-center gap-2 text-sm text-gray-600 hover:text-[#0e223c]">
+            <Mail className="w-4 h-4 text-[#0e223c]" /> {resort.email}
           </a>
         )}
 
@@ -226,7 +226,7 @@ export default async function ResortDetailPage({ params }: { params: { slug: str
 
         {resort.website && (
           <a href={resort.website} target="_blank" rel="noopener noreferrer"
-            className="flex items-center gap-2 text-sm text-[#1a6b5e] hover:underline">
+            className="flex items-center gap-2 text-sm text-[#0e223c] hover:underline">
             <Globe className="w-4 h-4" /> Visit Website
           </a>
         )}
@@ -239,7 +239,7 @@ export default async function ResortDetailPage({ params }: { params: { slug: str
             href={bookingUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-1 flex items-center justify-center gap-2 bg-[#1a6b5e] hover:bg-[#145a4f] text-white font-semibold py-3 rounded-xl transition-colors">
+            className="flex flex-1 items-center justify-center gap-2 rounded-full bg-lime-400 py-3 font-extrabold text-resort-900 transition-colors hover:bg-lime-300">
             <ExternalLink className="w-4 h-4" />
             {bookingLabel}
           </a>

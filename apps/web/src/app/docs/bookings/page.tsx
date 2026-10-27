@@ -210,7 +210,7 @@ export default function BookingsPage() {
       </p>
       <p>
         Go to <strong>Group Bookings</strong> in the sidebar to create and manage group reservations.
-        See the <a href="/docs/group-bookings" className="text-[#1a6b5e] underline">Group Bookings guide</a> for
+        See the <a href="/docs/group-bookings" className="text-lime-700 underline">Group Bookings guide</a> for
         step-by-step instructions.
       </p>
 
