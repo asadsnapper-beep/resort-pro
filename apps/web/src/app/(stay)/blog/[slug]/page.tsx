@@ -56,7 +56,7 @@ function renderMarkdown(md: string): string {
     // Bold
     .replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-gray-800">$1</strong>')
     // Links
-    .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" class="text-[#1a6b5e] underline hover:opacity-80">$1</a>')
+    .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" class="text-[#0e223c] underline hover:opacity-80">$1</a>')
     // Bullet points
     .replace(/^- (.+)$/gm, '<li class="ml-4 list-disc text-gray-600">$1</li>')
     // Numbered list
@@ -110,13 +110,13 @@ export default function BlogPostPage({ params }: { params: { slug: string } }) {
 
       <div className="max-w-3xl mx-auto px-4 py-8">
         {/* Back */}
-        <Link href="/blog" className="inline-flex items-center gap-1.5 text-sm text-[#1a6b5e] hover:underline mb-6">
+        <Link href="/blog" className="inline-flex items-center gap-1.5 text-sm text-[#0e223c] hover:underline mb-6">
           <ChevronLeft className="w-4 h-4" /> Back to Blog
         </Link>
 
         {/* Cover image */}
         {post.coverImage && (
-          <div className="rounded-2xl overflow-hidden h-52 sm:h-72 mb-6">
+          <div className="mb-8 h-52 overflow-hidden rounded-[2rem] sm:h-80">
             <img src={post.coverImage} alt={post.title} className="w-full h-full object-cover" />
           </div>
         )}
@@ -131,7 +131,7 @@ export default function BlogPostPage({ params }: { params: { slug: string } }) {
         </div>
 
         {/* Title */}
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-3 leading-tight">
+        <h1 className="mb-4 font-editorial text-4xl font-medium leading-[1.02] text-resort-900 sm:text-6xl">
           {post.title}
         </h1>
 
@@ -154,17 +154,17 @@ export default function BlogPostPage({ params }: { params: { slug: string } }) {
         />
 
         {/* CTA */}
-        <div className="mt-10 p-5 bg-gradient-to-r from-[#f0faf8] to-[#e8f5f2] rounded-2xl border border-[#b2ddd6]">
-          <p className="text-sm font-semibold text-[#1a6b5e] mb-1">Ready to explore?</p>
+        <div className="mt-12 rounded-[2rem] border border-lime-200 bg-lime-50 p-6">
+          <p className="text-sm font-semibold text-[#0e223c] mb-1">Ready to explore?</p>
           <p className="text-xs text-gray-500 mb-3">Find and book the resorts mentioned in this article.</p>
           <div className="flex flex-wrap gap-2">
             <Link href="/discover"
-              className="inline-flex items-center gap-1.5 bg-[#1a6b5e] text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-[#145a4f] transition-colors">
+              className="inline-flex items-center gap-1.5 rounded-full bg-resort-900 px-4 py-2 text-sm font-extrabold text-white transition-colors hover:bg-resort-800">
               Browse Resorts on Map →
             </Link>
             {post.tags[0] && (
               <Link href={`/discover?category=${post.tags[0]}`}
-                className="inline-flex items-center gap-1.5 border border-[#1a6b5e] text-[#1a6b5e] text-sm font-semibold px-4 py-2 rounded-xl hover:bg-[#f0faf8] transition-colors">
+                className="inline-flex items-center gap-1.5 border border-[#0e223c] text-[#0e223c] text-sm font-semibold px-4 py-2 rounded-xl hover:bg-[#f7fee7] transition-colors">
                 Browse {post.tags[0]} resorts
               </Link>
             )}
@@ -180,12 +180,12 @@ export default function BlogPostPage({ params }: { params: { slug: string } }) {
                 <Link
                   key={related.slug}
                   href={`/blog/${related.slug}`}
-                  className="group bg-white rounded-xl border border-gray-100 p-3 hover:border-[#b2ddd6] hover:shadow-sm transition-all">
+                  className="group bg-white rounded-xl border border-gray-100 p-3 hover:border-[#d9f99d] hover:shadow-sm transition-all">
                   {related.coverImage && (
                     <img src={related.coverImage} alt={related.title}
                       className="w-full h-20 object-cover rounded-lg mb-2" />
                   )}
-                  <p className="text-xs font-semibold text-gray-700 group-hover:text-[#1a6b5e] transition-colors line-clamp-2">
+                  <p className="text-xs font-semibold text-gray-700 group-hover:text-[#0e223c] transition-colors line-clamp-2">
                     {related.title}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">{related.readTime} min read</p>

@@ -27,13 +27,13 @@ import { BrandLogo } from '@/components/brand/BrandLogo';
 // Palette matches the landing page's design system
 // (claude.ai/design/p/d56b55b0-882c-44d6-aecd-3667a5499d43 — "ResortPro Landing.dc.html").
 // Keep these in sync with LandingPage.tsx if that source changes.
-const NAVY = '#14314D';
-const GOLD = '#CFA153';
-const GOLD_HOVER = '#B98B3E';
-const CREAM = '#F7F3EE';
-const BORDER = '#EDE7DD';
-const MUTED = '#5B6B79';
-const MUTED_LIGHT = '#8B95A0';
+const NAVY = '#0e223c';
+const GOLD = '#84cc16';
+const GOLD_HOVER = '#65a30d';
+const CREAM = '#f8f6f1';
+const BORDER = '#e7e5df';
+const MUTED = '#586574';
+const MUTED_LIGHT = '#7b8794';
 
 const DEMO_EMAIL_KEY = 'rp_demo_email';
 
@@ -246,12 +246,12 @@ export default function DemoPage() {
         <div className="mx-auto grid max-w-7xl gap-8 px-5 py-14 sm:px-8 lg:grid-cols-[1fr_300px] lg:items-end lg:py-20">
           <div>
             <span
-              className="font-bitcount block text-[13px] font-medium uppercase tracking-[0.14em]"
+              className="block text-[12px] font-extrabold uppercase tracking-[0.18em]"
               style={{ color: GOLD }}
             >
               {isBn ? 'ইন্টারঅ্যাক্টিভ প্রোডাক্ট ট্যুর' : 'Interactive product tour'}
             </span>
-            <h1 className="mt-4 max-w-3xl text-[clamp(2.4rem,5vw,3.2rem)] font-extrabold leading-[1.15]">
+            <h1 className="mt-5 max-w-4xl font-editorial text-[clamp(3rem,7vw,5.4rem)] font-medium leading-[0.98] tracking-[-0.035em]">
               {isBn
                 ? 'আপনার কাজের জায়গা থেকে ResortPro দেখুন।'
                 : 'See ResortPro from the desk where work actually happens.'}
@@ -264,7 +264,7 @@ export default function DemoPage() {
           </div>
           <aside className="rounded-2xl p-6 text-white" style={{ background: NAVY }}>
             <span
-              className="font-bitcount block text-[11px] font-medium uppercase tracking-[0.12em]"
+              className="block text-[11px] font-extrabold uppercase tracking-[0.16em]"
               style={{ color: GOLD }}
             >
               {isBn ? 'একটি প্রকৃত ওয়ার্কস্পেস' : 'A real workspace'}
@@ -288,12 +288,12 @@ export default function DemoPage() {
         >
           <div>
             <span
-              className="font-bitcount block text-[11px] font-medium uppercase tracking-[0.12em]"
+              className="block text-[11px] font-extrabold uppercase tracking-[0.16em]"
               style={{ color: GOLD }}
             >
               {isBn ? 'আপনার ভিউ বেছে নিন' : 'Choose your view'}
             </span>
-            <h2 className="mt-2 text-3xl font-extrabold">
+            <h2 className="mt-2 font-editorial text-4xl font-medium">
               {isBn ? 'কোন role-এ explore করতে চান?' : 'Which role do you want to explore?'}
             </h2>
           </div>
@@ -311,7 +311,7 @@ export default function DemoPage() {
                 type="button"
                 onClick={() => handleRoleSelect(role.role)}
                 disabled={loading !== null}
-                className="group relative flex min-h-[300px] flex-col rounded-2xl border p-6 text-left transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                className="group relative flex min-h-[300px] flex-col rounded-[1.75rem] border p-6 text-left transition-all hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
                 style={
                   role.primary
                     ? { background: NAVY, borderColor: NAVY, color: '#fff' }
@@ -344,7 +344,7 @@ export default function DemoPage() {
                     {isBn ? role.titleBn : role.title}
                   </h3>
                   <span
-                    className="font-bitcount shrink-0 text-[9px] uppercase tracking-[0.1em]"
+                    className="shrink-0 text-[9px] font-extrabold uppercase tracking-[0.14em]"
                     style={{ color: role.primary ? GOLD : GOLD }}
                   >
                     {role.badge}
@@ -417,12 +417,12 @@ export default function DemoPage() {
                 <Mail className="h-5 w-5" />
               </span>
               <span
-                className="font-bitcount mt-6 block text-[11px] font-medium uppercase tracking-[0.14em]"
+                className="mt-6 block text-[11px] font-extrabold uppercase tracking-[0.16em]"
                 style={{ color: GOLD }}
               >
                 {isBn ? 'একটি ছোট তথ্য' : 'One quick detail'}
               </span>
-              <h2 className="mt-2 text-3xl font-extrabold leading-none" style={{ color: NAVY }}>
+              <h2 className="mt-2 font-editorial text-4xl font-medium leading-none" style={{ color: NAVY }}>
                 {isBn ? 'Demo দেখতে email দিন' : 'Enter your email, then explore freely.'}
               </h2>
               <p className="mt-4 text-sm leading-6" style={{ color: MUTED }}>
@@ -454,7 +454,7 @@ export default function DemoPage() {
                 )}
                 <button
                   type="submit"
-                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3.5 text-sm font-extrabold text-white transition-colors"
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-full px-4 py-3.5 text-sm font-extrabold text-resort-900 transition-colors"
                   style={{ background: GOLD }}
                   onMouseEnter={(e) => { e.currentTarget.style.background = GOLD_HOVER; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = GOLD; }}

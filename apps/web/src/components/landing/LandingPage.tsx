@@ -133,13 +133,7 @@ export function LandingPage({ isBn = false }: { isBn?: boolean }) {
               {isBn ? 'EN' : 'বাংলা'}
             </Link>
             <Link href="/auth/login" className="text-sm font-bold hover:text-resort-600">{isBn ? 'লগ ইন' : 'Log in'}</Link>
-            {/* Without this the page had no way to open an account at all:
-                every call to action went to the demo or the pricing, and the
-                header offered only Log in. A visitor could read everything
-                and still not start. */}
-            <Link href="/auth/register" className="text-sm font-bold hover:text-resort-600">
-              {isBn ? 'সাইন আপ' : 'Sign up'}
-            </Link>
+            <Link href="/auth/register" className="text-sm font-bold hover:text-resort-600">{isBn ? 'সাইন আপ' : 'Sign up'}</Link>
             <Link href="/try" className="rounded-full bg-resort-600 px-5 py-2.5 text-sm font-extrabold text-white transition-colors hover:bg-resort-700">
               {isBn ? 'Demo দেখুন' : 'View demo'}
             </Link>
@@ -163,21 +157,8 @@ export function LandingPage({ isBn = false }: { isBn?: boolean }) {
               <a key={link.href} href={link.href} onClick={() => setMenuOpen(false)} className="border-b border-resort-900/10 py-5 text-lg font-bold">{link.label}</a>
             ))}
           </div>
-          {/* The menu held the three section anchors and the demo, and nothing
-              else — so on a phone there was no way to sign in and no way to
-              open an account, because both live in the header, which is
-              `lg:` only. Most visitors here are on a phone. */}
-          <div className="mt-auto flex flex-col gap-3">
-            <Link href="/auth/register" onClick={() => setMenuOpen(false)} className="rounded-full bg-resort-600 px-5 py-3.5 text-center text-sm font-extrabold text-white">
-              {isBn ? 'অ্যাকাউন্ট খুলুন' : 'Sign up'}
-            </Link>
-            <Link href="/try" onClick={() => setMenuOpen(false)} className="rounded-full border border-resort-900/15 px-5 py-3.5 text-center text-sm font-extrabold text-resort-900">
-              {isBn ? 'Demo দেখুন' : 'View demo'}
-            </Link>
-            <Link href="/auth/login" onClick={() => setMenuOpen(false)} className="py-1 text-center text-sm font-bold text-resort-700">
-              {isBn ? 'লগ ইন' : 'Log in'}
-            </Link>
-          </div>
+          <Link href="/try" onClick={() => setMenuOpen(false)} className="mt-auto rounded-full bg-resort-600 px-5 py-3.5 text-center text-sm font-extrabold text-white">{isBn ? 'Demo দেখুন' : 'View demo'}</Link>
+          <Link href="/auth/register" onClick={() => setMenuOpen(false)} className="mt-3 rounded-full bg-lime-300 px-5 py-3.5 text-center text-sm font-extrabold text-resort-900">{isBn ? 'অ্যাকাউন্ট খুলুন' : 'Sign up'}</Link>
         </div>
       </div>
 
@@ -200,9 +181,6 @@ export function LandingPage({ isBn = false }: { isBn?: boolean }) {
               {isBn ? 'Live demo দেখুন' : 'Explore the live demo'}
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Link>
-            {/* The demo stays the primary action: a resort owner who has never
-                heard of this wants to look before signing up. But there has to
-                be a way to start, and there was not one anywhere on the page. */}
             <Link href="/auth/register" className="text-sm font-extrabold text-resort-700 underline decoration-lime-400 decoration-2 underline-offset-4">
               {isBn ? 'অ্যাকাউন্ট খুলুন' : 'Create your account'}
             </Link>
@@ -313,17 +291,13 @@ export function LandingPage({ isBn = false }: { isBn?: boolean }) {
         <div className="mx-auto max-w-3xl">
           <h2 className="font-editorial text-[clamp(2.6rem,6vw,5rem)] font-medium leading-tight">{isBn ? 'নিজে দেখে সিদ্ধান্ত নিন।' : 'See it before you decide.'}</h2>
           <p className="mx-auto mt-5 max-w-xl text-base leading-7 text-slate-600">{isBn ? 'Live demo খুলে room, booking, guest ও payment workflow ঘুরে দেখুন।' : 'Open the live demo and explore rooms, bookings, guests and payment workflows.'}</p>
-          {/* Somebody who has read this far is the readiest visitor the page
-              will ever have, and the only thing offered to them was the demo
-              again. */}
-          <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link href="/try" className="group inline-flex items-center gap-2 rounded-full bg-resort-600 px-7 py-3.5 text-sm font-extrabold text-white hover:bg-resort-700">
-              {isBn ? 'Live demo খুলুন' : 'Open the live demo'} <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-            </Link>
-            <Link href="/auth/register" className="text-sm font-extrabold text-resort-700 underline decoration-lime-400 decoration-2 underline-offset-4">
-              {isBn ? 'অ্যাকাউন্ট খুলুন' : 'Create your account'}
-            </Link>
-          </div>
+          <Link href="/try" className="group mt-8 inline-flex items-center gap-2 rounded-full bg-resort-600 px-7 py-3.5 text-sm font-extrabold text-white hover:bg-resort-700">
+            {isBn ? 'Live demo খুলুন' : 'Open the live demo'} <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+          </Link>
+          <p className="mt-6 text-sm font-bold text-slate-600">
+            {isBn ? 'অথবা ' : 'Or '}
+            <Link href="/auth/register" className="font-extrabold text-resort-700 underline decoration-lime-400 decoration-2 underline-offset-4">{isBn ? 'অ্যাকাউন্ট খুলুন' : 'Create your account'}</Link>
+          </p>
         </div>
       </section>
 

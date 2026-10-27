@@ -1,22 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Check, ChevronDown, Sparkles } from 'lucide-react';
 import { PLAN_PRICING, PUBLIC_PLAN_ORDER } from '@resort-pro/types';
+import { BrandLogo } from '@/components/brand/BrandLogo';
 
-// Palette matches the landing page's design system
-// (claude.ai/design/p/d56b55b0-882c-44d6-aecd-3667a5499d43 — "ResortPro Landing.dc.html").
-// Keep these in sync with LandingPage.tsx if that source changes.
-const NAVY = '#14314D';
-const GOLD = '#CFA153';
-const GOLD_HOVER = '#B98B3E';
-const CREAM = '#F7F3EE';
-const BORDER = '#EDE7DD';
-const MUTED = '#5B6B79';
-const MUTED_LIGHT = '#8B95A0';
+const NAVY = '#0e223c';
+const ACCENT = '#65a30d';
+const ACCENT_BRIGHT = '#bef264';
+const ACCENT_HOVER = '#a3e635';
+const CREAM = '#f8f6f1';
+const BORDER = '#e7e5df';
+const MUTED = '#5f6b7a';
+const MUTED_LIGHT = '#8a94a3';
 
 const PLANS = [
   {
@@ -42,10 +40,7 @@ const PLANS = [
     id: 'PROFESSIONAL' as const,
     eyebrow: 'For resort groups',
     name: PLAN_PRICING.PROFESSIONAL.displayName,
-    // Was 'One operating view across every property you run.' There is no such
-    // view: every dashboard page shows all properties mixed together. Put the
-    // stronger claim back when a property switcher exists.
-    title: 'One account for every property you run.',
+    title: 'One operating view across every property you run.',
     price: PLAN_PRICING.PROFESSIONAL.monthlyUsd,
     annualPrice: PLAN_PRICING.PROFESSIONAL.annualUsd,
     capacity: `Up to ${PLAN_PRICING.PROFESSIONAL.propertyLimit} properties · ${PLAN_PRICING.PROFESSIONAL.roomLimit} rooms · ${PLAN_PRICING.PROFESSIONAL.staffLimit} staff`,
@@ -54,7 +49,7 @@ const PLANS = [
     cta: 'Start with Resort Group',
     features: [
       'Everything in Independent Resort',
-      // 'Multi-property owner view' removed 2026-09-15: it does not exist yet.
+      'Multi-property owner view',
       'OTA channel sync and corporate accounts',
       'Advanced reporting and AI chatbot',
       'Priority support',
@@ -106,33 +101,15 @@ const COMPARE_ROWS = [
   { label: 'Direct booking website', starter: true, pro: true, group: true },
   { label: 'Custom domain and loyalty', starter: false, pro: true, group: true },
   { label: 'Advanced analytics and reports', starter: false, pro: false, group: true },
-  // 'Multi-property reporting' removed 2026-09-15: reports do not separate
-  // properties. Restore it when they do.
+  { label: 'Multi-property reporting', starter: false, pro: false, group: true },
 ];
-
-function BrandMark() {
-  return (
-    <span
-      className="relative flex h-9 w-9 flex-none items-center justify-center overflow-hidden rounded-lg"
-      style={{ background: NAVY }}
-    >
-      <Image
-        src="/brand/resortpro-icon-mark.png"
-        alt="ResortPro"
-        fill
-        sizes="36px"
-        className="scale-125 object-cover mix-blend-screen"
-      />
-    </span>
-  );
-}
 
 function Price({ plan, billing }: { plan: (typeof PLANS)[number]; billing: 'monthly' | 'annual' }) {
   const price = billing === 'annual' ? plan.annualPrice : plan.price;
 
   return (
     <div className="flex items-end gap-2">
-      <span className="font-bitcount text-5xl font-normal" style={{ color: NAVY }}>
+      <span className="font-editorial text-5xl font-medium tracking-[-0.04em]" style={{ color: NAVY }}>
         ${price}
       </span>
       <span className="mb-1.5 text-sm font-bold" style={{ color: MUTED }}>
@@ -149,11 +126,10 @@ export default function PlansPage() {
 
   return (
     <main className="min-h-screen overflow-hidden bg-white font-sans" style={{ color: NAVY }}>
-      <header className="border-b bg-white" style={{ borderColor: BORDER }}>
+      <header className="border-b bg-[#f8f6f1]" style={{ borderColor: BORDER }}>
         <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-5 sm:px-8">
-          <Link href="/" className="flex items-center gap-2.5" aria-label="ResortPro home">
-            <BrandMark />
-            <span className="text-lg font-extrabold">ResortPro</span>
+          <Link href="/" className="flex items-center" aria-label="ResortPro home">
+            <BrandLogo />
           </Link>
           <div className="flex items-center gap-4 text-sm font-bold">
             <Link
@@ -165,10 +141,7 @@ export default function PlansPage() {
             </Link>
             <Link
               href="/try"
-              className="rounded-lg px-5 py-2.5 text-white transition-colors"
-              style={{ background: GOLD }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = GOLD_HOVER; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = GOLD; }}
+              className="rounded-full bg-resort-900 px-5 py-2.5 text-white transition-colors hover:bg-resort-800"
             >
               Try the demo
             </Link>
@@ -180,12 +153,12 @@ export default function PlansPage() {
         <div className="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[1fr_330px] lg:items-end lg:py-20">
           <div>
             <span
-              className="font-bitcount mb-5 block text-[13px] font-medium uppercase tracking-[0.14em]"
-              style={{ color: GOLD }}
+              className="mb-5 block text-xs font-extrabold uppercase tracking-[0.18em]"
+              style={{ color: ACCENT }}
             >
               Simple prices. Serious operations.
             </span>
-            <h1 className="max-w-3xl text-[clamp(2.6rem,5.5vw,4rem)] font-extrabold leading-[1.1]">
+            <h1 className="font-editorial max-w-3xl text-[clamp(3rem,6vw,5.4rem)] font-medium leading-[0.98] tracking-[-0.04em]">
               Pick the plan that matches your next season.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8" style={{ color: MUTED }}>
@@ -193,18 +166,17 @@ export default function PlansPage() {
               buying a smaller version of your business.
             </p>
           </div>
-          <aside className="rounded-2xl bg-white p-6">
+          <aside className="rounded-3xl border border-resort-900/10 bg-white p-6 shadow-[0_20px_60px_-44px_rgba(14,34,60,0.5)]">
             <div className="flex items-start gap-3">
               <span
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white"
-                style={{ background: GOLD }}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-resort-900 text-lime-300"
               >
                 <Sparkles className="h-5 w-5" />
               </span>
               <div>
                 <span
-                  className="font-bitcount block text-[11px] font-medium uppercase tracking-[0.12em]"
-                  style={{ color: GOLD }}
+                  className="block text-[11px] font-extrabold uppercase tracking-[0.14em]"
+                  style={{ color: ACCENT }}
                 >
                   Fair, predictable pricing
                 </span>
@@ -225,11 +197,11 @@ export default function PlansPage() {
           <p className="text-sm font-bold" style={{ color: MUTED }}>
             No setup fee. Cancel whenever your season changes. Your data stays yours.
           </p>
-          <div className="flex w-fit rounded-lg border p-1 text-sm font-extrabold" style={{ borderColor: BORDER }}>
+          <div className="flex w-fit rounded-full border bg-[#f8f6f1] p-1 text-sm font-extrabold" style={{ borderColor: BORDER }}>
             <button
               type="button"
               onClick={() => setBilling('monthly')}
-              className="rounded-md px-4 py-2 transition-colors"
+              className="rounded-full px-4 py-2 transition-colors"
               style={billing === 'monthly' ? { background: NAVY, color: '#fff' } : { color: MUTED }}
             >
               Monthly
@@ -237,10 +209,10 @@ export default function PlansPage() {
             <button
               type="button"
               onClick={() => setBilling('annual')}
-              className="rounded-md px-4 py-2 transition-colors"
+              className="rounded-full px-4 py-2 transition-colors"
               style={billing === 'annual' ? { background: NAVY, color: '#fff' } : { color: MUTED }}
             >
-              Annual <span className="ml-1" style={{ color: billing === 'annual' ? GOLD : GOLD }}>2 months free</span>
+              Annual <span className="ml-1" style={{ color: billing === 'annual' ? ACCENT_BRIGHT : ACCENT }}>2 months free</span>
             </button>
           </div>
         </div>
@@ -251,7 +223,7 @@ export default function PlansPage() {
           {PLANS.map((plan) => (
             <article
               key={plan.id}
-              className="relative flex min-w-0 flex-col rounded-2xl border p-6 sm:p-8"
+              className="relative flex min-w-0 flex-col rounded-3xl border p-6 sm:p-8"
               style={
                 plan.featured
                   ? { background: NAVY, borderColor: NAVY, color: '#fff' }
@@ -260,26 +232,26 @@ export default function PlansPage() {
             >
               {plan.badge && (
                 <span
-                  className="font-bitcount absolute right-6 top-6 rounded-full px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-white"
-                  style={{ background: GOLD }}
+                  className="absolute right-6 top-6 rounded-full px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em]"
+                  style={{ background: ACCENT_BRIGHT, color: NAVY }}
                 >
                   {plan.badge}
                 </span>
               )}
               <span
-                className="font-bitcount text-[11px] font-medium uppercase tracking-[0.12em]"
-                style={{ color: GOLD }}
+                className="text-[11px] font-extrabold uppercase tracking-[0.14em]"
+                style={{ color: plan.featured ? ACCENT_BRIGHT : ACCENT }}
               >
                 {plan.eyebrow}
               </span>
-              <h2 className="mt-3 text-3xl font-extrabold">{plan.name}</h2>
+              <h2 className="font-editorial mt-3 text-3xl font-medium">{plan.name}</h2>
               <p className="mt-3 min-h-12 text-sm leading-6" style={{ color: plan.featured ? 'rgba(255,255,255,0.75)' : MUTED }}>
                 {plan.title}
               </p>
               <div className="mt-7 border-y py-5" style={{ borderColor: plan.featured ? 'rgba(255,255,255,0.2)' : BORDER }}>
                 {plan.featured ? (
                   <div className="flex items-end gap-2">
-                    <span className="font-bitcount text-5xl font-normal text-white">
+                    <span className="font-editorial text-5xl font-medium tracking-[-0.04em] text-white">
                       ${billing === 'annual' ? plan.annualPrice : plan.price}
                     </span>
                     <span className="mb-1.5 text-sm font-bold text-white/70">
@@ -303,7 +275,7 @@ export default function PlansPage() {
                     className="flex gap-2.5 text-sm leading-5"
                     style={{ color: plan.featured ? 'rgba(255,255,255,0.85)' : MUTED }}
                   >
-                    <Check className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={3} style={{ color: GOLD }} />
+                    <Check className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={3} style={{ color: plan.featured ? ACCENT_BRIGHT : ACCENT }} />
                     {feature}
                   </li>
                 ))}
@@ -311,14 +283,14 @@ export default function PlansPage() {
               <button
                 type="button"
                 onClick={() => router.push(`/auth/register?plan=${plan.id}`)}
-                className="mt-8 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3.5 text-sm font-extrabold transition-colors"
-                style={plan.featured ? { background: GOLD, color: '#fff' } : { border: `1px solid ${BORDER}`, color: NAVY }}
+                className="mt-8 flex w-full items-center justify-center gap-2 rounded-full px-4 py-3.5 text-sm font-extrabold transition-colors"
+                style={plan.featured ? { background: ACCENT_BRIGHT, color: NAVY } : { border: `1px solid ${BORDER}`, color: NAVY }}
                 onMouseEnter={(e) => {
-                  if (plan.featured) e.currentTarget.style.background = GOLD_HOVER;
-                  else e.currentTarget.style.borderColor = GOLD;
+                  if (plan.featured) e.currentTarget.style.background = ACCENT_HOVER;
+                  else e.currentTarget.style.borderColor = ACCENT;
                 }}
                 onMouseLeave={(e) => {
-                  if (plan.featured) e.currentTarget.style.background = GOLD;
+                  if (plan.featured) e.currentTarget.style.background = ACCENT_BRIGHT;
                   else e.currentTarget.style.borderColor = BORDER;
                 }}
               >
@@ -331,7 +303,7 @@ export default function PlansPage() {
         <p className="mt-8 text-center text-sm leading-6" style={{ color: MUTED }}>
           Have more than {PLAN_PRICING.PROFESSIONAL.propertyLimit} properties, need SSO, or want
           white-label support?{' '}
-          <Link href="/contact" className="font-extrabold underline decoration-2 underline-offset-4" style={{ color: GOLD }}>
+          <Link href="/contact" className="font-extrabold underline decoration-2 underline-offset-4" style={{ color: ACCENT }}>
             Talk to us
           </Link>
           .
@@ -341,10 +313,10 @@ export default function PlansPage() {
       <section className="text-white" style={{ background: NAVY }}>
         <div className="mx-auto grid max-w-7xl gap-8 px-5 py-14 sm:px-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
           <div>
-            <span className="font-bitcount block text-[11px] font-medium uppercase tracking-[0.12em]" style={{ color: GOLD }}>
+            <span className="block text-[11px] font-extrabold uppercase tracking-[0.14em]" style={{ color: ACCENT_BRIGHT }}>
               Built for the day-to-day
             </span>
-            <h2 className="mt-3 text-[clamp(1.8rem,3.5vw,2.4rem)] font-extrabold leading-[1.2]">
+            <h2 className="font-editorial mt-3 text-[clamp(2.2rem,4vw,3.4rem)] font-medium leading-[1.05]">
               Your booking desk, front office and restaurant finally agree.
             </h2>
           </div>
@@ -356,7 +328,7 @@ export default function PlansPage() {
               ['24/7', 'your operations stay visible'],
             ].map(([number, label]) => (
               <div key={number} className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                <p className="font-bitcount text-3xl font-normal" style={{ color: GOLD }}>{number}</p>
+                <p className="font-editorial text-3xl font-medium" style={{ color: ACCENT_BRIGHT }}>{number}</p>
                 <p className="mt-2 text-xs leading-5 text-white/60">{label}</p>
               </div>
             ))}
@@ -372,10 +344,10 @@ export default function PlansPage() {
           style={{ borderColor: BORDER }}
         >
           <span>
-            <span className="font-bitcount block text-[11px] font-medium uppercase tracking-[0.12em]" style={{ color: GOLD }}>
+            <span className="block text-[11px] font-extrabold uppercase tracking-[0.14em]" style={{ color: ACCENT }}>
               No hidden tiers
             </span>
-            <span className="mt-1 block text-2xl font-extrabold">Compare every plan in detail</span>
+            <span className="font-editorial mt-1 block text-3xl font-medium">Compare every plan in detail</span>
           </span>
           <ChevronDown className={`h-5 w-5 shrink-0 transition-transform ${showCompare ? 'rotate-180' : ''}`} />
         </button>
@@ -397,7 +369,7 @@ export default function PlansPage() {
                     {(['starter', 'pro', 'group'] as const).map((tier) => (
                       <td key={tier} className="px-5 py-4">
                         {row[tier] === true ? (
-                          <Check className="h-4 w-4" strokeWidth={3} style={{ color: GOLD }} />
+                          <Check className="h-4 w-4" strokeWidth={3} style={{ color: ACCENT }} />
                         ) : row[tier] === false ? (
                           <span style={{ color: MUTED_LIGHT }}>—</span>
                         ) : (
@@ -421,7 +393,7 @@ export default function PlansPage() {
           </Link>
           <p className="text-xs" style={{ color: MUTED }}>
             Questions before you choose?{' '}
-            <Link href="/try" className="font-bold underline underline-offset-4" style={{ color: GOLD }}>
+            <Link href="/try" className="font-bold underline decoration-2 underline-offset-4" style={{ color: ACCENT }}>
               Explore a live role demo
             </Link>
             .

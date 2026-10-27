@@ -225,7 +225,7 @@ export default function RestaurantPage() {
       <h3>Can guests order food from their room themselves?</h3>
       <p>
         Yes, if you embed the food menu widget on your in-room tablet or TV system. See the
-        <a href="/docs/embed-widget" className="text-[#1a6b5e] underline"> Embed Widget guide</a> for
+        <a href="/docs/embed-widget" className="text-lime-700 underline"> Embed Widget guide</a> for
         how to set up the food menu widget.
       </p>
 

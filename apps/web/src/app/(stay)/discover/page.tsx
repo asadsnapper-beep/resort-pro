@@ -15,9 +15,9 @@ import DiscoverySchema from '@/components/stay/DiscoverySchema';
 const ResortMap = dynamic(() => import('@/components/stay/ResortMap'), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-[#f0faf8]">
+    <div className="w-full h-full flex items-center justify-center bg-[#f7fee7]">
       <div className="flex flex-col items-center gap-3">
-        <Loader2 className="w-8 h-8 text-[#1a6b5e] animate-spin" />
+        <Loader2 className="w-8 h-8 text-[#0e223c] animate-spin" />
         <p className="text-sm text-gray-400">Loading map…</p>
       </div>
     </div>
@@ -125,13 +125,13 @@ function ResortCard({
       onClick={onClick}
       className={`w-full text-left bg-white rounded-2xl border shadow-sm hover:shadow-md active:scale-[0.98] transition-all duration-200 overflow-hidden group ${
         resort.isFeatured
-          ? 'border-[#d4a853]/40 ring-1 ring-[#d4a853]/20'
-          : 'border-gray-100 hover:border-[#b2ddd6]'
+          ? 'border-[#84cc16]/40 ring-1 ring-[#84cc16]/20'
+          : 'border-gray-100 hover:border-[#d9f99d]'
       }`}>
 
       {/* Cover image */}
       {!compact && (
-        <div className="h-36 bg-gradient-to-br from-[#1a6b5e] to-[#145a4f] relative overflow-hidden">
+        <div className="h-36 bg-gradient-to-br from-[#0e223c] to-[#122846] relative overflow-hidden">
           {resort.coverImageUrl ? (
             <img
               src={resort.coverImageUrl}
@@ -153,7 +153,7 @@ function ResortCard({
 
           {/* Featured badge */}
           {resort.isFeatured && resort.featuredBadge && (
-            <span className="absolute top-2 right-2 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#d4a853] text-white shadow-sm">
+            <span className="absolute top-2 right-2 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#84cc16] text-white shadow-sm">
               <Star className="w-2.5 h-2.5 fill-white" />
               {resort.featuredBadge}
             </span>
@@ -168,8 +168,8 @@ function ResortCard({
             className="w-10 h-10 rounded-lg object-cover flex-shrink-0 border border-gray-100" />
         )}
         {compact && !resort.coverImageUrl && (
-          <div className="w-10 h-10 rounded-lg bg-[#f0faf8] flex items-center justify-center flex-shrink-0">
-            <MapPin className="w-4 h-4 text-[#1a6b5e]" />
+          <div className="w-10 h-10 rounded-lg bg-[#f7fee7] flex items-center justify-center flex-shrink-0">
+            <MapPin className="w-4 h-4 text-[#0e223c]" />
           </div>
         )}
 
@@ -181,13 +181,13 @@ function ResortCard({
               </h3>
               {/* Compact featured badge */}
               {compact && resort.isFeatured && resort.featuredBadge && (
-                <span className="flex-shrink-0 flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#d4a853]/15 text-[#b8882e]">
+                <span className="flex-shrink-0 flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#84cc16]/15 text-[#b8882e]">
                   <Star className="w-2 h-2 fill-[#b8882e]" />
                   {resort.featuredBadge}
                 </span>
               )}
             </div>
-            <ChevronRight className="w-3.5 h-3.5 text-gray-300 flex-shrink-0 mt-0.5 group-hover:text-[#1a6b5e] transition-colors" />
+            <ChevronRight className="w-3.5 h-3.5 text-gray-300 flex-shrink-0 mt-0.5 group-hover:text-[#0e223c] transition-colors" />
           </div>
 
           {!compact && resort.shortDescription && (
@@ -199,7 +199,7 @@ function ResortCard({
               <Globe className="w-3 h-3" /> {resort.country}
             </span>
             {resort.priceFrom && (
-              <span className={`font-semibold text-[#1a6b5e] ${compact ? 'text-[10px]' : 'text-xs'}`}>
+              <span className={`font-semibold text-[#0e223c] ${compact ? 'text-[10px]' : 'text-xs'}`}>
                 ৳{resort.priceFrom.toLocaleString()}/night
               </span>
             )}
@@ -270,8 +270,8 @@ function MobileBottomSheet({
           </div>
         ) : resorts.length === 0 ? (
           <div className="flex flex-col items-center py-8 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-[#f0faf8] flex items-center justify-center mb-3">
-              <MapPin className="w-7 h-7 text-[#1a6b5e]/40" />
+            <div className="w-14 h-14 rounded-2xl bg-[#f7fee7] flex items-center justify-center mb-3">
+              <MapPin className="w-7 h-7 text-[#0e223c]/40" />
             </div>
             <p className="text-sm font-medium text-gray-600">No resorts found</p>
             <p className="text-xs text-gray-400 mt-1">Try adjusting your filters</p>
@@ -298,8 +298,8 @@ function MobileBottomSheet({
 function EmptyState({ hasFilters, onClear }: { hasFilters: boolean; onClear: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
-      <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#f0faf8] to-[#ddf0ec] flex items-center justify-center mb-5 shadow-inner">
-        <MapPin className="w-10 h-10 text-[#1a6b5e]/40" />
+      <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#f7fee7] to-[#ddf0ec] flex items-center justify-center mb-5 shadow-inner">
+        <MapPin className="w-10 h-10 text-[#0e223c]/40" />
       </div>
       <h3 className="text-lg font-bold text-gray-700 mb-1">
         {hasFilters ? 'No resorts match your filters' : 'No resorts yet'}
@@ -312,7 +312,7 @@ function EmptyState({ hasFilters, onClear }: { hasFilters: boolean; onClear: () 
       {hasFilters ? (
         <button
           onClick={onClear}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1a6b5e] text-white text-sm font-semibold hover:bg-[#145a4f] transition-colors">
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0e223c] text-white text-sm font-semibold hover:bg-[#122846] transition-colors">
           <X className="w-4 h-4" /> Clear Filters
         </button>
       ) : (
@@ -320,7 +320,7 @@ function EmptyState({ hasFilters, onClear }: { hasFilters: boolean; onClear: () 
           href="https://resortpro.site"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1a6b5e] text-white text-sm font-semibold hover:bg-[#145a4f] transition-colors">
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0e223c] text-white text-sm font-semibold hover:bg-[#122846] transition-colors">
           List Your Resort →
         </a>
       )}
@@ -420,12 +420,13 @@ function DiscoverInner() {
       {!loading && <DiscoverySchema resorts={resorts} />}
 
       {/* ── Hero / Search bar ───────────────────────────────────────────── */}
-      <div className="bg-gradient-to-r from-[#1a6b5e] via-[#1a6b5e] to-[#145a4f] text-white px-4 py-4">
+      <div className="bg-resort-900 px-4 py-6 text-white sm:py-8">
         <div className="max-w-7xl mx-auto">
-          {/* Title — hidden on mobile to save space */}
-          <div className="hidden sm:block mb-3">
-            <h1 className="text-lg font-bold">Discover Resorts in South Asia</h1>
-            <p className="text-xs text-white/60">Eco · Agro · Beach · Hill · Heritage</p>
+          {/* Compact on mobile, expansive on larger screens. */}
+          <div className="mb-5">
+            <span className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-lime-300">Curated direct stays</span>
+            <h1 className="mt-2 font-editorial text-3xl font-medium leading-none sm:text-4xl">Discover resorts with a story.</h1>
+            <p className="mt-2 hidden text-xs text-white/60 sm:block">Eco · Agro · Beach · Hill · Heritage across South Asia</p>
           </div>
 
           {/* Search row */}
@@ -439,7 +440,7 @@ function DiscoverInner() {
                 value={q}
                 onChange={e => setQ(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && searchInputRef.current?.blur()}
-                className="w-full bg-white/15 backdrop-blur border border-white/20 rounded-xl pl-9 pr-8 py-2.5 text-sm text-white placeholder-white/50 focus:outline-none focus:border-white/50 focus:bg-white/20 transition-all"
+                className="w-full rounded-full border border-white/20 bg-white/15 py-3 pl-9 pr-8 text-sm text-white backdrop-blur transition-all placeholder:text-white/50 focus:border-lime-300 focus:bg-white/20 focus:outline-none"
               />
               {q && (
                 <button onClick={() => setQ('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-white/20">
@@ -451,13 +452,13 @@ function DiscoverInner() {
               onClick={() => setShowFilter(f => !f)}
               className={`relative flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${
                 showFilter || hasFilters
-                  ? 'bg-white text-[#1a6b5e] border-white shadow-sm'
+                  ? 'bg-white text-[#0e223c] border-white shadow-sm'
                   : 'border-white/30 text-white hover:border-white/60'
               }`}>
               <Filter className="w-4 h-4" />
               <span className="hidden sm:inline">Filter</span>
               {hasFilters && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#d4a853] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#84cc16] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                   {[q, country, category].filter(Boolean).length}
                 </span>
               )}
@@ -470,7 +471,7 @@ function DiscoverInner() {
               onClick={() => setCategory('')}
               className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
                 !category
-                  ? 'bg-white text-[#1a6b5e] border-white'
+                  ? 'bg-white text-[#0e223c] border-white'
                   : 'border-white/30 text-white/80 hover:border-white/60'
               }`}>
               All
@@ -481,7 +482,7 @@ function DiscoverInner() {
                 onClick={() => setCategory(v => v === cat.value ? '' : cat.value)}
                 className={`flex-shrink-0 flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
                   category === cat.value
-                    ? 'bg-white text-[#1a6b5e] border-white'
+                    ? 'bg-white text-[#0e223c] border-white'
                     : 'border-white/30 text-white/80 hover:border-white/60'
                 }`}>
                 <span>{cat.emoji}</span>
@@ -525,14 +526,14 @@ function DiscoverInner() {
             <button
               onClick={() => setView('map')}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
-                view === 'map' ? 'bg-[#1a6b5e] text-white' : 'text-gray-500 hover:bg-gray-50'
+                view === 'map' ? 'bg-[#0e223c] text-white' : 'text-gray-500 hover:bg-gray-50'
               }`}>
               <MapPin className="w-3.5 h-3.5" /> Map
             </button>
             <button
               onClick={() => setView('list')}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
-                view === 'list' ? 'bg-[#1a6b5e] text-white' : 'text-gray-500 hover:bg-gray-50'
+                view === 'list' ? 'bg-[#0e223c] text-white' : 'text-gray-500 hover:bg-gray-50'
               }`}>
               <List className="w-3.5 h-3.5" /> List
             </button>
@@ -646,19 +647,19 @@ function DiscoverInner() {
               {hasFilters && (
                 <div className="flex flex-wrap gap-2 mb-4">
                   {q && (
-                    <span className="inline-flex items-center gap-1.5 bg-[#f0faf8] border border-[#b2ddd6] text-[#1a6b5e] text-xs font-medium px-3 py-1 rounded-full">
+                    <span className="inline-flex items-center gap-1.5 bg-[#f7fee7] border border-[#d9f99d] text-[#0e223c] text-xs font-medium px-3 py-1 rounded-full">
                       "{q}"
                       <button onClick={() => setQ('')}><X className="w-3 h-3" /></button>
                     </span>
                   )}
                   {country && (
-                    <span className="inline-flex items-center gap-1.5 bg-[#f0faf8] border border-[#b2ddd6] text-[#1a6b5e] text-xs font-medium px-3 py-1 rounded-full">
+                    <span className="inline-flex items-center gap-1.5 bg-[#f7fee7] border border-[#d9f99d] text-[#0e223c] text-xs font-medium px-3 py-1 rounded-full">
                       {countries.find(c => c.code === country)?.name ?? country}
                       <button onClick={() => setCountry('')}><X className="w-3 h-3" /></button>
                     </span>
                   )}
                   {category && (
-                    <span className="inline-flex items-center gap-1.5 bg-[#f0faf8] border border-[#b2ddd6] text-[#1a6b5e] text-xs font-medium px-3 py-1 rounded-full">
+                    <span className="inline-flex items-center gap-1.5 bg-[#f7fee7] border border-[#d9f99d] text-[#0e223c] text-xs font-medium px-3 py-1 rounded-full">
                       {CATEGORIES.find(c => c.value === category)?.emoji} {CATEGORIES.find(c => c.value === category)?.label}
                       <button onClick={() => setCategory('')}><X className="w-3 h-3" /></button>
                     </span>
@@ -670,7 +671,7 @@ function DiscoverInner() {
               {resorts.some(r => r.isFeatured) && (
                 <div className="mb-6">
                   <div className="flex items-center gap-2 mb-3">
-                    <Star className="w-4 h-4 text-[#d4a853] fill-[#d4a853]" />
+                    <Star className="w-4 h-4 text-[#84cc16] fill-[#84cc16]" />
                     <h2 className="text-sm font-bold text-gray-700">Featured Resorts</h2>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -703,7 +704,7 @@ export default function DiscoverPage() {
     <Suspense fallback={
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-[#1a6b5e]" />
+          <Loader2 className="w-8 h-8 animate-spin text-[#0e223c]" />
           <p className="text-sm text-gray-400">Loading discovery…</p>
         </div>
       </div>
