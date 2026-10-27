@@ -18,6 +18,7 @@
  * Adding a section to a theme therefore means adding it to that theme's
  * exported list, and the builder follows automatically.
  */
+import { WEBSITE_SECTION_IDS, isWebsiteSectionId, type WebsiteSectionId } from '@resort-pro/types';
 import { LUXE_SECTIONS } from './luxe';
 import { MINIMAL_SECTIONS } from './minimal';
 import { COASTAL_SECTIONS } from './coastal';
@@ -26,28 +27,13 @@ import { TEA_GARDEN_SECTIONS } from './tea-garden-eco-resort';
 /**
  * Every section id the product knows about.
  *
- * Also the allowlist the API validates `sectionOrder` and `hiddenSections`
- * against, so an unknown id cannot be stored and come back as a section that
- * renders twice or not at all.
+ * Shared with the API, which validates `sectionOrder` and `hiddenSections`
+ * against the same list — one vocabulary, so an id cannot be legal on one side
+ * of the wire and meaningless on the other.
  */
-export const SECTION_IDS = [
-  'about',
-  'amenities',
-  'rooms',
-  'menu',
-  'venues',
-  'vehicles',
-  'gallery',
-  'testimonials',
-  'availability',
-  'offers',
-  'booking',
-  'contact',
-] as const;
+export const SECTION_IDS = WEBSITE_SECTION_IDS;
 
-export type SectionId = (typeof SECTION_IDS)[number];
-
-const KNOWN: ReadonlySet<string> = new Set(SECTION_IDS);
+export type SectionId = WebsiteSectionId;
 
 export const THEME_SECTIONS: Record<string, readonly SectionId[]> = {
   luxe: LUXE_SECTIONS,
@@ -84,7 +70,7 @@ export function supportsSection(themeKey: string | null | undefined, section: st
 
 /** Whether an id is a section this product has ever heard of. */
 export function isKnownSection(section: string): section is SectionId {
-  return KNOWN.has(section);
+  return isWebsiteSectionId(section);
 }
 
 /**

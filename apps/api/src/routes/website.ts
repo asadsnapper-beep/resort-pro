@@ -4,6 +4,7 @@ import { prisma, Prisma } from '@resort-pro/database';
 import { requireRole } from '../middleware/auth';
 import { ok, validate } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
+import { cleanSectionIds } from '@resort-pro/types';
 import { resolveRate } from './ratePlans';
 import { sendWebBookingEmails } from '../utils/guest-emails';
 import { PENDING_HOLD_MINUTES } from '../utils/booking';
@@ -86,9 +87,29 @@ export async function websiteRoutes(app: FastifyInstance) {
             offerPriceUsd: true, offerPriceBdt: true, offerEndsAt: true,
           },
         });
-        // An unknown key is left alone deliberately: the renderer already falls
-        // back to the default theme for one, and rejecting here would lock out
-        // any tenant sitting on a stale templateId from saving anything at all.
+        // An unknown key is refused, but only when it is a change. The
+        // renderer falls back to the default for one, so what the owner sees
+        // is not the theme the dashboard claims is selected — and the API
+        // accepting it is how that state gets created (Website Builder QA
+        // 2026-10-28, WB-005).
+        //
+        // The exception is the case the old comment was protecting: a tenant
+        // already sitting on a stale key must still be able to save everything
+        // else. Refusing only a *new* unknown key keeps that door open while
+        // closing the one that lets new bad state in.
+        if (!theme) {
+          const current = await db.websiteContent.findUnique({
+            where: { tenantId },
+            select: { templateId: true },
+          });
+          if (current?.templateId !== body.templateId) {
+            return reply.status(400).send({
+              success: false,
+              error: `No template called "${body.templateId}". Pick one from the Template tab.`,
+              code: 'UNKNOWN_TEMPLATE',
+            });
+          }
+        }
         if (theme) {
           const owned = await prisma.themePurchase.findUnique({
             where: { tenantId_themeKey: { tenantId, themeKey: theme.key } },
@@ -110,10 +131,22 @@ export async function websiteRoutes(app: FastifyInstance) {
         }
       }
 
+      // Section ids arrive from controls the owner cannot type into, so an
+      // unknown or repeated one is this product's mistake rather than theirs.
+      // They are cleaned rather than refused: unknown ids dropped, repeats
+      // kept once, the chosen order preserved. A repeat used to render the
+      // section twice and hand React two children with the same key
+      // (WB-006).
+      const sanitised = {
+        ...body,
+        ...(body.sectionOrder   ? { sectionOrder:   cleanSectionIds(body.sectionOrder) }   : {}),
+        ...(body.hiddenSections ? { hiddenSections: cleanSectionIds(body.hiddenSections) } : {}),
+      };
+
       const content = await db.websiteContent.upsert({
         where: { tenantId },
-        update: body,
-        create: { tenantId, ...body },
+        update: sanitised,
+        create: { tenantId, ...sanitised },
       });
       return ok(content, 'Website updated');
     },
