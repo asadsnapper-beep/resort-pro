@@ -136,3 +136,75 @@ describe('the order and visibility of sections', () => {
     expect(after?.heroTitle).toBe('Only the title changed');
   });
 });
+
+describe('the rules the form claimed to enforce, now enforced where it counts', () => {
+  it('refuses a hero title that is nothing at all, and says why', () => {
+    return put({ heroTitle: '   ' }).then((res) => {
+      expect(res.statusCode).toBe(400);
+      expect(res.body).toContain('Hero Title cannot be empty');
+    });
+  });
+
+  it('takes a real one', async () => {
+    const res = await put({ heroTitle: 'Where the hills meet the tea' });
+    expect(res.statusCode, res.body).toBe(200);
+    expect((await stored())?.heroTitle).toBe('Where the hills meet the tea');
+  });
+
+  it('refuses a testimonial with no name', async () => {
+    const res = await put({ testimonials: [{ name: '', text: 'Lovely stay', rating: 5 }] });
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toContain("guest's name");
+  });
+
+  it('refuses a testimonial that says nothing', async () => {
+    const res = await put({ testimonials: [{ name: 'Rina', text: '   ', rating: 5 }] });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('takes a complete one', async () => {
+    const res = await put({ testimonials: [{ name: 'Rina', text: 'The garden at dawn.', rating: 5 }] });
+    expect(res.statusCode, res.body).toBe(200);
+  });
+
+  it('bounds the gallery server-side, not only in the form', async () => {
+    const twentyOne = Array.from({ length: 21 }, (_, i) => `/uploads/photo-${i}.jpg`);
+    const res = await put({ galleryImages: twentyOne });
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toContain('up to 20 photos');
+  });
+
+  it('takes a gallery at the limit', async () => {
+    const twenty = Array.from({ length: 20 }, (_, i) => `/uploads/photo-${i}.jpg`);
+    const res = await put({ galleryImages: twenty });
+    expect(res.statusCode, res.body).toBe(200);
+  });
+});
+
+describe('the WhatsApp number, which becomes a link a guest taps', () => {
+  it.each([
+    ['digits with a plus', '+8801712345678', '+8801712345678'],
+    ['spaces and dashes people actually type', '+880 1712-345678', '+8801712345678'],
+    ['the 00 prefix', '008801712345678', '+8801712345678'],
+    ['no plus at all', '8801712345678', '8801712345678'],
+  ])('normalises %s', async (_label, typed, expected) => {
+    const res = await put({ whatsappNumber: typed });
+    expect(res.statusCode, res.body).toBe(200);
+    expect((await stored())?.whatsappNumber).toBe(expected);
+  });
+
+  it.each([
+    ['words', 'call the front desk'],
+    ['far too short', '12'],
+    ['a leading zero after the plus', '+0123456789'],
+  ])('refuses %s, because wa.me would 404 on it', async (_label, typed) => {
+    const res = await put({ whatsappNumber: typed });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('allows it to be cleared', async () => {
+    const res = await put({ whatsappNumber: '' });
+    expect(res.statusCode, res.body).toBe(200);
+    expect((await stored())?.whatsappNumber).toBe('');
+  });
+});
