@@ -19,7 +19,48 @@
  * in the same real way instead of a hand-rolled localStorage auth mock that
  * drifts out of sync with the app's actual auth-store shape/login flow.
  */
-import { expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+/**
+ * One login per describe block, instead of one per test.
+ *
+ * `loginAsRole` walks /try, the role picker and then the dashboard shell, and
+ * that shell fires a dozen requests of its own. The suite did this for every
+ * test — eighteen times in roles.spec.ts alone, doubled across the two
+ * projects — which pushed it past the API's 300/min global rate limit. A local
+ * run served 972 throttled responses; even at CI's single worker it served
+ * 139. Mostly they landed on dashboard widgets nothing asserted on, so the
+ * suite stayed green by luck, until crm.spec.ts asserted on data whose request
+ * was the one refused and CI failed on its first attempt.
+ *
+ * Sharing the login is the fix with the smallest blast radius: no production
+ * code changes, no rate-limit bypass switch to leave lying around, and the
+ * suite gets faster. The describe runs serially, so a failed login fails the
+ * block rather than producing six confusing failures.
+ *
+ * The context is built from `testInfo.project.use` because a hand-made context
+ * does not inherit the project's device emulation, and the Mobile Safari run is
+ * half the reason these tests exist.
+ */
+export function useRole(role: string): { page: Page } {
+  const shared = { page: undefined as unknown as Page };
+
+  test.describe.configure({ mode: 'serial' });
+
+  test.beforeAll(async ({ browser }, testInfo) => {
+    const context = await browser.newContext(
+      testInfo.project.use as Parameters<typeof browser.newContext>[0],
+    );
+    shared.page = await context.newPage();
+    await loginAsRole(shared.page, role);
+  });
+
+  test.afterAll(async () => {
+    await shared.page?.context().close();
+  });
+
+  return shared;
+}
 
 // ── Login via demo as a specific role ───────────────────────────────────────
 // The demo entry point moved from /demo (a role-picker) to /try, which now

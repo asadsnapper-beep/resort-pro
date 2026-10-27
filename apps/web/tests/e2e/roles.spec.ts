@@ -10,12 +10,14 @@
  * drifted out of sync with the app's real login flow).
  */
 import { test, expect } from '@playwright/test';
-import { loginAsRole, isDesktopNav, mobileSheet, ensureNavOpen, navItem, groupHeader, expandGroup, logout } from './helpers';
+import { loginAsRole, useRole, isDesktopNav, mobileSheet, ensureNavOpen, navItem, groupHeader, expandGroup, logout } from './helpers';
 
 // ── OWNER ──────────────────────────────────────────────────────────────────────
 test.describe('OWNER role', () => {
-  test('sees full sidebar navigation', async ({ page }) => {
-    await loginAsRole(page, 'OWNER');
+  const shared = useRole('OWNER');
+
+  test('sees full sidebar navigation', async () => {
+    const page = shared.page;
     await ensureNavOpen(page);
     // Daily tier — always rendered on desktop, no group expand needed.
     await expect(await navItem(page, 'Rooms')).toBeVisible({ timeout: 8000 });
@@ -27,14 +29,14 @@ test.describe('OWNER role', () => {
     await expect(await navItem(page, 'F&B Orders')).toBeVisible();
   });
 
-  test('sees Monthly Revenue card on dashboard', async ({ page }) => {
-    await loginAsRole(page, 'OWNER');
+  test('sees Monthly Revenue card on dashboard', async () => {
+    const page = shared.page;
     await page.goto('/dashboard');
     await expect(page.getByText('Monthly Revenue')).toBeVisible({ timeout: 8000 });
   });
 
-  test('can access Roles & Team page', async ({ page }) => {
-    await loginAsRole(page, 'OWNER');
+  test('can access Roles & Team page', async () => {
+    const page = shared.page;
     // /dashboard/roles is a server-redirect shim to /dashboard/staff — the
     // actual staff/team management page. Going straight there sidesteps a
     // redirect-timing quirk and tests the same access. Its heading copy is
@@ -49,8 +51,10 @@ test.describe('OWNER role', () => {
 
 // ── SHAREHOLDER ────────────────────────────────────────────────────────────────
 test.describe('SHAREHOLDER role', () => {
-  test('sees only Dashboard and Analytics in sidebar', async ({ page }) => {
-    await loginAsRole(page, 'SHAREHOLDER');
+  const shared = useRole('SHAREHOLDER');
+
+  test('sees only Dashboard and Analytics in sidebar', async () => {
+    const page = shared.page;
     await ensureNavOpen(page);
     await expect(await navItem(page, 'Dashboard')).toBeVisible({ timeout: 8000 });
     await expandGroup(page, 'Overview');
@@ -63,14 +67,14 @@ test.describe('SHAREHOLDER role', () => {
     }
   });
 
-  test('sees Monthly Revenue card on dashboard', async ({ page }) => {
-    await loginAsRole(page, 'SHAREHOLDER');
+  test('sees Monthly Revenue card on dashboard', async () => {
+    const page = shared.page;
     await page.goto('/dashboard');
     await expect(page.getByText('Monthly Revenue')).toBeVisible({ timeout: 8000 });
   });
 
-  test('shows role badge "Shareholder" in sidebar', async ({ page }) => {
-    await loginAsRole(page, 'SHAREHOLDER');
+  test('shows role badge "Shareholder" in sidebar', async () => {
+    const page = shared.page;
     await ensureNavOpen(page);
     // Desktop sidebar renders "Shareholder"; the mobile sheet's header
     // renders it lowercase ("shareholder") — match case-insensitively.
@@ -83,8 +87,10 @@ test.describe('SHAREHOLDER role', () => {
 
 // ── RECEPTIONIST ───────────────────────────────────────────────────────────────
 test.describe('RECEPTIONIST role', () => {
-  test('sees Rooms, Bookings, Guests, Housekeeping, F&B Orders', async ({ page }) => {
-    await loginAsRole(page, 'RECEPTIONIST');
+  const shared = useRole('RECEPTIONIST');
+
+  test('sees Rooms, Bookings, Guests, Housekeeping, F&B Orders', async () => {
+    const page = shared.page;
     await ensureNavOpen(page);
     await expect(await navItem(page, 'Rooms')).toBeVisible({ timeout: 8000 });
     await expect(await navItem(page, 'Bookings')).toBeVisible();
@@ -96,15 +102,15 @@ test.describe('RECEPTIONIST role', () => {
     await expect(await navItem(page, 'F&B Orders')).toBeVisible();
   });
 
-  test('does NOT see Monthly Revenue on dashboard', async ({ page }) => {
-    await loginAsRole(page, 'RECEPTIONIST');
+  test('does NOT see Monthly Revenue on dashboard', async () => {
+    const page = shared.page;
     await page.goto('/dashboard');
     await page.waitForTimeout(2000);
     await expect(page.getByText('Monthly Revenue')).not.toBeVisible();
   });
 
-  test('does NOT see Inventory in sidebar', async ({ page }) => {
-    await loginAsRole(page, 'RECEPTIONIST');
+  test('does NOT see Inventory in sidebar', async () => {
+    const page = shared.page;
     await ensureNavOpen(page);
     // Inventory is filtered out of RECEPTIONIST's nav items entirely, so it
     // never renders regardless of the Restaurant group's collapse state.
@@ -114,8 +120,10 @@ test.describe('RECEPTIONIST role', () => {
 
 // ── STAFF ──────────────────────────────────────────────────────────────────────
 test.describe('STAFF role', () => {
-  test('sees only Housekeeping in sidebar', async ({ page }) => {
-    await loginAsRole(page, 'STAFF');
+  const shared = useRole('STAFF');
+
+  test('sees only Housekeeping in sidebar', async () => {
+    const page = shared.page;
     await ensureNavOpen(page);
     await expandGroup(page, 'Operations');
     await expect(await navItem(page, 'Housekeeping')).toBeVisible({ timeout: 8000 });
@@ -126,8 +134,8 @@ test.describe('STAFF role', () => {
     await expect(await navItem(page, 'Inventory')).not.toBeVisible();
   });
 
-  test('dashboard shows housekeeping banner, not stat cards', async ({ page }) => {
-    await loginAsRole(page, 'STAFF');
+  test('dashboard shows housekeeping banner, not stat cards', async () => {
+    const page = shared.page;
     await page.goto('/dashboard');
     // STAFF gets a dedicated "Your Tasks" banner instead of the stat-card
     // dashboard (see app/(dashboard)/dashboard/page.tsx).
@@ -136,8 +144,8 @@ test.describe('STAFF role', () => {
     await expect(page.getByText('Total Bookings')).not.toBeVisible();
   });
 
-  test('Housekeeping page shows tasks but no Add Task button', async ({ page }) => {
-    await loginAsRole(page, 'STAFF');
+  test('Housekeeping page shows tasks but no Add Task button', async () => {
+    const page = shared.page;
     await page.goto('/dashboard/housekeeping');
     await page.waitForTimeout(2000);
     // "New Task" is gated to canManage roles (OWNER/MANAGER/RECEPTIONIST) —
@@ -150,8 +158,10 @@ test.describe('STAFF role', () => {
 
 // ── CHEF ───────────────────────────────────────────────────────────────────────
 test.describe('CHEF role', () => {
-  test('sees only F&B Orders in sidebar', async ({ page }) => {
-    await loginAsRole(page, 'CHEF');
+  const shared = useRole('CHEF');
+
+  test('sees only F&B Orders in sidebar', async () => {
+    const page = shared.page;
     await ensureNavOpen(page);
     await expandGroup(page, 'Restaurant');
     await expect(await navItem(page, 'F&B Orders')).toBeVisible({ timeout: 8000 });
@@ -162,8 +172,8 @@ test.describe('CHEF role', () => {
     await expect(await navItem(page, 'Inventory')).not.toBeVisible();
   });
 
-  test('dashboard shows F&B Orders banner, not stat cards', async ({ page }) => {
-    await loginAsRole(page, 'CHEF');
+  test('dashboard shows F&B Orders banner, not stat cards', async () => {
+    const page = shared.page;
     await page.goto('/dashboard');
     // CHEF gets a dedicated "Kitchen Orders" banner (linking to F&B Orders)
     // instead of the stat-card dashboard.
@@ -171,8 +181,8 @@ test.describe('CHEF role', () => {
     await expect(page.getByText('Monthly Revenue')).not.toBeVisible();
   });
 
-  test('F&B Orders page shows Kitchen Display (dark background)', async ({ page }) => {
-    await loginAsRole(page, 'CHEF');
+  test('F&B Orders page shows Kitchen Display (dark background)', async () => {
+    const page = shared.page;
     await page.goto('/dashboard/orders');
     // Kitchen Display has "Kitchen Display" heading
     await expect(page.getByText('Kitchen Display')).toBeVisible({ timeout: 8000 });
@@ -185,8 +195,8 @@ test.describe('CHEF role', () => {
     await expect(page.getByRole('button', { name: /New Order/i })).not.toBeVisible();
   });
 
-  test('Kitchen Display shows live clock', async ({ page }) => {
-    await loginAsRole(page, 'CHEF');
+  test('Kitchen Display shows live clock', async () => {
+    const page = shared.page;
     await page.goto('/dashboard/orders');
     // Clock shows HH:MM format. The same pattern also matches the
     // "Last updated: HH:MM:SS" footer text below it — .first() picks the
