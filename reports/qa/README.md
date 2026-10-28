@@ -45,6 +45,7 @@ and the git history.
 | WB-005 — an unknown theme key could be stored, and the site silently fell back | Website Builder QA, Major | ✅ 2026-10-28 — refused when it is a change; a tenant already on a stale key can still save everything else |
 | WB-006 — section arrays took unknown and duplicated ids | Website Builder QA, Major | ✅ 2026-10-28 — cleaned on the way in, and the renderer dedupes as a second line |
 | WB-009 — required fields, complete testimonials, the gallery cap and the WhatsApp number were enforced only by the form | Website Builder QA, Major | ✅ 2026-10-28 — all four hold on the server now |
+| WB-002 — "live immediately" was false; the site cached for a minute and its analytics for an hour | Website Builder QA, Critical | ✅ 2026-10-28 — the content is no longer cached, so a publish is live on the next page view; the public read is counted per resort so the fleet does not share one ceiling |
 
 Everything else below is, as far as anyone has checked, still open. In
 particular the Settings audit's "not production-ready" verdict has not been
