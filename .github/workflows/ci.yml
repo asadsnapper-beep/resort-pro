@@ -287,6 +287,15 @@ jobs:
         run: node dist/index.js &
         env:
           PORT: 4000
+          # Every request in this job comes from the one runner, and a browser
+          # test is a stream of dashboard loads — around sixty in ninety
+          # seconds, each firing a dozen parallel calls. The production ceiling
+          # of 300/min was refusing hundreds of them per run; they mostly hit
+          # widgets nothing asserted on, so the suite stayed green by luck
+          # until a CRM test asserted on data whose request was the one
+          # refused. Raised only here. The limiter is unchanged everywhere
+          # else, and src/app.ts ignores a value that is not a positive number.
+          RATE_LIMIT_MAX: 100000
 
       - name: Start background worker
         working-directory: apps/api
@@ -328,7 +337,7 @@ jobs:
         # listing it here would have left the gate exactly as open as before.
         # It reads the seeded demo tenant, which is why the seed step above
         # must stay without continue-on-error in this job.
-        run: pnpm exec playwright test tests/e2e/roles.spec.ts tests/e2e/landing.spec.ts tests/e2e/crm.spec.ts --reporter=github
+        run: pnpm exec playwright test tests/e2e/roles.spec.ts tests/e2e/landing.spec.ts tests/e2e/crm.spec.ts tests/e2e/website-builder.spec.ts --reporter=github
 
       - name: Upload Playwright report on failure
         if: failure()

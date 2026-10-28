@@ -12,6 +12,7 @@ import {
   Monitor, Smartphone, Copy, Check, ChevronUp, ChevronDown,
 } from 'lucide-react';
 import { ThemePicker } from '@/components/dashboard/website/ThemePicker';
+import { canonicalSectionOrder, themeSections, supportsSection } from '@/components/themes/capabilities';
 import { CustomDesignModal, CustomDesignCta } from '@/components/dashboard/website/CustomDesignModal';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 import { ModalShell } from '@/components/ui/modal-shell';
@@ -48,7 +49,7 @@ interface WebsiteContent {
 // but still reorderable. Order here is the default page order.
 const SITE_SECTIONS = [
   { id: 'about',        label: 'About / Our Story',     desc: 'Resort story, about image',                          fixed: false },
-  { id: 'amenities',    label: 'Amenities',              desc: 'Pool, spa, gym etc. (Coastal theme)',                fixed: false },
+  { id: 'amenities',    label: 'Amenities',              desc: 'Pool, spa, gym etc.',                                fixed: false },
   { id: 'rooms',        label: 'Rooms & Villas',         desc: 'Room cards with prices & booking',                   fixed: true },
   { id: 'menu',         label: 'Restaurant Menu',        desc: 'Food menu with in-room ordering',                    fixed: false },
   { id: 'venues',       label: 'Venues & Events',        desc: 'Conference hall, banquet, lawn — with enquiry form', fixed: false },
@@ -57,18 +58,24 @@ const SITE_SECTIONS = [
   { id: 'testimonials', label: 'Testimonials',           desc: 'Guest reviews & ratings',                            fixed: false },
   { id: 'availability', label: 'Availability Calendar',  desc: 'Date picker to check open rooms',                    fixed: false },
   { id: 'booking',      label: 'Booking Form',           desc: 'Direct reservation form',                           fixed: true },
+  { id: 'offers',       label: 'Offers & Promotions',    desc: 'Live offers with promo codes',                      fixed: false },
   { id: 'contact',      label: 'Contact / Feedback',     desc: 'Contact form and map',                              fixed: false },
 ] as const;
 
 const DEFAULT_SECTION_ORDER = SITE_SECTIONS.map(s => s.id);
 
 /** Resolve saved order → full valid order (unknown ids dropped, missing appended). */
-function resolveSectionOrder(saved?: string[]): string[] {
-  if (!saved || saved.length === 0) return [...DEFAULT_SECTION_ORDER];
-  const known = new Set<string>(DEFAULT_SECTION_ORDER);
-  const out = saved.filter(id => known.has(id));
-  for (const id of DEFAULT_SECTION_ORDER) if (!out.includes(id)) out.push(id);
-  return out;
+/**
+ * The sections this theme will actually draw, in the order it will draw them.
+ *
+ * It used to be every section the builder knows, for every theme. Minimal
+ * renders neither Gallery nor Testimonials and Amenities belongs to Coastal
+ * alone, so the list promised things the site would never show (Website
+ * Builder QA 2026-10-28, WB-001). The capability contract lives with the
+ * themes, so the builder and the renderer cannot disagree.
+ */
+function resolveSectionOrder(themeKey: string | undefined, saved?: string[]): string[] {
+  return canonicalSectionOrder(themeKey ?? 'luxe', saved);
 }
 
 const TABS = [
@@ -490,6 +497,13 @@ export default function WebsitePage() {
             {/* ── Gallery tab ──────────────────────────────────────────────── */}
             {tab === 'gallery' && (
               <div className={cardCls} style={cardStyle}>
+                {!supportsSection(form.templateId ?? 'luxe', 'gallery') && (
+                  <div className="rounded-rp-card border border-rp-border bg-rp-surface-3 p-3">
+                    <p className="text-rp-meta text-rp-muted">
+                      The <strong className="text-rp-text">{form.templateId ?? 'luxe'}</strong> template does not show this section. You can still edit it, and it will appear if you switch to a template that does.
+                    </p>
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                     <div className="flex h-7 w-7 items-center justify-center rounded-[7px]" style={{ background: 'var(--rp-coral-bg)' }}>
@@ -528,6 +542,13 @@ export default function WebsitePage() {
             {/* ── Testimonials tab ──────────────────────────────────────────── */}
             {tab === 'testimonials' && (
               <div className={cardCls} style={cardStyle}>
+                {!supportsSection(form.templateId ?? 'luxe', 'testimonials') && (
+                  <div className="rounded-rp-card border border-rp-border bg-rp-surface-3 p-3">
+                    <p className="text-rp-meta text-rp-muted">
+                      The <strong className="text-rp-text">{form.templateId ?? 'luxe'}</strong> template does not show this section. You can still edit it, and it will appear if you switch to a template that does.
+                    </p>
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <h3 className="flex items-center gap-2 text-[13.5px] font-semibold text-[#183153] dark:text-[#f8fafc]">
                     <div className="flex h-7 w-7 items-center justify-center rounded-[7px]" style={{ background: 'var(--rp-amber-bg)' }}>
@@ -670,7 +691,8 @@ export default function WebsitePage() {
 
             {/* ── Sections visibility tab ───────────────────────────────────── */}
             {tab === 'sections' && (() => {
-              const order = resolveSectionOrder(form.sectionOrder);
+              const order = resolveSectionOrder(form.templateId, form.sectionOrder);
+              const unsupported = SITE_SECTIONS.filter(sec => !supportsSection(form.templateId ?? 'luxe', sec.id));
               const move = (id: string, dir: -1 | 1) => {
                 const idx = order.indexOf(id);
                 const to  = idx + dir;
@@ -743,6 +765,23 @@ export default function WebsitePage() {
                       );
                     })}
                   </div>
+                  {unsupported.length > 0 && (
+                    /* Said rather than hidden. An owner who looked for Gallery
+                       and found no control at all would reasonably conclude the
+                       product cannot do it; the truthful answer is that this
+                       theme cannot. */
+                    <div className="rounded-rp-card border border-rp-border bg-rp-surface-3 p-3">
+                      <p className="text-rp-meta font-semibold text-rp-text">
+                        Not supported by this theme
+                      </p>
+                      <p className="mt-1 text-rp-meta text-rp-muted">
+                        {unsupported.map(sec => sec.label).join(', ')}
+                        {' — '}these will not appear on your website while
+                        {' '}{form.templateId ?? 'luxe'}{' '}is selected, whatever you put in them.
+                        Choose another template to use them.
+                      </p>
+                    </div>
+                  )}
                   <button type="button" onClick={() => set('sectionOrder', [])}
                     className="text-[12px] font-medium underline-offset-2 hover:underline" style={{ color: 'var(--rp-text-muted)' }}>
                     Reset to default order

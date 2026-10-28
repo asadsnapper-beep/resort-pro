@@ -6,7 +6,9 @@ import type { ThemeProps, ResortRoom } from '../types'
 import { orderSections } from '../_utils/sections'
 import { toLocalDateKey } from '../_utils/date'
 
-const LUXE_SECTION_ORDER = ['about', 'rooms', 'menu', 'venues', 'vehicles', 'gallery', 'testimonials', 'availability', 'booking', 'contact'] as const
+/** The sections this theme actually renders. Exported because the builder
+ *  needs the same list the renderer uses — see ../capabilities.ts. */
+export const LUXE_SECTIONS = ['about', 'rooms', 'menu', 'venues', 'vehicles', 'gallery', 'testimonials', 'availability', 'booking', 'contact'] as const
 import { AvailabilityCalendar, BookingForm, MenuWidget, ContactForm, VenuesWidget, VehiclesWidget } from '../_widgets'
 import { WhatsAppButton } from '../_widgets/SocialLinks'
 import {
@@ -221,7 +223,7 @@ export function LuxeTheme({ data }: ThemeProps) {
             </section>
           ),
         }
-        const order = orderSections(LUXE_SECTION_ORDER, website.sectionOrder)
+        const order = orderSections(LUXE_SECTIONS, website.sectionOrder)
         return order.map(id => <React.Fragment key={id}>{nodes[id]}</React.Fragment>)
       })()}
 

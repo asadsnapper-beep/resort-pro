@@ -4,6 +4,7 @@ import { prisma, Prisma } from '@resort-pro/database';
 import { requireRole } from '../middleware/auth';
 import { ok, validate } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
+import { cleanSectionIds } from '@resort-pro/types';
 import { resolveRate } from './ratePlans';
 import { sendWebBookingEmails } from '../utils/guest-emails';
 import { PENDING_HOLD_MINUTES } from '../utils/booking';
@@ -16,24 +17,63 @@ const imageRef = z.string().refine(
   'Must be an http(s) URL or a site-relative path',
 );
 
+/**
+ * A phone number WhatsApp could actually reach.
+ *
+ * The field took any text at all, and whatever went in was pasted straight
+ * into a `wa.me/` link — so a guest who tapped the button on a resort's own
+ * website landed on an error page, and the resort never heard about the
+ * enquiry they did not get (Website Builder QA 2026-10-28, WB-009).
+ *
+ * Punctuation people type is forgiven rather than refused: spaces, dashes,
+ * brackets and a leading 00 all normalise to the E.164 form wa.me needs.
+ */
+const whatsapp = z.string().trim()
+  .transform((v) => v.replace(/[\s()\-.]/g, '').replace(/^00/, '+'))
+  .refine(
+    (v) => v === '' || /^\+?[1-9]\d{6,14}$/.test(v),
+    'Enter a WhatsApp number with its country code, like +8801712345678',
+  );
+
+/**
+ * Limits that were only ever in the browser.
+ *
+ * The gallery cap, the required hero title and complete testimonials were all
+ * enforced by the form and by nothing else, so anything that was not the form
+ * could publish a website with no title, blank reviews and an unbounded image
+ * array (WB-009). The ceilings are generous — they exist to stop nonsense, not
+ * to argue with a resort about how it describes itself.
+ */
+const GALLERY_MAX = 20;
+
 const websiteSchema = z.object({
-  heroTitle: z.string().optional().default('Welcome'),
-  heroSubtitle: z.string().optional(),
+  // Marked required in the builder with a `*`, and optional here, so an empty
+  // one published a website whose headline was nothing at all. Still optional
+  // in the sense that a save need not mention it; it may just not be blank.
+  heroTitle: z.string().trim()
+    .min(1, 'Hero Title cannot be empty — it is the headline of your website')
+    .max(120, 'Hero Title is too long for a headline (120 characters)')
+    .optional().default('Welcome'),
+  heroSubtitle: z.string().max(300).optional(),
   heroImage: imageRef.optional(),
   aboutTitle: z.string().optional(),
-  aboutText: z.string().optional(),
+  aboutText: z.string().max(5000).optional(),
   aboutImage: imageRef.optional(),
-  galleryImages: z.array(imageRef).optional(),
-  seoTitle: z.string().optional(),
-  seoDescription: z.string().optional(),
+  galleryImages: z.array(imageRef)
+    .max(GALLERY_MAX, `A gallery holds up to ${GALLERY_MAX} photos`)
+    .optional(),
+  seoTitle: z.string().max(70, 'Search engines cut titles off around 70 characters').optional(),
+  seoDescription: z.string().max(200, 'Search engines cut descriptions off around 160 characters').optional(),
   primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   accentColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  // A review with no name and no words is not a review, and the form let one
+  // through to the live site.
   testimonials: z.array(z.object({
-    name: z.string(),
-    text: z.string(),
+    name: z.string().trim().min(1, 'A testimonial needs the guest\'s name').max(80),
+    text: z.string().trim().min(1, 'A testimonial needs something the guest said').max(1000),
     rating: z.number().min(1).max(5),
     avatar: z.string().optional(),
-  })).optional(),
+  })).max(50, 'That is a lot of testimonials — 50 is the limit').optional(),
   templateId: z.string().optional(),
   hiddenSections: z.array(z.string()).optional(),
   sectionOrder: z.array(z.string()).optional(),
@@ -43,7 +83,7 @@ const websiteSchema = z.object({
   twitterUrl: z.string().url().optional().or(z.literal('')),
   tiktokUrl: z.string().url().optional().or(z.literal('')),
   youtubeUrl: z.string().url().optional().or(z.literal('')),
-  whatsappNumber: z.string().optional(),
+  whatsappNumber: whatsapp.optional(),
   tripadvisorUrl: z.string().url().optional().or(z.literal('')),
   googleAnalyticsId: z.string().regex(/^G-[A-Z0-9]+$/).optional().or(z.literal('')),
 });
@@ -86,9 +126,29 @@ export async function websiteRoutes(app: FastifyInstance) {
             offerPriceUsd: true, offerPriceBdt: true, offerEndsAt: true,
           },
         });
-        // An unknown key is left alone deliberately: the renderer already falls
-        // back to the default theme for one, and rejecting here would lock out
-        // any tenant sitting on a stale templateId from saving anything at all.
+        // An unknown key is refused, but only when it is a change. The
+        // renderer falls back to the default for one, so what the owner sees
+        // is not the theme the dashboard claims is selected — and the API
+        // accepting it is how that state gets created (Website Builder QA
+        // 2026-10-28, WB-005).
+        //
+        // The exception is the case the old comment was protecting: a tenant
+        // already sitting on a stale key must still be able to save everything
+        // else. Refusing only a *new* unknown key keeps that door open while
+        // closing the one that lets new bad state in.
+        if (!theme) {
+          const current = await db.websiteContent.findUnique({
+            where: { tenantId },
+            select: { templateId: true },
+          });
+          if (current?.templateId !== body.templateId) {
+            return reply.status(400).send({
+              success: false,
+              error: `No template called "${body.templateId}". Pick one from the Template tab.`,
+              code: 'UNKNOWN_TEMPLATE',
+            });
+          }
+        }
         if (theme) {
           const owned = await prisma.themePurchase.findUnique({
             where: { tenantId_themeKey: { tenantId, themeKey: theme.key } },
@@ -110,10 +170,22 @@ export async function websiteRoutes(app: FastifyInstance) {
         }
       }
 
+      // Section ids arrive from controls the owner cannot type into, so an
+      // unknown or repeated one is this product's mistake rather than theirs.
+      // They are cleaned rather than refused: unknown ids dropped, repeats
+      // kept once, the chosen order preserved. A repeat used to render the
+      // section twice and hand React two children with the same key
+      // (WB-006).
+      const sanitised = {
+        ...body,
+        ...(body.sectionOrder   ? { sectionOrder:   cleanSectionIds(body.sectionOrder) }   : {}),
+        ...(body.hiddenSections ? { hiddenSections: cleanSectionIds(body.hiddenSections) } : {}),
+      };
+
       const content = await db.websiteContent.upsert({
         where: { tenantId },
-        update: body,
-        create: { tenantId, ...body },
+        update: sanitised,
+        create: { tenantId, ...sanitised },
       });
       return ok(content, 'Website updated');
     },

@@ -1,18 +1,22 @@
-import { test, expect, type Page } from '@playwright/test';
-import { loginAsRole } from './helpers';
+import { test, expect } from '@playwright/test';
+import { useRole } from './helpers';
 
 /**
- * Every tab draws a "Loading <thing>…" placeholder until its own fetch
- * settles, so an assertion fired straight after the click was racing it.
- * Alone the race was always won; with the other specs running beside it on
- * four workers, WebKit lost it often enough to fail a run while the page was
- * working perfectly. Waiting for the placeholder to go is the condition that
- * actually matters — raising every timeout instead would have bought the same
- * green and hidden a genuine hang just as well.
+ * How long a tab's own fetch is given.
+ *
+ * Each tab draws a "Loading <thing>…" placeholder while it fetches, and the
+ * first version of this file waited for that placeholder to disappear. That
+ * is the wrong signal: straight after a navigation the placeholder has not
+ * mounted yet, so the wait saw a count of zero and returned at once, leaving
+ * the assertion behind it racing the fetch on Playwright's default five
+ * seconds. It passed locally and failed on CI's first attempt — CI's two
+ * retries then hid it, which is worse than a plain red.
+ *
+ * Waiting for the expected element itself is the signal that cannot race:
+ * absent, the test still fails, just after a bound long enough for a cold
+ * WebKit on a shared runner rather than one tuned to a fast laptop.
  */
-async function waitForTab(page: Page, thing: string) {
-  await expect(page.getByText(new RegExp(`Loading ${thing}`))).toHaveCount(0, { timeout: 30000 });
-}
+const FETCHED = { timeout: 30_000 };
 
 /**
  * The CRM had no E2E coverage at all (CRM QA 2026-10-07, finding 014). Ten API
@@ -24,43 +28,23 @@ async function waitForTab(page: Page, thing: string) {
  * These run against the seeded demo tenant, which is PROFESSIONAL and so has
  * the `crm_v2` entitlement the nav and the API both gate on.
  *
- * One login serves the whole file rather than one per test. `loginAsRole` walks /try, the role picker and the dashboard shell, and that
- * shell fires a dozen requests of its own. Twelve of those (six tests on two
- * projects) pushed the run past the API's 300/min global rate limit: a full
- * local run served 770 throttled responses, and even at CI's single worker it
- * still served 147. The suite passed, but only because the 429s happened to
- * land on dashboard widgets rather than on `/api/crm/campaigns` — a gate that
- * green by luck is the kind that gets excluded later for rotting, which is
- * exactly what happened to landing.spec.ts.
- *
- * The context is built from `testInfo.project.use` because a context made by
- * hand does not inherit the project's device emulation, and the Mobile Safari
- * run is half the point of having this file.
+ * `useRole` gives the whole block one login rather than one per test; the
+ * reason that matters is written out where it lives, in helpers.ts.
  */
-test.describe.configure({ mode: 'serial' });
-
 test.describe('CRM', () => {
-  let page: Page;
-
-  test.beforeAll(async ({ browser }, testInfo) => {
-    const context = await browser.newContext(testInfo.project.use as Parameters<typeof browser.newContext>[0]);
-    page = await context.newPage();
-    await loginAsRole(page, 'OWNER');
-  });
-
-  test.afterAll(async () => {
-    await page.context().close();
-  });
+  const shared = useRole('OWNER');
 
   test('the page loads with all six tabs', async () => {
+    const page = shared.page;
     await page.goto('/dashboard/crm');
-    await expect(page.getByText('CRM & Email Marketing')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('CRM & Email Marketing')).toBeVisible(FETCHED);
     for (const tab of ['Contacts', 'Tags', 'Campaigns', 'Sequences', 'Templates', 'Analytics']) {
       await expect(page.getByRole('button', { name: tab, exact: true })).toBeVisible();
     }
   });
 
   test('contacts load, and each one says where it stands on consent', async () => {
+    const page = shared.page;
     await page.goto('/dashboard/crm');
     // A guest with no consent row used to be drawn as subscribed, which is a
     // claim about a person's permission the data did not support (finding
@@ -70,27 +54,26 @@ test.describe('CRM', () => {
     // text is " Subscribed" — and unlike a string, a regex passed to getByText
     // is matched without the whitespace being normalised away. Same reason
     // helpers.ts carries its own `exact()`.
-    await waitForTab(page, 'contacts');
     const consent = page.getByText(/^\s*(Subscribed|Unsubscribed)\s*$/);
-    await expect(consent.first()).toBeVisible();
+    await expect(consent.first()).toBeVisible(FETCHED);
   });
 
   test('a campaign is listed for each state it can be in', async () => {
+    const page = shared.page;
     await page.goto('/dashboard/crm');
     await page.getByRole('button', { name: 'Campaigns', exact: true }).click();
-    await waitForTab(page, 'campaigns');
     // The three the demo seed creates — sent, scheduled and draft. The tab was
     // empty before them, which read as a feature that did not exist.
-    await expect(page.getByText('Monsoon Weekend Getaway')).toBeVisible();
+    await expect(page.getByText('Monsoon Weekend Getaway')).toBeVisible(FETCHED);
     await expect(page.getByText('Eid Package — Early Access')).toBeVisible();
     await expect(page.getByText('Winter Season Preview')).toBeVisible();
   });
 
   test('sequences list, including one that is paused rather than deleted', async () => {
+    const page = shared.page;
     await page.goto('/dashboard/crm');
     await page.getByRole('button', { name: 'Sequences', exact: true }).click();
-    await waitForTab(page, 'sequences');
-    await expect(page.getByText('Pre-arrival welcome')).toBeVisible();
+    await expect(page.getByText('Pre-arrival welcome')).toBeVisible(FETCHED);
     await expect(page.getByText('Win back a quiet guest')).toBeVisible();
   });
 
@@ -105,22 +88,22 @@ test.describe('CRM', () => {
    * If either rate comes back before something populates it, this fails.
    */
   test('analytics shows no open or click rate, because nothing records one', async () => {
+    const page = shared.page;
     await page.goto('/dashboard/crm');
     await page.getByRole('button', { name: 'Analytics', exact: true }).click();
-    await waitForTab(page, 'analytics');
-    await expect(page.getByText('Sent (last 5 campaigns)')).toBeVisible();
+    await expect(page.getByText('Sent (last 5 campaigns)')).toBeVisible(FETCHED);
     await expect(page.getByText(/open rate|click rate/i)).toHaveCount(0);
   });
 
   test('a contact opens its detail sheet', async () => {
+    const page = shared.page;
     await page.goto('/dashboard/crm');
     // The name is the control, not the row: the row also carries a recalc
     // button. `GET /crm/contacts/:id` existed with no screen calling it
     // (finding 016) — this is the screen.
-    await waitForTab(page, 'contacts');
     const firstContact = page.locator('table button.hover\\:underline').first();
-    await expect(firstContact).toBeVisible();
+    await expect(firstContact).toBeVisible(FETCHED);
     await firstContact.click();
-    await expect(page.getByText('Sequences', { exact: true }).last()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Sequences', { exact: true }).last()).toBeVisible(FETCHED);
   });
 });

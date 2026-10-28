@@ -3,6 +3,10 @@ import React, { useState, useEffect } from 'react'
 import { Menu, X } from 'lucide-react'
 
 import { orderSections } from '../_utils/sections'
+
+/** The sections this theme actually renders. Exported because the builder
+ *  needs the same list the renderer uses — see ../capabilities.ts. */
+export const TEA_GARDEN_SECTIONS = ['about', 'rooms', 'menu', 'venues', 'vehicles', 'availability', 'offers', 'booking', 'gallery', 'testimonials', 'contact'] as const
 import { toLocalDateKey } from '../_utils/date'
 import type { ThemeProps, ResortRoom } from '../types'
 import {
@@ -242,10 +246,7 @@ export function TeaGardenEcoResortTheme({ data }: ThemeProps) {
           testimonials: show('testimonials') && <TestimonialsSection data={data} />,
           contact:      show('contact')      && <ContactSection data={data} />,
         }
-        const order = orderSections(
-          ['about', 'rooms', 'menu', 'venues', 'vehicles', 'availability', 'offers', 'booking', 'gallery', 'testimonials', 'contact'],
-          website.sectionOrder,
-        )
+        const order = orderSections(TEA_GARDEN_SECTIONS, website.sectionOrder)
         return order.map(id => <React.Fragment key={id}>{nodes[id]}</React.Fragment>)
       })()}
 

@@ -77,6 +77,16 @@ import { aiRoutes } from './routes/ai';
 import { requireFlag } from './middleware/auth';
 import { metrics, normalizePath } from './utils/metrics';
 
+/** Requests per minute per IP before the global limiter refuses. See its
+ *  registration below for why this is configurable and why 300 is the floor
+ *  anyone gets by accident. */
+const DEFAULT_RATE_LIMIT_MAX = 300;
+
+export function rateLimitMax(): number {
+  const raw = Number(process.env.RATE_LIMIT_MAX);
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : DEFAULT_RATE_LIMIT_MAX;
+}
+
 export async function buildApp() {
   // ── Fail-fast: JWT_SECRET must be set in production ───────────────────────
   // Never fall back to a hardcoded default secret in production — a missing
@@ -179,7 +189,20 @@ export async function buildApp() {
     // multi-page browsing, not just abuse. Sensitive routes (login, admin,
     // design-requests) already have their own tighter per-route overrides
     // above this global default.
-    max: 300,
+    //
+    // The ceiling is a number rather than a constant for the same reason it
+    // was raised to 300 in the first place: one address, many page loads. The
+    // E2E suite is that case taken to its extreme — around sixty dashboard
+    // loads inside ninety seconds, all from the runner — and it was being
+    // throttled hundreds of times per run. Mostly on widgets no test looked
+    // at, so the suite stayed green by luck until a test asserted on data
+    // whose request was the one refused.
+    //
+    // `RATE_LIMIT_MAX` lets the E2E job raise it for itself. The default is
+    // unchanged, so production and staging behave exactly as before unless
+    // somebody deliberately sets the variable. It is a dial, not an off
+    // switch: an unset, unparseable or non-positive value is 300.
+    max: rateLimitMax(),
     timeWindow: '1 minute',
     // statusCode must be included here — without it the throttled response is
     // sent with a 500 instead of the correct 429 (the returned object is used

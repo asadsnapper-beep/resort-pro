@@ -1,4 +1,5 @@
 export * from './plans';
+export * from './website-sections';
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 export type UserRole =
