@@ -492,6 +492,52 @@ ways on the same theme:
 
 Raised as its own task rather than folded in.
 
+### WB-012, first item — removing your own domain now asks, and reports failure
+
+Two problems in the same six lines of `settings/page.tsx`.
+
+One click on a small trash icon removed the resort's custom domain outright.
+The address they put on their cards stops leading to their site and the SSL
+status is cleared with it, and the most likely reason an owner clicks there is
+to correct a typo in the domain — which removed it instead. The admin panel
+already called `confirm()` before doing the same thing to the same record; the
+owner's own page did not.
+
+The second was `catch { /* ignore */ }`. A removal that failed and one that
+worked were indistinguishable from outside: no toast either way, no change on
+screen, the domain still live, and reloading the page the only way to find
+out.
+
+`ConfirmDialog` already existed and already solves both — it is ModalShell-
+based, awaits an async `onConfirm`, and shows a thrown error on the dialog
+rather than closing. The fix is wiring the button to it and rethrowing instead
+of swallowing, plus an accessible name on a button whose only content was an
+icon. The dialog also says what *keeps* working (their free `resortpro`
+address), not only what stops.
+
+Five mutations, each applied alone, all killed:
+
+| mutation | result |
+|---|---|
+| the trash button removes outright again (the bug itself) | 6 tests fail |
+| no accessible name on the trash button | 6 fail |
+| the failure is swallowed again | 2 fail |
+| the dialog stops warning it cannot be undone | 1 fails |
+| the dialog no longer names the domain | 1 fails |
+
+The test mounts the settings page rather than `ConfirmDialog`, because neither
+half of this lives in the dialog — both are in how the button is wired to it.
+One note for whoever writes the next one: the react-query mock has to return
+stable object identities. A fresh object per render sends the page's domain
+effect into a setState loop that kills the vitest worker after 95 seconds,
+which looks like a hang in the code under test and is not.
+
+**The other three items of WB-012 are still open:** a full-page error and
+retry state for a failed website/tenant query; the theme catalogue falling
+back to three static free themes on an outage, which hides the outage and
+omits themes the resort has paid for; and switch semantics on the section
+toggles.
+
 ---
 
 ## Verification run for the work above
@@ -532,7 +578,7 @@ published, and no email, payment, DNS or SSL action was taken.
 | WB-004 | live typing inside a Tier 2 template | needs Handlebars in the browser (~80KB on the preview path). Everything else about preview is closed; this is the only thing that bundle buys |
 | WB-007 | Roles see actions they cannot use | needs capability flags from the API, then the UI |
 | WB-008 | "Verified & live" from DNS alone | needs an HTTPS check and the production SSL path documented; part of it is infrastructure, not code |
-| WB-012 | Error states and accessibility | smallest of these |
+| WB-012 | Error states and accessibility | one of four items done (domain removal). The remaining three: a full-page retry state, the theme catalogue hiding an outage behind three free themes, and switch semantics on section toggles |
 | — | Draft, publish and rollback | item 8 of the spec: a versioning model with migrations. A feature in its own right, not a gate that can be slipped in |
 
 Phase 1 and Phase 2 of the brief — multi-page sites, media library, SEO suite,
@@ -556,7 +602,7 @@ closed is live *typing* inside a Tier 2 template, where the preview shows saved
 content and says so on the page. That is a narrower gap than the gate was, and
 it is stated to the owner rather than left to be discovered.
 
-What remains is WB-007, WB-008 and WB-012. WB-007 and WB-012 are small. Part
-of WB-008 is infrastructure rather than code. Separately, UPLOADED and
+What remains is WB-007, WB-008 and the other three items of WB-012. WB-007
+and WB-012 are small. Part of WB-008 is infrastructure rather than code. Separately, UPLOADED and
 AI_GENERATED themes are still offered every section control in the builder
 rather than their own.
