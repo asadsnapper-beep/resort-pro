@@ -71,3 +71,82 @@ test.describe('Website builder — theme capabilities', () => {
     await expect(page.getByText('Amenities')).toBeVisible();
   });
 });
+
+/**
+ * The live preview's channel to the builder (WB-003).
+ *
+ * The frame now announces itself and the editor answers with the current form,
+ * so neither side has to load first. The frame's half of that — the
+ * announcement, and refusing an update from anyone who is not the editor — is
+ * covered in preview-page-handshake.test.tsx. The editor's half lives inside
+ * the builder page and has no unit test, so it is covered here.
+ *
+ * The second test is the audit's race made deterministic. sessionStorage used
+ * to paper over most of that window, which is why the audit saw one pass and
+ * one miss rather than a consistent failure — so the test empties it, leaving
+ * the handshake as the only way the owner's unsaved edit can reach a freshly
+ * mounted frame.
+ *
+ * Each covers a different failure, which was checked by mutation rather than
+ * assumed: a trust check that can never pass — the way this fix would break if
+ * the frame were ever loaded cross-origin — fails the first and not the
+ * second, and removing the announcement fails the second and not the first.
+ *
+ * Nothing here publishes. Typing changes the form in the browser only.
+ */
+test.describe('Website builder — live preview channel', () => {
+  // The preview pane is `hidden lg:flex` — the builder deliberately does not
+  // show it on a phone, so on the Mobile Safari project there is no frame to
+  // talk to. Skipped rather than loosened: an assertion that passes because
+  // the thing is absent is worse than no assertion.
+  test.skip(({ viewport }) => (viewport?.width ?? Infinity) < 1024,
+    'the builder hides the preview below the lg breakpoint');
+
+  const shared = useRole('OWNER');
+
+  const previewFrame = () =>
+    shared.page.frameLocator('iframe[title="Website preview"]');
+
+  /** Opens the builder on the Hero tab, which is a tab away from the default. */
+  const openHeroTab = async () => {
+    const page = shared.page;
+    await page.goto('/dashboard/website');
+    await expect(page.locator('iframe[title="Website preview"]')).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('button', { name: 'Hero & About', exact: true }).click();
+    const heroTitle = page.getByPlaceholder('Welcome to Paradise');
+    await expect(heroTitle).toBeVisible({ timeout: 30_000 });
+    return heroTitle;
+  };
+
+  const RESTORE = 'Where Ocean Meets Luxury';
+
+  test('an unsaved edit reaches the preview', async () => {
+    const heroTitle = await openHeroTab();
+    const typed = `Unsaved hero ${Date.now()}`;
+
+    await heroTitle.fill(typed);
+    await expect(previewFrame().getByText(typed)).toBeVisible({ timeout: 30_000 });
+
+    await heroTitle.fill(RESTORE);
+  });
+
+  test('and survives a preview reload with nothing in storage to fall back on', async () => {
+    const page = shared.page;
+    const heroTitle = await openHeroTab();
+    const typed = `Handshake only ${Date.now()}`;
+
+    await heroTitle.fill(typed);
+    await expect(previewFrame().getByText(typed)).toBeVisible({ timeout: 30_000 });
+
+    // Take away the fallback. From here the only route into a newly mounted
+    // frame is the frame asking for the form and the editor answering.
+    await page.evaluate(() => sessionStorage.clear());
+    await page.getByTitle('Reload preview').click();
+
+    await expect(previewFrame().getByText(typed)).toBeVisible({ timeout: 30_000 });
+
+    // Leave the form as it was found, so nothing downstream inherits a dirty
+    // editor — and so the unsaved-changes guard does not block a navigation.
+    await heroTitle.fill(RESTORE);
+  });
+});

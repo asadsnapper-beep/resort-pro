@@ -2,10 +2,10 @@
 
 **Started:** 2026-10-28
 **Parent audit:** [2026-10-28 Website Builder deep functional QA](./2026-10-28-website-builder-deep-functional-qa.md)
-**Branches:** `fix/e2e-rate-limit` (PR #6 → `dev`), `fix/website-publish-freshness` (WB-002, stacked on it)
-**Status:** four P0 gates closed, one dependency closed first. **Customer handoff remains NO-GO.**
+**Branches:** `fix/e2e-rate-limit` (#6, merged), `fix/website-publish-freshness` (#7, merged), `fix/preview-handshake` (WB-003)
+**Status:** five P0 gates closed, one dependency closed first. **Customer handoff remains NO-GO.**
 
-The audit's own minimum handoff gate lists eight items. Four are done. This file
+The audit's own minimum handoff gate lists eight items. Five are done. This file
 records what was actually changed and verified, and is updated as the rest land.
 
 ---
@@ -171,6 +171,59 @@ static and the fetch is only an existence check; a crawler does not need the
 answer to be a second old, and making it uncached would add load for no
 freshness anyone experiences.
 
+### WB-003 — The live preview had a startup race
+
+**Status:** fixed
+
+The editor posted the unsaved form into the preview frame on a 600ms debounce;
+the frame installed its listener after mount. `postMessage` has no queue, so an
+update sent while the frame was still loading reached a window that was not
+listening and was dropped. The audit's repeated browser run produced one pass
+and one miss.
+
+| | |
+|---|---|
+| Files | `apps/web/src/lib/preview-channel.ts` (new), `(public)/[slug]/PreviewPage.tsx`, `(dashboard)/dashboard/website/page.tsx` |
+| Migration | none |
+| API behaviour | unchanged |
+| Browser behaviour | the frame announces itself with `rp-preview-ready` and the editor answers with the form as it stands; the frame applies an update only from the editor window on its own origin |
+| Tests added | 6 unit on the trust check, 13 unit on the frame (`preview-page-handshake.test.tsx`), 2 browser |
+| Verified | every guard mutation-tested alone; see below |
+| Remaining risk | none known for same-origin, which is what the frame is. A cross-origin preview frame would be refused by design, and the browser test is what would catch it |
+| Rollback | revert; nothing persisted changes shape |
+
+No amount of waiting on the sending side fixes a dropped message, so the frame
+had to be the one to speak first. Once the editor answers a `ready`, the order
+the two sides load in stops mattering, which is the only way a race like this
+actually closes rather than narrows.
+
+**The frame also trusted anyone.** It applied `rp-preview-update` from any
+sender at all, and the preview URL needs no login — so any page could embed a
+resort's site and post content into what it renders. Nothing is persisted and
+the victim has to be looking at the attacker's page, so this is small, but a
+page that renders whatever it is told is not worth keeping. Both sides now pin
+the origin and the specific window.
+
+**What the tests can and cannot show.** The frame's half is unit-tested,
+including that it refuses a foreign origin and a sibling frame on the right
+one. The editor's half lives inside the builder page, so it is covered by two
+browser tests. Those cannot reproduce the original race — it is a window of
+milliseconds and sessionStorage covered most of it, which is exactly why the
+audit saw one pass and one miss rather than a consistent failure. The second
+browser test empties sessionStorage before reloading the frame, which leaves
+the handshake as the only route and makes the case deterministic.
+
+Each mutation was checked alone, and they fail different tests, which is the
+point of running them separately:
+
+| Mutation | Fails |
+|---|---|
+| The frame stops announcing itself | the storage-emptied browser test, and 2 unit tests |
+| The frame trusts any sender | 2 unit tests |
+| A trust check that can never pass — how this would break if the frame were ever cross-origin | the first browser test, and 2 unit tests |
+| Origin no longer checked | 2 unit tests |
+| Source no longer pinned | 3 unit tests |
+
 ---
 
 ## Verification run for the work above
@@ -180,17 +233,21 @@ freshness anyone experiences.
 | API TypeScript | pass |
 | Web TypeScript | pass |
 | Full API suite | **986/986**, 86 files |
-| Full web unit suite | **227/227**, 24 files |
-| Every e2e spec, four workers, retries off | 83/84 — see below |
-| `website-builder.spec.ts` on both projects | 10/10 |
+| Full web unit suite | **246/246**, 26 files |
+| The four specs CI runs, both projects, four workers, retries off | **70 passed, 2 skipped** |
+| `website-builder.spec.ts` on both projects | 12 passed, 2 skipped — the preview pane is `hidden lg:flex`, so the two preview tests do not apply on the phone project |
 | Design-system ratchet | no regressions; no baseline moved |
 | `git diff --check` | clean |
-| 429s during a full e2e run | **0** |
+| 429s during that e2e run | **0** |
 
-The one e2e failure is `auth.spec.ts` "slug auto-generates from resort name" on
-Mobile Safari under four local workers. It passes alone, twice; it is in a spec
-CI does not run; nothing in this work touches auth or the register page.
-Recorded rather than hidden — it is a flake that predates this.
+The 2 skipped are the preview tests on the phone project, for the reason
+above.
+
+Separately, a run of *every* spec — including the four CI does not run — gave
+83/84 earlier in this work. The one failure is `auth.spec.ts` "slug
+auto-generates from resort name" on Mobile Safari under four local workers. It
+passes alone, twice; CI does not run that spec; nothing here touches auth or
+the register page. Recorded rather than hidden — a flake that predates this.
 
 Databases: all of the above ran against throwaway databases created and dropped
 for the purpose. No demo, staging or production data was touched, nothing was
@@ -204,7 +261,6 @@ published, and no email, payment, DNS or SSL action was taken.
 
 | | Finding | Why it is not done |
 |---|---|---|
-| WB-003 | Preview has a startup race | needs a ready handshake both sides honour; mechanical, and now the next one up |
 | WB-004 | Config/TEMPLATE theme preview is incomplete | the differentiator, and the largest of the P0s |
 | WB-007 | Roles see actions they cannot use | needs capability flags from the API, then the UI |
 | WB-008 | "Verified & live" from DNS alone | needs an HTTPS check and the production SSL path documented; part of it is infrastructure, not code |
@@ -221,10 +277,13 @@ product of its own and none should start before the P0 list is closed.
 
 **NO-GO**, unchanged from the audit.
 
-What changed is that four of its eight gates are closed with tests that fail
+What changed is that five of its eight gates are closed with tests that fail
 when the behaviour comes back, and the test suite can now carry the rest. The
-gate that mattered most to a first day — publishing and seeing nothing happen —
-is among them. What remains is WB-003, WB-004, WB-007, WB-008 and WB-012, and
-of those WB-004 is the large one: config and TEMPLATE theme preview is the
-differentiator, and it is also the reason those two theme kinds are still
-offered every section control in the builder rather than their own.
+two that mattered most to a first day are among them: publishing and seeing
+nothing happen, and a preview that sometimes showed none of your edits.
+
+What remains is WB-004, WB-007, WB-008 and WB-012. WB-004 is the large one:
+config and TEMPLATE theme preview is the differentiator, and it is also the
+reason those two theme kinds are still offered every section control in the
+builder rather than their own. WB-007 and WB-012 are small. Part of WB-008 is
+infrastructure rather than code.

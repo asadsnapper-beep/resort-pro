@@ -3,19 +3,23 @@
 /**
  * Client-side preview page rendered when ?preview=themeKey is in the URL.
  *
- * Receives server-fetched data as initialData, then:
- *  1. On mount: reads sessionStorage for any unsaved form data
- *  2. Listens for postMessage({ type: 'rp-preview-update', payload: WebsiteForm })
- *     sent by the dashboard editor iframe parent
- *  3. Re-renders the theme live as the owner edits fields — no save needed
+ * Receives server-fetched data as initialData, then re-renders the theme live
+ * as the owner edits fields in the builder — no save needed.
+ *
+ * The order of the three steps below is the fix for WB-003 and is not
+ * arbitrary; see lib/preview-channel.ts for what was racing.
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { getTheme } from '@/components/themes/registry';
 import { ConfigThemeRenderer } from '@/components/themes/config-renderer';
+import {
+  PREVIEW_READY,
+  PREVIEW_UPDATE,
+  PREVIEW_STORAGE_KEY,
+  isTrustedPreviewMessage,
+} from '@/lib/preview-channel';
 import type { ResortData } from '@/components/themes/types';
-
-const STORAGE_KEY = 'rp-website-preview';
 
 interface Props {
   initialData: ResortData;
@@ -25,28 +29,39 @@ interface Props {
 
 export function PreviewPage({ initialData, themeKey, configJson }: Props) {
   const [data, setData] = useState<ResortData>(initialData);
+  const [mergeCount, setMergeCount] = useState(0);
   const ThemeComponent = getTheme(themeKey);
-  const mergeCount = useRef(0);
 
   useEffect(() => {
-    // 1. Read sessionStorage on mount (handles page reload / new tab cases)
-    try {
-      const stored = sessionStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const override = JSON.parse(stored);
-        setData(prev => ({ ...prev, website: { ...prev.website, ...override } }));
-        mergeCount.current++;
-      }
-    } catch {}
+    const applyOverride = (override: Partial<NonNullable<ResortData['website']>>) => {
+      setData(prev => ({ ...prev, website: { ...prev.website, ...override } }));
+      setMergeCount(n => n + 1);
+    };
 
-    // 2. Listen for real-time postMessage updates from the dashboard iframe parent
+    // 1. Listen first. Anything that arrives after this point is handled, so
+    //    the steps below cannot open a gap for a message to fall through.
     function onMessage(e: MessageEvent) {
-      if (e.data?.type === 'rp-preview-update' && e.data.payload) {
-        setData(prev => ({ ...prev, website: { ...prev.website, ...e.data.payload } }));
-        mergeCount.current++;
-      }
+      if (!isTrustedPreviewMessage(e, window.parent)) return;
+      if (e.data?.type !== PREVIEW_UPDATE || !e.data.payload) return;
+      applyOverride(e.data.payload);
     }
     window.addEventListener('message', onMessage);
+
+    // 2. sessionStorage, for a preview opened in its own tab — there is no
+    //    parent to ask, so the handshake below cannot help.
+    try {
+      const stored = sessionStorage.getItem(PREVIEW_STORAGE_KEY);
+      if (stored) applyOverride(JSON.parse(stored));
+    } catch {}
+
+    // 3. Tell the editor we are listening, and let it answer with the form as
+    //    it stands. This is what makes the order of the two sides irrelevant:
+    //    an update posted while this document was still loading used to be
+    //    delivered to a window with no listener and silently dropped.
+    if (window.parent !== window) {
+      window.parent.postMessage({ type: PREVIEW_READY }, window.location.origin);
+    }
+
     return () => window.removeEventListener('message', onMessage);
   }, []);
 
@@ -56,7 +71,7 @@ export function PreviewPage({ initialData, themeKey, configJson }: Props) {
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-3 bg-gray-900/95 backdrop-blur-sm text-white text-sm px-5 py-2.5 rounded-full shadow-xl border border-gray-700 pointer-events-none select-none">
         <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
         Preview — <strong>{themeKey}</strong>
-        {mergeCount.current > 0 && (
+        {mergeCount > 0 && (
           <span className="ml-1 text-xs text-green-400">● live</span>
         )}
       </div>
