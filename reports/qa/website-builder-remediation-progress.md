@@ -224,6 +224,68 @@ point of running them separately:
 | Origin no longer checked | 2 unit tests |
 | Source no longer pinned | 3 unit tests |
 
+### Found while reproducing WB-004 — an unreleased theme was public
+
+**Status:** fixed
+
+Not in the audit. `GET /site/theme/:key` had no filter on `themeStatus` or
+`isActive` at all, so the full `configJson` of an unreleased design — or a Tier
+2 theme's whole HTML and CSS — came back to anyone who knew the key, with no
+login. Confirmed against a row left exactly as the admin upload path leaves
+one: `PREVIEW`, `isActive: false`, 200, config and all.
+
+The schema had said so all along: `DRAFT` is "saved, not visible to tenants",
+`PREVIEW` is "previewable by admin only".
+
+| | |
+|---|---|
+| Files | `apps/api/src/utils/signed-theme-preview.ts` (new), `routes/website.ts`, `routes/admin.ts`, `apps/web/src/app/theme-preview/[key]/page.tsx`, `admin/(panel)/themes/page.tsx` |
+| Migration | none |
+| API behaviour | an unpublished theme is served only with a short-lived signature the API minted; the owner's theme list filters on status; selecting an unpublished theme is refused, unless the tenant is already on it |
+| Browser behaviour | the admin's Preview link carries the signature and still works; nothing changes for a published theme |
+| Tests added | 18 integration (`theme-preview-access.test.ts`) |
+| Verified | five mutations, each alone; end-to-end in a browser, below |
+| Remaining risk | a signed link forwarded to someone else works until it expires. That is what a signed link is; two hours bounds it |
+| Rollback | revert; nothing persisted changes shape |
+
+**Refusing outright would have been one line, and it would have been worse.**
+The admin themes page offers a Preview link straight after an upload or an AI
+generation, and those are exactly the themes sitting at `PREVIEW`. That link is
+how an admin finds out whether an upload rendered at all. So the link is signed
+instead — the same shape, and for the same stated reason, as the existing
+`signed-upload-url.ts`: *"Unguessable filenames are not access control."* It is
+keyed on `JWT_SECRET`, which both deployments already have, so unlike WB-002's
+first option there is nothing new for anyone to set.
+
+**A correction to this file's earlier draft.** The first pass recorded that the
+owner's theme picker listed `DRAFT` themes. It does not. That came from a QA row
+written by hand with `isActive: true`, a combination the application never
+produces — the admin paths keep `isActive` in lockstep with `PUBLISHED`. Checked
+again against a faithful row: the picker excluded it. The status filter added to
+that query is therefore documentation of an invariant, not a hole being closed,
+and the test that covers it has to construct the drifted row deliberately.
+
+Mutations, each applied alone:
+
+| Mutation | Fails |
+|---|---|
+| No signature check on the public route | 8 tests |
+| A tenant may select an unreleased theme | 2 tests |
+| Expiry no longer checked | 1 test |
+| The picker's status filter removed | 1 test (the deliberately drifted row) |
+| Domain separation dropped from the signature | 1 test (an upload-style signature replayed) |
+
+The last two survived the first round, which is what a surviving mutation is
+for: no test covered what those two lines are *for*, so two were added.
+
+End to end, against a throwaway database and a disposable local secret:
+
+| | |
+|---|---|
+| The admin's signed link | **200**, and the unreleased theme actually renders — its marker text and its colours |
+| The same page with no signature | **404** |
+| A stranger calling the API with the key | **404**, byte-identical to the response for a key that does not exist |
+
 ---
 
 ## Verification run for the work above
@@ -232,7 +294,7 @@ point of running them separately:
 |---|---|
 | API TypeScript | pass |
 | Web TypeScript | pass |
-| Full API suite | **986/986**, 86 files |
+| Full API suite | **1004/1004**, 87 files |
 | Full web unit suite | **246/246**, 26 files |
 | The four specs CI runs, both projects, four workers, retries off | **70 passed, 2 skipped** |
 | `website-builder.spec.ts` on both projects | 12 passed, 2 skipped — the preview pane is `hidden lg:flex`, so the two preview tests do not apply on the phone project |

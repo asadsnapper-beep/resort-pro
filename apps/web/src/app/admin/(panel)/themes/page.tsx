@@ -28,6 +28,8 @@ interface Theme {
   requiredPlan: string;
   sortOrder:    number;
   usageCount:   number;
+  /** Signed by the API while the theme is unpublished — see signed-theme-preview.ts. */
+  previewUrl?:  string;
   createdAt:    string;
   // One-time sale price — 0 means the theme is free.
   priceUsd?:      string | number;
@@ -526,7 +528,7 @@ function ThemeCard({
         {/* Actions */}
         <div className="flex items-center gap-1">
           {/* Preview */}
-          <a href={`/theme-preview/${theme.key}`} target="_blank" rel="noopener noreferrer"
+          <a href={theme.previewUrl ?? `/theme-preview/${theme.key}`} target="_blank" rel="noopener noreferrer"
             className="h-8 w-8 rounded-lg flex items-center justify-center text-gray-500 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors" title="Preview theme in new tab">
             <ExternalLink className="h-4 w-4" />
           </a>
@@ -1148,7 +1150,7 @@ function UploadThemeModal({
                 </div>
 
                 <a
-                  href={`/theme-preview/${result?.key}`}
+                  href={result?.previewUrl ?? `/theme-preview/${result?.key}`}
                   target="_blank"
                   rel="noopener"
                   className="flex items-center gap-2 w-full py-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 text-sm rounded-xl transition-colors justify-center mb-4"
@@ -1201,7 +1203,7 @@ function AIBuilderModal({
   const [savingKey,     setSavingKey]     = useState(false);
   const [keySaved,      setKeySaved]      = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
-  const [result,        setResult]        = useState<{ key: string; name: string } | null>(null);
+  const [result,        setResult]        = useState<{ key: string; name: string; previewUrl?: string } | null>(null);
   const [error,         setError]         = useState('');
   const [generating,    setGenerating]    = useState(false);
   const [publishing,    setPublishing]    = useState(false);
@@ -1308,7 +1310,7 @@ function AIBuilderModal({
                 </div>
 
                 <a
-                  href={`/theme-preview/${result.key}`}
+                  href={result.previewUrl ?? `/theme-preview/${result.key}`}
                   target="_blank"
                   rel="noopener"
                   className="flex items-center gap-2 w-full py-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 text-sm rounded-xl transition-colors justify-center"

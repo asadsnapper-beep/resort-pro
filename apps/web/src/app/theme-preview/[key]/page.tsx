@@ -126,10 +126,20 @@ function PreviewBanner({ themeKey, themeType }: { themeKey: string; themeType?: 
 /* ── Main page ──────────────────────────────────────────────────────────── */
 export default async function ThemePreviewPage({
   params,
+  searchParams,
 }: {
   params: { key: string };
+  searchParams: { exp?: string; sig?: string };
 }) {
   const { key } = params;
+
+  // An unpublished theme is only served with the signature the API minted
+  // when it handed this link to an admin. Forwarded verbatim; a published
+  // theme carries none and needs none. A missing or expired pair comes back
+  // as a 404 below, the same as a key that does not exist.
+  const signature = new URLSearchParams(
+    Object.entries(searchParams ?? {}).filter(([k, v]) => (k === 'exp' || k === 'sig') && v) as [string, string][],
+  ).toString();
 
   // 1. Try to load live demo tenant data
   let data: ResortData = MOCK_DATA;
@@ -147,7 +157,7 @@ export default async function ThemePreviewPage({
   let templateHtml: string | null = null;
   let templateCss: string | null = null;
   try {
-    const res = await fetch(`${API_URL}/site/theme/${key}`, { cache: 'no-store' });
+    const res = await fetch(`${API_URL}/site/theme/${key}${signature ? `?${signature}` : ''}`, { cache: 'no-store' });
     if (res.ok) {
       const json = await res.json();
       themeType = json.data?.themeType;

@@ -10,6 +10,7 @@ import type { FastifyInstance } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { prisma, Prisma } from '@resort-pro/database';
 import { refreshTokenPayload } from '../utils/refresh-token';
+import { themePreviewPath } from '../utils/signed-theme-preview';
 import { purgeGuestDocumentFiles } from '../utils/guest-documents';
 import { encryptOrNull, decryptOrNull } from '../utils/secret-box';
 import {
@@ -1727,7 +1728,14 @@ export async function adminRoutes(app: FastifyInstance) {
       usageCounts.map(r => [r.templateId ?? 'luxe', r._count.templateId])
     );
 
-    const data = themes.map(t => ({ ...t, usageCount: countMap[t.key] ?? 0 }));
+    // Signed while the theme is unpublished, so the Preview link on this
+    // page keeps working for exactly the themes an admin has just uploaded
+    // and nobody else. See utils/signed-theme-preview.ts.
+    const data = themes.map(t => ({
+      ...t,
+      usageCount: countMap[t.key] ?? 0,
+      previewUrl: themePreviewPath(t),
+    }));
     return reply.send(ok(data));
   });
 
@@ -1946,7 +1954,7 @@ export async function adminRoutes(app: FastifyInstance) {
         if (!/id=["']hero["']/.test(templateHtml)) warnings.push('No id="hero" section found — recommended but not required.');
         if (!/@media|clamp\(|[0-9]v[wh]|%\s*[;}]/.test(templateCss || '')) warnings.push('No responsive CSS pattern detected (@media/clamp/vw/vh/%) — double-check the mobile layout.');
 
-        return reply.status(201).send(ok({ ...theme, previewUrl: `/theme-preview/${key}`, warnings }, 'Template theme uploaded successfully'));
+        return reply.status(201).send(ok({ ...theme, previewUrl: themePreviewPath(theme), warnings }, 'Template theme uploaded successfully'));
       }
 
       let configJson: Record<string, unknown>;
@@ -2013,7 +2021,7 @@ export async function adminRoutes(app: FastifyInstance) {
         ipAddress: request.ip,
       });
 
-      return reply.status(201).send(ok({ ...theme, previewUrl: `/theme-preview/${key}` }, 'Theme uploaded successfully'));
+      return reply.status(201).send(ok({ ...theme, previewUrl: themePreviewPath(theme) }, 'Theme uploaded successfully'));
     }
   );
 
@@ -2138,7 +2146,7 @@ Rules:
         ipAddress: request.ip,
       });
 
-      return reply.status(201).send(ok({ ...theme, previewUrl: `/theme-preview/${finalKey}` }, 'Theme generated successfully'));
+      return reply.status(201).send(ok({ ...theme, previewUrl: themePreviewPath(theme) }, 'Theme generated successfully'));
     }
   );
 

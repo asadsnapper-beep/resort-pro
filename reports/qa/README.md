@@ -47,6 +47,7 @@ and the git history.
 | WB-009 — required fields, complete testimonials, the gallery cap and the WhatsApp number were enforced only by the form | Website Builder QA, Major | ✅ 2026-10-28 — all four hold on the server now |
 | WB-002 — "live immediately" was false; the site cached for a minute and its analytics for an hour | Website Builder QA, Critical | ✅ 2026-10-28 — the content is no longer cached, so a publish is live on the next page view; the public read is counted per resort so the fleet does not share one ceiling |
 | WB-003 — the live preview could miss the editor's update entirely | Website Builder QA, Major | ✅ 2026-10-28 — the frame announces itself and the editor answers, so neither has to load first; it also stopped applying updates from senders that are not the editor |
+| An unreleased theme's full config was readable by anyone with the key | Found 2026-10-29 while reproducing WB-004, Major | ✅ 2026-10-29 — unpublished themes need a short-lived signature the API mints; the admin's own Preview link carries one, so nothing an admin does was taken away |
 
 Everything else below is, as far as anyone has checked, still open. In
 particular the Settings audit's "not production-ready" verdict has not been
