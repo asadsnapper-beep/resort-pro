@@ -13,6 +13,7 @@
 import { useState, useEffect } from 'react';
 import { getTheme } from '@/components/themes/registry';
 import { ConfigThemeRenderer } from '@/components/themes/config-renderer';
+import { TemplateThemeRenderer } from '@/components/themes/template-renderer';
 import {
   PREVIEW_READY,
   PREVIEW_UPDATE,
@@ -20,14 +21,20 @@ import {
   isTrustedPreviewMessage,
 } from '@/lib/preview-channel';
 import type { ResortData } from '@/components/themes/types';
+import type { PreviewTemplate } from './site-data';
 
 interface Props {
   initialData: ResortData;
   themeKey: string;
   configJson: unknown | null;
+  /**
+   * A Tier 2 theme, already Handlebars-compiled by the server against saved
+   * content. Null for every other tier.
+   */
+  template?: PreviewTemplate | null;
 }
 
-export function PreviewPage({ initialData, themeKey, configJson }: Props) {
+export function PreviewPage({ initialData, themeKey, configJson, template }: Props) {
   const [data, setData] = useState<ResortData>(initialData);
   const [mergeCount, setMergeCount] = useState(0);
   const ThemeComponent = getTheme(themeKey);
@@ -71,14 +78,22 @@ export function PreviewPage({ initialData, themeKey, configJson }: Props) {
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-3 bg-gray-900/95 backdrop-blur-sm text-white text-sm px-5 py-2.5 rounded-full shadow-xl border border-gray-700 pointer-events-none select-none">
         <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
         Preview — <strong>{themeKey}</strong>
-        {mergeCount > 0 && (
+        {/* A Tier 2 template is a compiled HTML string, so an edit the owner
+            has not saved cannot appear inside it. Claiming "live" there would
+            be worse than claiming nothing: the owner would read unchanged text
+            as the edit having been lost. */}
+        {template ? (
+          <span className="ml-1 text-xs text-amber-300">saved content — unsaved edits not shown</span>
+        ) : mergeCount > 0 && (
           <span className="ml-1 text-xs text-green-400">● live</span>
         )}
       </div>
 
-      {configJson
-        ? <ConfigThemeRenderer data={data} config={configJson as Record<string, unknown>} />
-        : <ThemeComponent data={data} />
+      {template
+        ? <TemplateThemeRenderer html={template.html} css={template.css} data={data} />
+        : configJson
+          ? <ConfigThemeRenderer data={data} config={configJson as Record<string, unknown>} />
+          : <ThemeComponent data={data} />
       }
     </>
   );

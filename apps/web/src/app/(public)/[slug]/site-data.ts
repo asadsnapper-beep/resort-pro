@@ -46,8 +46,16 @@ export async function getSiteData(slug: string): Promise<ResortData | null> {
   }
 }
 
+/** One theme as `/site/theme/:key` returns it. */
+interface ThemeRecord {
+  themeType?:    string | null;
+  configJson?:   ResortData['themeConfig'];
+  templateHtml?: string | null;
+  templateCss?:  string | null;
+}
+
 /**
- * The config of one theme, by its key.
+ * One theme, by its key.
  *
  * Returns null for a key that does not exist — and for an unreleased theme
  * asked for without the signature the API minted, which answers the same way
@@ -59,28 +67,59 @@ export async function getSiteData(slug: string): Promise<ResortData | null> {
  * a corrected package and presses Preview again is asking what is in the
  * database now.
  */
-export async function getThemeConfig(key: string): Promise<ResortData['themeConfig']> {
+export async function fetchThemeByKey(key: string): Promise<ThemeRecord | null> {
   try {
     const res = await fetch(`${API}/site/theme/${encodeURIComponent(key)}`, { cache: 'no-store' });
     if (!res.ok) return null;
-    return (await res.json()).data?.configJson ?? null;
+    return (await res.json()).data ?? null;
   } catch {
     return null;
   }
 }
 
+/** A Tier 2 theme's Handlebars source, for the caller to compile. */
+export interface PreviewTemplate {
+  html: string;
+  css:  string | null;
+}
+
 /**
- * The config to render `?preview=<key>` with.
+ * What `?preview=<key>` renders with: a Tier 1 config, a Tier 2 template, or
+ * neither — in which case the key is hardcoded, or unreadable, and the
+ * registry renders it.
  *
- * This is the half of WB-004 that was missing. `?preview=` set the theme *key*
- * and then deliberately threw the config away — `configJson = isPreview ? null
- * : data.themeConfig` — on the reasoning that a preview should show the
- * previewed theme rather than the saved one. But nothing ever looked the
- * previewed theme up, so an UPLOADED or AI_GENERATED key fell through
- * `getTheme()` to the luxe default. An owner who had just paid for a theme
- * pressed Preview and saw a different theme, with nothing to suggest anything
- * had gone wrong: these two URLs returned byte-for-byte identical pages,
- * 95,734 bytes each, for two themes that look nothing alike.
+ * Exactly one of the two is ever set. They are different enough to be worth
+ * separate fields rather than a tagged union: `config` is data a React
+ * renderer walks, `template` is HTML to compile.
+ */
+export interface PreviewTheme {
+  config:   ResortData['themeConfig'];
+  template: PreviewTemplate | null;
+}
+
+function asPreviewTheme(theme: ThemeRecord | null): PreviewTheme {
+  if (!theme) return { config: null, template: null };
+  // A TEMPLATE theme has no config to walk and a config theme has no HTML, so
+  // the themeType decides which field to fill rather than both being tried.
+  if (theme.themeType === 'TEMPLATE') {
+    if (!theme.templateHtml) return { config: null, template: null };
+    return { config: null, template: { html: theme.templateHtml, css: theme.templateCss ?? null } };
+  }
+  return { config: theme.configJson ?? null, template: null };
+}
+
+/**
+ * The theme to render `?preview=<key>` with.
+ *
+ * This is WB-004. `?preview=` set the theme *key* and then deliberately threw
+ * the config away — `configJson = isPreview ? null : data.themeConfig` — on the
+ * reasoning that a preview should show the previewed theme rather than the
+ * saved one. But nothing ever looked the previewed theme up, so an UPLOADED,
+ * AI_GENERATED or TEMPLATE key fell through `getTheme()` to the luxe default.
+ * An owner who had just paid for a theme pressed Preview and saw a different
+ * theme, with nothing to suggest anything had gone wrong: these two URLs
+ * returned byte-for-byte identical pages, 95,734 bytes each, for two themes
+ * that look nothing alike.
  *
  *     /<slug>?preview=wb004-uploaded   →  luxe
  *     /<slug>?preview=wb004-template   →  luxe
@@ -90,16 +129,19 @@ export async function getThemeConfig(key: string): Promise<ResortData['themeConf
  * editing the site they are looking at — and it is also the only branch that
  * still works for a theme unpublished *after* they chose it: `/site/:slug`
  * returns their theme whatever its status, while `/site/theme/:key` will not.
- *
- * A TEMPLATE key still resolves to null here and still falls back to the
- * registry. That one is not fixed; it needs Handlebars on the client, which is
- * a decision of its own.
  */
-export async function resolvePreviewConfig(
+export async function resolvePreviewTheme(
   key: string | null | undefined,
   data: ResortData,
-): Promise<ResortData['themeConfig']> {
-  if (!key) return null;
-  if (key === data.website?.templateId) return data.themeConfig ?? null;
-  return getThemeConfig(key);
+): Promise<PreviewTheme> {
+  if (!key) return { config: null, template: null };
+  if (key === data.website?.templateId) {
+    return asPreviewTheme({
+      themeType:    data.themeType,
+      configJson:   data.themeConfig,
+      templateHtml: data.templateHtml,
+      templateCss:  data.templateCss,
+    });
+  }
+  return asPreviewTheme(await fetchThemeByKey(key));
 }
