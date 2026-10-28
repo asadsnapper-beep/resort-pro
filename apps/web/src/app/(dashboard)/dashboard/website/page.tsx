@@ -16,8 +16,14 @@ import { canonicalSectionOrder, themeSections, supportsSection } from '@/compone
 import { CustomDesignModal, CustomDesignCta } from '@/components/dashboard/website/CustomDesignModal';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 import { ModalShell } from '@/components/ui/modal-shell';
+import {
+  PREVIEW_READY,
+  PREVIEW_UPDATE,
+  PREVIEW_STORAGE_KEY,
+  isTrustedPreviewMessage,
+} from '@/lib/preview-channel';
 
-const PREVIEW_STORAGE_KEY = 'rp-website-preview';
+
 
 interface WebsiteContent {
   heroTitle: string;
@@ -188,7 +194,7 @@ export default function WebsitePage() {
   const sendPreviewUpdate = useCallback((payload: WebsiteContent) => {
     try { sessionStorage.setItem(PREVIEW_STORAGE_KEY, JSON.stringify(payload)); } catch {}
     iframeRef.current?.contentWindow?.postMessage(
-      { type: 'rp-preview-update', payload }, window.location.origin,
+      { type: PREVIEW_UPDATE, payload }, window.location.origin,
     );
   }, []);
 
@@ -196,6 +202,28 @@ export default function WebsitePage() {
     const t = setTimeout(() => sendPreviewUpdate(form), 600);
     return () => clearTimeout(t);
   }, [form, sendPreviewUpdate]);
+
+  // The form as it stands, for the handshake to answer with. A ref rather than
+  // a dependency: the listener must not be torn down and reinstalled on every
+  // keystroke, and it must not answer with a form from an old closure.
+  const formRef = useRef(form);
+  useEffect(() => { formRef.current = form; }, [form]);
+
+  // Answer the preview when it says it is listening (WB-003). Without this the
+  // debounced update above could be posted at a frame that was still loading,
+  // and `postMessage` has no queue — the owner got a preview of their saved
+  // site with none of their unsaved edits, or an empty one, depending on which
+  // side won. The frame reloads on every theme switch and on Reload, so this
+  // fires often, not only at startup.
+  useEffect(() => {
+    function onReady(e: MessageEvent) {
+      if (!isTrustedPreviewMessage(e, iframeRef.current?.contentWindow)) return;
+      if (e.data?.type !== PREVIEW_READY) return;
+      sendPreviewUpdate(formRef.current);
+    }
+    window.addEventListener('message', onReady);
+    return () => window.removeEventListener('message', onReady);
+  }, [sendPreviewUpdate]);
 
   const saveMutation = useMutation({
     mutationFn: () => websiteApi.update(form),
