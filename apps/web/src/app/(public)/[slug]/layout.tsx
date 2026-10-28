@@ -1,18 +1,6 @@
 import Script from 'next/script';
 import { GoogleAnalyticsTracker } from './GoogleAnalyticsTracker';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-
-async function getGaId(slug: string): Promise<string | null> {
-  try {
-    const res = await fetch(`${API}/site/${slug}`, { next: { revalidate: 3600 } });
-    if (!res.ok) return null;
-    const json = await res.json();
-    return (json.data?.website?.googleAnalyticsId as string) || null;
-  } catch {
-    return null;
-  }
-}
+import { getSiteData } from './site-data';
 
 export default async function SlugLayout({
   children,
@@ -21,7 +9,11 @@ export default async function SlugLayout({
   children: React.ReactNode;
   params: { slug: string };
 }) {
-  const gaId = await getGaId(params.slug);
+  // Same call the page and its metadata make — `getSiteData` memoises it for
+  // the request, so this costs nothing extra. It used to be a second fetch of
+  // the same payload on an hour-long cache, which is why turning on analytics
+  // appeared to do nothing until the hour was up.
+  const gaId = (await getSiteData(params.slug))?.website?.googleAnalyticsId || null;
 
   return (
     <>

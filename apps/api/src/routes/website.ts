@@ -286,6 +286,29 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
 
   // GET /site/:slug — full public resort data
   app.get('/:slug', {
+    // Counted per resort, not per caller.
+    //
+    // The global ceiling keys on the IP, which is right for an authenticated
+    // API: one ceiling per person. This route is read by the Next server
+    // rendering a resort's public website, so from here every visitor of every
+    // tenant site arrives as one address — the web container's. The default
+    // 300/min would therefore be 5 page views per second for the whole fleet.
+    // It did not show while the renderer cached for a minute; it would have
+    // shown the moment it stopped (WB-002), as 429s on resort websites.
+    //
+    // Keying on the slug gives each resort its own ceiling and stops one
+    // resort's traffic from throttling another's. It is deliberately generous
+    // because the handler is two indexed reads of public data. Bounding abuse
+    // per source address for an unauthenticated read belongs at the edge, not
+    // in this process.
+    config: {
+      rateLimit: {
+        max: 600,
+        timeWindow: '1 minute',
+        keyGenerator: (request: { params: unknown }) =>
+          `site:${(request.params as { slug?: string } | undefined)?.slug ?? ''}`,
+      },
+    },
     schema: { tags: ['website'], summary: 'Get public resort website data' },
     handler: async (request, reply) => {
       const { slug } = request.params as { slug: string };

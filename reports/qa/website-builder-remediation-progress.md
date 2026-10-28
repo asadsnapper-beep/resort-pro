@@ -2,10 +2,10 @@
 
 **Started:** 2026-10-28
 **Parent audit:** [2026-10-28 Website Builder deep functional QA](./2026-10-28-website-builder-deep-functional-qa.md)
-**Branch:** `fix/e2e-rate-limit` (not pushed — pushes wait for the owner)
-**Status:** three P0 gates closed, one dependency closed first. **Customer handoff remains NO-GO.**
+**Branches:** `fix/e2e-rate-limit` (PR #6 → `dev`), `fix/website-publish-freshness` (WB-002, stacked on it)
+**Status:** four P0 gates closed, one dependency closed first. **Customer handoff remains NO-GO.**
 
-The audit's own minimum handoff gate lists eight items. Three are done. This file
+The audit's own minimum handoff gate lists eight items. Four are done. This file
 records what was actually changed and verified, and is updated as the rest land.
 
 ---
@@ -114,6 +114,63 @@ validate against one list rather than two that could drift.
 owner typing their own number the way they say it is not an error; text that
 could not be a phone number is.
 
+### WB-002 — "Live immediately" was false
+
+**Status:** fixed · owner chose to stop caching website content
+
+`(public)/[slug]/page.tsx` fetched with `revalidate: 60` and `layout.tsx` —
+which carries the metadata and the GA id — with `revalidate: 3600`. Publishing
+writes to the database at once, so the dashboard was right and the website was
+wrong for up to a minute, or an hour for analytics. This is the one a pilot
+resort owner meets on their first day: they publish, open the site, see no
+change, and conclude it did not work.
+
+Two ways out were put to the owner — tag the fetches and invalidate them from
+the publish route, which needs a shared secret in both deployments, or stop
+caching the content. They chose the second: correct immediately, no secret, no
+deployment change.
+
+| | |
+|---|---|
+| Files | `apps/web/src/app/(public)/[slug]/site-data.ts` (new), `[slug]/page.tsx`, `[slug]/layout.tsx`, `apps/api/src/routes/website.ts` |
+| Migration | none |
+| API behaviour | `GET /site/:slug` is counted per resort instead of per caller — see below |
+| Browser behaviour | a publish is on the website on the next page view; turning on Google Analytics takes effect at once instead of within the hour |
+| Tests added | 8 web unit (`site-data.test.ts`), 5 API integration (`public-site-rate-limit.test.ts`) |
+| Verified | measured against a seeded throwaway resort, below |
+| Remaining risk | one API call per page view instead of one per minute. Two indexed reads of public data, and the ceiling below is what keeps that bounded |
+| Rollback | revert; nothing persisted changes shape |
+
+The builder's own wording — *"Your changes will be live for guests
+immediately"* — needed no edit. It is now true, which was the point; weakening
+the promise would have been the other kind of fix.
+
+**The rate limiter had to move with it.** The global ceiling keys on the IP
+address, which is right for an authenticated API. But this route is read by the
+Next server rendering a resort's website, so from the API's side every visitor
+of every tenant site arrives as one address: the web container's. 300/min would
+have been 5 page views per second for the entire fleet. The minute cache was
+hiding it; removing the cache would have turned it into 429s on resort
+websites. The route now counts per slug, so each resort has its own ceiling and
+one resort's traffic cannot throttle another's. Bounding abuse per source
+address for an unauthenticated public read belongs at the edge, not in this
+process, and that is said in the code rather than left to be discovered.
+
+**Measured, not assumed.** Against a throwaway database seeded with the demo
+resort:
+
+| | |
+|---|---|
+| API calls per page view | **1** — the layout, `generateMetadata` and the page share one request, where the route used to make three against two different cache policies |
+| A publish, then an immediate reload | the new hero title is there; the old one is gone |
+| Analytics switched on, then an immediate reload | the `gtag` tag is in the HTML — this also proves the layout is reading from that shared call |
+| The same, with `revalidate: 60` put back | the publish is **invisible**. The bug reproduces exactly, which is what makes the fix a fix |
+
+`sitemap.ts` still reads with `revalidate: 3600`, deliberately. Its URLs are
+static and the fetch is only an existence check; a crawler does not need the
+answer to be a second old, and making it uncached would add load for no
+freshness anyone experiences.
+
 ---
 
 ## Verification run for the work above
@@ -122,8 +179,8 @@ could not be a phone number is.
 |---|---|
 | API TypeScript | pass |
 | Web TypeScript | pass |
-| Full API suite | **981/981**, 85 files |
-| Full web unit suite | **219/219**, 23 files |
+| Full API suite | **986/986**, 86 files |
+| Full web unit suite | **227/227**, 24 files |
 | Every e2e spec, four workers, retries off | 83/84 — see below |
 | `website-builder.spec.ts` on both projects | 10/10 |
 | Design-system ratchet | no regressions; no baseline moved |
@@ -143,35 +200,11 @@ published, and no email, payment, DNS or SSL action was taken.
 
 ## Open, in the order they are worth doing
 
-### WB-002 — "Live immediately" is false · **needs an owner decision**
-
-`apps/web/src/app/(public)/[slug]/page.tsx` fetches with `revalidate: 60`, and
-`layout.tsx` — which carries the metadata and the GA id — with `revalidate:
-3600`. Publishing writes to the database at once, so the dashboard is right and
-the website is wrong for up to a minute, or an hour for analytics.
-
-This is the one a pilot resort owner meets on their first day: they publish,
-open the site, see no change, and conclude it did not work.
-
-It cannot be finished without a decision, which is why it stopped here:
-
-1. **Tag the fetches and have the publish route invalidate them.** Correct, and
-   keeps the cache. The API is Fastify and the cache is Next's, so the API has
-   to call a revalidation endpoint in the web app, which needs a shared secret
-   in both deployments. That is an environment variable only the owner can set,
-   and until it is set the behaviour is exactly as broken as today.
-2. **Stop caching website content.** One API call per page view instead of one
-   per minute. Correct immediately, no secret, no deployment change — and a
-   real cost on a busy site.
-
-Until one is chosen, the builder should not say "live immediately". Saying so
-is the part that turns a cache into a support call.
-
 ### Remaining P0 gates from the audit
 
 | | Finding | Why it is not done |
 |---|---|---|
-| WB-003 | Preview has a startup race | needs a ready handshake both sides honour; mechanical, next after WB-002 |
+| WB-003 | Preview has a startup race | needs a ready handshake both sides honour; mechanical, and now the next one up |
 | WB-004 | Config/TEMPLATE theme preview is incomplete | the differentiator, and the largest of the P0s |
 | WB-007 | Roles see actions they cannot use | needs capability flags from the API, then the UI |
 | WB-008 | "Verified & live" from DNS alone | needs an HTTPS check and the production SSL path documented; part of it is infrastructure, not code |
@@ -188,7 +221,10 @@ product of its own and none should start before the P0 list is closed.
 
 **NO-GO**, unchanged from the audit.
 
-What changed is that three of its eight gates are closed with tests that fail when
-the behaviour comes back, and the test suite can now carry the rest. The single
-most visible remaining problem is WB-002: an owner who publishes and sees no
-change on their own website will not trust anything else the builder says.
+What changed is that four of its eight gates are closed with tests that fail
+when the behaviour comes back, and the test suite can now carry the rest. The
+gate that mattered most to a first day — publishing and seeing nothing happen —
+is among them. What remains is WB-003, WB-004, WB-007, WB-008 and WB-012, and
+of those WB-004 is the large one: config and TEMPLATE theme preview is the
+differentiator, and it is also the reason those two theme kinds are still
+offered every section control in the builder rather than their own.

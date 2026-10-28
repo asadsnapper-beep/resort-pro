@@ -5,23 +5,11 @@ import { ConfigThemeRenderer } from '@/components/themes/config-renderer';
 import { TemplateThemeRenderer } from '@/components/themes/template-renderer';
 import { compileTemplate } from '@/components/themes/template-renderer/compile';
 import { PreviewPage } from './PreviewPage';
+import { getSiteData } from './site-data';
 import type { ResortData } from '@/components/themes/types';
 
-async function fetchResortData(slug: string, noCache = false): Promise<ResortData | null> {
-  try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/site/${slug}`, {
-      next: noCache ? { revalidate: 0 } : { revalidate: 60 },
-    });
-    if (!res.ok) return null;
-    const json = await res.json();
-    return json.data;
-  } catch {
-    return null;
-  }
-}
-
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const data = await fetchResortData(params.slug);
+  const data = await getSiteData(params.slug);
   if (!data) return { title: 'Resort Not Found' };
   return {
     title: data.website?.seoTitle || data.tenant.name,
@@ -54,8 +42,7 @@ export default async function ResortWebsitePage({
   searchParams: { preview?: string };
 }) {
   const isPreview = !!searchParams?.preview;
-  // Preview mode: bypass 60s cache so changes show immediately
-  const data = await fetchResortData(params.slug, isPreview);
+  const data = await getSiteData(params.slug);
 
   // No tenant at all → hard 404
   if (!data) notFound();
