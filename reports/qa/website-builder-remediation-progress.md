@@ -532,11 +532,46 @@ stable object identities. A fresh object per render sends the page's domain
 effect into a setState loop that kills the vitest worker after 95 seconds,
 which looks like a hang in the code under test and is not.
 
-**The other three items of WB-012 are still open:** a full-page error and
-retry state for a failed website/tenant query; the theme catalogue falling
-back to three static free themes on an outage, which hides the outage and
-omits themes the resort has paid for; and switch semantics on the section
-toggles.
+**Two items of WB-012 remain:** a full-page error and retry state for a failed
+website/tenant query, and switch semantics on the section toggles.
+
+### WB-012, third item — a catalogue outage stopped passing for the catalogue
+
+The picker falls back to three static free themes when `/site/:slug/themes`
+fails. That part is right and stays: a wall of locks during an outage is worse
+than three usable themes. What was wrong is that the fallback was silent. An
+owner who had bought a theme opened the panel during an outage, found three
+free themes with no trace of the one they paid for, and had nothing on screen
+to say the list was incomplete rather than the purchase gone.
+
+Counting how many ways this could break without anyone noticing was the part
+worth doing. Only two of five produced an error at all:
+
+| what goes wrong | before | now |
+|---|---|---|
+| the request throws | caught, silent | notice |
+| a non-2xx status | not checked | notice |
+| the body is not JSON | caught, silent | notice |
+| `success: false` | fell through the condition | notice |
+| `data` is not a list | fell through the condition | notice |
+| an empty catalogue | fell through — correctly | no notice, free themes kept |
+
+Three of them never failed; they fell through `if (json.success && …)` and
+left the fallback in place, so nothing was logged internally either. The last
+row is the one that must *keep* falling through: nothing published yet is a
+real answer, not an outage.
+
+The notice is `role="alert"`, says a bought theme is missing rather than lost
+and that the live website is unaffected, and carries a Retry that clears it on
+success and keeps it on another failure.
+
+Six mutations, each applied alone. Five died at once; **one survived**, and
+that is worth recording rather than smoothing over: deleting the `res.ok`
+check kept the suite green, because the 500 fixture carried a malformed body
+that the next check caught anyway. The fixture now carries a well-formed
+success envelope behind a 500 — a stale proxy response, the one shape only
+`res.ok` catches — and deleting the check fails. The mutation was the only
+thing that found that; the suite looked complete without it.
 
 ---
 
@@ -578,7 +613,7 @@ published, and no email, payment, DNS or SSL action was taken.
 | WB-004 | live typing inside a Tier 2 template | needs Handlebars in the browser (~80KB on the preview path). Everything else about preview is closed; this is the only thing that bundle buys |
 | WB-007 | Roles see actions they cannot use | needs capability flags from the API, then the UI |
 | WB-008 | "Verified & live" from DNS alone | needs an HTTPS check and the production SSL path documented; part of it is infrastructure, not code |
-| WB-012 | Error states and accessibility | one of four items done (domain removal). The remaining three: a full-page retry state, the theme catalogue hiding an outage behind three free themes, and switch semantics on section toggles |
+| WB-012 | Error states and accessibility | two of four items done (domain removal, catalogue outage). Remaining: a full-page retry state for a failed website/tenant query, and switch semantics on the section toggles |
 | — | Draft, publish and rollback | item 8 of the spec: a versioning model with migrations. A feature in its own right, not a gate that can be slipped in |
 
 Phase 1 and Phase 2 of the brief — multi-page sites, media library, SEO suite,
@@ -602,7 +637,7 @@ closed is live *typing* inside a Tier 2 template, where the preview shows saved
 content and says so on the page. That is a narrower gap than the gate was, and
 it is stated to the owner rather than left to be discovered.
 
-What remains is WB-007, WB-008 and the other three items of WB-012. WB-007
-and WB-012 are small. Part of WB-008 is infrastructure rather than code. Separately, UPLOADED and
+What remains is WB-007, WB-008 and the last two items of WB-012. WB-007 and
+WB-012 are small. Part of WB-008 is infrastructure rather than code. Separately, UPLOADED and
 AI_GENERATED themes are still offered every section control in the builder
 rather than their own.
