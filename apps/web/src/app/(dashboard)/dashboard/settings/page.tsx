@@ -14,7 +14,7 @@ import {
   FileText, Palette, Lock, CheckCircle2, Circle, Loader2, Shield, Send, ToggleLeft, ToggleRight,
   CreditCard, Eye, EyeOff, ChevronDown, ChevronRight, Bell, LayoutGrid, Link2,
 } from 'lucide-react'
-import { PageShell, PageHeader } from '@/components/patterns';
+import { PageShell, PageHeader, ConfirmDialog } from '@/components/patterns';
 import { ModalShell } from '@/components/ui/modal-shell';
 import { ConnectedResortsTab } from '@/components/dashboard/ConnectedResortsTab';
 import { paymentGatewayApi } from '@/lib/api';
@@ -292,6 +292,7 @@ export default function SettingsPage() {
   const tenantData = data?.data?.data;
   const [domainInput, setDomainInput]   = useState('');
   const [domainSaving, setDomainSaving] = useState(false);
+  const [confirmRemoveDomain, setConfirmRemoveDomain] = useState(false);
   const [domainVerifying, setDomainVerifying] = useState(false);
   const [domainStatus, setDomainStatus] = useState<{
     customDomain: string | null;
@@ -361,6 +362,21 @@ export default function SettingsPage() {
     setDomainVerifying(false);
   };
 
+  /**
+   * Take the resort's own domain off their site.
+   *
+   * Asked about first, and no longer silent when it fails. One click on a
+   * small trash icon used to do this outright — the resort's address stops
+   * resolving to their site and the SSL status is cleared with it, and an
+   * owner who wanted to correct a typo in the domain has instead removed it.
+   * The admin panel asked before doing the same thing; the owner's own page
+   * did not. (Website Builder QA 2026-10-28, WB-012.)
+   *
+   * The error is rethrown rather than swallowed so ConfirmDialog can show it
+   * on the dialog: the previous `catch { }` meant a failed removal and a
+   * successful one looked identical from the outside — no toast, no change —
+   * and the only way to tell was to reload the page.
+   */
   const removeDomain = async () => {
     setDomainSaving(true);
     try {
@@ -368,8 +384,9 @@ export default function SettingsPage() {
       setDomainInput('');
       setDomainStatus({ customDomain: null, domainVerified: false });
       toast({ title: 'Custom domain removed' });
-    } catch { /* ignore */ }
-    setDomainSaving(false);
+    } finally {
+      setDomainSaving(false);
+    }
   };
 
   const provisionSsl = async () => {
@@ -882,14 +899,34 @@ export default function SettingsPage() {
                     Save
                   </Button>
                   {domainStatus?.customDomain && (
-                    <button onClick={removeDomain}
-                      className="px-3 rounded-lg border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                    <button onClick={() => setConfirmRemoveDomain(true)}
+                      disabled={domainSaving}
+                      aria-label={`Remove custom domain ${domainStatus.customDomain}`}
+                      className="px-3 rounded-lg border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-50"
                       title="Remove domain">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   )}
                 </div>
                 <p className="text-xs text-gray-400 mt-1.5">Enter without https:// — e.g. <code>www.sunsetresort.com</code></p>
+
+                <ConfirmDialog
+                  open={confirmRemoveDomain}
+                  onClose={() => setConfirmRemoveDomain(false)}
+                  onConfirm={removeDomain}
+                  variant="resort"
+                  tone="danger"
+                  title="Remove this domain?"
+                  description={
+                    <>
+                      <strong>{domainStatus?.customDomain}</strong> will stop
+                      leading to your website, and its SSL certificate status is
+                      cleared. Visitors who have it bookmarked will not reach
+                      you. Your free <code>resortpro</code> address keeps working.
+                    </>
+                  }
+                  confirmLabel="Remove domain"
+                />
               </div>
 
               {/* Verify button */}
