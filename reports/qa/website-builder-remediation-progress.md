@@ -365,6 +365,118 @@ Each mutation applied alone:
 | the key is not escaped into the URL | 1 fails |
 | no guard for a missing key | 1 fails |
 
+### WB-004, second half — a previewed Tier 2 theme renders as itself
+
+The first half taught the page to look the previewed theme up. It looked up a
+*config*. A Tier 2 (TEMPLATE) theme has no config — it has Handlebars HTML in
+a different column — so a TEMPLATE key still resolved to null and still fell
+through `getTheme()` to luxe. Measured on the step-2 commit, with a Tier 2
+theme whose own stylesheet paints the hero `#00e5ff` and whose markup carries
+a unique marker:
+
+| `/palm-paradise-resort…` | bytes | the Tier 2 marker | its own `#00e5ff` | luxe-only markup |
+|---|---|---|---|---|
+| **before**, `?preview=wb004-tier2` | 58,268 | absent | absent | **present** |
+| **before**, `?preview=luxe` | 58,240 | absent | absent | present |
+| **after**, `?preview=wb004-tier2` | **26,932** | **present** | **present** | absent |
+| **after**, `?preview=luxe` | 58,258 | absent | absent | present |
+
+The two "before" rows are the same page within 28 bytes. That is the same
+symptom the first half had, surviving in the one tier the first half did not
+reach.
+
+All counts are of non-`<script>` markup. That distinction is not pedantry: in
+the first half I briefly reported a theme as rendering because its marker text
+was present, when the marker was only inside the serialized RSC payload and
+never drawn. Here the browser confirms it independently — `#hero` computes to
+`rgb(0, 229, 255)` with `letter-spacing: 5.28px`, both from the theme's own
+stylesheet, the `<h1>` reads "Palm Paradise" where the template source says
+`{{tenant.name}}`, and the booking widget the template declares with
+`data-rp-widget` is mounted and interactive.
+
+**The decision this was waiting on was a false choice.** It was posed as
+Handlebars on the client (~80KB, true live editing) versus an honest notice.
+Compiling on the *server* was the option not on the list, and it is strictly
+better than either: `page.tsx` is already a Server Component, Handlebars is
+already a server dependency there, and the owner's first paint is the real
+theme rather than a flash of fallback. The ~80KB buys exactly one thing —
+re-compiling as the owner types — and nothing else was blocked on it.
+
+So the notice is still there, narrowed to what is actually true. A compiled
+HTML string cannot show an edit that has not been saved, so the Tier 2 preview
+reads "saved content — unsaved edits not shown" where the other tiers earn a
+"● live" badge once an edit arrives. Showing "● live" there would be worse
+than showing nothing: unchanged text would read as a lost edit.
+
+`resolvePreviewConfig` became `resolvePreviewTheme`, returning a config *or* a
+template from the request it was already making, and both halves of a Tier 2
+theme are compiled by one `compileTier2` now shared with the live site — so a
+previewed template cannot drift from the published one. Requests per page view
+are therefore unchanged from the first half:
+
+| | API requests |
+|---|---|
+| live site | 1 |
+| preview of the theme already saved | 1 |
+| preview of any other theme, config or template | 2 |
+
+**The unreleased-theme gate still holds, and it had to be re-checked** — this
+change is the first time the public slug page reads `templateHtml`, which is a
+whole Tier 2 design, not just a colour palette. With the Tier 2 theme set to
+DRAFT and asked for with no signature:
+
+| | result |
+|---|---|
+| `/site/theme/wb004-tier2` | HTTP 404, "Theme not found" |
+| `?preview=wb004-tier2` for a resort that does not own it | falls back to luxe; no marker, no `#00e5ff` |
+| the same DRAFT theme, for the resort whose own theme it is | renders, live and in preview |
+| the picker's own list, `/site/:slug/themes` | excludes it |
+
+That last pair is the split the code is built around: `/site/:slug` carries a
+resort's own theme whatever its status, so an owner is not dropped onto luxe
+inside their own builder by an admin unpublishing a design — while a stranger
+guessing the key still gets nothing.
+
+Eight mutations, each applied alone, all killed:
+
+| mutation | result |
+|---|---|
+| the TEMPLATE branch deleted (the step-3 bug itself) | 10 tests fail |
+| page never hands the template down | 5 fail |
+| the stylesheet is dropped | 3 fail |
+| the missing-HTML guard removed | 2 fail |
+| the resort's own Tier 2 theme not read from the payload | 2 fail |
+| CSS passed through uncompiled | 2 fail |
+| PreviewPage ignores the template | 2 fail |
+| the Tier 2 banner claims to be live | 1 fails |
+
+A third test file exists, `preview-page-render.test.tsx`, because the last two
+of those mutations live in the client component that *chooses* a renderer, and
+the first two test files stay green for both. This is the third time in this
+work that the bug was in the choosing rather than in the value returned.
+
+**Still not done:** live typing inside a Tier 2 template. That is the ~80KB,
+and it is now the only thing it buys.
+
+### WB-004, step 4 — what the theme picker shows
+
+Both the picker's thumbnails and its preview modal build exactly
+`/${slug}?preview=${theme.key}` — the URL measured above — and neither seeded
+theme carries a `previewImage`, so both fall to the live-iframe path. On that
+basis the thumbnails and the modal are fixed by the same change. Stated at the
+level it was checked: the URL they construct was verified end to end, in the
+browser and byte for byte; the picker itself was not driven through the
+dashboard, which would need a login the throwaway database has no user for.
+
+One cost worth recording rather than hiding. Every thumbnail without a
+`previewImage` is a full page render of `?preview=<key>` in an iframe scaled to
+0.2, so opening the picker costs one server render per theme — and, since the
+preview now looks the theme up, about **2N API requests instead of N**. The
+requests are two indexed reads of public data and the per-resort limiter is
+generous, so nothing is at risk; but the long-term answer is generating
+`previewImage` at upload rather than rendering N pages to show N thumbnails.
+That predates this work and is not changed by it.
+
 ### Found while verifying the above — centred About layout drops its bullets
 
 Not WB-004 and not fixed here. `ConfigAbout.tsx` builds a `TextBlock` that
@@ -417,7 +529,7 @@ published, and no email, payment, DNS or SSL action was taken.
 
 | | Finding | Why it is not done |
 |---|---|---|
-| WB-004 | TEMPLATE preview only — config themes now render | needs Handlebars on the client, or an honest notice; a decision, not a task |
+| WB-004 | live typing inside a Tier 2 template | needs Handlebars in the browser (~80KB on the preview path). Everything else about preview is closed; this is the only thing that bundle buys |
 | WB-007 | Roles see actions they cannot use | needs capability flags from the API, then the UI |
 | WB-008 | "Verified & live" from DNS alone | needs an HTTPS check and the production SSL path documented; part of it is infrastructure, not code |
 | WB-012 | Error states and accessibility | smallest of these |
@@ -433,18 +545,18 @@ product of its own and none should start before the P0 list is closed.
 
 **NO-GO**, unchanged from the audit.
 
-What changed is that five of its eight gates are closed with tests that fail
+What changed is that six of its eight gates are closed with tests that fail
 when the behaviour comes back, and the test suite can now carry the rest. The
 two that mattered most to a first day are among them: publishing and seeing
 nothing happen, and a preview that sometimes showed none of your edits.
 
-WB-004 is half closed, and the half that is closed is the one an owner meets
-first: a theme they bought now renders when they press Preview. TEMPLATE
-preview still falls back, so the gate is not signed off.
+WB-004 is closed for every theme kind: press Preview on a theme you bought —
+config-driven or Tier 2 template — and that theme is what renders. What is not
+closed is live *typing* inside a Tier 2 template, where the preview shows saved
+content and says so on the page. That is a narrower gap than the gate was, and
+it is stated to the owner rather than left to be discovered.
 
-What remains is the TEMPLATE half of WB-004, then WB-007, WB-008 and WB-012.
-The TEMPLATE half is a decision before it is work — Handlebars on the client,
-or a page that says plainly that unsaved edits cannot be shown for a Tier 2
-theme. Until one of those is taken, those two theme kinds are also still
-offered every section control in the builder rather than their own. WB-007 and
-WB-012 are small. Part of WB-008 is infrastructure rather than code.
+What remains is WB-007, WB-008 and WB-012. WB-007 and WB-012 are small. Part
+of WB-008 is infrastructure rather than code. Separately, UPLOADED and
+AI_GENERATED themes are still offered every section control in the builder
+rather than their own.
