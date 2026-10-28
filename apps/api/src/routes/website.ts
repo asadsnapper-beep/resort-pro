@@ -9,6 +9,7 @@ import { resolveRate } from './ratePlans';
 import { sendWebBookingEmails } from '../utils/guest-emails';
 import { PENDING_HOLD_MINUTES } from '../utils/booking';
 import { effectiveThemePrice, themeAccessFor } from '../utils/theme-access';
+import { isUnpublishedTheme, verifyThemePreviewSignature } from '../utils/signed-theme-preview';
 
 // Accept absolute http(s) URLs OR site-relative upload paths (/uploads/…) —
 // the app's own ImageUpload produces relative paths, so strict .url() broke saves.
@@ -121,7 +122,7 @@ export async function websiteRoutes(app: FastifyInstance) {
         const theme = await prisma.theme.findUnique({
           where: { key: body.templateId },
           select: {
-            key: true, exclusiveToTenantId: true,
+            key: true, exclusiveToTenantId: true, themeStatus: true,
             priceUsd: true, priceBdt: true,
             offerPriceUsd: true, offerPriceBdt: true, offerEndsAt: true,
           },
@@ -149,6 +150,31 @@ export async function websiteRoutes(app: FastifyInstance) {
             });
           }
         }
+        // An unpublished theme is not on offer. The picker never lists one, so
+        // reaching here means the key came from somewhere else — and selecting
+        // it would put an unfinished design on a real resort's live website,
+        // because the public renderer looks a theme up by key without asking
+        // about its status (deliberately: a tenant whose theme is unpublished
+        // later must not have their site go blank).
+        //
+        // Refused only when it is a change, for that same reason. Treated as
+        // an unknown key rather than a forbidden one: "this is not a theme you
+        // can pick" is the whole truth an owner needs, and confirming that the
+        // key names something real is the part worth not saying.
+        if (theme && isUnpublishedTheme(theme)) {
+          const current = await db.websiteContent.findUnique({
+            where: { tenantId },
+            select: { templateId: true },
+          });
+          if (current?.templateId !== body.templateId) {
+            return reply.status(400).send({
+              success: false,
+              error: `No template called "${body.templateId}". Pick one from the Template tab.`,
+              code: 'UNKNOWN_TEMPLATE',
+            });
+          }
+        }
+
         if (theme) {
           const owned = await prisma.themePurchase.findUnique({
             where: { tenantId_themeKey: { tenantId, themeKey: theme.key } },
@@ -280,6 +306,29 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
         },
       });
       if (!theme) return reply.status(404).send({ success: false, error: 'Theme not found' });
+
+      // An unpublished theme's contents are not public. This route had no
+      // filter on `themeStatus` or `isActive` at all, so the full config of an
+      // unreleased design — or a Tier 2 theme's whole HTML and CSS — came back
+      // to anyone who knew the key, with no login. The schema's own words:
+      // DRAFT is "saved, not visible to tenants", PREVIEW is "previewable by
+      // admin only".
+      //
+      // The admin's Preview link still has to work, and it is a plain page in
+      // a new tab that cannot carry an Authorization header, so it carries a
+      // short-lived signature the API minted when it handed the link out. See
+      // utils/signed-theme-preview.ts.
+      //
+      // 404 rather than 403: a refusal that distinguishes "wrong signature"
+      // from "no such theme" would confirm the key exists, which is the one
+      // thing a caller guessing keys is trying to learn.
+      if (isUnpublishedTheme(theme)) {
+        const { exp, sig } = request.query as { exp?: string; sig?: string };
+        if (!verifyThemePreviewSignature(key, exp, sig)) {
+          return reply.status(404).send({ success: false, error: 'Theme not found' });
+        }
+      }
+
       return reply.send({ success: true, data: theme });
     },
   });
@@ -868,6 +917,12 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
       const themes = await prisma.theme.findMany({
         where: {
           isActive: true,
+          // Already implied: the admin paths keep `isActive` in lockstep with
+          // PUBLISHED, so an unpublished theme is inactive and was excluded by
+          // the line above. Stated anyway, because "not visible to tenants" is
+          // a rule about `themeStatus` and leaving it to be enforced by a
+          // different column is how the two drift apart.
+          themeStatus: 'PUBLISHED',
           // Bespoke themes belong to the tenant that paid for them. Everyone
           // sees the shared catalogue (exclusiveToTenantId = null) plus their
           // own commissioned theme — never someone else's.
