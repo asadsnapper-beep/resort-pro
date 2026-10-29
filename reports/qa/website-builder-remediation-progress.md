@@ -770,6 +770,91 @@ The marketer row was read off the network log: only `/api/tenant/announcements`
 
 ---
 
+### WB-008 — half closed: the UI stops lying, HTTPS still does not work
+
+The builder showed **"Verified & live"** the moment DNS resolved, with an
+`https://` link beside it. DNS resolving says the name points here and nothing
+more. Without a certificate that link fails, so the owner was told their
+domain was live and then watched it not load.
+
+It could not have done better from where it read: the card used `GET /tenant`,
+whose `TENANT_SETTINGS_SELECT` returns `customDomain` and `domainVerified` and
+**not one SSL field**. It now reads `GET /tenant/domain/status` — which
+already existed, carries `sslStatus` and `sslError`, and sits behind the same
+OWNER/MANAGER gate, so no API change was needed.
+
+Settings carried the same claim in a second place: `✅ <domain> is live!` and
+"Guests can access your website at this domain", from DNS alone — **while the
+SSL card directly below it could read "Not provisioned"**. The banner
+contradicted the next card down. Both now share `domainState`.
+
+Verified in a browser, flipping the record through each state:
+
+| DNS | `sslStatus` | Builder card | Link offered |
+|---|---|---|---|
+| not resolved | `none` | DNS *Not pointing here yet* · HTTPS *Certificate not issued yet* | no |
+| resolved | `none` | DNS **done** · HTTPS *not issued yet*, plus "this domain will not load" | no |
+| resolved | `active` | DNS **done** · HTTPS **Certificate active** | yes, `https://…` |
+
+The middle row is exactly what the old UI called "Verified & live". Settings
+for that same row now reads *"www.palmparadise.com is not serving your site
+yet — DNS: Pointing to ResortPro · HTTPS: Certificate not issued yet"*, and
+the Visit link is gone.
+
+#### What is still broken, and why this gate stays open
+
+**1. Nothing issues certificates.** `POST /tenant/domain/provision-ssl` sets
+`sslStatus = 'provisioning'` and returns a webhook URL,
+`/api/tenant/domain/ssl-webhook`. That string is the **only** occurrence of
+`ssl-webhook` in the repository — there is no such route. The handler's own
+comment says "In production this would call cert-manager / ACME / Caddy API".
+Nothing does. The only thing that ever sets `active` is an admin calling
+`PATCH /admin/domains/:id/ssl` by hand.
+
+So `sslStatus` is a record of what the platform was last told, never a
+measurement. The UI now treats it that way and still does not perform the
+HTTPS health check the audit asked for.
+
+**2. Production never routes a customer domain at all.** This is bigger than
+the certificate, and the audit did not reach it. `deploy/production/docker-compose.yml`
+gives the web container one Traefik router:
+
+```
+Host(`resortpro.site`) || Host(`www.resortpro.site`) || Host(`app.resortpro.site`)
+  || HostRegexp(`{sub:[a-z0-9-]+}.resortpro.site`)
+```
+
+with `tls.domains[0].main=resortpro.site` and `sans=*.resortpro.site`.
+
+A request arriving with `Host: www.palmparadise.com` matches none of those
+rules, so it never reaches the web container — and the wildcard certificate
+does not cover it either. Nothing in the repo adds routers dynamically.
+
+The application side is complete: `apps/web/src/middleware.ts` resolves an
+unknown host through `/site/domain/:hostname` and rewrites to `/<slug>`. That
+code has simply never been reachable in production for a customer's own
+domain.
+
+**Therefore a custom domain cannot work today, certificate or not.** Closing
+this gate needs an infrastructure decision, not a page change:
+
+- a Traefik rule that accepts arbitrary hosts (plus `certresolver` per-host
+  on-demand issuance), or a dynamic provider fed from the tenant table;
+- then the ACME callback that moves `sslStatus` to `active` — the webhook the
+  API already advertises;
+- then an actual HTTPS probe before the word "live" is used at all.
+
+Until then the honest position is the one now on screen: DNS can be pointing
+here, and the domain still will not serve the site.
+
+**16 mutations, all killed.** One survived the first pass: forcing the HTTPS
+row's icon to the done state changed no label, and the tests read only labels.
+A green tick beside "Certificate not issued yet" contradicts the words next to
+it, and the icon is what is read at a glance — the row now carries the same
+state in `data-state` and five assertions check it.
+
+---
+
 ## Verification run for the work above
 
 | Check | Result |
@@ -777,7 +862,7 @@ The marketer row was read off the network log: only `/api/tenant/announcements`
 | API TypeScript | pass |
 | Web TypeScript | pass |
 | Full API suite | **1004/1004**, 87 files |
-| Full web unit suite | **389/389**, 36 files |
+| Full web unit suite | **424/424**, 38 files |
 | The four specs CI runs, both projects, four workers, retries off | **70 passed, 2 skipped** |
 | `website-builder.spec.ts` on both projects | 12 passed, 2 skipped — the preview pane is `hidden lg:flex`, so the two preview tests do not apply on the phone project |
 | Design-system ratchet | no regressions; no baseline moved |
@@ -807,7 +892,7 @@ published, and no email, payment, DNS or SSL action was taken.
 |---|---|---|
 | WB-004 | live typing inside a Tier 2 template | needs Handlebars in the browser (~80KB on the preview path). Everything else about preview is closed; this is the only thing that bundle buys |
 | WB-007 | Roles see actions they cannot use | **closed.** Derived from role, mirroring the API's own gates — no API change needed. One finding left open: `GET /tenant/flags` and `requireFlag` read different sources and disagree |
-| WB-008 | "Verified & live" from DNS alone | needs an HTTPS check and the production SSL path documented; part of it is infrastructure, not code |
+| WB-008 | "Verified & live" from DNS alone | **UI half done** — DNS and HTTPS shown separately, "live" needs both, on both pages. Still open: production Traefik routes no customer domain at all, nothing issues certificates, and the advertised `ssl-webhook` route does not exist |
 | WB-012 | Error states and accessibility | **closed.** All four items done. One thing found and not fixed: the dashboard shell's dark-mode toggle has no accessible name — outside this page, worth its own small change |
 | — | Draft, publish and rollback | item 8 of the spec: a versioning model with migrations. A feature in its own right, not a gate that can be slipped in |
 
@@ -822,8 +907,12 @@ product of its own and none should start before the P0 list is closed.
 **NO-GO**, unchanged from the audit.
 
 What changed is that **seven of its eight gates are closed** with tests that
-fail when the behaviour comes back, and the test suite can now carry the last
-one. The
+fail when the behaviour comes back, and the eighth no longer misleads the
+owner even though it is not fixed.
+
+WB-008 is the honest exception. A custom domain still cannot work in
+production — not because of the builder, but because nothing routes or
+certifies it. The page now says so instead of showing a green tick. The
 two that mattered most to a first day are among them: publishing and seeing
 nothing happen, and a preview that sometimes showed none of your edits.
 
@@ -845,6 +934,9 @@ neither belongs to the gate being closed:
   paying tenant can be entitled to `custom_domain` and absent from the
   endpoint that reports it.
 
-**What remains is WB-008 alone.** Part of it is infrastructure rather than
-code. Separately, UPLOADED and AI_GENERATED themes are still offered every
-section control in the builder rather than their own.
+**What remains is WB-008, and it is not a page change.** The UI half is done:
+nothing now calls a domain live on DNS alone, on either page. The rest is
+infrastructure — production Traefik has no router and no certificate for a
+customer's own domain, so the middleware that would serve it has never been
+reachable there. Separately, UPLOADED and AI_GENERATED themes are still
+offered every section control in the builder rather than their own.
