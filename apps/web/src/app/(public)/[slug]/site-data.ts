@@ -45,3 +45,61 @@ export async function getSiteData(slug: string): Promise<ResortData | null> {
     return null;
   }
 }
+
+/**
+ * The config of one theme, by its key.
+ *
+ * Returns null for a key that does not exist — and for an unreleased theme
+ * asked for without the signature the API minted, which answers the same way
+ * on purpose. Either way the caller falls back to the hardcoded registry,
+ * which is the right outcome: a key nobody is allowed to read is a key nobody
+ * can preview.
+ *
+ * `no-store` for the same reason as above, and one more: an admin who uploads
+ * a corrected package and presses Preview again is asking what is in the
+ * database now.
+ */
+export async function getThemeConfig(key: string): Promise<ResortData['themeConfig']> {
+  try {
+    const res = await fetch(`${API}/site/theme/${encodeURIComponent(key)}`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    return (await res.json()).data?.configJson ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The config to render `?preview=<key>` with.
+ *
+ * This is the half of WB-004 that was missing. `?preview=` set the theme *key*
+ * and then deliberately threw the config away — `configJson = isPreview ? null
+ * : data.themeConfig` — on the reasoning that a preview should show the
+ * previewed theme rather than the saved one. But nothing ever looked the
+ * previewed theme up, so an UPLOADED or AI_GENERATED key fell through
+ * `getTheme()` to the luxe default. An owner who had just paid for a theme
+ * pressed Preview and saw a different theme, with nothing to suggest anything
+ * had gone wrong: these two URLs returned byte-for-byte identical pages,
+ * 95,734 bytes each, for two themes that look nothing alike.
+ *
+ *     /<slug>?preview=wb004-uploaded   →  luxe
+ *     /<slug>?preview=wb004-template   →  luxe
+ *
+ * The tenant's own theme is answered from the payload already in hand instead
+ * of being re-fetched. That saves a request on the common case — an owner
+ * editing the site they are looking at — and it is also the only branch that
+ * still works for a theme unpublished *after* they chose it: `/site/:slug`
+ * returns their theme whatever its status, while `/site/theme/:key` will not.
+ *
+ * A TEMPLATE key still resolves to null here and still falls back to the
+ * registry. That one is not fixed; it needs Handlebars on the client, which is
+ * a decision of its own.
+ */
+export async function resolvePreviewConfig(
+  key: string | null | undefined,
+  data: ResortData,
+): Promise<ResortData['themeConfig']> {
+  if (!key) return null;
+  if (key === data.website?.templateId) return data.themeConfig ?? null;
+  return getThemeConfig(key);
+}

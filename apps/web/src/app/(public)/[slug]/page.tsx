@@ -5,7 +5,7 @@ import { ConfigThemeRenderer } from '@/components/themes/config-renderer';
 import { TemplateThemeRenderer } from '@/components/themes/template-renderer';
 import { compileTemplate } from '@/components/themes/template-renderer/compile';
 import { PreviewPage } from './PreviewPage';
-import { getSiteData } from './site-data';
+import { getSiteData, resolvePreviewConfig } from './site-data';
 import type { ResortData } from '@/components/themes/types';
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
@@ -56,15 +56,20 @@ export default async function ResortWebsitePage({
   // ?preview=themeKey → show that theme without saving
   const themeKey = searchParams?.preview || websiteData.templateId;
 
-  // Config-driven theme (uploaded or AI-generated) takes priority over hardcoded
-  // In preview mode, skip config-driven theme so we show the previewed theme directly
-  const configJson    = isPreview ? null : data.themeConfig;
+  // Config-driven theme (uploaded or AI-generated) takes priority over hardcoded.
+  // In preview mode the config has to come from the *previewed* theme, not the
+  // saved one — looking it up is what WB-004 was missing; see
+  // resolvePreviewConfig for what the owner saw instead.
+  const configJson     = isPreview
+    ? await resolvePreviewConfig(themeKey, data)
+    : data.themeConfig;
   const ThemeComponent = getTheme(themeKey);
   const resolvedData: ResortData = { ...data, website: websiteData };
 
   // Preview mode → client component for live postMessage updates
-  // (Tier 2 live-editing preview is not wired up yet — /theme-preview/[key]
-  // covers static preview for TEMPLATE themes in the meantime)
+  // (Tier 2 live-editing preview is not wired up yet — a TEMPLATE key still
+  // falls back here, and /theme-preview/[key] covers static preview for those
+  // in the meantime)
   if (isPreview) {
     return (
       <PreviewPage

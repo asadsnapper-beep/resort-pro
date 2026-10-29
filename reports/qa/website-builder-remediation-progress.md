@@ -288,6 +288,100 @@ End to end, against a throwaway database and a disposable local secret:
 
 ---
 
+### WB-004, first half — the previewed theme is the theme that renders
+
+`?preview=<key>` set the theme *key* and then threw the config away:
+
+```ts
+const configJson = isPreview ? null : data.themeConfig;
+```
+
+The reasoning was sound — a preview should show the previewed theme, not the
+saved one — but nothing ever looked the previewed theme up. So an UPLOADED or
+AI_GENERATED key fell through `getTheme()` to the luxe default. An owner who
+had just paid ৳3,000 for a theme pressed Preview and saw a different theme,
+with nothing on the page to say so.
+
+Reproduced on the branch before the change, with two deliberately garish QA
+themes. The decisive measurement is that the two URLs were not merely both
+wrong, they were the same page:
+
+| URL | rendered | bytes |
+|---|---|---|
+| `/palm-paradise-resort?preview=wb004-uploaded` | luxe | 95,734 |
+| `/palm-paradise-resort?preview=wb004-template` | luxe | 95,734 |
+
+After: `resolvePreviewConfig()` in `site-data.ts` resolves the key, and the
+page passes the result to `PreviewPage`.
+
+| URL | luxe-only markup | theme's own colour | bytes |
+|---|---|---|---|
+| `?preview=wb004-uploaded` | absent | `#fff200` present | 71,832 |
+| `?preview=minimal` | absent | — | 70,491 |
+| `?preview=wb004-template` | **present** | — | 95,734 |
+| live site | present | — | 95,262 |
+
+The third row is not a failure, it is the scope line: **TEMPLATE preview is
+still the fallback.** Compiling a Tier 2 theme as the owner types needs
+Handlebars on the client, which is a decision of its own and is not taken here.
+`/theme-preview/[key]` still covers static preview for those.
+
+A note on the evidence, because the first signal was weaker than it looked.
+Grepping the response for the QA theme's marker text showed it present after
+the change and absent before, which is true but proves only that the config
+reached the client — the marker sits in the serialized RSC payload. What proves
+the theme *renders* is the pair above: the theme's own `#fff200` in real
+markup, and luxe's own classes gone from it.
+
+**Requests per page view**, measured from the API log, because the fix adds a
+lookup:
+
+| | requests |
+|---|---|
+| live site | 1 — unchanged |
+| preview of the theme already saved | 1 — answered from the payload in hand |
+| preview of any other theme | 2 |
+
+That middle row is not only an optimisation. It is the one branch that still
+works for a theme unpublished *after* a tenant chose it: `/site/:slug` returns
+their theme whatever its status, while `/site/theme/:key` now refuses one.
+Without it an owner in that position would be dropped onto luxe inside their own
+builder.
+
+Two test files, 25 tests, and the second exists because of where the bug was.
+`preview-theme.test.ts` covers the resolver; `preview-page-theme.test.tsx`
+calls the server component the way Next does and reads what it passes down —
+a test on the resolver alone passes with the original one-line bug still in
+place.
+
+Each mutation applied alone:
+
+| mutation | result |
+|---|---|
+| page never looks the previewed theme up (the original bug) | 5 tests fail |
+| page uses the saved config in preview mode | 4 fail |
+| the tenant's own theme is re-fetched instead of used in hand | 3 fail |
+| any key resolves to the saved config | 7 fail |
+| the key is not escaped into the URL | 1 fails |
+| no guard for a missing key | 1 fails |
+
+### Found while verifying the above — centred About layout drops its bullets
+
+Not WB-004 and not fixed here. `ConfigAbout.tsx` builds a `TextBlock` that
+renders `about.bullets`, but `layout === 'centered'` takes an early return that
+re-implements the heading markup inline and never uses it, so a theme package
+that specifies `centered` loses every bullet it ships, silently. Shown both
+ways on the same theme:
+
+| `about.layout` | bullet in rendered DOM |
+|---|---|
+| `image-right` | yes |
+| `centered` | no |
+
+Raised as its own task rather than folded in.
+
+---
+
 ## Verification run for the work above
 
 | Check | Result |
@@ -323,7 +417,7 @@ published, and no email, payment, DNS or SSL action was taken.
 
 | | Finding | Why it is not done |
 |---|---|---|
-| WB-004 | Config/TEMPLATE theme preview is incomplete | the differentiator, and the largest of the P0s |
+| WB-004 | TEMPLATE preview only — config themes now render | needs Handlebars on the client, or an honest notice; a decision, not a task |
 | WB-007 | Roles see actions they cannot use | needs capability flags from the API, then the UI |
 | WB-008 | "Verified & live" from DNS alone | needs an HTTPS check and the production SSL path documented; part of it is infrastructure, not code |
 | WB-012 | Error states and accessibility | smallest of these |
@@ -344,8 +438,13 @@ when the behaviour comes back, and the test suite can now carry the rest. The
 two that mattered most to a first day are among them: publishing and seeing
 nothing happen, and a preview that sometimes showed none of your edits.
 
-What remains is WB-004, WB-007, WB-008 and WB-012. WB-004 is the large one:
-config and TEMPLATE theme preview is the differentiator, and it is also the
-reason those two theme kinds are still offered every section control in the
-builder rather than their own. WB-007 and WB-012 are small. Part of WB-008 is
-infrastructure rather than code.
+WB-004 is half closed, and the half that is closed is the one an owner meets
+first: a theme they bought now renders when they press Preview. TEMPLATE
+preview still falls back, so the gate is not signed off.
+
+What remains is the TEMPLATE half of WB-004, then WB-007, WB-008 and WB-012.
+The TEMPLATE half is a decision before it is work — Handlebars on the client,
+or a page that says plainly that unsaved edits cannot be shown for a Tier 2
+theme. Until one of those is taken, those two theme kinds are also still
+offered every section control in the builder rather than their own. WB-007 and
+WB-012 are small. Part of WB-008 is infrastructure rather than code.
