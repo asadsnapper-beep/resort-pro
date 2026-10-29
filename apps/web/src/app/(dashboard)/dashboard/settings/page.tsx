@@ -14,7 +14,8 @@ import {
   FileText, Palette, Lock, CheckCircle2, Circle, Loader2, Shield, Send, ToggleLeft, ToggleRight,
   CreditCard, Eye, EyeOff, ChevronDown, ChevronRight, Bell, LayoutGrid, Link2,
 } from 'lucide-react'
-import { PageShell, PageHeader } from '@/components/patterns';
+import { PageShell, PageHeader, ConfirmDialog } from '@/components/patterns';
+import { domainState } from '@/lib/domain-status';
 import { ModalShell } from '@/components/ui/modal-shell';
 import { ConnectedResortsTab } from '@/components/dashboard/ConnectedResortsTab';
 import { paymentGatewayApi } from '@/lib/api';
@@ -292,6 +293,7 @@ export default function SettingsPage() {
   const tenantData = data?.data?.data;
   const [domainInput, setDomainInput]   = useState('');
   const [domainSaving, setDomainSaving] = useState(false);
+  const [confirmRemoveDomain, setConfirmRemoveDomain] = useState(false);
   const [domainVerifying, setDomainVerifying] = useState(false);
   const [domainStatus, setDomainStatus] = useState<{
     customDomain: string | null;
@@ -307,6 +309,15 @@ export default function SettingsPage() {
     daysUntilExpiry: number | null;
   } | null>(null);
   const [sslProvisioning, setSslProvisioning] = useState(false);
+
+  // DNS and HTTPS are separate; "live" needs both. The two halves arrive from
+  // two different calls, so they are combined here. See lib/domain-status.
+  const dom = domainState(domainStatus && {
+    customDomain:   domainStatus.customDomain,
+    domainVerified: domainStatus.domainVerified,
+    sslStatus:      sslStatus?.sslStatus ?? null,
+    sslError:       sslStatus?.sslError ?? null,
+  });
 
   useEffect(() => {
     if (tenantData?.customDomain !== undefined) {
@@ -361,6 +372,21 @@ export default function SettingsPage() {
     setDomainVerifying(false);
   };
 
+  /**
+   * Take the resort's own domain off their site.
+   *
+   * Asked about first, and no longer silent when it fails. One click on a
+   * small trash icon used to do this outright — the resort's address stops
+   * resolving to their site and the SSL status is cleared with it, and an
+   * owner who wanted to correct a typo in the domain has instead removed it.
+   * The admin panel asked before doing the same thing; the owner's own page
+   * did not. (Website Builder QA 2026-10-28, WB-012.)
+   *
+   * The error is rethrown rather than swallowed so ConfirmDialog can show it
+   * on the dialog: the previous `catch { }` meant a failed removal and a
+   * successful one looked identical from the outside — no toast, no change —
+   * and the only way to tell was to reload the page.
+   */
   const removeDomain = async () => {
     setDomainSaving(true);
     try {
@@ -368,8 +394,9 @@ export default function SettingsPage() {
       setDomainInput('');
       setDomainStatus({ customDomain: null, domainVerified: false });
       toast({ title: 'Custom domain removed' });
-    } catch { /* ignore */ }
-    setDomainSaving(false);
+    } finally {
+      setDomainSaving(false);
+    }
   };
 
   const provisionSsl = async () => {
@@ -825,28 +852,36 @@ export default function SettingsPage() {
       {tab === 'domain' && (
         <div className="space-y-5 max-w-2xl">
 
-          {/* Status banner */}
-          {domainStatus?.customDomain && (
+          {/* Status banner.
+              This said "✅ <domain> is live!" and "Guests can access your website
+              at this domain" the moment DNS resolved — while the SSL card
+              immediately below it could be reading "Not provisioned". Without a
+              certificate the domain does not load, so the banner was both wrong
+              and contradicted by the next card down. (WB-008) */}
+          {dom.configured && (
             <div className={`flex items-center gap-3 rounded-xl border px-5 py-3 ${
-              domainStatus.domainVerified
-                ? 'border-green-200 bg-green-50'
-                : 'border-yellow-200 bg-yellow-50'
+              dom.live ? 'border-green-200 bg-green-50' : 'border-yellow-200 bg-yellow-50'
             }`}>
-              {domainStatus.domainVerified
+              {dom.live
                 ? <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
                 : <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0" />}
               <div className="flex-1">
-                <p className="text-sm font-semibold" style={{ color: domainStatus.domainVerified ? '#16a34a' : '#92400e' }}>
-                  {domainStatus.domainVerified ? `✅ ${domainStatus.customDomain} is live!` : `⏳ ${domainStatus.customDomain} — awaiting DNS`}
+                <p className="text-sm font-semibold" style={{ color: dom.live ? '#16a34a' : '#92400e' }}>
+                  {dom.live
+                    ? `${domainStatus?.customDomain} is live`
+                    : `${domainStatus?.customDomain} is not serving your site yet`}
                 </p>
-                <p className="text-xs mt-0.5" style={{ color: domainStatus.domainVerified ? '#15803d' : '#78350f' }}>
-                  {domainStatus.domainVerified
-                    ? 'Guests can access your website at this domain'
-                    : 'Configure DNS below, then click Verify Domain'}
+                <p className="text-xs mt-0.5" style={{ color: dom.live ? '#15803d' : '#78350f' }}>
+                  {dom.live
+                    ? 'Guests can reach your website at this domain over https.'
+                    : `DNS: ${dom.dns.label} · HTTPS: ${dom.https.label}`}
                 </p>
+                {!dom.live && dom.nextStep && (
+                  <p className="text-xs mt-1" style={{ color: '#78350f' }}>{dom.nextStep}</p>
+                )}
               </div>
-              {domainStatus.domainVerified && (
-                <a href={`https://${domainStatus.customDomain}`} target="_blank" rel="noopener noreferrer"
+              {dom.canOpen && (
+                <a href={`https://${domainStatus?.customDomain}`} target="_blank" rel="noopener noreferrer"
                   className="flex items-center gap-1 text-xs font-medium text-green-700 hover:underline">
                   Visit <ExternalLink className="h-3 w-3" />
                 </a>
@@ -882,14 +917,34 @@ export default function SettingsPage() {
                     Save
                   </Button>
                   {domainStatus?.customDomain && (
-                    <button onClick={removeDomain}
-                      className="px-3 rounded-lg border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                    <button onClick={() => setConfirmRemoveDomain(true)}
+                      disabled={domainSaving}
+                      aria-label={`Remove custom domain ${domainStatus.customDomain}`}
+                      className="px-3 rounded-lg border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-50"
                       title="Remove domain">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   )}
                 </div>
                 <p className="text-xs text-gray-400 mt-1.5">Enter without https:// — e.g. <code>www.sunsetresort.com</code></p>
+
+                <ConfirmDialog
+                  open={confirmRemoveDomain}
+                  onClose={() => setConfirmRemoveDomain(false)}
+                  onConfirm={removeDomain}
+                  variant="resort"
+                  tone="danger"
+                  title="Remove this domain?"
+                  description={
+                    <>
+                      <strong>{domainStatus?.customDomain}</strong> will stop
+                      leading to your website, and its SSL certificate status is
+                      cleared. Visitors who have it bookmarked will not reach
+                      you. Your free <code>resortpro</code> address keeps working.
+                    </>
+                  }
+                  confirmLabel="Remove domain"
+                />
               </div>
 
               {/* Verify button */}

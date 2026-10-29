@@ -5,7 +5,7 @@ import { ConfigThemeRenderer } from '@/components/themes/config-renderer';
 import { TemplateThemeRenderer } from '@/components/themes/template-renderer';
 import { compileTemplate } from '@/components/themes/template-renderer/compile';
 import { PreviewPage } from './PreviewPage';
-import { getSiteData, resolvePreviewConfig } from './site-data';
+import { getSiteData, resolvePreviewTheme, type PreviewTemplate } from './site-data';
 import type { ResortData } from '@/components/themes/types';
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
@@ -34,6 +34,21 @@ function previewFallback(tenantName: string): ResortData['website'] {
   };
 }
 
+/**
+ * Handlebars-compile a Tier 2 theme against real data, HTML and CSS together.
+ *
+ * The CSS needs the same pass as the HTML because it can reference the same
+ * tokens (`background: {{website.primaryColor}}`) and a raw `{{ }}` left in is
+ * invalid CSS. Both the live site and the preview compile here, so a previewed
+ * Tier 2 theme cannot drift from the published one.
+ */
+function compileTier2(template: PreviewTemplate, data: ResortData): PreviewTemplate {
+  return {
+    html: compileTemplate(template.html, data),
+    css:  template.css ? compileTemplate(template.css, data) : null,
+  };
+}
+
 export default async function ResortWebsitePage({
   params,
   searchParams,
@@ -57,38 +72,38 @@ export default async function ResortWebsitePage({
   const themeKey = searchParams?.preview || websiteData.templateId;
 
   // Config-driven theme (uploaded or AI-generated) takes priority over hardcoded.
-  // In preview mode the config has to come from the *previewed* theme, not the
+  // In preview mode the theme has to come from the *previewed* key, not the
   // saved one — looking it up is what WB-004 was missing; see
-  // resolvePreviewConfig for what the owner saw instead.
-  const configJson     = isPreview
-    ? await resolvePreviewConfig(themeKey, data)
-    : data.themeConfig;
+  // resolvePreviewTheme for what the owner saw instead.
+  const previewTheme   = isPreview ? await resolvePreviewTheme(themeKey, data) : null;
+  const configJson     = isPreview ? previewTheme?.config ?? null : data.themeConfig;
   const ThemeComponent = getTheme(themeKey);
   const resolvedData: ResortData = { ...data, website: websiteData };
 
-  // Preview mode → client component for live postMessage updates
-  // (Tier 2 live-editing preview is not wired up yet — a TEMPLATE key still
-  // falls back here, and /theme-preview/[key] covers static preview for those
-  // in the meantime)
+  // Preview mode → client component for live postMessage updates.
+  //
+  // A Tier 2 template is compiled here rather than in the client component:
+  // Handlebars is a server dependency, and compiling before the response means
+  // the owner's first paint is the real theme instead of a flash of fallback.
+  // The cost is that the compiled HTML carries saved content, so text the
+  // owner is still typing does not appear inside it — the banner says so.
   if (isPreview) {
     return (
       <PreviewPage
         initialData={resolvedData}
         themeKey={themeKey ?? 'luxe'}
         configJson={configJson}
+        template={previewTheme?.template ? compileTier2(previewTheme.template, resolvedData) : null}
       />
     );
   }
 
-  // Tier 2 template theme — Handlebars-compile server-side (real data baked
-  // into the HTML string here, so SSR output has real content for SEO), then
-  // hand off to the client renderer for widget hydration + section hide/reorder.
+  // Tier 2 template theme — compiled server-side so the SSR output carries real
+  // content for SEO, then handed to the client renderer for widget hydration
+  // and section hide/reorder.
   if (data.themeType === 'TEMPLATE' && data.templateHtml) {
-    const compiledHtml = compileTemplate(data.templateHtml, resolvedData);
-    // CSS can reference the same tokens as HTML (e.g. `background: {{website.primaryColor}}`)
-    // so it needs the same Handlebars pass — raw `{{ }}` left in is invalid CSS.
-    const compiledCss = data.templateCss ? compileTemplate(data.templateCss, resolvedData) : null;
-    return <TemplateThemeRenderer html={compiledHtml} css={compiledCss} data={resolvedData} />;
+    const compiled = compileTier2({ html: data.templateHtml, css: data.templateCss ?? null }, resolvedData);
+    return <TemplateThemeRenderer html={compiled.html} css={compiled.css} data={resolvedData} />;
   }
 
   return (

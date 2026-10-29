@@ -466,6 +466,9 @@ export const tenantApi = {
   // Custom domain
   setDomain: (domain: string | null) => api.put('/tenant/domain', { domain }),
   verifyDomain: () => api.post('/tenant/domain/verify', {}),
+  // DNS *and* certificate state. GET /tenant omits every ssl field, so the
+  // builder cannot tell DNS from HTTPS without this one.
+  getDomainStatus: () => api.get('/tenant/domain/status'),
   // SMS & WhatsApp
   getSmsSettings: () => api.get('/tenant/sms-settings'),
   updateSmsSettings: (data: unknown) => api.patch('/tenant/sms-settings', data),
