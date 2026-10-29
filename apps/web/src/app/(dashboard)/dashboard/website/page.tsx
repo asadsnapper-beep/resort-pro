@@ -590,6 +590,7 @@ export default function WebsitePage() {
                       <img src={url} alt={`Gallery ${i + 1}`} className="h-full w-full object-cover" />
                       <button
                         onClick={() => set('galleryImages', (form.galleryImages ?? []).filter((_, idx) => idx !== i))}
+                        aria-label={`Remove gallery photo ${i + 1}`}
                         className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100"
                         style={{ background: 'rgba(24,49,83,0.7)', color: 'var(--rp-btn-accent-text)' }}>
                         <Trash2 className="h-3 w-3" />
@@ -651,6 +652,7 @@ export default function WebsitePage() {
                         <div className="flex items-center justify-between">
                           <span className="text-[12.5px] font-medium text-[#64748b] dark:text-[#a9c1d0]">Testimonial #{i + 1}</span>
                           <button onClick={() => removeTestimonial(i)}
+                            aria-label={t.name ? `Remove testimonial from ${t.name}` : `Remove testimonial ${i + 1}`}
                             className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#fef2f2] text-[#94a3b8] dark:text-[#7f99ab]">
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -801,12 +803,12 @@ export default function WebsitePage() {
                           {/* Reorder arrows */}
                           <div className="flex flex-col">
                             <button type="button" onClick={() => move(sec.id, -1)} disabled={idx === 0}
-                              title="Move up"
+                              title="Move up" aria-label={`Move ${sec.label} up`}
                               className="flex h-5 w-6 items-center justify-center rounded-[5px] transition-colors disabled:opacity-25 enabled:hover:bg-black/[0.06]">
                               <ChevronUp className="h-3.5 w-3.5" style={{ color: 'var(--rp-text)' }} />
                             </button>
                             <button type="button" onClick={() => move(sec.id, 1)} disabled={idx === order.length - 1}
-                              title="Move down"
+                              title="Move down" aria-label={`Move ${sec.label} down`}
                               className="flex h-5 w-6 items-center justify-center rounded-[5px] transition-colors disabled:opacity-25 enabled:hover:bg-black/[0.06]">
                               <ChevronDown className="h-3.5 w-3.5" style={{ color: 'var(--rp-text)' }} />
                             </button>
@@ -824,6 +826,9 @@ export default function WebsitePage() {
                             </span>
                           ) : (
                             <button type="button" onClick={e => { e.stopPropagation(); toggle(); }}
+                              role="switch"
+                              aria-checked={!isHidden}
+                              aria-label={`Show ${sec.label} on your website`}
                               className="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors"
                               style={{ background: isHidden ? '#d6d0c8' : '#183153' }}>
                               <span className="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
