@@ -16,6 +16,7 @@ import { canonicalSectionOrder, themeSections, supportsSection } from '@/compone
 import { CustomDesignModal, CustomDesignCta } from '@/components/dashboard/website/CustomDesignModal';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 import { ModalShell } from '@/components/ui/modal-shell';
+import { ConfirmDialog, EmptyState, ActionButton } from '@/components/patterns';
 import {
   PREVIEW_READY,
   PREVIEW_UPDATE,
@@ -147,7 +148,8 @@ export default function WebsitePage() {
     tripadvisorUrl: '', hiddenSections: [], sectionOrder: [], googleAnalyticsId: '',
   });
 
-  const { data, isLoading } = useQuery({ queryKey: ['website'], queryFn: () => websiteApi.get() });
+  const { data, isLoading, isError, isFetching, refetch } =
+    useQuery({ queryKey: ['website'], queryFn: () => websiteApi.get() });
 
   useEffect(() => {
     const content = data?.data?.data;
@@ -269,7 +271,14 @@ export default function WebsitePage() {
     cnameTarget?: string;
   } | null>(null);
 
-  const { data: tenantData } = useQuery({ queryKey: ['tenant-domain'], queryFn: () => tenantApi.get() });
+  const [confirmRemoveDomain, setConfirmRemoveDomain] = useState(false);
+
+  const {
+    data: tenantData,
+    isError: tenantFailed,
+    isFetching: tenantFetching,
+    refetch: refetchTenant,
+  } = useQuery({ queryKey: ['tenant-domain'], queryFn: () => tenantApi.get() });
 
   useEffect(() => {
     const t = tenantData?.data?.data;
@@ -315,6 +324,38 @@ export default function WebsitePage() {
       <div className="space-y-5">
         <div className="h-7 w-48 rounded-[8px] animate-pulse" style={{ background: 'var(--rp-surface-4)' }} />
         <div className="h-64 rounded-[14px] animate-pulse" style={{ background: 'var(--rp-surface-4)' }} />
+      </div>
+    );
+  }
+
+  // A failed load used to render the whole builder with every field at its
+  // blank default — the owner's reasonable reading of that is "my website
+  // content is gone". It was also a dead end: `savedSnapshot` stays null when
+  // the effect never runs, so `dirty` stays false and Save stayed disabled,
+  // insisting "No changes to publish" however much they retyped. Nothing could
+  // be overwritten from there, but nothing said why either.
+  if (isError) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8" role="alert">
+        <EmptyState
+          icon={AlertTriangle}
+          title="Could not load your website content"
+          description={
+            <>
+              Nothing has been lost and your published website is still serving visitors — this
+              page could not reach the server. Check your connection and try again.
+            </>
+          }
+          action={
+            <ActionButton
+              icon={<RefreshCw className={`h-4 w-4${isFetching ? ' animate-spin' : ''}`} />}
+              onClick={() => refetch()}
+              disabled={isFetching}
+            >
+              {isFetching ? 'Retrying…' : 'Try again'}
+            </ActionButton>
+          }
+        />
       </div>
     );
   }
@@ -912,6 +953,29 @@ export default function WebsitePage() {
                     ) instead of the resortpro.site subdomain.
                   </p>
 
+                  {/* Tokens, not the raw hex the rest of this card still uses —
+                      new markup may not add to that debt, and the ratchet
+                      enforces it. */}
+                  {tenantFailed && !domainInfo && (
+                    <div role="alert" className="flex items-start gap-2.5 rounded-rp-panel border border-rp-border-md bg-rp-amber-bg p-3">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rp-gold" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-rp-body font-semibold text-rp-text">
+                          Could not check your domain settings
+                        </p>
+                        <p className="text-rp-label text-rp-muted">
+                          The box below is empty because this page could not reach the server, not
+                          because you have no domain. Any domain you already connected is still live.
+                        </p>
+                        <button onClick={() => refetchTenant()} disabled={tenantFetching}
+                          className="mt-1.5 inline-flex items-center gap-1.5 text-rp-label font-semibold text-rp-gold hover:underline disabled:opacity-60">
+                          <RefreshCw className={`h-3 w-3${tenantFetching ? ' animate-spin' : ''}`} />
+                          {tenantFetching ? 'Checking…' : 'Try again'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {domainInfo?.customDomain && (
                     <div className="flex items-center gap-3 rounded-[10px] border p-3"
                       style={domainInfo.domainVerified
@@ -963,11 +1027,38 @@ export default function WebsitePage() {
                   )}
 
                   {domainInfo?.customDomain && (
-                    <button onClick={() => { setDomainInput(''); setDomainMut.mutate(null); }}
-                      className="text-[12px] hover:underline" style={{ color: 'var(--rp-danger)' }}>
+                    <button onClick={() => setConfirmRemoveDomain(true)}
+                      disabled={setDomainMut.isPending}
+                      aria-label={`Remove custom domain ${domainInfo.customDomain}`}
+                      className="text-[12px] hover:underline disabled:opacity-60" style={{ color: 'var(--rp-danger)' }}>
                       Remove custom domain
                     </button>
                   )}
+
+                  {/* The sibling of this button in Settings already confirmed; this
+                      one did not, and it is the more likely of the two to be
+                      pressed — the domain lives on this page. One click took the
+                      address off the card, SSL and all. */}
+                  <ConfirmDialog
+                    open={confirmRemoveDomain}
+                    onClose={() => setConfirmRemoveDomain(false)}
+                    variant="resort"
+                    tone="danger"
+                    title="Remove this domain?"
+                    confirmLabel="Remove domain"
+                    description={
+                      <>
+                        <strong className="font-mono">{domainInfo?.customDomain}</strong> will stop
+                        serving your website, and visitors who have it bookmarked will see an error.
+                        Your free <strong>{tenant?.slug}.resortpro.site</strong> address keeps working,
+                        and nothing you have written is deleted.
+                      </>
+                    }
+                    onConfirm={async () => {
+                      await setDomainMut.mutateAsync(null);
+                      setDomainInput('');
+                    }}
+                  />
                 </div>
 
                 {domainInfo?.customDomain && !domainInfo.domainVerified && (
