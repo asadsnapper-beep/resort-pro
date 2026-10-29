@@ -309,6 +309,13 @@ export default function SettingsPage() {
     daysUntilExpiry: number | null;
   } | null>(null);
   const [sslProvisioning, setSslProvisioning] = useState(false);
+  // Result of a real TLS handshake against the domain — not a stored column.
+  // Only this may be used to tell an owner their site is live.
+  const [httpsState, setHttpsState] = useState<{
+    live: boolean;
+    reachable: boolean;
+    error: string | null;
+  } | null>(null);
 
   // DNS and HTTPS are separate; "live" needs both. The two halves arrive from
   // two different calls, so they are combined here. See lib/domain-status.
@@ -338,6 +345,7 @@ export default function SettingsPage() {
               sslError: d.sslError,
               daysUntilExpiry: d.daysUntilExpiry,
             });
+            setHttpsState(d.https ?? null);
           })
           .catch(() => {});
       }
@@ -1011,14 +1019,14 @@ export default function SettingsPage() {
               <CardContent className="p-6 space-y-5">
                 <h3 className="font-semibold text-gray-900">DNS Configuration</h3>
                 <p className="text-sm text-gray-500">
-                  Add one of the following records in your domain registrar (GoDaddy, Namecheap, Cloudflare, etc.):
+                  Add this record in your domain registrar (GoDaddy, Namecheap, Cloudflare, etc.):
                 </p>
 
                 {/* CNAME Option */}
                 <div className="rounded-xl border border-gray-200 overflow-hidden">
                   <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Option 1 — CNAME record (recommended)</p>
-                    <span className="text-xs bg-green-100 text-green-700 font-medium px-2 py-0.5 rounded-full">Recommended</span>
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">CNAME record</p>
+                    <span className="text-xs bg-green-100 text-green-700 font-medium px-2 py-0.5 rounded-full">Required</span>
                   </div>
                   <div className="p-4">
                     <table className="w-full text-sm">
