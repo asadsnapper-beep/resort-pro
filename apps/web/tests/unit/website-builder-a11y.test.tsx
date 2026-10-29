@@ -52,7 +52,7 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 vi.mock('@/lib/api', () => ({
   websiteApi: { get: vi.fn(), update: vi.fn() },
-  tenantApi:  { get: vi.fn(), setDomain: vi.fn(), verifyDomain: vi.fn() },
+  tenantApi:  { get: vi.fn(), getDomainStatus: vi.fn(), setDomain: vi.fn(), verifyDomain: vi.fn() },
 }));
 vi.mock('@/hooks/use-toast', () => ({ toast: () => {} }));
 vi.mock('@/store/auth', () => ({

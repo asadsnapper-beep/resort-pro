@@ -18,6 +18,7 @@ import { ImageUpload } from '@/components/ui/ImageUpload';
 import { ModalShell } from '@/components/ui/modal-shell';
 import { ConfirmDialog, EmptyState, ActionButton } from '@/components/patterns';
 import { websiteCapabilities } from '@/lib/website-capabilities';
+import { domainState } from '@/lib/domain-status';
 import {
   PREVIEW_READY,
   PREVIEW_UPDATE,
@@ -121,6 +122,25 @@ function SaveBtn({ loading, dirty, onClick }: { loading: boolean; dirty?: boolea
         {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
         {loading ? 'Publishing…' : 'Save & Publish'}
       </button>
+    </div>
+  );
+}
+
+/** One line of the domain card: a name, a state, and whether it is done. */
+function DomainCheck({ name, label, done, failed }: {
+  name: string; label: string; done: boolean; failed?: boolean;
+}) {
+  const Icon = done ? CheckCircle2 : failed ? AlertTriangle : Loader2;
+  const tone = done ? 'text-rp-brand' : failed ? 'text-rp-danger' : 'text-rp-gold';
+  // The icon is the at-a-glance signal and is aria-hidden, so the row carries
+  // the same state where a test can see it. A tick beside "not issued yet"
+  // is precisely the contradiction this card exists to remove.
+  const state = done ? 'done' : failed ? 'failed' : 'pending';
+  return (
+    <div className="flex items-center gap-2" data-state={state}>
+      <Icon className={`h-4 w-4 shrink-0 ${tone}`} aria-hidden="true" />
+      <span className="w-14 shrink-0 text-rp-label font-semibold text-rp-text">{name}</span>
+      <span className="text-rp-label text-rp-muted">{label}</span>
     </div>
   );
 }
@@ -273,9 +293,14 @@ export default function WebsitePage() {
     domainVerified: boolean;
     domainVerifiedAt: string | null;
     cnameTarget?: string;
+    sslStatus?: string | null;
+    sslError?: string | null;
   } | null>(null);
 
   const [confirmRemoveDomain, setConfirmRemoveDomain] = useState(false);
+
+  // DNS and HTTPS are separate states; "live" needs both. See lib/domain-status.
+  const dom = domainState(domainInfo);
 
   const {
     data: tenantData,
@@ -284,7 +309,7 @@ export default function WebsitePage() {
     refetch: refetchTenant,
   } = useQuery({
     queryKey: ['tenant-domain'],
-    queryFn: () => tenantApi.get(),
+    queryFn: () => tenantApi.getDomainStatus(),
     // GET /tenant is OWNER/MANAGER. Asking anyway would 403 every time and
     // light up the failure notice for a role that is simply not entitled.
     enabled: caps.viewDomain,
@@ -297,7 +322,9 @@ export default function WebsitePage() {
         customDomain:     t.customDomain    ?? null,
         domainVerified:   t.domainVerified  ?? false,
         domainVerifiedAt: t.domainVerifiedAt ?? null,
-        cnameTarget: t.slug ? `${t.slug}.resortpro.site` : undefined,
+        cnameTarget: t.cnameTarget ?? (t.slug ? `${t.slug}.resortpro.site` : undefined),
+        sslStatus:        t.sslStatus ?? null,
+        sslError:         t.sslError  ?? null,
       });
       if (t.customDomain) setDomainInput(t.customDomain);
     }
@@ -993,25 +1020,35 @@ export default function WebsitePage() {
                     </div>
                   )}
 
-                  {domainInfo?.customDomain && (
-                    <div className="flex items-center gap-3 rounded-[10px] border p-3"
-                      style={domainInfo.domainVerified
-                        ? { background: 'var(--rp-teal-bg)', borderColor: 'var(--rp-border)' }
-                        : { background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.25)' }}>
-                      {domainInfo.domainVerified
-                        ? <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: 'var(--rp-text)' }} />
-                        : <AlertTriangle className="h-5 w-5 shrink-0" style={{ color: 'var(--rp-gold)' }} />}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold font-mono truncate text-[#183153] dark:text-[#f8fafc]">{domainInfo.customDomain}</p>
-                        <p className="text-[11.5px]" style={{ color: domainInfo.domainVerified ? '#183153' : '#b89040' }}>
-                          {domainInfo.domainVerified ? 'Verified & live' : 'Pending DNS verification'}
+                  {/* DNS and HTTPS, separately. "Verified & live" used to appear
+                      the moment DNS resolved, next to an https:// link that
+                      cannot load without a certificate — the owner was told the
+                      domain was live and then watched it fail. (WB-008) */}
+                  {dom.configured && (
+                    <div className="space-y-2 rounded-rp-panel border border-rp-border-md bg-rp-surface-3 p-3">
+                      <div className="flex items-center gap-2">
+                        <p className="min-w-0 flex-1 truncate font-mono text-rp-body font-semibold text-rp-text">
+                          {domainInfo?.customDomain}
                         </p>
+                        {dom.canOpen && (
+                          <a href={`https://${domainInfo?.customDomain}`} target="_blank" rel="noopener noreferrer"
+                            aria-label={`Open ${domainInfo?.customDomain} in a new tab`}
+                            className="text-rp-text">
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        )}
                       </div>
-                      {domainInfo.domainVerified && (
-                        <a href={`https://${domainInfo.customDomain}`} target="_blank" rel="noopener noreferrer"
-                          style={{ color: 'var(--rp-text)' }}>
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
+
+                      <DomainCheck done={dom.dns.done} name="DNS" label={dom.dns.label} />
+                      <DomainCheck
+                        done={dom.https.state === 'active'}
+                        failed={dom.https.state === 'failed'}
+                        name="HTTPS"
+                        label={dom.https.label}
+                      />
+
+                      {dom.nextStep && (
+                        <p className="pt-1 text-rp-label text-rp-muted">{dom.nextStep}</p>
                       )}
                     </div>
                   )}

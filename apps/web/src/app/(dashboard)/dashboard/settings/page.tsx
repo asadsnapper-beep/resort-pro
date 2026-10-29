@@ -15,6 +15,7 @@ import {
   CreditCard, Eye, EyeOff, ChevronDown, ChevronRight, Bell, LayoutGrid, Link2,
 } from 'lucide-react'
 import { PageShell, PageHeader, ConfirmDialog } from '@/components/patterns';
+import { domainState } from '@/lib/domain-status';
 import { ModalShell } from '@/components/ui/modal-shell';
 import { ConnectedResortsTab } from '@/components/dashboard/ConnectedResortsTab';
 import { paymentGatewayApi } from '@/lib/api';
@@ -308,6 +309,15 @@ export default function SettingsPage() {
     daysUntilExpiry: number | null;
   } | null>(null);
   const [sslProvisioning, setSslProvisioning] = useState(false);
+
+  // DNS and HTTPS are separate; "live" needs both. The two halves arrive from
+  // two different calls, so they are combined here. See lib/domain-status.
+  const dom = domainState(domainStatus && {
+    customDomain:   domainStatus.customDomain,
+    domainVerified: domainStatus.domainVerified,
+    sslStatus:      sslStatus?.sslStatus ?? null,
+    sslError:       sslStatus?.sslError ?? null,
+  });
 
   useEffect(() => {
     if (tenantData?.customDomain !== undefined) {
@@ -842,28 +852,36 @@ export default function SettingsPage() {
       {tab === 'domain' && (
         <div className="space-y-5 max-w-2xl">
 
-          {/* Status banner */}
-          {domainStatus?.customDomain && (
+          {/* Status banner.
+              This said "✅ <domain> is live!" and "Guests can access your website
+              at this domain" the moment DNS resolved — while the SSL card
+              immediately below it could be reading "Not provisioned". Without a
+              certificate the domain does not load, so the banner was both wrong
+              and contradicted by the next card down. (WB-008) */}
+          {dom.configured && (
             <div className={`flex items-center gap-3 rounded-xl border px-5 py-3 ${
-              domainStatus.domainVerified
-                ? 'border-green-200 bg-green-50'
-                : 'border-yellow-200 bg-yellow-50'
+              dom.live ? 'border-green-200 bg-green-50' : 'border-yellow-200 bg-yellow-50'
             }`}>
-              {domainStatus.domainVerified
+              {dom.live
                 ? <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
                 : <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0" />}
               <div className="flex-1">
-                <p className="text-sm font-semibold" style={{ color: domainStatus.domainVerified ? '#16a34a' : '#92400e' }}>
-                  {domainStatus.domainVerified ? `✅ ${domainStatus.customDomain} is live!` : `⏳ ${domainStatus.customDomain} — awaiting DNS`}
+                <p className="text-sm font-semibold" style={{ color: dom.live ? '#16a34a' : '#92400e' }}>
+                  {dom.live
+                    ? `${domainStatus?.customDomain} is live`
+                    : `${domainStatus?.customDomain} is not serving your site yet`}
                 </p>
-                <p className="text-xs mt-0.5" style={{ color: domainStatus.domainVerified ? '#15803d' : '#78350f' }}>
-                  {domainStatus.domainVerified
-                    ? 'Guests can access your website at this domain'
-                    : 'Configure DNS below, then click Verify Domain'}
+                <p className="text-xs mt-0.5" style={{ color: dom.live ? '#15803d' : '#78350f' }}>
+                  {dom.live
+                    ? 'Guests can reach your website at this domain over https.'
+                    : `DNS: ${dom.dns.label} · HTTPS: ${dom.https.label}`}
                 </p>
+                {!dom.live && dom.nextStep && (
+                  <p className="text-xs mt-1" style={{ color: '#78350f' }}>{dom.nextStep}</p>
+                )}
               </div>
-              {domainStatus.domainVerified && (
-                <a href={`https://${domainStatus.customDomain}`} target="_blank" rel="noopener noreferrer"
+              {dom.canOpen && (
+                <a href={`https://${domainStatus?.customDomain}`} target="_blank" rel="noopener noreferrer"
                   className="flex items-center gap-1 text-xs font-medium text-green-700 hover:underline">
                   Visit <ExternalLink className="h-3 w-3" />
                 </a>
