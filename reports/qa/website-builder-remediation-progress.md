@@ -575,6 +575,126 @@ thing that found that; the suite looked complete without it.
 
 ---
 
+### WB-012, second item — a failed load says so, instead of showing an empty builder
+
+`useQuery` was destructured as `{ data, isLoading }` only. On a failure the
+page therefore fell straight through to the full Website Builder with every
+field at its blank default. The honest reading of that screen is *my website
+content is gone* — the hero title, the about text, the gallery, all empty, for
+a resort whose site is still serving visitors normally.
+
+It was also a dead end, in a way worth spelling out because it reads as a
+second bug:
+
+```
+dirty = savedSnapshot !== null && JSON.stringify(form) !== savedSnapshot
+```
+
+The effect that fills the form never ran, so `savedSnapshot` stayed `null`, so
+`dirty` stayed `false` whatever the owner typed. Save is `disabled={!dirty}`
+with the title *"No changes to publish"*. An owner retyping their hero title
+into the blank form would have been told there was nothing to publish.
+
+That accident is the only reason a failed load could not overwrite a live site
+with blanks. The guard was real but nobody chose it.
+
+**Now:** a full-page state from `EmptyState` + `ActionButton`, `role="alert"`,
+with a retry — placed *after* the `isLoading` branch so a first load still in
+flight is not accused of failing.
+
+What it does and does not cover is worth being exact about. A **401 with a
+token** never reaches it: `api.ts` intercepts, tries `/api/auth/refresh`, and
+on failure clears auth and sends the browser to `/auth/login`. A **403 with
+`upgradeRequired`** redirects to the upgrade page. This state is for the rest —
+network failure, 500, timeout.
+
+The tenant query had the same silence in a smaller place: when it failed, the
+domain field was simply blank, which cannot be told apart from owning no
+domain. It now carries its own inline notice and retry, shown only while
+nothing is known (`tenantFailed && !domainInfo`), so a *later* refetch failure
+does not contradict the domain visible on screen.
+
+**Also found here:** the builder has its own *Remove custom domain* button,
+separate from the one in Settings fixed in `867e3d4`. That one still removed on
+a single click. It is the likelier of the two to be pressed, because the domain
+lives on this page. The earlier entry in this report said that item was closed;
+it was closed on one of the two pages. It now asks through `ConfirmDialog`,
+names the domain, and says the free `resortpro` address keeps working.
+
+The notice is written with design tokens rather than the raw hex the rest of
+that card uses. Writing it in the surrounding idiom first raised four ratchet
+categories (+4 hex, +3 inline style, +3 arbitrary font size, +1 radius) — the
+exact debt the rule exists to stop. Rewritten with tokens, the baseline is
+untouched, and dark mode then worked with no `dark:` variant written: measured
+in the browser as `rgba(255,255,255,0.07)` for the panel and `#f8fafc` for the
+title, which are the dark values of `rp-surface` and `rp-text`.
+
+No dashboard page handled `isError` before this one. The same gap exists on the
+other 47 pages; that is recorded here, not silently fixed.
+
+Ten mutations, each applied alone: **10/10 killed**.
+
+### WB-012, fourth item — the builder's icon-only controls say what they are
+
+Four kinds of control had no accessible name at all, so a screen reader
+announced each as "button" and nothing more.
+
+| Control | Before | Now |
+|---|---|---|
+| Section show/hide | `<button>` whose only child is a styled `<span>` — no name, no state, twelve identical | `role="switch"`, `aria-checked`, named after the section |
+| Gallery photo remove | up to 20, all nameless, all destructive | `Remove gallery photo 3` |
+| Testimonial remove | nameless | `Remove testimonial from Rahim Uddin`, falling back to the position while a new one is blank |
+| Reorder arrows | `title="Move up"` ×12 | `Move Photo Gallery up` |
+| `ImageUpload` clear | nameless, and shared well beyond this page | `Remove Hero Background Image` |
+
+A fixed section still gets no switch — a control that cannot move would promise
+a choice that is not there.
+
+`ImageUpload`'s `label` prop defaults to `"Upload image"`, so the obvious
+template read *"Remove Upload image"*. Stripping the leading verb gives "Remove
+image" there and the field's own name where a caller passed one.
+
+Twelve mutations were run; **two survived**, and both were weak tests rather
+than weak code:
+
+- Replacing the gallery index (`idx !== i` → `idx !== 0`) survived, because the
+  test clicked photo **1** — where a hardcoded `0` gives the same answer. It now
+  clicks photo 2 and checks photo 1 is the survivor. A label that does not match
+  what the button does is worse than no label, so that assertion is the point of
+  the test.
+- Reverting the `ImageUpload` naming survived, because the only unlabelled
+  uploader on this page is the gallery *adder*, which has no value and so renders
+  no clear button at all. The default-label branch is unreachable from the page.
+  It now has its own file against the component, which is where a shared
+  component's behaviour belongs.
+
+After fixing both and adding three more: **15/15 killed**.
+
+### Checked in a real browser, not only in jsdom
+
+Accessibility is read from the real accessibility tree, so jsdom alone was not
+enough. Against a throwaway database, signed in as a seeded owner:
+
+| Check | Result |
+|---|---|
+| Section switches | 10 switches, each uniquely named; `Show Photo Gallery` correctly `aria-checked="false"` (it was the seeded hidden section) |
+| Reorder arrows | 24 labels, all distinct |
+| Gallery removes | `Remove gallery photo 1 / 2 / 3` |
+| Testimonial removes | `Remove testimonial from Rahim Uddin`, `Remove testimonial 2` |
+| Image clears | `Remove Hero Background Image`, `Remove About Section Image` |
+| Nameless icon buttons left on the page | **1** — the dashboard shell's dark-mode toggle, outside this page and outside WB-012 |
+| Domain removal | dialog opens, names `www.palmparadise.com`, says the free address keeps working; Cancel removes nothing |
+| API stopped, page reloaded | error state renders; `role="alert"` present; **0** input fields and **no** Save button, so the blank-builder dead end is gone |
+| API restarted, *Try again* pressed | page recovered with no reload — builder back, Save button back |
+| Dark mode | panel `rgba(255,255,255,0.07)`, title `#f8fafc` — the `rp-surface` / `rp-text` dark values, with no `dark:` variant written |
+
+**Not verified in a browser:** the tenant-query notice. Making `/api/tenant`
+fail while `/api/website` succeeds needs two independent backends, and faking it
+in the page would only have tested the fake. It rests on unit tests and on two
+mutations (condition widened, retry pointed at the wrong query), both killed.
+
+---
+
 ## Verification run for the work above
 
 | Check | Result |
@@ -582,7 +702,7 @@ thing that found that; the suite looked complete without it.
 | API TypeScript | pass |
 | Web TypeScript | pass |
 | Full API suite | **1004/1004**, 87 files |
-| Full web unit suite | **246/246**, 26 files |
+| Full web unit suite | **352/352**, 34 files |
 | The four specs CI runs, both projects, four workers, retries off | **70 passed, 2 skipped** |
 | `website-builder.spec.ts` on both projects | 12 passed, 2 skipped — the preview pane is `hidden lg:flex`, so the two preview tests do not apply on the phone project |
 | Design-system ratchet | no regressions; no baseline moved |
@@ -613,7 +733,7 @@ published, and no email, payment, DNS or SSL action was taken.
 | WB-004 | live typing inside a Tier 2 template | needs Handlebars in the browser (~80KB on the preview path). Everything else about preview is closed; this is the only thing that bundle buys |
 | WB-007 | Roles see actions they cannot use | needs capability flags from the API, then the UI |
 | WB-008 | "Verified & live" from DNS alone | needs an HTTPS check and the production SSL path documented; part of it is infrastructure, not code |
-| WB-012 | Error states and accessibility | two of four items done (domain removal, catalogue outage). Remaining: a full-page retry state for a failed website/tenant query, and switch semantics on the section toggles |
+| WB-012 | Error states and accessibility | **closed.** All four items done. One thing found and not fixed: the dashboard shell's dark-mode toggle has no accessible name — outside this page, worth its own small change |
 | — | Draft, publish and rollback | item 8 of the spec: a versioning model with migrations. A feature in its own right, not a gate that can be slipped in |
 
 Phase 1 and Phase 2 of the brief — multi-page sites, media library, SEO suite,
@@ -626,7 +746,7 @@ product of its own and none should start before the P0 list is closed.
 
 **NO-GO**, unchanged from the audit.
 
-What changed is that six of its eight gates are closed with tests that fail
+What changed is that seven of its eight gates are closed with tests that fail
 when the behaviour comes back, and the test suite can now carry the rest. The
 two that mattered most to a first day are among them: publishing and seeing
 nothing happen, and a preview that sometimes showed none of your edits.
@@ -637,7 +757,12 @@ closed is live *typing* inside a Tier 2 template, where the preview shows saved
 content and says so on the page. That is a narrower gap than the gate was, and
 it is stated to the owner rather than left to be discovered.
 
-What remains is WB-007, WB-008 and the last two items of WB-012. WB-007 and
-WB-012 are small. Part of WB-008 is infrastructure rather than code. Separately, UPLOADED and
-AI_GENERATED themes are still offered every section control in the builder
-rather than their own.
+WB-012 is now closed too — seven of eight gates. A failed load says so rather
+than showing an empty builder, and the builder's icon-only controls can be used
+without seeing them. One thing was found there and deliberately not fixed: the
+dashboard shell's dark-mode toggle has no accessible name. It is outside this
+page and outside this gate, so it is recorded rather than folded in.
+
+What remains is WB-007 and WB-008. WB-007 is small. Part of WB-008 is
+infrastructure rather than code. Separately, UPLOADED and AI_GENERATED themes
+are still offered every section control in the builder rather than their own.
