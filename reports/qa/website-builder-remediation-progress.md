@@ -695,6 +695,81 @@ mutations (condition widened, retry pointed at the wrong query), both killed.
 
 ---
 
+### WB-007 — the builder stops offering what the role cannot do
+
+The page never read the role at all. Everyone the sidebar let in saw every
+control, while the API refused several of them:
+
+| Builder capability | API gate |
+|---|---|
+| Read / save website content | `OWNER, MANAGER, MARKETER, DEVELOPER` |
+| See the Custom Domain tab (`GET /tenant`) | `OWNER, MANAGER` |
+| Connect / verify / remove a domain | `OWNER` **+ `requireFlag('custom_domain')`** |
+| Request a paid custom design | `OWNER, MANAGER` |
+
+So a Marketer was shown the Custom Domain tab and the paid-design request, and
+a Manager was shown a writable domain form — all of which answer 403 on use.
+
+`websiteCapabilities(role)` mirrors those `preHandler`s. The server stays the
+authority: hiding a control is not treated as a security boundary, it only
+stops offering work that cannot be done.
+
+- A **manager** keeps the domain tab, read-only, with a line saying why.
+  Fields that are dead and silent read as a broken page.
+- A **marketer** no longer fires `GET /tenant` at all (`enabled:
+  caps.viewDomain`). It would 403 every time and light up the failure notice
+  added in `d5cd2c3` for a role that is simply not entitled.
+- An **absent role** yields no capability rather than all of them. The auth
+  store is briefly empty on a cold load, and the other default would flash the
+  owner-only controls at every role.
+
+#### The plan flag is deliberately not mirrored — and why that is a finding
+
+Domain writes are gated twice: by role, and by `requireFlag('custom_domain')`.
+The flag half is **not** reproduced in the UI, because the two things that
+report flags do not agree:
+
+| | Source |
+|---|---|
+| `requireFlag` — the gate that actually runs | `resolveTenantEntitlement`: the **plan's** flag list, plus per-tenant overrides |
+| `GET /tenant/flags` — what a client could read | `TenantFeatureFlag` rows, plus `FLAG_REGISTRY` entries with `defaultOn` |
+
+`custom_domain` is `defaultOn: false`, and STARTER, PROFESSIONAL and
+ENTERPRISE all grant it through the plan. So a paying tenant with no override
+row is **allowed by the gate and absent from the endpoint**. Gating the UI on
+`/tenant/flags` would have hidden the domain form from the owners most
+entitled to use it.
+
+An owner without the entitlement still gets the designed path: 403
+`upgradeRequired`, and the axios interceptor routes them to the upgrade page.
+
+The two flag sources disagreeing is a real defect in its own right. It is
+recorded here rather than worked around.
+
+#### Tests and verification
+
+Two files, because a correct map is worth nothing if the page does not consult
+it — which was the whole of WB-007. One assertion in the first draft was
+vacuous: `/custom design/i` matches nothing on the page, so "a marketer is not
+offered a custom design" passed whether or not the call to action rendered. It
+now matches the CTA's own words, with an owner-side positive control so the
+three negative assertions cannot all pass by the thing never rendering.
+
+**13 mutations, each applied alone: 13/13 killed.**
+
+Then signed in as each role in a real browser, against a throwaway database:
+
+| Role | Tabs | `GET /tenant` | Domain form | Design CTA |
+|---|---|---|---|---|
+| MARKETER | 7, **no** Custom Domain | **never requested** | — | hidden |
+| MANAGER | 8 | requested | domain shown; input `disabled`+`readOnly`, Save disabled, Verify and Remove hidden, reason given | shown |
+| OWNER | 8 | requested | writable; Verify and Remove present; no explanation, because nothing is withheld |  shown |
+
+The marketer row was read off the network log: only `/api/tenant/announcements`
+(open to every role) was called. No doomed 403.
+
+---
+
 ## Verification run for the work above
 
 | Check | Result |
@@ -702,7 +777,7 @@ mutations (condition widened, retry pointed at the wrong query), both killed.
 | API TypeScript | pass |
 | Web TypeScript | pass |
 | Full API suite | **1004/1004**, 87 files |
-| Full web unit suite | **352/352**, 34 files |
+| Full web unit suite | **389/389**, 36 files |
 | The four specs CI runs, both projects, four workers, retries off | **70 passed, 2 skipped** |
 | `website-builder.spec.ts` on both projects | 12 passed, 2 skipped — the preview pane is `hidden lg:flex`, so the two preview tests do not apply on the phone project |
 | Design-system ratchet | no regressions; no baseline moved |
@@ -731,7 +806,7 @@ published, and no email, payment, DNS or SSL action was taken.
 | | Finding | Why it is not done |
 |---|---|---|
 | WB-004 | live typing inside a Tier 2 template | needs Handlebars in the browser (~80KB on the preview path). Everything else about preview is closed; this is the only thing that bundle buys |
-| WB-007 | Roles see actions they cannot use | needs capability flags from the API, then the UI |
+| WB-007 | Roles see actions they cannot use | **closed.** Derived from role, mirroring the API's own gates — no API change needed. One finding left open: `GET /tenant/flags` and `requireFlag` read different sources and disagree |
 | WB-008 | "Verified & live" from DNS alone | needs an HTTPS check and the production SSL path documented; part of it is infrastructure, not code |
 | WB-012 | Error states and accessibility | **closed.** All four items done. One thing found and not fixed: the dashboard shell's dark-mode toggle has no accessible name — outside this page, worth its own small change |
 | — | Draft, publish and rollback | item 8 of the spec: a versioning model with migrations. A feature in its own right, not a gate that can be slipped in |
@@ -746,8 +821,9 @@ product of its own and none should start before the P0 list is closed.
 
 **NO-GO**, unchanged from the audit.
 
-What changed is that seven of its eight gates are closed with tests that fail
-when the behaviour comes back, and the test suite can now carry the rest. The
+What changed is that **seven of its eight gates are closed** with tests that
+fail when the behaviour comes back, and the test suite can now carry the last
+one. The
 two that mattered most to a first day are among them: publishing and seeing
 nothing happen, and a preview that sometimes showed none of your edits.
 
@@ -757,12 +833,18 @@ closed is live *typing* inside a Tier 2 template, where the preview shows saved
 content and says so on the page. That is a narrower gap than the gate was, and
 it is stated to the owner rather than left to be discovered.
 
-WB-012 is now closed too — seven of eight gates. A failed load says so rather
-than showing an empty builder, and the builder's icon-only controls can be used
-without seeing them. One thing was found there and deliberately not fixed: the
-dashboard shell's dark-mode toggle has no accessible name. It is outside this
-page and outside this gate, so it is recorded rather than folded in.
+WB-012 and WB-007 are closed too. A failed load says so rather than showing an
+empty builder; the builder's icon-only controls can be used without seeing
+them; and the page no longer offers a role work the API will refuse.
 
-What remains is WB-007 and WB-008. WB-007 is small. Part of WB-008 is
-infrastructure rather than code. Separately, UPLOADED and AI_GENERATED themes
-are still offered every section control in the builder rather than their own.
+Two things were found along the way and deliberately not folded in, because
+neither belongs to the gate being closed:
+
+- the dashboard shell's dark-mode toggle has no accessible name;
+- `GET /tenant/flags` and the `requireFlag` gate read different sources, so a
+  paying tenant can be entitled to `custom_domain` and absent from the
+  endpoint that reports it.
+
+**What remains is WB-008 alone.** Part of it is infrastructure rather than
+code. Separately, UPLOADED and AI_GENERATED themes are still offered every
+section control in the builder rather than their own.
