@@ -17,6 +17,7 @@ import { CustomDesignModal, CustomDesignCta } from '@/components/dashboard/websi
 import { ImageUpload } from '@/components/ui/ImageUpload';
 import { ModalShell } from '@/components/ui/modal-shell';
 import { ConfirmDialog, EmptyState, ActionButton } from '@/components/patterns';
+import { websiteCapabilities } from '@/lib/website-capabilities';
 import {
   PREVIEW_READY,
   PREVIEW_UPDATE,
@@ -126,7 +127,10 @@ function SaveBtn({ loading, dirty, onClick }: { loading: boolean; dirty?: boolea
 
 export default function WebsitePage() {
   const queryClient = useQueryClient();
-  const { tenant } = useAuthStore();
+  const { tenant, user } = useAuthStore();
+  // Mirrors the API's own role gates; the server still refuses either way.
+  const caps = websiteCapabilities(user?.role);
+  const visibleTabs = TABS.filter(t => t.id !== 'domain' || caps.viewDomain);
   const [tab, setTab] = useState<Tab>('template');
   const [showPreview, setShowPreview] = useState(true);
   const [previewKey,  setPreviewKey]  = useState(0);
@@ -278,7 +282,13 @@ export default function WebsitePage() {
     isError: tenantFailed,
     isFetching: tenantFetching,
     refetch: refetchTenant,
-  } = useQuery({ queryKey: ['tenant-domain'], queryFn: () => tenantApi.get() });
+  } = useQuery({
+    queryKey: ['tenant-domain'],
+    queryFn: () => tenantApi.get(),
+    // GET /tenant is OWNER/MANAGER. Asking anyway would 403 every time and
+    // light up the failure notice for a role that is simply not entitled.
+    enabled: caps.viewDomain,
+  });
 
   useEffect(() => {
     const t = tenantData?.data?.data;
@@ -410,7 +420,7 @@ export default function WebsitePage() {
           {/* Tab bar — wraps so ALL tabs stay visible (no hidden horizontal scroll) */}
           <div className="flex flex-wrap gap-0 flex-shrink-0 px-3"
             style={{ borderBottom: '1px solid rgba(0,0,0,0.07)', background: 'var(--rp-surface-2)' }}>
-            {TABS.map(({ id, label, icon: Icon }) => (
+            {visibleTabs.map(({ id, label, icon: Icon }) => (
               <button key={id} onClick={() => setTab(id)}
                 className="flex items-center gap-1.5 px-3 py-2.5 text-[12px] font-medium border-b-2 -mb-px transition-colors whitespace-nowrap"
                 style={tab === id
@@ -499,7 +509,9 @@ export default function WebsitePage() {
                   onSelect={(key) => set('templateId', key)}
                 />
                 {/* Paid custom-design service — plan/theme-studio-and-design-service.md */}
-                <CustomDesignCta onClick={() => setDesignModalOpen(true)} />
+                {caps.requestCustomDesign && (
+                  <CustomDesignCta onClick={() => setDesignModalOpen(true)} />
+                )}
               </div>
             )}
 
@@ -1004,14 +1016,28 @@ export default function WebsitePage() {
                     </div>
                   )}
 
+                  {!caps.editDomain && (
+                    /* Said, not silently greyed. A manager who finds the fields
+                       dead and no reason given will assume the page is broken
+                       and ask someone to look at it. */
+                    <div className="flex items-start gap-2.5 rounded-rp-panel border border-rp-border-md bg-rp-surface-3 p-3">
+                      <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-rp-muted" />
+                      <p className="text-rp-label text-rp-muted">
+                        Only the resort owner can connect, verify or remove a domain. You can see
+                        the current status here.
+                      </p>
+                    </div>
+                  )}
+
                   <div>
                     <label className={labelCls}>Domain Name</label>
                     <div className="flex gap-2">
                       <input value={domainInput} onChange={e => setDomainInput(e.target.value.toLowerCase().trim())}
-                        placeholder="www.yourresort.com" className={inputCls + ' font-mono'} />
+                        placeholder="www.yourresort.com" className={inputCls + ' font-mono'}
+                        disabled={!caps.editDomain} readOnly={!caps.editDomain} />
                       <button
                         onClick={() => setDomainMut.mutate(domainInput || null)}
-                        disabled={setDomainMut.isPending || (!domainInput && !domainInfo?.customDomain)}
+                        disabled={!caps.editDomain || setDomainMut.isPending || (!domainInput && !domainInfo?.customDomain)}
                         className="flex shrink-0 items-center gap-1.5 rounded-[8px] px-4 py-2 text-[13px] font-medium disabled:opacity-60 hover:opacity-90"
                         style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
                         {setDomainMut.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
@@ -1021,7 +1047,7 @@ export default function WebsitePage() {
                     <p className="mt-1 text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">Enter the exact domain with www or without — whichever you want to use.</p>
                   </div>
 
-                  {domainInfo?.customDomain && !domainInfo.domainVerified && (
+                  {caps.editDomain && domainInfo?.customDomain && !domainInfo.domainVerified && (
                     <button onClick={() => verifyMut.mutate()} disabled={verifyMut.isPending}
                       className="flex w-full items-center justify-center gap-2 rounded-[9px] border py-2 text-[13px] font-medium transition-colors disabled:opacity-60 hover:bg-[#f4ecda]"
                       style={{ borderColor: 'rgba(184,144,64,0.35)', color: 'var(--rp-gold)' }}>
@@ -1031,7 +1057,7 @@ export default function WebsitePage() {
                     </button>
                   )}
 
-                  {domainInfo?.customDomain && (
+                  {caps.editDomain && domainInfo?.customDomain && (
                     <button onClick={() => setConfirmRemoveDomain(true)}
                       disabled={setDomainMut.isPending}
                       aria-label={`Remove custom domain ${domainInfo.customDomain}`}
@@ -1237,7 +1263,8 @@ export default function WebsitePage() {
           )}
         </div>
       </ModalShell>
-      <CustomDesignModal open={designModalOpen} onClose={() => setDesignModalOpen(false)} />
+      <CustomDesignModal open={designModalOpen && caps.requestCustomDesign}
+        onClose={() => setDesignModalOpen(false)} />
     </div>
   );
 }

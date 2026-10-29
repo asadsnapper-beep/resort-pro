@@ -56,7 +56,12 @@ vi.mock('@/lib/api', () => ({
 }));
 vi.mock('@/hooks/use-toast', () => ({ toast: () => {} }));
 vi.mock('@/store/auth', () => ({
-  useAuthStore: () => ({ tenant: { id: 't1', slug: 'palm-paradise-resort' }, token: 'tok' }),
+  // An OWNER: the Custom Domain tab is owner/manager-only now (WB-007).
+  useAuthStore: () => ({
+    tenant: { id: 't1', slug: 'palm-paradise-resort' },
+    user: { role: 'OWNER' },
+    token: 'tok',
+  }),
 }));
 vi.mock('@/components/dashboard/website/ThemePicker', () => ({ ThemePicker: () => null }));
 vi.mock('@/components/dashboard/website/CustomDesignModal', () => ({
