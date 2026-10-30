@@ -116,6 +116,27 @@ services:
       - traefik.http.routers.rp-web.tls.domains[0].main=resortpro.site
       - traefik.http.routers.rp-web.tls.domains[0].sans=*.resortpro.site
       - traefik.http.services.rp-web.loadbalancer.server.port=3000
+      # ── Customer custom domains (Cloudflare for SaaS) ───────────────────────
+      # Cloudflare terminates TLS for the customer's own domain and proxies
+      # here, preserving Host: www.theirresort.com. Without a router that
+      # accepts an arbitrary Host, that request matches nothing and dies at
+      # Traefik. See docs/custom-domains.md for the full mechanism.
+      #
+      # Deliberately NO certresolver: we must never ask Let's Encrypt for a
+      # certificate covering a domain we do not own. Cloudflare issues and
+      # renews that certificate. This router serves the wildcard above,
+      # selected by SNI — which is why Cloudflare must either rewrite SNI to
+      # the fallback origin (preferred, allows Full (Strict)) or run in Full.
+      #
+      # Lowest priority so the specific rp-web/rp-api rules always win.
+      #
+      # ⚠ The regexp below is Traefik **v2** syntax, matching the `{sub:…}`
+      #   rule above. On Traefik v3 this must become HostRegexp(`^.+$`).
+      - traefik.http.routers.rp-web-custom.rule=HostRegexp(`{any:.+}`)
+      - traefik.http.routers.rp-web-custom.priority=1
+      - traefik.http.routers.rp-web-custom.entrypoints=https
+      - traefik.http.routers.rp-web-custom.tls=true
+      - traefik.http.routers.rp-web-custom.service=rp-web
 
   # ── Worker (cron: reminders, iCal, reports, automation, trial mail) ─────────
   # Private network only — it talks to nobody from outside.

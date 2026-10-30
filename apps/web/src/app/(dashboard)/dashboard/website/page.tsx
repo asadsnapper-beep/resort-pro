@@ -1157,11 +1157,11 @@ export default function WebsitePage() {
                       <FileText className="h-4 w-4 text-[#64748b] dark:text-[#a9c1d0]" /> DNS Setup Instructions
                     </h4>
                     <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">
-                      Add <strong>one</strong> of these records in your DNS provider (Cloudflare, GoDaddy, Namecheap, etc.):
+                      Add this record in your DNS provider (Cloudflare, GoDaddy, Namecheap, etc.):
                     </p>
                     <div className="rounded-[10px] border p-4 space-y-3"
                       style={{ background: 'var(--rp-surface-2)', borderColor: 'var(--rp-border)' }}>
-                      <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-[#64748b] dark:text-[#a9c1d0]">Option 1 — CNAME (recommended)</p>
+                      <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-[#64748b] dark:text-[#a9c1d0]">CNAME record — required for HTTPS</p>
                       <div className="grid grid-cols-3 gap-3">
                         {[
                           { label: 'Type',          value: 'CNAME' },

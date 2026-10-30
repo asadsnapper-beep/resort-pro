@@ -15,6 +15,13 @@ import { createAdminNotification } from '../utils/notifications';
 import { type SendResult } from '../services/messaging';
 import { sendCountedMessage } from '../services/messaging-quota';
 import { encryptOrNull, decryptOrNull } from '../utils/secret-box';
+import {
+  isCloudflareSaasConfigured,
+  createCustomHostname,
+  getCustomHostname,
+  deleteCustomHostname,
+} from '../services/cloudflare-saas';
+import { probeHttps } from '../services/https-probe';
 
 /** Only the columns messaging needs — never the whole tenant row. */
 const MESSAGING_SELECT = {
@@ -160,23 +167,43 @@ export async function tenantRoutes(app: FastifyInstance) {
         if (existing) return reply.status(409).send({ success: false, error: 'This domain is already connected to another resort' });
       }
 
+      // The domain being replaced, if any — it must be deregistered from
+      // Cloudflare, or it keeps consuming the zone's hostname allowance and
+      // renewing a certificate nobody is using.
+      const previous = await db.tenant.findUnique({
+        where: { id: tenantId },
+        select: { customDomain: true },
+      });
+
       const tenant = await db.tenant.update({
         where: { id: tenantId },
         data: {
           customDomain:   body.domain,
           domainVerified: false,
           domainVerifiedAt: null,
+          // The old certificate does not carry over to a new domain.
+          sslStatus: 'none', sslProvisionedAt: null, sslExpiresAt: null, sslError: null,
         },
         select: { customDomain: true, domainVerified: true, slug: true },
       });
 
+      if (previous?.customDomain && previous.customDomain !== body.domain) {
+        // Best-effort: the tenant's record is already updated, and a stale
+        // hostname left at Cloudflare must not fail the owner's request.
+        await deleteCustomHostname(previous.customDomain).catch((err) => {
+          request.log.warn({ err, hostname: previous.customDomain }, 'Cloudflare deregister failed');
+        });
+      }
+
       return ok({
         ...tenant,
         cnameTarget: `${tenant.slug}.${APP_DOMAIN}`,
-        aRecord:     APP_IP || null,
+        // No A-record option. An A record points straight at the server and
+        // bypasses Cloudflare, so the domain would verify and then serve a
+        // certificate error forever. CNAME is the only route that can get
+        // HTTPS — see docs/custom-domains.md.
         instructions: body.domain ? [
           `Add a CNAME record: ${body.domain} → ${tenant.slug}.${APP_DOMAIN}`,
-          `Or an A record: ${body.domain} → ${APP_IP || '<server IP>'}`,
           'DNS changes may take up to 48 hours to propagate.',
           'Click "Verify Domain" once DNS is set.',
         ] : [],
@@ -212,7 +239,10 @@ export async function tenantRoutes(app: FastifyInstance) {
           verified = true; method = 'CNAME'; resolvedTo = cnameTarget;
         }
 
-        // Fallback: check A record if IP configured
+        // Legacy only. We no longer tell owners to use an A record, because it
+        // bypasses Cloudflare and so can never serve HTTPS. Still accepted as
+        // proof of ownership so that owners who set one up before this changed
+        // do not suddenly fail verification — they get a warning instead.
         if (!verified && APP_IP) {
           const addrs = await dns.resolve4(tenant.customDomain).catch(() => [] as string[]);
           if (addrs.includes(APP_IP)) {
@@ -241,7 +271,45 @@ export async function tenantRoutes(app: FastifyInstance) {
         data: { domainVerified: true, domainVerifiedAt: new Date() },
       });
 
-      return ok({ verified: true, method, resolvedTo }, '✅ Domain verified successfully!');
+      // DNS now proves the owner controls this domain, which is the gate that
+      // lets us hand it to Cloudflare for a certificate. Nothing unverified
+      // ever reaches createCustomHostname.
+      let ssl: Awaited<ReturnType<typeof createCustomHostname>> = null;
+      if (isCloudflareSaasConfigured()) {
+        try {
+          // Re-registering an existing hostname is an error at Cloudflare, so
+          // reuse the record when the owner verifies a second time.
+          ssl = (await getCustomHostname(tenant.customDomain))
+             ?? (await createCustomHostname(tenant.customDomain));
+          await db.tenant.update({
+            where: { id: tenantId },
+            data: { sslStatus: ssl?.sslStatus ?? 'provisioning', sslError: ssl?.error ?? null },
+          });
+        } catch (err) {
+          // Verification itself succeeded; only the certificate request failed.
+          request.log.error({ err, hostname: tenant.customDomain }, 'Cloudflare custom hostname failed');
+          await db.tenant.update({
+            where: { id: tenantId },
+            data: { sslStatus: 'error', sslError: err instanceof Error ? err.message : 'SSL request failed' },
+          });
+        }
+      }
+
+      // An A record proves ownership but cannot carry HTTPS: it reaches the
+      // server directly, so Cloudflare never sees the request and the
+      // certificate it issued is never served. Say so rather than letting the
+      // owner discover it from a browser warning.
+      const aRecordWarning = method === 'A'
+        ? `${tenant.customDomain} is pointed with an A record, which cannot serve HTTPS. `
+          + `Replace it with a CNAME to ${cnameTarget} to get a secure site.`
+        : null;
+
+      return ok({
+        verified: true, method, resolvedTo,
+        sslStatus: ssl?.sslStatus ?? null,
+        validationRecords: ssl?.validationRecords ?? [],
+        warning: aRecordWarning,
+      }, aRecordWarning ?? '✅ Domain verified successfully!');
     },
   });
 
@@ -267,18 +335,40 @@ export async function tenantRoutes(app: FastifyInstance) {
         return reply.status(400).send({ success: false, error: 'SSL certificate is already active' });
       }
 
-      // In production this would call cert-manager / ACME / Caddy API.
-      // Here we set status to "provisioning" — a background job / webhook updates it to "active".
+      // Certificates come from Cloudflare for SaaS — see docs/custom-domains.md.
+      // Verification normally registers the hostname already; this endpoint is
+      // the retry path for when that call failed or was never made.
+      if (!isCloudflareSaasConfigured()) {
+        return reply.status(503).send({
+          success: false,
+          error: 'SSL automation is not configured on this deployment',
+        });
+      }
+
+      let ssl;
+      try {
+        ssl = (await getCustomHostname(tenant.customDomain))
+           ?? (await createCustomHostname(tenant.customDomain));
+      } catch (err) {
+        request.log.error({ err, hostname: tenant.customDomain }, 'Cloudflare custom hostname failed');
+        const message = err instanceof Error ? err.message : 'SSL request failed';
+        await db.tenant.update({
+          where: { id: tenantId },
+          data: { sslStatus: 'error', sslError: message },
+        });
+        return reply.status(502).send({ success: false, error: message });
+      }
+
       const updated = await db.tenant.update({
         where: { id: tenantId },
-        data: { sslStatus: 'provisioning', sslError: null },
+        data: { sslStatus: ssl?.sslStatus ?? 'provisioning', sslError: ssl?.error ?? null },
         select: { customDomain: true, sslStatus: true },
       });
 
       return ok({
         ...updated,
+        validationRecords: ssl?.validationRecords ?? [],
         message: 'SSL provisioning started. Certificates are usually issued within 5 minutes.',
-        webhook: `${process.env.APP_DOMAIN ? `https://${process.env.APP_DOMAIN}` : 'http://localhost:4000'}/api/tenant/domain/ssl-webhook`,
       }, 'SSL provisioning initiated');
     },
   });
@@ -301,12 +391,56 @@ export async function tenantRoutes(app: FastifyInstance) {
       if (!tenant) return reply.status(404).send({ success: false, error: 'Not found' });
 
       const APP_DOMAIN = process.env.APP_DOMAIN || 'resortpro.site';
-      const APP_IP = process.env.APP_IP || '';
+
+      // Cloudflare owns the certificate's real state; the stored column is a
+      // cache that goes stale the moment a certificate issues or expires. Read
+      // through to Cloudflare and write back only when it actually differs.
+      // The only honest answer to "is it live?" — an actual TLS handshake.
+      // Started before the Cloudflare read so the two network calls overlap.
+      const httpsProbe = tenant.customDomain && tenant.domainVerified
+        ? probeHttps(tenant.customDomain)
+        : Promise.resolve(null);
+
+      let sslStatus = tenant.sslStatus;
+      let sslError  = tenant.sslError;
+      let validationRecords: Array<Record<string, string | undefined>> = [];
+
+      if (tenant.customDomain && isCloudflareSaasConfigured()) {
+        try {
+          const live = await getCustomHostname(tenant.customDomain);
+          if (live) {
+            validationRecords = live.validationRecords;
+            if (live.sslStatus !== sslStatus || (live.error ?? null) !== sslError) {
+              sslStatus = live.sslStatus;
+              sslError  = live.error ?? null;
+              await db.tenant.update({
+                where: { id: tenantId },
+                data: {
+                  sslStatus,
+                  sslError,
+                  ...(sslStatus === 'active' && !tenant.sslProvisionedAt && { sslProvisionedAt: new Date() }),
+                },
+              });
+            }
+          }
+        } catch (err) {
+          // A Cloudflare outage should not blank the status page — fall back
+          // to the stored values.
+          request.log.warn({ err, hostname: tenant.customDomain }, 'Cloudflare status read failed');
+        }
+      }
+
+      const https = await httpsProbe;
 
       return ok({
         ...tenant,
+        sslStatus,
+        sslError,
+        validationRecords,
         cnameTarget: `${tenant.slug}.${APP_DOMAIN}`,
-        aRecord: APP_IP || null,
+        // DNS verified ≠ reachable over HTTPS. The UI must use `https.live`,
+        // not domainVerified, before telling an owner their site is live.
+        https: https ?? { live: false, reachable: false, expiresAt: null, daysUntilExpiry: null, error: null },
         daysUntilExpiry: tenant.sslExpiresAt
           ? Math.ceil((new Date(tenant.sslExpiresAt).getTime() - Date.now()) / 86_400_000)
           : null,
