@@ -12,7 +12,7 @@ import {
   Monitor, Smartphone, Copy, Check, ChevronUp, ChevronDown,
 } from 'lucide-react';
 import { ThemePicker } from '@/components/dashboard/website/ThemePicker';
-import { canonicalSectionOrder, themeSections, supportsSection } from '@/components/themes/capabilities';
+import { canonicalSectionOrder, themeSections, supportsSection, type ThemeKind } from '@/components/themes/capabilities';
 import { CustomDesignModal, CustomDesignCta } from '@/components/dashboard/website/CustomDesignModal';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 import { ModalShell } from '@/components/ui/modal-shell';
@@ -83,8 +83,12 @@ const DEFAULT_SECTION_ORDER = SITE_SECTIONS.map(s => s.id);
  * Builder QA 2026-10-28, WB-001). The capability contract lives with the
  * themes, so the builder and the renderer cannot disagree.
  */
-function resolveSectionOrder(themeKey: string | undefined, saved?: string[]): string[] {
-  return canonicalSectionOrder(themeKey ?? 'luxe', saved);
+function resolveSectionOrder(
+  themeKey: string | undefined,
+  saved?: string[],
+  kind?: ThemeKind | null,
+): string[] {
+  return canonicalSectionOrder(themeKey ?? 'luxe', saved, kind);
 }
 
 const TABS = [
@@ -270,6 +274,24 @@ export default function WebsitePage() {
     set('testimonials', (form.testimonials ?? []).map((t, idx) => idx === i ? { ...t, [key]: value } : t));
   const removeTestimonial = (i: number) =>
     set('testimonials', (form.testimonials ?? []).filter((_, idx) => idx !== i));
+
+  /**
+   * How the saved theme is drawn — `HARDCODED`, `UPLOADED`, `AI_GENERATED` or
+   * `TEMPLATE`. An uploaded theme's key is bespoke and says nothing about its
+   * capabilities; its kind says everything, because every uploaded theme is
+   * drawn by the same renderer.
+   *
+   * Deliberately only trusted while the picked theme is still the saved one.
+   * Choosing a different theme changes `form.templateId` immediately and this
+   * answer is about the old one, so until Save it falls back to null — the
+   * full set of controls, exactly as before this change. Wrong controls would
+   * be worse than cautious ones.
+   */
+  const savedContent = data?.data?.data;
+  const themeKind: ThemeKind | null =
+    form.templateId && form.templateId === savedContent?.templateId
+      ? ((savedContent?.themeType as ThemeKind | null | undefined) ?? null)
+      : null;
 
   const publicUrl  = tenant?.slug ? `/${tenant.slug}` : null;
   const previewUrl = tenant?.slug ? `/${tenant.slug}?preview=${form.templateId ?? 'luxe'}` : null;
@@ -605,7 +627,7 @@ export default function WebsitePage() {
             {/* ── Gallery tab ──────────────────────────────────────────────── */}
             {tab === 'gallery' && (
               <div className={cardCls} style={cardStyle}>
-                {!supportsSection(form.templateId ?? 'luxe', 'gallery') && (
+                {!supportsSection(form.templateId ?? 'luxe', 'gallery', themeKind) && (
                   <div className="rounded-rp-card border border-rp-border bg-rp-surface-3 p-3">
                     <p className="text-rp-meta text-rp-muted">
                       The <strong className="text-rp-text">{form.templateId ?? 'luxe'}</strong> template does not show this section. You can still edit it, and it will appear if you switch to a template that does.
@@ -651,7 +673,7 @@ export default function WebsitePage() {
             {/* ── Testimonials tab ──────────────────────────────────────────── */}
             {tab === 'testimonials' && (
               <div className={cardCls} style={cardStyle}>
-                {!supportsSection(form.templateId ?? 'luxe', 'testimonials') && (
+                {!supportsSection(form.templateId ?? 'luxe', 'testimonials', themeKind) && (
                   <div className="rounded-rp-card border border-rp-border bg-rp-surface-3 p-3">
                     <p className="text-rp-meta text-rp-muted">
                       The <strong className="text-rp-text">{form.templateId ?? 'luxe'}</strong> template does not show this section. You can still edit it, and it will appear if you switch to a template that does.
@@ -801,8 +823,8 @@ export default function WebsitePage() {
 
             {/* ── Sections visibility tab ───────────────────────────────────── */}
             {tab === 'sections' && (() => {
-              const order = resolveSectionOrder(form.templateId, form.sectionOrder);
-              const unsupported = SITE_SECTIONS.filter(sec => !supportsSection(form.templateId ?? 'luxe', sec.id));
+              const order = resolveSectionOrder(form.templateId, form.sectionOrder, themeKind);
+              const unsupported = SITE_SECTIONS.filter(sec => !supportsSection(form.templateId ?? 'luxe', sec.id, themeKind));
               const move = (id: string, dir: -1 | 1) => {
                 const idx = order.indexOf(id);
                 const to  = idx + dir;

@@ -101,7 +101,28 @@ export async function websiteRoutes(app: FastifyInstance) {
       // tenantId is @unique on WebsiteContent; the tenant-scoped client does NOT
       // inject it into findUnique, so it must be passed explicitly.
       const content = await db.websiteContent.findUnique({ where: { tenantId } });
-      return ok(content ?? { heroTitle: '', galleryImages: [], testimonials: [], hiddenSections: [] });
+      if (!content) {
+        return ok({ heroTitle: '', galleryImages: [], testimonials: [], hiddenSections: [], themeType: null });
+      }
+
+      // The dashboard's section controls have to match whatever will actually
+      // draw the site. For an uploaded or AI-generated theme that is settled by
+      // the theme's kind, not its key: every one of them is drawn by the same
+      // ConfigThemeRenderer, which has no Amenities section, while the key
+      // itself is bespoke and tells the builder nothing.
+      //
+      // Themes are a shared catalogue rather than tenant data, which is why
+      // this reads the unscoped client — the same way `templateId` is validated
+      // on PUT below. Nothing tenant-owned is selected: only the kind.
+      let themeType: string | null = null;
+      if (content.templateId) {
+        const theme = await prisma.theme.findUnique({
+          where: { key: content.templateId },
+          select: { themeType: true },
+        });
+        themeType = theme?.themeType ?? null;
+      }
+      return ok({ ...content, themeType });
     },
   });
 
