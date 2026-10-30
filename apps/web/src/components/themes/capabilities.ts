@@ -23,6 +23,7 @@ import { LUXE_SECTIONS } from './luxe';
 import { MINIMAL_SECTIONS } from './minimal';
 import { COASTAL_SECTIONS } from './coastal';
 import { TEA_GARDEN_SECTIONS } from './tea-garden-eco-resort';
+import { CONFIG_THEME_SECTIONS } from './config-renderer';
 
 /**
  * Every section id the product knows about.
@@ -50,22 +51,52 @@ export const THEME_SECTIONS: Record<string, readonly SectionId[]> = {
 export const ALWAYS_RENDERED: readonly SectionId[] = ['rooms', 'booking'];
 
 /**
+ * How a theme is drawn, which is what decides who knows its sections.
+ *
+ * `HARDCODED` themes each have their own list below. `UPLOADED` and
+ * `AI_GENERATED` are all drawn by the single ConfigThemeRenderer, so they
+ * share its list. `TEMPLATE` is the one kind nobody here can answer for — see
+ * `themeSections`.
+ */
+export type ThemeKind = 'HARDCODED' | 'UPLOADED' | 'AI_GENERATED' | 'TEMPLATE';
+
+/**
+ * Annotated rather than inferred on purpose: an id the config renderer adds
+ * that this product has never heard of fails to compile here, instead of
+ * reaching the builder as a control for a section the API would reject.
+ */
+const CONFIG_SECTIONS: readonly SectionId[] = CONFIG_THEME_SECTIONS;
+
+/**
  * The sections a theme renders.
  *
- * An unknown key — a config or template theme, or a stale id left in the
- * database — gets the full set rather than an empty one. Those themes are
- * rendered by ConfigThemeRenderer and TemplateThemeRenderer, whose capability
- * comes from their own definition and is not known here; hiding every control
- * for them would be a worse lie than showing them all.
+ * `kind` is what makes an uploaded theme answerable: its key is bespoke and
+ * means nothing here, but every uploaded and AI-generated theme goes through
+ * ConfigThemeRenderer, so the kind alone settles it.
+ *
+ * `TEMPLATE` still gets the full set. A Tier 2 theme is arbitrary HTML and
+ * TemplateThemeRenderer hides or moves whichever `id="<section>"` elements it
+ * finds, so the honest answer lives in that theme's markup and not here.
+ * Hiding every control for it would be a worse lie than showing them all.
+ * The same goes for a key with no kind — a stale id, or a theme whose
+ * catalogue entry did not load.
  */
-export function themeSections(themeKey?: string | null): readonly SectionId[] {
+export function themeSections(
+  themeKey?: string | null,
+  kind?: ThemeKind | null,
+): readonly SectionId[] {
+  if (kind === 'UPLOADED' || kind === 'AI_GENERATED') return CONFIG_SECTIONS;
   if (!themeKey) return SECTION_IDS;
   return THEME_SECTIONS[themeKey] ?? SECTION_IDS;
 }
 
 /** Whether a theme renders a section at all. */
-export function supportsSection(themeKey: string | null | undefined, section: string): boolean {
-  return themeSections(themeKey).includes(section as SectionId);
+export function supportsSection(
+  themeKey: string | null | undefined,
+  section: string,
+  kind?: ThemeKind | null,
+): boolean {
+  return themeSections(themeKey, kind).includes(section as SectionId);
 }
 
 /** Whether an id is a section this product has ever heard of. */
@@ -84,8 +115,9 @@ export function isKnownSection(section: string): section is SectionId {
 export function canonicalSectionOrder(
   themeKey: string | null | undefined,
   saved?: readonly string[] | null,
+  kind?: ThemeKind | null,
 ): SectionId[] {
-  const supported = themeSections(themeKey);
+  const supported = themeSections(themeKey, kind);
   const out: SectionId[] = [];
   for (const id of saved ?? []) {
     if (isKnownSection(id) && supported.includes(id) && !out.includes(id)) out.push(id);

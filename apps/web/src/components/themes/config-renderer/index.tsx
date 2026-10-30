@@ -20,6 +20,24 @@ import { AnnouncementBar, OffersSection, usePublicOffers } from '../_widgets/Off
    Hardcoded themes (luxe, minimal, coastal) still use their own components.
 ──────────────────────────────────────────────────────────────────────────── */
 
+/**
+ * The sections this renderer draws, in its default order.
+ *
+ * Every uploaded and AI-generated theme is drawn by this one component, so
+ * this is the capability list for all of them — `capabilities.ts` reads it so
+ * the builder offers exactly these and no others. `amenities` is absent
+ * because there is no `ConfigAmenities`: the builder used to offer it anyway,
+ * and an owner who hid or reordered it was moving a section that nothing
+ * would ever draw (the config half of Website Builder QA 2026-10-28, WB-001).
+ *
+ * The node map below is keyed by these ids. Anything added there belongs here
+ * too, or it is built and never rendered.
+ */
+export const CONFIG_THEME_SECTIONS = [
+  'about', 'rooms', 'menu', 'venues', 'vehicles', 'availability',
+  'offers', 'booking', 'gallery', 'testimonials', 'contact',
+] as const
+
 export interface ConfigThemeProps {
   data:   ResortData
   config: Partial<ThemeConfig>
@@ -303,8 +321,9 @@ export function ConfigThemeRenderer({ data, config: rawConfig }: ConfigThemeProp
           testimonials: show('testimonials') && <ConfigTestimonials  data={data} config={config} />,
           contact:      show('contact')      && <ConfigContact       data={data} config={config} />,
         }
+        // The same list the builder is told about, not a second copy of it.
         const order = orderSections(
-          ['about', 'rooms', 'menu', 'venues', 'vehicles', 'availability', 'offers', 'booking', 'gallery', 'testimonials', 'contact'],
+          [...CONFIG_THEME_SECTIONS],
           website.sectionOrder,
         )
         return order.map(id => <React.Fragment key={id}>{nodes[id]}</React.Fragment>)
