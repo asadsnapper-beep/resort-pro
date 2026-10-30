@@ -324,6 +324,8 @@ export default function SettingsPage() {
     domainVerified: domainStatus.domainVerified,
     sslStatus:      sslStatus?.sslStatus ?? null,
     sslError:       sslStatus?.sslError ?? null,
+    // The TLS handshake the API took. Outranks the stored status.
+    https:          httpsState,
   });
 
   useEffect(() => {

@@ -152,3 +152,106 @@ describe('live implies both halves, for every combination', () => {
     }
   });
 });
+
+/**
+ * The measurement, added once the API began taking a real TLS handshake.
+ *
+ * Until then this module could only read `sslStatus`, and said so in its own
+ * doc comment: a record of what the platform was last told, not a measurement.
+ * `https` is that measurement, and where the two disagree it wins — a stored
+ * column cannot notice a certificate being revoked, expiring, or never having
+ * been served.
+ */
+describe('a real TLS handshake outranks the stored status', () => {
+  const connected = { customDomain: 'theirresort.com', domainVerified: true };
+
+  it('is live when the handshake was trusted, whatever the column says', () => {
+    const d = domainState({
+      ...connected,
+      sslStatus: 'provisioning',
+      https: { live: true, reachable: true, error: null },
+    });
+    expect(d.live).toBe(true);
+    expect(d.https.state).toBe('active');
+    expect(d.canOpen).toBe(true);
+    expect(d.nextStep).toBeNull();
+  });
+
+  it('is not live when the column says active and nothing answers', () => {
+    // The exact lie this module exists to stop, now also catchable when an
+    // administrator marked it active by hand.
+    const d = domainState({
+      ...connected,
+      sslStatus: 'active',
+      https: { live: false, reachable: false, error: 'The domain did not respond' },
+    });
+    expect(d.live).toBe(false);
+    expect(d.canOpen).toBe(false);
+    expect(d.https.state).not.toBe('active');
+  });
+
+  it('calls an untrusted certificate a failure, not a work in progress', () => {
+    // A host answering on 443 with the wrong certificate has a definite
+    // problem — this is what an A record produces.
+    const d = domainState({
+      ...connected,
+      sslStatus: 'provisioning',
+      https: { live: false, reachable: true, error: 'Certificate not trusted: ERR_TLS_CERT_ALTNAME_INVALID' },
+    });
+    expect(d.https.state).toBe('failed');
+    expect(d.live).toBe(false);
+  });
+
+  it('passes the probe\'s own words through to the owner', () => {
+    const d = domainState({
+      ...connected,
+      sslStatus: 'provisioning',
+      https: { live: false, reachable: true, error: 'Certificate not trusted: CERT_HAS_EXPIRED' },
+    });
+    expect(d.nextStep).toContain('CERT_HAS_EXPIRED');
+  });
+
+  it('prefers the probe\'s reason over the stored sslError', () => {
+    const d = domainState({
+      ...connected,
+      sslStatus: 'error',
+      sslError: 'Cloudflare: 1414 something older',
+      https: { live: false, reachable: true, error: 'Certificate not trusted: self signed certificate' },
+    });
+    expect(d.nextStep).toContain('self signed');
+    expect(d.nextStep).not.toContain('1414');
+  });
+
+  it('leaves issuance alone while nothing answers yet', () => {
+    // Not reachable during issuance is ordinary, not a failure. The stored
+    // status is the better guide here and must not be overridden.
+    const d = domainState({
+      ...connected,
+      sslStatus: 'provisioning',
+      https: { live: false, reachable: false, error: 'Nothing is listening on port 443' },
+    });
+    expect(d.https.state).toBe('working');
+    expect(d.nextStep).toMatch(/being issued/i);
+  });
+
+  it('still needs DNS, however good the handshake was', () => {
+    // A domain can answer over HTTPS and not be pointed at us at all.
+    const d = domainState({
+      customDomain: 'theirresort.com',
+      domainVerified: false,
+      sslStatus: 'active',
+      https: { live: true, reachable: true, error: null },
+    });
+    expect(d.live).toBe(false);
+    expect(d.nextStep).toMatch(/Verify Domain/);
+  });
+
+  it('works exactly as before when no measurement is passed', () => {
+    // The builder page reads a payload with no `https` field. It must keep
+    // behaving, just promising less.
+    const withOut = domainState({ ...connected, sslStatus: 'active' });
+    const withNull = domainState({ ...connected, sslStatus: 'active', https: null });
+    expect(withOut.live).toBe(true);
+    expect(withNull).toEqual(withOut);
+  });
+});

@@ -10,24 +10,37 @@
  * DNS and HTTPS are therefore reported separately, and "live" is never claimed
  * from DNS alone.
  *
- * What this cannot tell you: `sslStatus` is a record of what the platform was
- * last told, not a measurement. Nothing in the codebase moves it past
- * `provisioning` on its own — `POST /tenant/domain/provision-ssl` writes that
- * status and names a webhook (`/api/tenant/domain/ssl-webhook`) that does not
- * exist as a route, so only an admin calling `PATCH /admin/domains/:id/ssl`
- * ever sets `active`. Treat `active` as "an administrator confirmed a
- * certificate", not as a live HTTPS check. The remaining gap is recorded in
- * the QA report rather than papered over with a confident label here.
+ * `sslStatus` is still only a record of what the platform was last told. What
+ * closed the gap this file used to record is `https`: a real TLS handshake,
+ * taken by the API (services/https-probe.ts) and passed in here. When it is
+ * present it outranks `sslStatus`, because a measurement beats a stored
+ * column — a certificate can be revoked, expire, or never have been served at
+ * all while the column still reads `active`.
+ *
+ * It is optional on purpose. The builder page reads a payload that carries no
+ * measurement, and it keeps working from `sslStatus` alone; it simply cannot
+ * promise as much.
  */
 export type SslStatus = 'none' | 'pending' | 'provisioning' | 'active' | 'error';
 
 export type HttpsState = 'waiting' | 'working' | 'active' | 'failed';
+
+/** The result of an actual TLS handshake — see services/https-probe.ts. */
+export interface HttpsMeasurement {
+  /** The handshake completed AND the certificate chain was trusted. */
+  live: boolean;
+  /** Something answered on 443, even if its certificate was not trusted. */
+  reachable: boolean;
+  error: string | null;
+}
 
 export interface DomainStatusInput {
   customDomain?: string | null;
   domainVerified?: boolean | null;
   sslStatus?: string | null;
   sslError?: string | null;
+  /** Outranks sslStatus when present. Absent is normal, not an error. */
+  https?: HttpsMeasurement | null;
 }
 
 export interface DomainState {
@@ -74,19 +87,41 @@ function httpsState(ssl: string | null | undefined): HttpsState {
   }
 }
 
+/**
+ * Reconcile the stored status with a measurement, when there is one.
+ *
+ * A handshake that completed and was trusted is the only thing that proves
+ * HTTPS, so it wins outright. A host that answered with a certificate we could
+ * not trust has a definite problem — that is `failed`, whatever the column
+ * says. A host that did not answer at all is the ordinary state during
+ * issuance, so the stored status decides, except that it may no longer claim
+ * `active`: the column saying active while nothing answers is precisely the
+ * lie this module exists to stop.
+ */
+function reconcile(stored: HttpsState, measured: HttpsMeasurement): HttpsState {
+  if (measured.live) return 'active';
+  if (measured.reachable) return 'failed';
+  return stored === 'active' ? 'waiting' : stored;
+}
+
 export function domainState(t: DomainStatusInput | null | undefined): DomainState {
   if (!t?.customDomain) return NOT_CONFIGURED;
 
-  const dnsDone = t.domainVerified === true;
-  const https   = httpsState(t.sslStatus);
-  const live    = dnsDone && https === 'active';
+  const dnsDone  = t.domainVerified === true;
+  const measured = t.https ?? null;
+  const https    = measured ? reconcile(httpsState(t.sslStatus), measured) : httpsState(t.sslStatus);
+  const live     = dnsDone && https === 'active';
 
   let nextStep: string | null = null;
   if (!dnsDone) {
     nextStep = 'Add the DNS record below at your domain registrar, then press Verify Domain.';
   } else if (https === 'failed') {
-    nextStep = t.sslError
-      ? `The certificate could not be issued: ${t.sslError}`
+    // The probe's own words when it has them: "Certificate not trusted:
+    // ERR_TLS_CERT_ALTNAME_INVALID" tells an owner far more than a generic
+    // issuance failure, and it is the case an A record produces.
+    const reason = measured?.error ?? t.sslError;
+    nextStep = reason
+      ? `The certificate could not be issued: ${reason}`
       : 'The certificate could not be issued. Contact support and we will look into it.';
   } else if (https === 'working') {
     nextStep = 'Your certificate is being issued. This usually takes a few minutes.';
