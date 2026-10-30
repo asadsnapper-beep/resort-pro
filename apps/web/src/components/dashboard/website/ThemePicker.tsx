@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   CheckCircle2, ExternalLink, Sparkles, Loader2,
-  X, Eye, Search, Lock, ShoppingCart,
+  X, Eye, Search, Lock, ShoppingCart, AlertTriangle, RefreshCw,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
@@ -64,6 +64,7 @@ export function ThemePicker({ currentTheme, slug, onSelect }: ThemePickerProps) 
   const [filter,   setFilter]   = useState<'all' | 'free' | 'premium'>('all');
   const [preview,  setPreview]  = useState<Theme | null>(null);
   const [buying,   setBuying]   = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   /**
    * Send the owner to bKash for a theme they don't own yet. The server decides
@@ -90,18 +91,38 @@ export function ThemePicker({ currentTheme, slug, onSelect }: ThemePickerProps) 
   };
 
   /* ── Fetch active themes from DB ─────────────────────────────────────────── */
-  useEffect(() => {
+  /**
+   * Load the catalogue, and say so when it could not be loaded.
+   *
+   * The fallback above is deliberate and stays — a wall of locks during an
+   * outage is worse than three usable free themes. What was wrong is that the
+   * fallback was shown *silently*. An owner who had paid for a theme opened
+   * this panel during an outage, found three free themes and no trace of the
+   * one they bought, and had nothing on the page to tell them the list was
+   * incomplete rather than their purchase being gone. The outage was hidden
+   * from us at the same time. (Website Builder QA 2026-10-28, WB-012.)
+   *
+   * `res.ok` is checked now too: a 500 whose body happens to parse, or a 200
+   * carrying `success: false`, used to leave the fallback in place by falling
+   * through the condition below rather than by failing.
+   */
+  const loadThemes = useCallback(() => {
     setLoading(true);
+    setLoadFailed(false);
     fetch(`${API}/site/${slug}/themes`)
-      .then(r => r.json())
-      .then(json => {
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          setThemes(json.data);
-        }
+      .then(async res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        if (!json.success || !Array.isArray(json.data)) throw new Error('Malformed catalogue');
+        // An empty catalogue is a real answer, not a failure; it still should
+        // not wipe the free themes the fallback guarantees.
+        if (json.data.length > 0) setThemes(json.data);
       })
-      .catch(() => {})
+      .catch(() => setLoadFailed(true))
       .finally(() => setLoading(false));
   }, [slug]);
+
+  useEffect(() => { loadThemes(); }, [loadThemes]);
 
   /* ── Filter & search ─────────────────────────────────────────────────────── */
   const filtered = themes.filter(t => {
@@ -137,6 +158,30 @@ export function ThemePicker({ currentTheme, slug, onSelect }: ThemePickerProps) 
         </div>
         {loading && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
       </div>
+
+      {/* Catalogue could not be loaded — say it, rather than passing the
+          fallback off as the catalogue. */}
+      {loadFailed && (
+        <div role="alert" className="flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-950/40">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-500" />
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">
+              Could not load your theme catalogue
+            </p>
+            <p className="mt-0.5 text-xs text-amber-800 dark:text-amber-300">
+              Showing the free themes only. Any theme you have bought is missing from
+              this list — it has not been lost, and your live website is unaffected.
+            </p>
+          </div>
+          <button
+            onClick={loadThemes}
+            disabled={loading}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-400 px-2.5 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-700 dark:text-amber-200 dark:hover:bg-amber-900/40"
+          >
+            <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} /> Retry
+          </button>
+        </div>
+      )}
 
       {/* Search + Filter bar */}
       <div className="flex flex-col sm:flex-row gap-3">

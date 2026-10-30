@@ -165,10 +165,16 @@ export function ImageUpload({
                 onError={() => { onChange(null); setError('Could not load image from that URL'); }}
               />
               {/* Clear button */}
+              {/* The clear button had no accessible name at all — screen
+                  readers announced "button". `label` defaults to "Upload
+                  image", so stripping the verb gives "Remove image" there and
+                  "Remove Hero Background Image" where a caller named the
+                  field. */}
               {!disabled && (
                 <button
                   type="button"
                   onClick={clear}
+                  aria-label={`Remove ${label.replace(/^upload /i, '')}`}
                   className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white transition-opacity hover:bg-black/80"
                 >
                   <X className="h-3.5 w-3.5" />

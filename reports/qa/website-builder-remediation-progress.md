@@ -365,6 +365,118 @@ Each mutation applied alone:
 | the key is not escaped into the URL | 1 fails |
 | no guard for a missing key | 1 fails |
 
+### WB-004, second half — a previewed Tier 2 theme renders as itself
+
+The first half taught the page to look the previewed theme up. It looked up a
+*config*. A Tier 2 (TEMPLATE) theme has no config — it has Handlebars HTML in
+a different column — so a TEMPLATE key still resolved to null and still fell
+through `getTheme()` to luxe. Measured on the step-2 commit, with a Tier 2
+theme whose own stylesheet paints the hero `#00e5ff` and whose markup carries
+a unique marker:
+
+| `/palm-paradise-resort…` | bytes | the Tier 2 marker | its own `#00e5ff` | luxe-only markup |
+|---|---|---|---|---|
+| **before**, `?preview=wb004-tier2` | 58,268 | absent | absent | **present** |
+| **before**, `?preview=luxe` | 58,240 | absent | absent | present |
+| **after**, `?preview=wb004-tier2` | **26,932** | **present** | **present** | absent |
+| **after**, `?preview=luxe` | 58,258 | absent | absent | present |
+
+The two "before" rows are the same page within 28 bytes. That is the same
+symptom the first half had, surviving in the one tier the first half did not
+reach.
+
+All counts are of non-`<script>` markup. That distinction is not pedantry: in
+the first half I briefly reported a theme as rendering because its marker text
+was present, when the marker was only inside the serialized RSC payload and
+never drawn. Here the browser confirms it independently — `#hero` computes to
+`rgb(0, 229, 255)` with `letter-spacing: 5.28px`, both from the theme's own
+stylesheet, the `<h1>` reads "Palm Paradise" where the template source says
+`{{tenant.name}}`, and the booking widget the template declares with
+`data-rp-widget` is mounted and interactive.
+
+**The decision this was waiting on was a false choice.** It was posed as
+Handlebars on the client (~80KB, true live editing) versus an honest notice.
+Compiling on the *server* was the option not on the list, and it is strictly
+better than either: `page.tsx` is already a Server Component, Handlebars is
+already a server dependency there, and the owner's first paint is the real
+theme rather than a flash of fallback. The ~80KB buys exactly one thing —
+re-compiling as the owner types — and nothing else was blocked on it.
+
+So the notice is still there, narrowed to what is actually true. A compiled
+HTML string cannot show an edit that has not been saved, so the Tier 2 preview
+reads "saved content — unsaved edits not shown" where the other tiers earn a
+"● live" badge once an edit arrives. Showing "● live" there would be worse
+than showing nothing: unchanged text would read as a lost edit.
+
+`resolvePreviewConfig` became `resolvePreviewTheme`, returning a config *or* a
+template from the request it was already making, and both halves of a Tier 2
+theme are compiled by one `compileTier2` now shared with the live site — so a
+previewed template cannot drift from the published one. Requests per page view
+are therefore unchanged from the first half:
+
+| | API requests |
+|---|---|
+| live site | 1 |
+| preview of the theme already saved | 1 |
+| preview of any other theme, config or template | 2 |
+
+**The unreleased-theme gate still holds, and it had to be re-checked** — this
+change is the first time the public slug page reads `templateHtml`, which is a
+whole Tier 2 design, not just a colour palette. With the Tier 2 theme set to
+DRAFT and asked for with no signature:
+
+| | result |
+|---|---|
+| `/site/theme/wb004-tier2` | HTTP 404, "Theme not found" |
+| `?preview=wb004-tier2` for a resort that does not own it | falls back to luxe; no marker, no `#00e5ff` |
+| the same DRAFT theme, for the resort whose own theme it is | renders, live and in preview |
+| the picker's own list, `/site/:slug/themes` | excludes it |
+
+That last pair is the split the code is built around: `/site/:slug` carries a
+resort's own theme whatever its status, so an owner is not dropped onto luxe
+inside their own builder by an admin unpublishing a design — while a stranger
+guessing the key still gets nothing.
+
+Eight mutations, each applied alone, all killed:
+
+| mutation | result |
+|---|---|
+| the TEMPLATE branch deleted (the step-3 bug itself) | 10 tests fail |
+| page never hands the template down | 5 fail |
+| the stylesheet is dropped | 3 fail |
+| the missing-HTML guard removed | 2 fail |
+| the resort's own Tier 2 theme not read from the payload | 2 fail |
+| CSS passed through uncompiled | 2 fail |
+| PreviewPage ignores the template | 2 fail |
+| the Tier 2 banner claims to be live | 1 fails |
+
+A third test file exists, `preview-page-render.test.tsx`, because the last two
+of those mutations live in the client component that *chooses* a renderer, and
+the first two test files stay green for both. This is the third time in this
+work that the bug was in the choosing rather than in the value returned.
+
+**Still not done:** live typing inside a Tier 2 template. That is the ~80KB,
+and it is now the only thing it buys.
+
+### WB-004, step 4 — what the theme picker shows
+
+Both the picker's thumbnails and its preview modal build exactly
+`/${slug}?preview=${theme.key}` — the URL measured above — and neither seeded
+theme carries a `previewImage`, so both fall to the live-iframe path. On that
+basis the thumbnails and the modal are fixed by the same change. Stated at the
+level it was checked: the URL they construct was verified end to end, in the
+browser and byte for byte; the picker itself was not driven through the
+dashboard, which would need a login the throwaway database has no user for.
+
+One cost worth recording rather than hiding. Every thumbnail without a
+`previewImage` is a full page render of `?preview=<key>` in an iframe scaled to
+0.2, so opening the picker costs one server render per theme — and, since the
+preview now looks the theme up, about **2N API requests instead of N**. The
+requests are two indexed reads of public data and the per-resort limiter is
+generous, so nothing is at risk; but the long-term answer is generating
+`previewImage` at upload rather than rendering N pages to show N thumbnails.
+That predates this work and is not changed by it.
+
 ### Found while verifying the above — centred About layout drops its bullets
 
 Not WB-004 and not fixed here. `ConfigAbout.tsx` builds a `TextBlock` that
@@ -380,6 +492,367 @@ ways on the same theme:
 
 Raised as its own task rather than folded in.
 
+### WB-012, first item — removing your own domain now asks, and reports failure
+
+Two problems in the same six lines of `settings/page.tsx`.
+
+One click on a small trash icon removed the resort's custom domain outright.
+The address they put on their cards stops leading to their site and the SSL
+status is cleared with it, and the most likely reason an owner clicks there is
+to correct a typo in the domain — which removed it instead. The admin panel
+already called `confirm()` before doing the same thing to the same record; the
+owner's own page did not.
+
+The second was `catch { /* ignore */ }`. A removal that failed and one that
+worked were indistinguishable from outside: no toast either way, no change on
+screen, the domain still live, and reloading the page the only way to find
+out.
+
+`ConfirmDialog` already existed and already solves both — it is ModalShell-
+based, awaits an async `onConfirm`, and shows a thrown error on the dialog
+rather than closing. The fix is wiring the button to it and rethrowing instead
+of swallowing, plus an accessible name on a button whose only content was an
+icon. The dialog also says what *keeps* working (their free `resortpro`
+address), not only what stops.
+
+Five mutations, each applied alone, all killed:
+
+| mutation | result |
+|---|---|
+| the trash button removes outright again (the bug itself) | 6 tests fail |
+| no accessible name on the trash button | 6 fail |
+| the failure is swallowed again | 2 fail |
+| the dialog stops warning it cannot be undone | 1 fails |
+| the dialog no longer names the domain | 1 fails |
+
+The test mounts the settings page rather than `ConfirmDialog`, because neither
+half of this lives in the dialog — both are in how the button is wired to it.
+One note for whoever writes the next one: the react-query mock has to return
+stable object identities. A fresh object per render sends the page's domain
+effect into a setState loop that kills the vitest worker after 95 seconds,
+which looks like a hang in the code under test and is not.
+
+**Two items of WB-012 remain:** a full-page error and retry state for a failed
+website/tenant query, and switch semantics on the section toggles.
+
+### WB-012, third item — a catalogue outage stopped passing for the catalogue
+
+The picker falls back to three static free themes when `/site/:slug/themes`
+fails. That part is right and stays: a wall of locks during an outage is worse
+than three usable themes. What was wrong is that the fallback was silent. An
+owner who had bought a theme opened the panel during an outage, found three
+free themes with no trace of the one they paid for, and had nothing on screen
+to say the list was incomplete rather than the purchase gone.
+
+Counting how many ways this could break without anyone noticing was the part
+worth doing. Only two of five produced an error at all:
+
+| what goes wrong | before | now |
+|---|---|---|
+| the request throws | caught, silent | notice |
+| a non-2xx status | not checked | notice |
+| the body is not JSON | caught, silent | notice |
+| `success: false` | fell through the condition | notice |
+| `data` is not a list | fell through the condition | notice |
+| an empty catalogue | fell through — correctly | no notice, free themes kept |
+
+Three of them never failed; they fell through `if (json.success && …)` and
+left the fallback in place, so nothing was logged internally either. The last
+row is the one that must *keep* falling through: nothing published yet is a
+real answer, not an outage.
+
+The notice is `role="alert"`, says a bought theme is missing rather than lost
+and that the live website is unaffected, and carries a Retry that clears it on
+success and keeps it on another failure.
+
+Six mutations, each applied alone. Five died at once; **one survived**, and
+that is worth recording rather than smoothing over: deleting the `res.ok`
+check kept the suite green, because the 500 fixture carried a malformed body
+that the next check caught anyway. The fixture now carries a well-formed
+success envelope behind a 500 — a stale proxy response, the one shape only
+`res.ok` catches — and deleting the check fails. The mutation was the only
+thing that found that; the suite looked complete without it.
+
+---
+
+### WB-012, second item — a failed load says so, instead of showing an empty builder
+
+`useQuery` was destructured as `{ data, isLoading }` only. On a failure the
+page therefore fell straight through to the full Website Builder with every
+field at its blank default. The honest reading of that screen is *my website
+content is gone* — the hero title, the about text, the gallery, all empty, for
+a resort whose site is still serving visitors normally.
+
+It was also a dead end, in a way worth spelling out because it reads as a
+second bug:
+
+```
+dirty = savedSnapshot !== null && JSON.stringify(form) !== savedSnapshot
+```
+
+The effect that fills the form never ran, so `savedSnapshot` stayed `null`, so
+`dirty` stayed `false` whatever the owner typed. Save is `disabled={!dirty}`
+with the title *"No changes to publish"*. An owner retyping their hero title
+into the blank form would have been told there was nothing to publish.
+
+That accident is the only reason a failed load could not overwrite a live site
+with blanks. The guard was real but nobody chose it.
+
+**Now:** a full-page state from `EmptyState` + `ActionButton`, `role="alert"`,
+with a retry — placed *after* the `isLoading` branch so a first load still in
+flight is not accused of failing.
+
+What it does and does not cover is worth being exact about. A **401 with a
+token** never reaches it: `api.ts` intercepts, tries `/api/auth/refresh`, and
+on failure clears auth and sends the browser to `/auth/login`. A **403 with
+`upgradeRequired`** redirects to the upgrade page. This state is for the rest —
+network failure, 500, timeout.
+
+The tenant query had the same silence in a smaller place: when it failed, the
+domain field was simply blank, which cannot be told apart from owning no
+domain. It now carries its own inline notice and retry, shown only while
+nothing is known (`tenantFailed && !domainInfo`), so a *later* refetch failure
+does not contradict the domain visible on screen.
+
+**Also found here:** the builder has its own *Remove custom domain* button,
+separate from the one in Settings fixed in `867e3d4`. That one still removed on
+a single click. It is the likelier of the two to be pressed, because the domain
+lives on this page. The earlier entry in this report said that item was closed;
+it was closed on one of the two pages. It now asks through `ConfirmDialog`,
+names the domain, and says the free `resortpro` address keeps working.
+
+The notice is written with design tokens rather than the raw hex the rest of
+that card uses. Writing it in the surrounding idiom first raised four ratchet
+categories (+4 hex, +3 inline style, +3 arbitrary font size, +1 radius) — the
+exact debt the rule exists to stop. Rewritten with tokens, the baseline is
+untouched, and dark mode then worked with no `dark:` variant written: measured
+in the browser as `rgba(255,255,255,0.07)` for the panel and `#f8fafc` for the
+title, which are the dark values of `rp-surface` and `rp-text`.
+
+No dashboard page handled `isError` before this one. The same gap exists on the
+other 47 pages; that is recorded here, not silently fixed.
+
+Ten mutations, each applied alone: **10/10 killed**.
+
+### WB-012, fourth item — the builder's icon-only controls say what they are
+
+Four kinds of control had no accessible name at all, so a screen reader
+announced each as "button" and nothing more.
+
+| Control | Before | Now |
+|---|---|---|
+| Section show/hide | `<button>` whose only child is a styled `<span>` — no name, no state, twelve identical | `role="switch"`, `aria-checked`, named after the section |
+| Gallery photo remove | up to 20, all nameless, all destructive | `Remove gallery photo 3` |
+| Testimonial remove | nameless | `Remove testimonial from Rahim Uddin`, falling back to the position while a new one is blank |
+| Reorder arrows | `title="Move up"` ×12 | `Move Photo Gallery up` |
+| `ImageUpload` clear | nameless, and shared well beyond this page | `Remove Hero Background Image` |
+
+A fixed section still gets no switch — a control that cannot move would promise
+a choice that is not there.
+
+`ImageUpload`'s `label` prop defaults to `"Upload image"`, so the obvious
+template read *"Remove Upload image"*. Stripping the leading verb gives "Remove
+image" there and the field's own name where a caller passed one.
+
+Twelve mutations were run; **two survived**, and both were weak tests rather
+than weak code:
+
+- Replacing the gallery index (`idx !== i` → `idx !== 0`) survived, because the
+  test clicked photo **1** — where a hardcoded `0` gives the same answer. It now
+  clicks photo 2 and checks photo 1 is the survivor. A label that does not match
+  what the button does is worse than no label, so that assertion is the point of
+  the test.
+- Reverting the `ImageUpload` naming survived, because the only unlabelled
+  uploader on this page is the gallery *adder*, which has no value and so renders
+  no clear button at all. The default-label branch is unreachable from the page.
+  It now has its own file against the component, which is where a shared
+  component's behaviour belongs.
+
+After fixing both and adding three more: **15/15 killed**.
+
+### Checked in a real browser, not only in jsdom
+
+Accessibility is read from the real accessibility tree, so jsdom alone was not
+enough. Against a throwaway database, signed in as a seeded owner:
+
+| Check | Result |
+|---|---|
+| Section switches | 10 switches, each uniquely named; `Show Photo Gallery` correctly `aria-checked="false"` (it was the seeded hidden section) |
+| Reorder arrows | 24 labels, all distinct |
+| Gallery removes | `Remove gallery photo 1 / 2 / 3` |
+| Testimonial removes | `Remove testimonial from Rahim Uddin`, `Remove testimonial 2` |
+| Image clears | `Remove Hero Background Image`, `Remove About Section Image` |
+| Nameless icon buttons left on the page | **1** — the dashboard shell's dark-mode toggle, outside this page and outside WB-012 |
+| Domain removal | dialog opens, names `www.palmparadise.com`, says the free address keeps working; Cancel removes nothing |
+| API stopped, page reloaded | error state renders; `role="alert"` present; **0** input fields and **no** Save button, so the blank-builder dead end is gone |
+| API restarted, *Try again* pressed | page recovered with no reload — builder back, Save button back |
+| Dark mode | panel `rgba(255,255,255,0.07)`, title `#f8fafc` — the `rp-surface` / `rp-text` dark values, with no `dark:` variant written |
+
+**Not verified in a browser:** the tenant-query notice. Making `/api/tenant`
+fail while `/api/website` succeeds needs two independent backends, and faking it
+in the page would only have tested the fake. It rests on unit tests and on two
+mutations (condition widened, retry pointed at the wrong query), both killed.
+
+---
+
+### WB-007 — the builder stops offering what the role cannot do
+
+The page never read the role at all. Everyone the sidebar let in saw every
+control, while the API refused several of them:
+
+| Builder capability | API gate |
+|---|---|
+| Read / save website content | `OWNER, MANAGER, MARKETER, DEVELOPER` |
+| See the Custom Domain tab (`GET /tenant`) | `OWNER, MANAGER` |
+| Connect / verify / remove a domain | `OWNER` **+ `requireFlag('custom_domain')`** |
+| Request a paid custom design | `OWNER, MANAGER` |
+
+So a Marketer was shown the Custom Domain tab and the paid-design request, and
+a Manager was shown a writable domain form — all of which answer 403 on use.
+
+`websiteCapabilities(role)` mirrors those `preHandler`s. The server stays the
+authority: hiding a control is not treated as a security boundary, it only
+stops offering work that cannot be done.
+
+- A **manager** keeps the domain tab, read-only, with a line saying why.
+  Fields that are dead and silent read as a broken page.
+- A **marketer** no longer fires `GET /tenant` at all (`enabled:
+  caps.viewDomain`). It would 403 every time and light up the failure notice
+  added in `d5cd2c3` for a role that is simply not entitled.
+- An **absent role** yields no capability rather than all of them. The auth
+  store is briefly empty on a cold load, and the other default would flash the
+  owner-only controls at every role.
+
+#### The plan flag is deliberately not mirrored — and why that is a finding
+
+Domain writes are gated twice: by role, and by `requireFlag('custom_domain')`.
+The flag half is **not** reproduced in the UI, because the two things that
+report flags do not agree:
+
+| | Source |
+|---|---|
+| `requireFlag` — the gate that actually runs | `resolveTenantEntitlement`: the **plan's** flag list, plus per-tenant overrides |
+| `GET /tenant/flags` — what a client could read | `TenantFeatureFlag` rows, plus `FLAG_REGISTRY` entries with `defaultOn` |
+
+`custom_domain` is `defaultOn: false`, and STARTER, PROFESSIONAL and
+ENTERPRISE all grant it through the plan. So a paying tenant with no override
+row is **allowed by the gate and absent from the endpoint**. Gating the UI on
+`/tenant/flags` would have hidden the domain form from the owners most
+entitled to use it.
+
+An owner without the entitlement still gets the designed path: 403
+`upgradeRequired`, and the axios interceptor routes them to the upgrade page.
+
+The two flag sources disagreeing is a real defect in its own right. It is
+recorded here rather than worked around.
+
+#### Tests and verification
+
+Two files, because a correct map is worth nothing if the page does not consult
+it — which was the whole of WB-007. One assertion in the first draft was
+vacuous: `/custom design/i` matches nothing on the page, so "a marketer is not
+offered a custom design" passed whether or not the call to action rendered. It
+now matches the CTA's own words, with an owner-side positive control so the
+three negative assertions cannot all pass by the thing never rendering.
+
+**13 mutations, each applied alone: 13/13 killed.**
+
+Then signed in as each role in a real browser, against a throwaway database:
+
+| Role | Tabs | `GET /tenant` | Domain form | Design CTA |
+|---|---|---|---|---|
+| MARKETER | 7, **no** Custom Domain | **never requested** | — | hidden |
+| MANAGER | 8 | requested | domain shown; input `disabled`+`readOnly`, Save disabled, Verify and Remove hidden, reason given | shown |
+| OWNER | 8 | requested | writable; Verify and Remove present; no explanation, because nothing is withheld |  shown |
+
+The marketer row was read off the network log: only `/api/tenant/announcements`
+(open to every role) was called. No doomed 403.
+
+---
+
+### WB-008 — half closed: the UI stops lying, HTTPS still does not work
+
+The builder showed **"Verified & live"** the moment DNS resolved, with an
+`https://` link beside it. DNS resolving says the name points here and nothing
+more. Without a certificate that link fails, so the owner was told their
+domain was live and then watched it not load.
+
+It could not have done better from where it read: the card used `GET /tenant`,
+whose `TENANT_SETTINGS_SELECT` returns `customDomain` and `domainVerified` and
+**not one SSL field**. It now reads `GET /tenant/domain/status` — which
+already existed, carries `sslStatus` and `sslError`, and sits behind the same
+OWNER/MANAGER gate, so no API change was needed.
+
+Settings carried the same claim in a second place: `✅ <domain> is live!` and
+"Guests can access your website at this domain", from DNS alone — **while the
+SSL card directly below it could read "Not provisioned"**. The banner
+contradicted the next card down. Both now share `domainState`.
+
+Verified in a browser, flipping the record through each state:
+
+| DNS | `sslStatus` | Builder card | Link offered |
+|---|---|---|---|
+| not resolved | `none` | DNS *Not pointing here yet* · HTTPS *Certificate not issued yet* | no |
+| resolved | `none` | DNS **done** · HTTPS *not issued yet*, plus "this domain will not load" | no |
+| resolved | `active` | DNS **done** · HTTPS **Certificate active** | yes, `https://…` |
+
+The middle row is exactly what the old UI called "Verified & live". Settings
+for that same row now reads *"www.palmparadise.com is not serving your site
+yet — DNS: Pointing to ResortPro · HTTPS: Certificate not issued yet"*, and
+the Visit link is gone.
+
+#### What is still broken, and why this gate stays open
+
+**1. Nothing issues certificates.** `POST /tenant/domain/provision-ssl` sets
+`sslStatus = 'provisioning'` and returns a webhook URL,
+`/api/tenant/domain/ssl-webhook`. That string is the **only** occurrence of
+`ssl-webhook` in the repository — there is no such route. The handler's own
+comment says "In production this would call cert-manager / ACME / Caddy API".
+Nothing does. The only thing that ever sets `active` is an admin calling
+`PATCH /admin/domains/:id/ssl` by hand.
+
+So `sslStatus` is a record of what the platform was last told, never a
+measurement. The UI now treats it that way and still does not perform the
+HTTPS health check the audit asked for.
+
+**2. Production never routes a customer domain at all.** This is bigger than
+the certificate, and the audit did not reach it. `deploy/production/docker-compose.yml`
+gives the web container one Traefik router:
+
+```
+Host(`resortpro.site`) || Host(`www.resortpro.site`) || Host(`app.resortpro.site`)
+  || HostRegexp(`{sub:[a-z0-9-]+}.resortpro.site`)
+```
+
+with `tls.domains[0].main=resortpro.site` and `sans=*.resortpro.site`.
+
+A request arriving with `Host: www.palmparadise.com` matches none of those
+rules, so it never reaches the web container — and the wildcard certificate
+does not cover it either. Nothing in the repo adds routers dynamically.
+
+The application side is complete: `apps/web/src/middleware.ts` resolves an
+unknown host through `/site/domain/:hostname` and rewrites to `/<slug>`. That
+code has simply never been reachable in production for a customer's own
+domain.
+
+**Therefore a custom domain cannot work today, certificate or not.** Closing
+this gate needs an infrastructure decision, not a page change:
+
+- a Traefik rule that accepts arbitrary hosts (plus `certresolver` per-host
+  on-demand issuance), or a dynamic provider fed from the tenant table;
+- then the ACME callback that moves `sslStatus` to `active` — the webhook the
+  API already advertises;
+- then an actual HTTPS probe before the word "live" is used at all.
+
+Until then the honest position is the one now on screen: DNS can be pointing
+here, and the domain still will not serve the site.
+
+**16 mutations, all killed.** One survived the first pass: forcing the HTTPS
+row's icon to the done state changed no label, and the tests read only labels.
+A green tick beside "Certificate not issued yet" contradicts the words next to
+it, and the icon is what is read at a glance — the row now carries the same
+state in `data-state` and five assertions check it.
+
 ---
 
 ## Verification run for the work above
@@ -389,7 +862,7 @@ Raised as its own task rather than folded in.
 | API TypeScript | pass |
 | Web TypeScript | pass |
 | Full API suite | **1004/1004**, 87 files |
-| Full web unit suite | **246/246**, 26 files |
+| Full web unit suite | **424/424**, 38 files |
 | The four specs CI runs, both projects, four workers, retries off | **70 passed, 2 skipped** |
 | `website-builder.spec.ts` on both projects | 12 passed, 2 skipped — the preview pane is `hidden lg:flex`, so the two preview tests do not apply on the phone project |
 | Design-system ratchet | no regressions; no baseline moved |
@@ -417,10 +890,10 @@ published, and no email, payment, DNS or SSL action was taken.
 
 | | Finding | Why it is not done |
 |---|---|---|
-| WB-004 | TEMPLATE preview only — config themes now render | needs Handlebars on the client, or an honest notice; a decision, not a task |
-| WB-007 | Roles see actions they cannot use | needs capability flags from the API, then the UI |
-| WB-008 | "Verified & live" from DNS alone | needs an HTTPS check and the production SSL path documented; part of it is infrastructure, not code |
-| WB-012 | Error states and accessibility | smallest of these |
+| WB-004 | live typing inside a Tier 2 template | needs Handlebars in the browser (~80KB on the preview path). Everything else about preview is closed; this is the only thing that bundle buys |
+| WB-007 | Roles see actions they cannot use | **closed.** Derived from role, mirroring the API's own gates — no API change needed. One finding left open: `GET /tenant/flags` and `requireFlag` read different sources and disagree |
+| WB-008 | "Verified & live" from DNS alone | **UI half done** — DNS and HTTPS shown separately, "live" needs both, on both pages. Still open: production Traefik routes no customer domain at all, nothing issues certificates, and the advertised `ssl-webhook` route does not exist |
+| WB-012 | Error states and accessibility | **closed.** All four items done. One thing found and not fixed: the dashboard shell's dark-mode toggle has no accessible name — outside this page, worth its own small change |
 | — | Draft, publish and rollback | item 8 of the spec: a versioning model with migrations. A feature in its own right, not a gate that can be slipped in |
 
 Phase 1 and Phase 2 of the brief — multi-page sites, media library, SEO suite,
@@ -433,18 +906,37 @@ product of its own and none should start before the P0 list is closed.
 
 **NO-GO**, unchanged from the audit.
 
-What changed is that five of its eight gates are closed with tests that fail
-when the behaviour comes back, and the test suite can now carry the rest. The
+What changed is that **seven of its eight gates are closed** with tests that
+fail when the behaviour comes back, and the eighth no longer misleads the
+owner even though it is not fixed.
+
+WB-008 is the honest exception. A custom domain still cannot work in
+production — not because of the builder, but because nothing routes or
+certifies it. The page now says so instead of showing a green tick. The
 two that mattered most to a first day are among them: publishing and seeing
 nothing happen, and a preview that sometimes showed none of your edits.
 
-WB-004 is half closed, and the half that is closed is the one an owner meets
-first: a theme they bought now renders when they press Preview. TEMPLATE
-preview still falls back, so the gate is not signed off.
+WB-004 is closed for every theme kind: press Preview on a theme you bought —
+config-driven or Tier 2 template — and that theme is what renders. What is not
+closed is live *typing* inside a Tier 2 template, where the preview shows saved
+content and says so on the page. That is a narrower gap than the gate was, and
+it is stated to the owner rather than left to be discovered.
 
-What remains is the TEMPLATE half of WB-004, then WB-007, WB-008 and WB-012.
-The TEMPLATE half is a decision before it is work — Handlebars on the client,
-or a page that says plainly that unsaved edits cannot be shown for a Tier 2
-theme. Until one of those is taken, those two theme kinds are also still
-offered every section control in the builder rather than their own. WB-007 and
-WB-012 are small. Part of WB-008 is infrastructure rather than code.
+WB-012 and WB-007 are closed too. A failed load says so rather than showing an
+empty builder; the builder's icon-only controls can be used without seeing
+them; and the page no longer offers a role work the API will refuse.
+
+Two things were found along the way and deliberately not folded in, because
+neither belongs to the gate being closed:
+
+- the dashboard shell's dark-mode toggle has no accessible name;
+- `GET /tenant/flags` and the `requireFlag` gate read different sources, so a
+  paying tenant can be entitled to `custom_domain` and absent from the
+  endpoint that reports it.
+
+**What remains is WB-008, and it is not a page change.** The UI half is done:
+nothing now calls a domain live on DNS alone, on either page. The rest is
+infrastructure — production Traefik has no router and no certificate for a
+customer's own domain, so the middleware that would serve it has never been
+reachable there. Separately, UPLOADED and AI_GENERATED themes are still
+offered every section control in the builder rather than their own.

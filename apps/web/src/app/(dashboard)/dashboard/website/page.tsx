@@ -16,6 +16,9 @@ import { canonicalSectionOrder, themeSections, supportsSection } from '@/compone
 import { CustomDesignModal, CustomDesignCta } from '@/components/dashboard/website/CustomDesignModal';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 import { ModalShell } from '@/components/ui/modal-shell';
+import { ConfirmDialog, EmptyState, ActionButton } from '@/components/patterns';
+import { websiteCapabilities } from '@/lib/website-capabilities';
+import { domainState } from '@/lib/domain-status';
 import {
   PREVIEW_READY,
   PREVIEW_UPDATE,
@@ -123,9 +126,31 @@ function SaveBtn({ loading, dirty, onClick }: { loading: boolean; dirty?: boolea
   );
 }
 
+/** One line of the domain card: a name, a state, and whether it is done. */
+function DomainCheck({ name, label, done, failed }: {
+  name: string; label: string; done: boolean; failed?: boolean;
+}) {
+  const Icon = done ? CheckCircle2 : failed ? AlertTriangle : Loader2;
+  const tone = done ? 'text-rp-brand' : failed ? 'text-rp-danger' : 'text-rp-gold';
+  // The icon is the at-a-glance signal and is aria-hidden, so the row carries
+  // the same state where a test can see it. A tick beside "not issued yet"
+  // is precisely the contradiction this card exists to remove.
+  const state = done ? 'done' : failed ? 'failed' : 'pending';
+  return (
+    <div className="flex items-center gap-2" data-state={state}>
+      <Icon className={`h-4 w-4 shrink-0 ${tone}`} aria-hidden="true" />
+      <span className="w-14 shrink-0 text-rp-label font-semibold text-rp-text">{name}</span>
+      <span className="text-rp-label text-rp-muted">{label}</span>
+    </div>
+  );
+}
+
 export default function WebsitePage() {
   const queryClient = useQueryClient();
-  const { tenant } = useAuthStore();
+  const { tenant, user } = useAuthStore();
+  // Mirrors the API's own role gates; the server still refuses either way.
+  const caps = websiteCapabilities(user?.role);
+  const visibleTabs = TABS.filter(t => t.id !== 'domain' || caps.viewDomain);
   const [tab, setTab] = useState<Tab>('template');
   const [showPreview, setShowPreview] = useState(true);
   const [previewKey,  setPreviewKey]  = useState(0);
@@ -147,7 +172,8 @@ export default function WebsitePage() {
     tripadvisorUrl: '', hiddenSections: [], sectionOrder: [], googleAnalyticsId: '',
   });
 
-  const { data, isLoading } = useQuery({ queryKey: ['website'], queryFn: () => websiteApi.get() });
+  const { data, isLoading, isError, isFetching, refetch } =
+    useQuery({ queryKey: ['website'], queryFn: () => websiteApi.get() });
 
   useEffect(() => {
     const content = data?.data?.data;
@@ -267,9 +293,27 @@ export default function WebsitePage() {
     domainVerified: boolean;
     domainVerifiedAt: string | null;
     cnameTarget?: string;
+    sslStatus?: string | null;
+    sslError?: string | null;
   } | null>(null);
 
-  const { data: tenantData } = useQuery({ queryKey: ['tenant-domain'], queryFn: () => tenantApi.get() });
+  const [confirmRemoveDomain, setConfirmRemoveDomain] = useState(false);
+
+  // DNS and HTTPS are separate states; "live" needs both. See lib/domain-status.
+  const dom = domainState(domainInfo);
+
+  const {
+    data: tenantData,
+    isError: tenantFailed,
+    isFetching: tenantFetching,
+    refetch: refetchTenant,
+  } = useQuery({
+    queryKey: ['tenant-domain'],
+    queryFn: () => tenantApi.getDomainStatus(),
+    // GET /tenant is OWNER/MANAGER. Asking anyway would 403 every time and
+    // light up the failure notice for a role that is simply not entitled.
+    enabled: caps.viewDomain,
+  });
 
   useEffect(() => {
     const t = tenantData?.data?.data;
@@ -278,7 +322,9 @@ export default function WebsitePage() {
         customDomain:     t.customDomain    ?? null,
         domainVerified:   t.domainVerified  ?? false,
         domainVerifiedAt: t.domainVerifiedAt ?? null,
-        cnameTarget: t.slug ? `${t.slug}.resortpro.site` : undefined,
+        cnameTarget: t.cnameTarget ?? (t.slug ? `${t.slug}.resortpro.site` : undefined),
+        sslStatus:        t.sslStatus ?? null,
+        sslError:         t.sslError  ?? null,
       });
       if (t.customDomain) setDomainInput(t.customDomain);
     }
@@ -315,6 +361,38 @@ export default function WebsitePage() {
       <div className="space-y-5">
         <div className="h-7 w-48 rounded-[8px] animate-pulse" style={{ background: 'var(--rp-surface-4)' }} />
         <div className="h-64 rounded-[14px] animate-pulse" style={{ background: 'var(--rp-surface-4)' }} />
+      </div>
+    );
+  }
+
+  // A failed load used to render the whole builder with every field at its
+  // blank default — the owner's reasonable reading of that is "my website
+  // content is gone". It was also a dead end: `savedSnapshot` stays null when
+  // the effect never runs, so `dirty` stays false and Save stayed disabled,
+  // insisting "No changes to publish" however much they retyped. Nothing could
+  // be overwritten from there, but nothing said why either.
+  if (isError) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8" role="alert">
+        <EmptyState
+          icon={AlertTriangle}
+          title="Could not load your website content"
+          description={
+            <>
+              Nothing has been lost and your published website is still serving visitors — this
+              page could not reach the server. Check your connection and try again.
+            </>
+          }
+          action={
+            <ActionButton
+              icon={<RefreshCw className={`h-4 w-4${isFetching ? ' animate-spin' : ''}`} />}
+              onClick={() => refetch()}
+              disabled={isFetching}
+            >
+              {isFetching ? 'Retrying…' : 'Try again'}
+            </ActionButton>
+          }
+        />
       </div>
     );
   }
@@ -369,7 +447,7 @@ export default function WebsitePage() {
           {/* Tab bar — wraps so ALL tabs stay visible (no hidden horizontal scroll) */}
           <div className="flex flex-wrap gap-0 flex-shrink-0 px-3"
             style={{ borderBottom: '1px solid rgba(0,0,0,0.07)', background: 'var(--rp-surface-2)' }}>
-            {TABS.map(({ id, label, icon: Icon }) => (
+            {visibleTabs.map(({ id, label, icon: Icon }) => (
               <button key={id} onClick={() => setTab(id)}
                 className="flex items-center gap-1.5 px-3 py-2.5 text-[12px] font-medium border-b-2 -mb-px transition-colors whitespace-nowrap"
                 style={tab === id
@@ -458,7 +536,9 @@ export default function WebsitePage() {
                   onSelect={(key) => set('templateId', key)}
                 />
                 {/* Paid custom-design service — plan/theme-studio-and-design-service.md */}
-                <CustomDesignCta onClick={() => setDesignModalOpen(true)} />
+                {caps.requestCustomDesign && (
+                  <CustomDesignCta onClick={() => setDesignModalOpen(true)} />
+                )}
               </div>
             )}
 
@@ -549,6 +629,7 @@ export default function WebsitePage() {
                       <img src={url} alt={`Gallery ${i + 1}`} className="h-full w-full object-cover" />
                       <button
                         onClick={() => set('galleryImages', (form.galleryImages ?? []).filter((_, idx) => idx !== i))}
+                        aria-label={`Remove gallery photo ${i + 1}`}
                         className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100"
                         style={{ background: 'rgba(24,49,83,0.7)', color: 'var(--rp-btn-accent-text)' }}>
                         <Trash2 className="h-3 w-3" />
@@ -610,6 +691,7 @@ export default function WebsitePage() {
                         <div className="flex items-center justify-between">
                           <span className="text-[12.5px] font-medium text-[#64748b] dark:text-[#a9c1d0]">Testimonial #{i + 1}</span>
                           <button onClick={() => removeTestimonial(i)}
+                            aria-label={t.name ? `Remove testimonial from ${t.name}` : `Remove testimonial ${i + 1}`}
                             className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#fef2f2] text-[#94a3b8] dark:text-[#7f99ab]">
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -760,12 +842,12 @@ export default function WebsitePage() {
                           {/* Reorder arrows */}
                           <div className="flex flex-col">
                             <button type="button" onClick={() => move(sec.id, -1)} disabled={idx === 0}
-                              title="Move up"
+                              title="Move up" aria-label={`Move ${sec.label} up`}
                               className="flex h-5 w-6 items-center justify-center rounded-[5px] transition-colors disabled:opacity-25 enabled:hover:bg-black/[0.06]">
                               <ChevronUp className="h-3.5 w-3.5" style={{ color: 'var(--rp-text)' }} />
                             </button>
                             <button type="button" onClick={() => move(sec.id, 1)} disabled={idx === order.length - 1}
-                              title="Move down"
+                              title="Move down" aria-label={`Move ${sec.label} down`}
                               className="flex h-5 w-6 items-center justify-center rounded-[5px] transition-colors disabled:opacity-25 enabled:hover:bg-black/[0.06]">
                               <ChevronDown className="h-3.5 w-3.5" style={{ color: 'var(--rp-text)' }} />
                             </button>
@@ -783,6 +865,9 @@ export default function WebsitePage() {
                             </span>
                           ) : (
                             <button type="button" onClick={e => { e.stopPropagation(); toggle(); }}
+                              role="switch"
+                              aria-checked={!isHidden}
+                              aria-label={`Show ${sec.label} on your website`}
                               className="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors"
                               style={{ background: isHidden ? '#d6d0c8' : '#183153' }}>
                               <span className="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
@@ -912,26 +997,72 @@ export default function WebsitePage() {
                     ) instead of the resortpro.site subdomain.
                   </p>
 
-                  {domainInfo?.customDomain && (
-                    <div className="flex items-center gap-3 rounded-[10px] border p-3"
-                      style={domainInfo.domainVerified
-                        ? { background: 'var(--rp-teal-bg)', borderColor: 'var(--rp-border)' }
-                        : { background: 'var(--rp-amber-bg)', borderColor: 'rgba(184,144,64,0.25)' }}>
-                      {domainInfo.domainVerified
-                        ? <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: 'var(--rp-text)' }} />
-                        : <AlertTriangle className="h-5 w-5 shrink-0" style={{ color: 'var(--rp-gold)' }} />}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold font-mono truncate text-[#183153] dark:text-[#f8fafc]">{domainInfo.customDomain}</p>
-                        <p className="text-[11.5px]" style={{ color: domainInfo.domainVerified ? '#183153' : '#b89040' }}>
-                          {domainInfo.domainVerified ? 'Verified & live' : 'Pending DNS verification'}
+                  {/* Tokens, not the raw hex the rest of this card still uses —
+                      new markup may not add to that debt, and the ratchet
+                      enforces it. */}
+                  {tenantFailed && !domainInfo && (
+                    <div role="alert" className="flex items-start gap-2.5 rounded-rp-panel border border-rp-border-md bg-rp-amber-bg p-3">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rp-gold" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-rp-body font-semibold text-rp-text">
+                          Could not check your domain settings
                         </p>
+                        <p className="text-rp-label text-rp-muted">
+                          The box below is empty because this page could not reach the server, not
+                          because you have no domain. Any domain you already connected is still live.
+                        </p>
+                        <button onClick={() => refetchTenant()} disabled={tenantFetching}
+                          className="mt-1.5 inline-flex items-center gap-1.5 text-rp-label font-semibold text-rp-gold hover:underline disabled:opacity-60">
+                          <RefreshCw className={`h-3 w-3${tenantFetching ? ' animate-spin' : ''}`} />
+                          {tenantFetching ? 'Checking…' : 'Try again'}
+                        </button>
                       </div>
-                      {domainInfo.domainVerified && (
-                        <a href={`https://${domainInfo.customDomain}`} target="_blank" rel="noopener noreferrer"
-                          style={{ color: 'var(--rp-text)' }}>
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
+                    </div>
+                  )}
+
+                  {/* DNS and HTTPS, separately. "Verified & live" used to appear
+                      the moment DNS resolved, next to an https:// link that
+                      cannot load without a certificate — the owner was told the
+                      domain was live and then watched it fail. (WB-008) */}
+                  {dom.configured && (
+                    <div className="space-y-2 rounded-rp-panel border border-rp-border-md bg-rp-surface-3 p-3">
+                      <div className="flex items-center gap-2">
+                        <p className="min-w-0 flex-1 truncate font-mono text-rp-body font-semibold text-rp-text">
+                          {domainInfo?.customDomain}
+                        </p>
+                        {dom.canOpen && (
+                          <a href={`https://${domainInfo?.customDomain}`} target="_blank" rel="noopener noreferrer"
+                            aria-label={`Open ${domainInfo?.customDomain} in a new tab`}
+                            className="text-rp-text">
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        )}
+                      </div>
+
+                      <DomainCheck done={dom.dns.done} name="DNS" label={dom.dns.label} />
+                      <DomainCheck
+                        done={dom.https.state === 'active'}
+                        failed={dom.https.state === 'failed'}
+                        name="HTTPS"
+                        label={dom.https.label}
+                      />
+
+                      {dom.nextStep && (
+                        <p className="pt-1 text-rp-label text-rp-muted">{dom.nextStep}</p>
                       )}
+                    </div>
+                  )}
+
+                  {!caps.editDomain && (
+                    /* Said, not silently greyed. A manager who finds the fields
+                       dead and no reason given will assume the page is broken
+                       and ask someone to look at it. */
+                    <div className="flex items-start gap-2.5 rounded-rp-panel border border-rp-border-md bg-rp-surface-3 p-3">
+                      <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-rp-muted" />
+                      <p className="text-rp-label text-rp-muted">
+                        Only the resort owner can connect, verify or remove a domain. You can see
+                        the current status here.
+                      </p>
                     </div>
                   )}
 
@@ -939,10 +1070,11 @@ export default function WebsitePage() {
                     <label className={labelCls}>Domain Name</label>
                     <div className="flex gap-2">
                       <input value={domainInput} onChange={e => setDomainInput(e.target.value.toLowerCase().trim())}
-                        placeholder="www.yourresort.com" className={inputCls + ' font-mono'} />
+                        placeholder="www.yourresort.com" className={inputCls + ' font-mono'}
+                        disabled={!caps.editDomain} readOnly={!caps.editDomain} />
                       <button
                         onClick={() => setDomainMut.mutate(domainInput || null)}
-                        disabled={setDomainMut.isPending || (!domainInput && !domainInfo?.customDomain)}
+                        disabled={!caps.editDomain || setDomainMut.isPending || (!domainInput && !domainInfo?.customDomain)}
                         className="flex shrink-0 items-center gap-1.5 rounded-[8px] px-4 py-2 text-[13px] font-medium disabled:opacity-60 hover:opacity-90"
                         style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
                         {setDomainMut.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
@@ -952,7 +1084,7 @@ export default function WebsitePage() {
                     <p className="mt-1 text-[11.5px] text-[#64748b] dark:text-[#a9c1d0]">Enter the exact domain with www or without — whichever you want to use.</p>
                   </div>
 
-                  {domainInfo?.customDomain && !domainInfo.domainVerified && (
+                  {caps.editDomain && domainInfo?.customDomain && !domainInfo.domainVerified && (
                     <button onClick={() => verifyMut.mutate()} disabled={verifyMut.isPending}
                       className="flex w-full items-center justify-center gap-2 rounded-[9px] border py-2 text-[13px] font-medium transition-colors disabled:opacity-60 hover:bg-[#f4ecda]"
                       style={{ borderColor: 'rgba(184,144,64,0.35)', color: 'var(--rp-gold)' }}>
@@ -962,12 +1094,39 @@ export default function WebsitePage() {
                     </button>
                   )}
 
-                  {domainInfo?.customDomain && (
-                    <button onClick={() => { setDomainInput(''); setDomainMut.mutate(null); }}
-                      className="text-[12px] hover:underline" style={{ color: 'var(--rp-danger)' }}>
+                  {caps.editDomain && domainInfo?.customDomain && (
+                    <button onClick={() => setConfirmRemoveDomain(true)}
+                      disabled={setDomainMut.isPending}
+                      aria-label={`Remove custom domain ${domainInfo.customDomain}`}
+                      className="text-[12px] hover:underline disabled:opacity-60" style={{ color: 'var(--rp-danger)' }}>
                       Remove custom domain
                     </button>
                   )}
+
+                  {/* The sibling of this button in Settings already confirmed; this
+                      one did not, and it is the more likely of the two to be
+                      pressed — the domain lives on this page. One click took the
+                      address off the card, SSL and all. */}
+                  <ConfirmDialog
+                    open={confirmRemoveDomain}
+                    onClose={() => setConfirmRemoveDomain(false)}
+                    variant="resort"
+                    tone="danger"
+                    title="Remove this domain?"
+                    confirmLabel="Remove domain"
+                    description={
+                      <>
+                        <strong className="font-mono">{domainInfo?.customDomain}</strong> will stop
+                        serving your website, and visitors who have it bookmarked will see an error.
+                        Your free <strong>{tenant?.slug}.resortpro.site</strong> address keeps working,
+                        and nothing you have written is deleted.
+                      </>
+                    }
+                    onConfirm={async () => {
+                      await setDomainMut.mutateAsync(null);
+                      setDomainInput('');
+                    }}
+                  />
                 </div>
 
                 {domainInfo?.customDomain && !domainInfo.domainVerified && (
@@ -1141,7 +1300,8 @@ export default function WebsitePage() {
           )}
         </div>
       </ModalShell>
-      <CustomDesignModal open={designModalOpen} onClose={() => setDesignModalOpen(false)} />
+      <CustomDesignModal open={designModalOpen && caps.requestCustomDesign}
+        onClose={() => setDesignModalOpen(false)} />
     </div>
   );
 }

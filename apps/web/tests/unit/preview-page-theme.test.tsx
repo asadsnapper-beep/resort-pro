@@ -21,9 +21,14 @@ vi.mock('next/navigation', () => ({
 
 import ResortWebsitePage from '@/app/(public)/[slug]/page';
 import { PreviewPage } from '@/app/(public)/[slug]/PreviewPage';
+import { TemplateThemeRenderer } from '@/components/themes/template-renderer';
 
 const brutalist = { key: 'brutalist', name: 'Brutalist', colors: { background: '#fff200' } };
 const savedUpload = { key: 'saved-upload', name: 'Saved Upload' };
+
+const TIER2_HTML = '<section id="hero"><h1>{{tenant.name}}</h1></section>';
+const TIER2_CSS = '#hero { --resort: "{{tenant.name}}"; }';
+const tier2 = { themeType: 'TEMPLATE', configJson: null, templateHtml: TIER2_HTML, templateCss: TIER2_CSS };
 
 const site = (over: Record<string, unknown> = {}) => ({
   tenant: { name: 'Palm Paradise', slug: 'palm-paradise-resort' },
@@ -150,5 +155,64 @@ describe('previewing the theme already saved', () => {
     const el = await render({ preview: 'saved-upload' });
     expect(el.props.configJson).toEqual(savedUpload);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('?preview=<key> for a Tier 2 template', () => {
+  it('compiles the previewed template instead of falling through to luxe', async () => {
+    stub(site(), { 'tier-two': tier2 });
+    const el = await render({ preview: 'tier-two' });
+    expect(el.type).toBe(PreviewPage);
+    expect(el.props.template.html).toContain('Palm Paradise');
+  });
+
+  it('leaves no uncompiled Handlebars in what it hands down', async () => {
+    // A raw `{{ }}` reaching the browser is the visible form of this failing:
+    // the owner reads their own markup instead of their resort's name.
+    stub(site(), { 'tier-two': tier2 });
+    const el = await render({ preview: 'tier-two' });
+    expect(el.props.template.html).not.toContain('{{');
+  });
+
+  it('compiles the stylesheet with the same pass', async () => {
+    // CSS can reference the same tokens, and a raw `{{ }}` left in it is
+    // invalid CSS — the rule it sits in is dropped by the browser.
+    stub(site(), { 'tier-two': tier2 });
+    const el = await render({ preview: 'tier-two' });
+    expect(el.props.template.css).toContain('Palm Paradise');
+  });
+
+  it('passes no config alongside it', async () => {
+    // The client picks the renderer off `template` first, so a config arriving
+    // with it would mean two renderers disagreeing about which theme this is.
+    stub(site(), { 'tier-two': tier2 });
+    const el = await render({ preview: 'tier-two' });
+    expect(el.props.configJson).toBeNull();
+  });
+
+  it('previews a Tier 2 theme the resort already uses', async () => {
+    stub(site({ ...tier2, website: { templateId: 'saved-tier2' } }));
+    const el = await render({ preview: 'saved-tier2' });
+    expect(el.props.template.html).toContain('Palm Paradise');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to the registry for a template theme with no HTML stored', async () => {
+    stub(site(), { 'tier-two': { themeType: 'TEMPLATE', templateHtml: null } });
+    const el = await render({ preview: 'tier-two' });
+    expect(el.props.template).toBeNull();
+    expect(el.props.configJson).toBeNull();
+  });
+});
+
+describe('the live site, Tier 2', () => {
+  it('still renders the saved template server-side', async () => {
+    // compileTier2 is shared with the preview path now; the live site must
+    // keep rendering through TemplateThemeRenderer, not PreviewPage.
+    stub(site({ ...tier2, website: { templateId: 'saved-tier2', heroTitle: 'Your Paradise Awaits' } }));
+    const el = await render({});
+    expect(el.type).toBe(TemplateThemeRenderer);
+    expect(el.props.html).toContain('Palm Paradise');
+    expect(el.props.css).toContain('Palm Paradise');
   });
 });
