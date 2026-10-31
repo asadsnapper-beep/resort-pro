@@ -4,6 +4,7 @@ import { prisma, Prisma } from '@resort-pro/database';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams, validate } from '../utils/response';
 import { generateConfirmationNo, calculateNights } from '../utils/booking';
+import { parseStayDates } from '../utils/stay-dates';
 import { sendEmail } from '../services/email';
 import {
   sendBookingConfirmation,
@@ -107,8 +108,10 @@ async function autoCreateInvoice(bookingId: string, tenantId: string) {
 const createBookingSchema = z.object({
   roomId: z.string().uuid(),
   guestId: z.string().uuid().optional(),
-  checkIn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  checkOut: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  // Shape only; the dates themselves are checked by parseStayDates in the
+  // handler, because a regex cannot tell February from its 31st.
+  checkIn: z.string().min(1),
+  checkOut: z.string().min(1),
   adults: z.number().int().min(1).default(1),
   children: z.number().int().min(0).default(0),
   specialRequests: z.string().optional(),
@@ -385,12 +388,11 @@ export async function bookingRoutes(app: FastifyInstance) {
       const { tenantId, sub: staffId } = request.user as JwtPayload;
       const body = createBookingSchema.parse(request.body);
 
-      const checkInDate = new Date(body.checkIn);
-      const checkOutDate = new Date(body.checkOut);
-
-      if (checkOutDate <= checkInDate) {
-        return reply.status(400).send({ success: false, error: 'Check-out must be after check-in' });
+      const dates = parseStayDates(body);
+      if (!dates.ok) {
+        return reply.status(400).send({ success: false, error: dates.error, code: dates.code });
       }
+      const { checkIn: checkInDate, checkOut: checkOutDate } = dates;
 
       // Check room exists and belongs to tenant
       const room = await db.room.findFirst({ where: { id: body.roomId, isActive: true } });

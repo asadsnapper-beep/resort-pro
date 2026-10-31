@@ -7,6 +7,7 @@ import { checkRoomLimit } from '../utils/entitlement';
 import { matchAllTerms } from '../utils/search-terms';
 import { propertyScope } from '../utils/property-scope';
 import { sellableRoomWhere } from '../utils/room-saleability';
+import { parseStayDates } from '../utils/stay-dates';
 
 const roomSchema = z.object({
   number:       z.string().min(1).max(10),
@@ -133,16 +134,16 @@ export async function roomRoutes(app: FastifyInstance) {
   app.get('/availability', {
     schema: { tags: ['rooms'], summary: 'Check room availability for date range', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
-    handler: async (request) => {
+    handler: async (request, reply) => {
       const { db } = request;
-      const { checkIn, checkOut } = request.query as { checkIn: string; checkOut: string };
 
-      if (!checkIn || !checkOut) {
-        return { success: false, error: 'checkIn and checkOut are required' };
+      // The dates are a contract, not a suggestion — utils/stay-dates.ts says
+      // what a stay date is, and every endpoint that takes one agrees.
+      const dates = parseStayDates(request.query);
+      if (!dates.ok) {
+        return reply.status(400).send({ success: false, error: dates.error, code: dates.code });
       }
-
-      const checkInDate  = new Date(checkIn);
-      const checkOutDate = new Date(checkOut);
+      const { checkIn: checkInDate, checkOut: checkOutDate } = dates;
 
       const bookedRoomIds = await db.booking.findMany({
         where: {

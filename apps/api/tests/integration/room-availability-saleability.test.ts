@@ -19,6 +19,15 @@
  * — so a blanket "must be AVAILABLE" would have taken rooms off sale for
  * weeks of dates nothing was holding. These tests pin the refusals and the
  * nights that must stay sellable, on both channels.
+ *
+ * One guard here is reasoned rather than measured. The rule reads `checkIn`'s
+ * *UTC* date parts, not the server's local ones, so the day it lands on does
+ * not depend on where the server is. A test once covered that by sending a
+ * late-evening timestamp, but utils/stay-dates.ts now refuses anything that is
+ * not a bare `YYYY-MM-DD` (RM-006), so every date that reaches the rule is
+ * already midnight UTC and the two readings agree — except on a server west of
+ * UTC, which this suite cannot create. The refusal itself is covered by
+ * stay-date-contract.test.ts.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildApp } from '../../src/app';
@@ -175,24 +184,6 @@ describe('a stay starting today', () => {
     const roomId = await makeRoom();
 
     expect(await offered(0)).toContain(roomId);
-  });
-
-  it('is still today when the date arrives as a late-evening timestamp', async () => {
-    const roomId = await makeRoom();
-    await setStatus(roomId, 'CLEANING');
-
-    // Nothing validates the shape of `checkIn`, and a client that reaches for
-    // `toISOString()` instead of slicing the date off sends a full instant.
-    // Whatever arrives is a calendar date, so a stay stamped 20:00 UTC on the
-    // resort's today is today — read as a server-local day instead it would
-    // come out as tomorrow and the dirty room would go back on sale.
-    const res = await app.inject({
-      method: 'GET', headers: auth(),
-      url: `/api/rooms/availability?checkIn=${dateStr(0)}T20:00:00Z&checkOut=${dateStr(2)}`,
-    });
-
-    expect(res.statusCode).toBe(200);
-    expect((body(res).data as { id: string }[]).map(r => r.id)).not.toContain(roomId);
   });
 });
 
