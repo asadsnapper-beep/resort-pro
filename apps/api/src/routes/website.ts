@@ -10,6 +10,7 @@ import { sendWebBookingEmails } from '../utils/guest-emails';
 import { PENDING_HOLD_MINUTES } from '../utils/booking';
 import { effectiveThemePrice, themeAccessFor } from '../utils/theme-access';
 import { isUnpublishedTheme, verifyThemePreviewSignature } from '../utils/signed-theme-preview';
+import { sellableRoomWhere, unsellableStatusesFor } from '../utils/room-saleability';
 
 // Accept absolute http(s) URLs OR site-relative upload paths (/uploads/…) —
 // the app's own ImageUpload produces relative paths, so strict .url() broke saves.
@@ -805,7 +806,14 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
       const bookedIds = bookedRoomIds.map((b) => b.roomId);
 
       const rooms = await prisma.room.findMany({
-        where: { tenantId: tenant.id, isActive: true, status: { not: 'MAINTENANCE' }, id: { notIn: bookedIds } },
+        // Same saleability rule the dashboard's own availability uses — a room
+        // being cleaned right now is not on sale for tonight, whichever side
+        // of the app is asking (utils/room-saleability.ts).
+        where: {
+          tenantId: tenant.id,
+          ...sellableRoomWhere(checkIn, tenant.timezone),
+          id: { notIn: bookedIds },
+        },
         select: { id: true, name: true, type: true, number: true, basePrice: true, maxOccupancy: true, images: true, videos: true, amenities: true, description: true },
         orderBy: { basePrice: 'asc' },
       });
@@ -824,7 +832,7 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
       // Validate slug
       const tenant = await prisma.tenant.findUnique({
         where: { slug },
-        select: { id: true, isActive: true },
+        select: { id: true, isActive: true, timezone: true },
       });
       if (!tenant || !tenant.isActive) {
         return reply.status(404).send({ success: false, error: 'Resort not found' });
@@ -859,10 +867,14 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
         where: {
           tenantId: tenant.id,
           isActive: true,
+          // MAINTENANCE rooms are out of order, so they are not part of the
+          // month's inventory at all and must not inflate `total` either. The
+          // statuses that only hold a room *today* are applied per day below,
+          // which is why `status` is selected rather than filtered here.
           status: { not: 'MAINTENANCE' },
           ...(roomTypeFilter ? { type: roomTypeFilter } : {}),
         },
-        select: { id: true },
+        select: { id: true, status: true },
       });
 
       const totalRooms = rooms.length;
@@ -894,6 +906,9 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
       for (let d = 1; d <= daysInMonth; d++) {
         const dayStart = new Date(year, month - 1, d, 0, 0, 0, 0);
         const dayEnd = new Date(year, month - 1, d, 23, 59, 59, 999);
+        // The same day as a bare calendar date — what room-saleability.ts
+        // compares against, and immune to the server's own timezone.
+        const dayDate = new Date(Date.UTC(year, month - 1, d));
 
         // Count how many rooms are booked on this day
         const bookedRoomIds = new Set<string>();
@@ -904,6 +919,15 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
           if (checkIn < dayEnd && checkOut > dayStart) {
             bookedRoomIds.add(booking.roomId);
           }
+        }
+
+        // A room being cleaned right now cannot be sold for tonight, so the
+        // calendar may not count it as free either — it would promise a night
+        // that /:slug/availability beside it then refuses to show. Same rule,
+        // same module, and for any day past today it changes nothing.
+        const blockedToday = new Set(unsellableStatusesFor(dayDate, tenant.timezone));
+        for (const room of rooms) {
+          if (blockedToday.has(room.status)) bookedRoomIds.add(room.id);
         }
 
         const booked = bookedRoomIds.size;
