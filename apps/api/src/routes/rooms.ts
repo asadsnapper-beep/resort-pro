@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
+import { prisma, Prisma } from '@resort-pro/database';
 import { requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams } from '../utils/response';
 import { checkRoomLimit } from '../utils/entitlement';
@@ -269,7 +270,91 @@ export async function roomRoutes(app: FastifyInstance) {
       const room = await db.room.findFirst({ where: { id } });
       if (!room) return reply.status(404).send({ success: false, error: 'Room not found' });
 
-      const updated = await db.room.update({ where: { id }, data: { status } });
+      /**
+       * A room with a guest inside it is occupied, and no one gets to type
+       * otherwise.
+       *
+       * This endpoint used to write whatever status it was handed, for Owner,
+       * Manager and Receptionist alike, without looking at the bookings. The
+       * audit checked a guest in and then set the same room back to Available
+       * in one more request; the booking stayed CHECKED_IN and the call
+       * returned 200. From there the room is saleable again — front desk can
+       * assign it, the website can offer it, and the occupancy counts and
+       * housekeeping lists all read from the same lie. (Room Management QA
+       * 2026-10-28, RM-001.)
+       *
+       * So while a booking on this room is CHECKED_IN, the only status the
+       * endpoint accepts is OCCUPIED — which is either a no-op or the repair
+       * of a room whose status drifted away from its guest. Everything else is
+       * refused until somebody checks the guest out, which is the one action
+       * that actually ends the occupancy.
+       *
+       * Deliberately narrow: this guard is about the guest, not about every
+       * invariant the status field has. A room marked Maintenance with no work
+       * order, and housekeeping marking an occupied room clean, are the same
+       * family of bug (RM-004) and are not touched here.
+       */
+      const tenantId = (request.user as { tenantId: string }).tenantId;
+
+      let updated;
+      try {
+        updated = await prisma.$transaction(async (tx) => {
+          // Lock this room's live bookings before reading them. Check-in
+          // updates such a row, so taking the lock first makes it wait for
+          // this transaction instead of slipping in between the read below
+          // and the write that follows it. The room row itself is locked by
+          // the update, which is what orders this against a booking created
+          // and auto-checked-in at the same moment.
+          await tx.$queryRaw`
+            SELECT "id" FROM "bookings"
+            WHERE "tenantId" = ${tenantId}
+              AND "roomId" = ${id}
+              AND "status"::text IN ('PENDING', 'CONFIRMED', 'CHECKED_IN')
+            FOR UPDATE`;
+
+          if (status !== 'OCCUPIED') {
+            const checkedIn = await tx.booking.findFirst({
+              where: { tenantId, roomId: id, status: 'CHECKED_IN' },
+              select: {
+                confirmationNo: true,
+                guest: { select: { firstName: true, lastName: true } },
+              },
+            });
+            if (checkedIn) {
+              const guest = `${checkedIn.guest.firstName} ${checkedIn.guest.lastName}`.trim();
+              throw Object.assign(
+                new Error(
+                  `Room ${room.number} has a guest checked in (${guest}, booking ` +
+                  `${checkedIn.confirmationNo}). Check them out before changing the room's status.`,
+                ),
+                { statusCode: 409, code: 'ROOM_HAS_CHECKED_IN_GUEST' },
+              );
+            }
+          }
+
+          return tx.room.update({ where: { id }, data: { status } });
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      } catch (err: unknown) {
+        const e = err as { statusCode?: number; message?: string; code?: string };
+        if (e.statusCode === 409) {
+          return reply.status(409).send({
+            success: false,
+            error: e.message,
+            code: 'ROOM_HAS_CHECKED_IN_GUEST',
+          });
+        }
+        // Another transaction touched the same booking or room first. Say so
+        // rather than returning a 500 the front desk cannot act on.
+        if (e.code === 'P2034') {
+          return reply.status(409).send({
+            success: false,
+            error: 'This room was being updated elsewhere. Reload and try again.',
+            code: 'ROOM_STATUS_CONFLICT',
+          });
+        }
+        throw err;
+      }
+
       return ok(updated, 'Status updated');
     },
   });

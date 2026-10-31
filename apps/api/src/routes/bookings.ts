@@ -882,28 +882,60 @@ export async function bookingRoutes(app: FastifyInstance) {
       const roomId = body.roomId ?? booking.roomId;
       const now = new Date();
 
-      const [updated] = await Promise.all([
-        db.booking.update({
-          where: { id },
-          data: {
-            status:       'CHECKED_IN',
-            actualCheckIn: now,
-            checkedInBy:  checkedInByStaff,
-            roomId,
-            deposit:      body.deposit,
-            roomNotes:    body.roomNotes,
-          },
-          include: {
-            guest: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
-            room:  { select: { number: true, name: true, type: true } },
-            payments: { select: { amount: true, method: true, status: true, processedAt: true } },
-          },
-        }),
-        db.room.update({ where: { id: roomId }, data: { status: 'OCCUPIED' } }),
-        // Record deposit payment if provided
-        ...(body.deposit
-          ? [db.payment.create({
+      /**
+       * Checking a guest in writes two facts that have to agree: the booking
+       * becomes CHECKED_IN and the room becomes OCCUPIED.
+       *
+       * These were three unordered statements in a `Promise.all`, each
+       * committing on its own. That is what let a room's status drift away
+       * from its guest: if the room write landed first and the booking write
+       * last, anything that ran in between read a room that was not yet
+       * occupied and acted on it — including `PATCH /rooms/:id/status`, whose
+       * guard against overwriting an occupied room could see the booking still
+       * CONFIRMED, write Available, and be overtaken. The pair is now one
+       * transaction, in order, so no reader can see half of a check-in.
+       * (Room Management QA 2026-10-28, RM-001.)
+       *
+       * `prisma` rather than `request.db` because the tenant extension does
+       * not reach into a transaction, so the scope is written out here: the
+       * booking was already fetched through the scoped client above, and the
+       * room is matched on `tenantId` below.
+       */
+      let updated;
+      try {
+        updated = await prisma.$transaction(async (tx) => {
+          const booking = await tx.booking.update({
+            where: { id },
+            data: {
+              status:       'CHECKED_IN',
+              actualCheckIn: now,
+              checkedInBy:  checkedInByStaff,
+              roomId,
+              deposit:      body.deposit,
+              roomNotes:    body.roomNotes,
+            },
+            include: {
+              guest: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
+              room:  { select: { number: true, name: true, type: true } },
+              payments: { select: { amount: true, method: true, status: true, processedAt: true } },
+            },
+          });
+
+          // `updateMany` so a `roomId` override naming a room this tenant does
+          // not have changes nothing and says so, instead of raising the
+          // unscoped-update error this used to turn into a 500.
+          const moved = await tx.room.updateMany({
+            where: { id: roomId, tenantId },
+            data:  { status: 'OCCUPIED' },
+          });
+          if (moved.count === 0) {
+            throw Object.assign(new Error('Room not found'), { statusCode: 404 });
+          }
+
+          if (body.deposit) {
+            await tx.payment.create({
               data: {
+                tenantId,
                 bookingId: id,
                 amount:    body.deposit,
                 method:    'CASH',
@@ -911,9 +943,18 @@ export async function bookingRoutes(app: FastifyInstance) {
                 processedAt: now,
                 notes:     'Deposit collected at check-in',
               },
-            })]
-          : []),
-      ]);
+            });
+          }
+
+          return booking;
+        });
+      } catch (err: unknown) {
+        const e = err as { statusCode?: number; message?: string };
+        if (e.statusCode === 404) {
+          return reply.status(404).send({ success: false, error: e.message });
+        }
+        throw err;
+      }
 
       // The CHECK_IN trigger's actual moment. It was selectable in the UI and
       // accepted by the API with nothing anywhere to process it, so a sequence
