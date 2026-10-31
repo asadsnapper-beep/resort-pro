@@ -125,7 +125,13 @@ export default function RoomsPage() {
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => roomsApi.updateStatus(id, status),
     onSuccess: (_, vars) => { invalidate(); toast({ title: 'Status updated' }); if (selectedRoom) setSelectedRoom(r => r ? { ...r, status: vars.status as Room['status'] } : null); },
-    onError: () => toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' }),
+    // The server refuses a status that contradicts a checked-in guest, and
+    // says which guest and which booking. Swallowing that for a flat "Failed
+    // to update status" left the front desk with a dead dropdown and no idea
+    // why, so the server's own sentence is shown, like every other mutation
+    // on this page already does.
+    onError: (err: { response?: { data?: { error?: string } } }) =>
+      toast({ title: 'Error', description: err?.response?.data?.error ?? 'Failed to update status', variant: 'destructive' }),
   });
 
   const deleteMutation = useMutation({
