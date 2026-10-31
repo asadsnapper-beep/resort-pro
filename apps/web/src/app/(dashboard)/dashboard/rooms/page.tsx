@@ -103,6 +103,9 @@ export default function RoomsPage() {
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['rooms'] });
     queryClient.invalidateQueries({ queryKey: ['rooms-stats'] });
+    // A room's property assignment changes that property's room count and its
+    // status tally, both of which /properties returns.
+    queryClient.invalidateQueries({ queryKey: ['properties'] });
   };
 
   const createMutation = useMutation({

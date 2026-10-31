@@ -55,6 +55,8 @@ export interface Room {
   name: string;
   type: RoomType;
   status: RoomStatus;
+  /** Which property this room belongs to, for a resort group with several. */
+  propertyId: string | null;
   floor: number | null;
   maxOccupancy: number;
   basePrice: number;

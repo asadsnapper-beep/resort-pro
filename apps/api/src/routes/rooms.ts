@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams } from '../utils/response';
@@ -17,9 +17,53 @@ const roomSchema = z.object({
   amenities:    z.array(z.string()).default([]),
   images:       z.array(z.string()).default([]),
   videos:       z.array(z.string().url('Each video must be a valid URL')).default([]),
+  /**
+   * The property this room belongs to, for a resort group with more than one.
+   *
+   * It was missing from this schema while the Add/Edit Room modal collected it
+   * and sent it on every save. Zod strips what it does not declare, so the
+   * request returned 201, the modal closed as though it had worked, and the
+   * row was written with propertyId null — for the multi-property customers
+   * who are the only ones shown the selector at all. Every dashboard list
+   * already narrows by `propertyScope()`, so those rooms could be filtered by
+   * a property none of them could ever be given. (Room Management QA
+   * 2026-10-28, RM-002.)
+   *
+   * `null` is how the modal says "no property", so it is accepted and means
+   * unassign. Omitting the field leaves an existing assignment alone.
+   */
+  propertyId:   z.string().uuid('Not a valid property').nullable().optional(),
 });
 
 export async function roomRoutes(app: FastifyInstance) {
+
+  /**
+   * Is this property one this tenant may put a room in?
+   *
+   * Read on the tenant-scoped client, so another tenant's property simply
+   * matches nothing and is refused the same way a made-up id is — the caller
+   * cannot tell the difference, which is the point. An inactive property is
+   * refused too: assigning inventory to a property the owner has retired puts
+   * rooms somewhere no dashboard view will show them.
+   */
+  async function assignablePropertyExists(
+    db: FastifyRequest['db'],
+    propertyId: string,
+  ): Promise<boolean> {
+    const property = await db.property.findFirst({
+      where: { id: propertyId, isActive: true },
+      select: { id: true },
+    });
+    return Boolean(property);
+  }
+
+  const unknownProperty = (reply: FastifyReply) =>
+    reply.status(400).send({
+      success: false,
+      error: 'That property does not exist, or is no longer active.',
+      code: 'PROPERTY_NOT_FOUND',
+      field: 'propertyId',
+    });
 
   /* ── GET /api/rooms/stats ────────────────────────────────────────────────── */
   app.get('/stats', {
@@ -174,6 +218,10 @@ export async function roomRoutes(app: FastifyInstance) {
         });
       }
 
+      if (body.propertyId && !(await assignablePropertyExists(db, body.propertyId))) {
+        return unknownProperty(reply);
+      }
+
       const room = await db.room.create({ data: body });
       return reply.status(201).send(ok(room, 'Room created'));
     },
@@ -194,6 +242,12 @@ export async function roomRoutes(app: FastifyInstance) {
       if (body.number && body.number !== room.number) {
         const dup = await db.room.findFirst({ where: { number: body.number, id: { not: id } } });
         if (dup) return reply.status(409).send({ success: false, error: 'Room number already exists' });
+      }
+
+      // Sent and non-null means reassign, so it is checked. Sent as null means
+      // unassign, which needs no property to exist. Absent means leave it.
+      if (body.propertyId && !(await assignablePropertyExists(db, body.propertyId))) {
+        return unknownProperty(reply);
       }
 
       const updated = await db.room.update({ where: { id }, data: body });
