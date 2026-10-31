@@ -101,7 +101,7 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
       setAmenities(room.amenities ?? []);
       setImages(room.images ?? []);
       setVideos(room.videos ?? []);
-      setPropertyId((room as Room & { propertyId?: string | null }).propertyId ?? '');
+      setPropertyId(room.propertyId ?? '');
     } else {
       reset({ type: 'STANDARD', maxOccupancy: 2, basePrice: 100 });
       setSelectedType('STANDARD');
