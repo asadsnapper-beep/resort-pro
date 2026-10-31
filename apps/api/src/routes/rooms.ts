@@ -6,6 +6,7 @@ import { ok, paginated, parsePageParams } from '../utils/response';
 import { checkRoomLimit } from '../utils/entitlement';
 import { matchAllTerms } from '../utils/search-terms';
 import { propertyScope } from '../utils/property-scope';
+import { sellableRoomWhere } from '../utils/room-saleability';
 
 const roomSchema = z.object({
   number:       z.string().min(1).max(10),
@@ -154,11 +155,20 @@ export async function roomRoutes(app: FastifyInstance) {
 
       const bookedIds = bookedRoomIds.map(b => b.roomId);
 
+      // Which room statuses may be sold for a stay starting on this date is
+      // utils/room-saleability.ts's decision, not this route's — the public
+      // site answers the same question and has to answer it the same way.
+      // Read for its own timezone because "today" is where the rule turns.
+      const { tenantId } = request.user as { tenantId: string };
+      const tenant = await prisma.tenant.findUnique({
+        where:  { id: tenantId },
+        select: { timezone: true },
+      });
+
       const availableRooms = await db.room.findMany({
         where: {
-          isActive: true,
-          status:   { not: 'MAINTENANCE' },
-          id:       { notIn: bookedIds },
+          ...sellableRoomWhere(checkInDate, tenant?.timezone),
+          id: { notIn: bookedIds },
         },
         orderBy: { basePrice: 'asc' },
       });
