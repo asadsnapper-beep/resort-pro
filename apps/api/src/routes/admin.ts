@@ -771,7 +771,7 @@ export async function adminRoutes(app: FastifyInstance) {
             currentPeriodEnd: true,
             stripeCustomerId: true,
             createdAt: true,
-            _count: { select: { users: true, rooms: true, bookings: true } },
+            _count: { select: { users: true, rooms: { where: { isActive: true } }, bookings: true } },
             users: {
               where: { role: 'OWNER' },
               select: { lastLoginAt: true },
@@ -818,7 +818,7 @@ export async function adminRoutes(app: FastifyInstance) {
       const tenant = await prisma.tenant.findUnique({
         where: { id: request.params.id },
         include: {
-          _count: { select: { users: true, rooms: true, bookings: true, guests: true } },
+          _count: { select: { users: true, rooms: { where: { isActive: true } }, bookings: true, guests: true } },
           users: {
             where: { role: 'OWNER' },
             select: { id: true, firstName: true, lastName: true, email: true, lastLoginAt: true },
@@ -1453,7 +1453,7 @@ export async function adminRoutes(app: FastifyInstance) {
         email: true, billingEmail: true, phone: true, currency: true,
         stripeCustomerId: true, stripeSubscriptionId: true,
         trialEndsAt: true, currentPeriodEnd: true, createdAt: true, updatedAt: true,
-        _count: { select: { users: true, rooms: true, bookings: true, guests: true } },
+        _count: { select: { users: true, rooms: { where: { isActive: true } }, bookings: true, guests: true } },
       },
     });
     const PRICES: Record<string, number> = MONTHLY_PLAN_PRICE_USD;

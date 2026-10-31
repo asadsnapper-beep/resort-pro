@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildApp } from '../../src/app';
 import { prisma } from '@resort-pro/database';
-import { verifyOwnerAndLogin } from '../helpers/auth';
+import { signAdmin, verifyOwnerAndLogin } from '../helpers/auth';
 import type { FastifyInstance } from 'fastify';
 
 let app: FastifyInstance;
@@ -21,6 +21,10 @@ const password = 'TestPass123!';
 let token: string;
 let propertyId: string;
 let roomId: string;
+const adminSlug = `${slug}-admin`;
+const adminEmail = `admin-${slug}@test.com`;
+let adminToken: string;
+let adminTenantId: string;
 
 const auth = () => ({ Authorization: `Bearer ${token}` });
 
@@ -67,10 +71,27 @@ beforeAll(async () => {
   roomId = (await prisma.room.create({
     data: { tenantId, propertyId, number: 'L1', name: 'Lone 1', basePrice: 4000, status: 'AVAILABLE' },
   })).id;
+
+  // A second resort for the admin surfaces, with a shape of its own: two live
+  // rooms and one deleted. Its own, so these counts do not depend on what the
+  // property tests above have deleted by the time they run.
+  adminTenantId = (await prisma.tenant.create({
+    data: { name: 'Admin Count', slug: adminSlug, planStatus: 'active' },
+  })).id;
+  await prisma.room.createMany({
+    data: [
+      { tenantId: adminTenantId, number: 'A1', name: 'Admin 1', basePrice: 1500 },
+      { tenantId: adminTenantId, number: 'A2', name: 'Admin 2', basePrice: 1500 },
+      { tenantId: adminTenantId, number: 'A3', name: 'Admin 3', basePrice: 1500, isActive: false },
+    ],
+  });
+  adminToken = (await signAdmin(app, { email: adminEmail })).token;
 }, 30000);
 
 afterAll(async () => {
-  await prisma.tenant.deleteMany({ where: { slug } });
+  await prisma.tenant.deleteMany({ where: { slug: { in: [slug, adminSlug] } } });
+  // The admin row the token helper made, and its session with it.
+  await prisma.adminUser.deleteMany({ where: { email: adminEmail } });
   await app.close();
 });
 
@@ -121,5 +142,46 @@ describe('a property with a live room', () => {
     const del = await app.inject({ method: 'DELETE', url: `/api/properties/${kept.id}`, headers: auth() });
     expect(del.statusCode).toBe(409);
     expect(JSON.parse(del.body).error).toContain('1 room(s)');
+  });
+});
+
+/**
+ * The same count reaches support and finance. An inactive room is one the
+ * resort has retired, so counting it overstates what they are running — and in
+ * the export, what they are billed against.
+ */
+describe('the admin tenant room count', () => {
+  const headers = () => ({ Authorization: `Bearer ${adminToken}` });
+
+  it('counts live rooms on the tenant detail', async () => {
+    const res = await app.inject({
+      method: 'GET', url: `/api/admin/tenants/${adminTenantId}`, headers: headers(),
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(JSON.parse(res.body).data._count.rooms).toBe(2);
+  });
+
+  it('counts live rooms in the tenant list', async () => {
+    const res = await app.inject({
+      method: 'GET', url: `/api/admin/tenants?limit=100&search=${adminSlug}`, headers: headers(),
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    const rows = JSON.parse(res.body).data.tenants as { id: string; _count: { rooms: number } }[];
+    expect(rows.find((t) => t.id === adminTenantId)?._count.rooms).toBe(2);
+  });
+
+  it('counts live rooms in the finance CSV export', async () => {
+    const res = await app.inject({
+      method: 'GET', url: '/api/admin/export/tenants-csv', headers: headers(),
+    });
+    expect(res.statusCode, res.body).toBe(200);
+
+    const lines = res.body.split('\n');
+    // By header name, so a new column cannot quietly move the assertion.
+    const column = lines[0].split(',').indexOf('Rooms');
+    expect(column).toBeGreaterThan(-1);
+    const row = lines.find((l) => l.includes(adminSlug));
+    expect(row, 'the tenant is missing from the export').toBeDefined();
+    expect(row!.split(',')[column]).toBe('2');
   });
 });
