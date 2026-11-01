@@ -9,6 +9,7 @@ import { propertyScope } from '../utils/property-scope';
 import { sellableRoomWhere } from '../utils/room-saleability';
 import { roomBlocker } from '../utils/room-state';
 import { parseStayDates } from '../utils/stay-dates';
+import { tenantToday, tenantDayOffset } from '../utils/tenant-day';
 import { ROOM_CAPABILITIES } from '@resort-pro/types';
 
 const roomSchema = z.object({
@@ -213,21 +214,79 @@ export async function roomRoutes(app: FastifyInstance) {
       const room = await db.room.findFirst({ where: { id } });
       if (!room) return reply.status(404).send({ success: false, error: 'Room not found' });
 
-      const now = new Date();
-      const currentBooking = await db.booking.findFirst({
-        where: {
-          roomId: id,
-          status: { in: ['CHECKED_IN', 'CONFIRMED', 'PENDING'] },
-          checkIn:  { lte: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) },
-          checkOut: { gte: now },
-        },
+      /**
+       * The panel says "Currently Occupied", and it used to ask a question
+       * that could not answer that: one query over CHECKED_IN, CONFIRMED and
+       * PENDING alike, narrowed by `checkOut >= now`. A guest who stayed past
+       * their scheduled checkout fell out of it while still CHECKED_IN, so
+       * staff saw an Occupied room with nobody in it and were invited to
+       * force its status with somebody still upstairs.
+       * (Room Management QA 2026-10-28, RM-008.)
+       *
+       * They are two different questions and are asked separately now. Who is
+       * in the room is settled by the booking status alone — a date cannot
+       * evict anyone — and only the second question, which arrival is coming
+       * up, has any business with a calendar window.
+       *
+       * Asking them in order is also what makes the answer stable. A single
+       * query ordered by `checkIn` handed the panel to whichever booking
+       * happened to start earlier, so a guest who is actually in the room
+       * could lose it to the next arrival.
+       */
+      const { tenantId } = request.user as { tenantId: string };
+      const tenant = await prisma.tenant.findUnique({
+        where:  { id: tenantId },
+        select: { timezone: true },
+      });
+      const today = tenantToday(tenant?.timezone ?? undefined);
+
+      const withGuest = {
+        guest: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
+      };
+
+      const occupant = await db.booking.findFirst({
+        where:   { roomId: id, status: 'CHECKED_IN' },
         orderBy: { checkIn: 'asc' },
-        include: {
-          guest: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
-        },
+        include: withGuest,
       });
 
-      return ok({ ...room, currentBooking: currentBooking ?? null });
+      // `checkOut > today` and not `>=`: a stay ending today is over, and the
+      // room is sellable tonight. The same half-open boundary as
+      // utils/room-state.ts, for the same reason.
+      const upcoming = occupant ? null : await db.booking.findFirst({
+        where: {
+          roomId: id,
+          status:   { in: ['CONFIRMED', 'PENDING'] },
+          checkIn:  { lte: tenantDayOffset(7, tenant?.timezone ?? undefined) },
+          checkOut: { gt: today },
+        },
+        orderBy: { checkIn: 'asc' },
+        include: withGuest,
+      });
+
+      // The preference is enforced by the `occupant ? null :` above, not by
+      // this `??`: flipping the operands changes nothing, because `upcoming`
+      // is only ever fetched when there is no one in the room. Said here
+      // because the `??` looks like the load-bearing line and is not.
+      const booking = occupant ?? upcoming;
+
+      return ok({
+        ...room,
+        currentBooking: booking && {
+          ...booking,
+          /**
+           * Counted rather than hidden, so the desk can act on it. Whole days
+           * past the scheduled departure — not hours, because `checkOut` is a
+           * calendar date and does not know the resort's checkout time.
+           */
+          overdueNights: Math.max(
+            0,
+            Math.round((today.getTime() - booking.checkOut.getTime()) / 86_400_000),
+          ),
+          /** Leaving today is ordinary. Calling it overdue would cry wolf. */
+          dueOutToday: booking.checkOut.getTime() === today.getTime(),
+        },
+      });
     },
   });
 
