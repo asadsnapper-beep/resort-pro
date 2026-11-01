@@ -153,7 +153,7 @@ export async function discoveryRoutes(fastify: FastifyInstance) {
       select: {
         ...PUBLIC_SELECT,
         phone: true, email: true,
-        _count: { select: { rooms: true } },
+        _count: { select: { rooms: { where: { isActive: true } } } },
       },
     });
 
