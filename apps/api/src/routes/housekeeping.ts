@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams } from '../utils/response';
 import { matchAllTerms } from '../utils/search-terms';
+import { prisma } from '@resort-pro/database';
+import { BETWEEN_STAY_TYPES, recomputeRoomStatus, type RoomStateClient } from '../utils/room-state';
 
 const taskSchema = z.object({
   roomId: z.string().uuid(),
@@ -13,8 +15,6 @@ const taskSchema = z.object({
   notes: z.string().optional(),
 });
 
-// Task types that involve cleaning between stays (room should be CLEANING while in progress, AVAILABLE when done)
-const BETWEEN_STAY_TYPES = ['CHECKOUT', 'DEEP_CLEAN', 'CHECKIN'] as const;
 
 type HousekeepingActor = Pick<JwtPayload, 'role' | 'sub'>;
 
@@ -139,26 +139,47 @@ export async function housekeepingRoutes(app: FastifyInstance) {
         });
       }
 
-      const updated = await db.housekeepingTask.update({
-        where: { id },
-        data: {
-          status: status as never,
-          completedAt: status === 'COMPLETED' ? new Date() : null,
-        },
-      });
-
-      // Only update room status for tasks that involve cleaning between stays.
-      // DAILY and TURNDOWN happen while the guest is still in the room — don't touch room status.
+      // Only tasks done between stays say anything about the room: DAILY and
+      // TURNDOWN happen around a guest who is still in residence.
       const isBetweenStay = (BETWEEN_STAY_TYPES as readonly string[]).includes(task.type);
-      if (isBetweenStay) {
-        if (status === 'IN_PROGRESS') {
-          // Mark room as being cleaned
-          await db.room.update({ where: { id: task.roomId }, data: { status: 'CLEANING' } });
-        } else if (status === 'COMPLETED') {
-          // Room ready for next guest
-          await db.room.update({ where: { id: task.roomId }, data: { status: 'AVAILABLE' } });
+
+      const updated = await db.$transaction(async (tx) => {
+        const task2 = await tx.housekeepingTask.update({
+          where: { id },
+          data: {
+            status: status as never,
+            completedAt: status === 'COMPLETED' ? new Date() : null,
+          },
+        });
+
+        /**
+         * Finishing a clean used to *assert* the room was ready: COMPLETED
+         * wrote AVAILABLE, full stop. So a room with a broken air conditioner
+         * went on sale the moment housekeeping ticked it off, and so did a
+         * room whose guest was still checked into it — the clean was DAILY's
+         * job and the guest had never left. (Room Management QA 2026-10-28,
+         * RM-004.)
+         *
+         * Now it asks instead. The task's own new status is already written
+         * above, inside this transaction, so the recompute sees it: a clean in
+         * progress means CLEANING, and one that is finished or skipped means
+         * whatever is left blocking the room — a guest, an open ticket, a
+         * booking that covers today, or nothing at all.
+         */
+        if (isBetweenStay) {
+          const tenant = await prisma.tenant.findUnique({
+            where:  { id: actor.tenantId },
+            select: { timezone: true },
+          });
+          await recomputeRoomStatus(tx as unknown as RoomStateClient, {
+            tenantId: actor.tenantId,
+            roomId:   task.roomId,
+            timezone: tenant?.timezone ?? undefined,
+          });
         }
-      }
+
+        return task2;
+      });
 
       return ok(updated, 'Task updated');
     },
