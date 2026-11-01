@@ -104,6 +104,24 @@ const makeBooking = async (roomId: string, from: number, to: number, last = 'Gue
   return body(res).data.id as string;
 };
 
+/**
+ * A fresh token for the clock as it stands.
+ *
+ * Access tokens live `JWT_EXPIRES_IN || '15m'`, and this file moves the clock
+ * by hours. A token minted before the jump is already expired after it, which
+ * is how the one test that travels in time came back 401 in CI and 200 here:
+ * the local .env sets a day, CI takes the fifteen-minute default. Re-issuing
+ * makes the test independent of either.
+ */
+const loginOwner = async () => {
+  const res = await app.inject({
+    method: 'POST', url: '/api/auth/login',
+    payload: { email: `owner-${run}@test.com`, password, slug: run },
+  });
+  if (res.statusCode !== 200) throw new Error(`login failed: ${res.body}`);
+  return body(res).data.token as string;
+};
+
 const checkIn = async (bookingId: string) => {
   const res = await app.inject({
     method: 'PATCH', url: `/api/bookings/${bookingId}/check-in`, headers: auth(), payload: {},
@@ -256,12 +274,14 @@ describe('whose day it is', () => {
     // so the resort has rolled over to a new day and UTC has not.
     vi.setSystemTime(new Date(`${leavesToday}T21:00:00.000Z`));
     try {
+      ownerToken = await loginOwner();
       const { currentBooking } = await detail(roomId);
 
       expect(currentBooking!.overdueNights).toBe(1);
       expect(currentBooking!.dueOutToday).toBe(false);
     } finally {
       vi.setSystemTime(FROZEN_AT);
+      ownerToken = await loginOwner();
     }
   });
 });
