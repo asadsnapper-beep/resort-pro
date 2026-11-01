@@ -11,6 +11,7 @@ import { PENDING_HOLD_MINUTES } from '../utils/booking';
 import { effectiveThemePrice, themeAccessFor } from '../utils/theme-access';
 import { isUnpublishedTheme, verifyThemePreviewSignature } from '../utils/signed-theme-preview';
 import { sellableRoomWhere, unsellableStatusesFor } from '../utils/room-saleability';
+import { parseStayDates } from '../utils/stay-dates';
 
 // Accept absolute http(s) URLs OR site-relative upload paths (/uploads/…) —
 // the app's own ImageUpload produces relative paths, so strict .url() broke saves.
@@ -448,8 +449,10 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
     email: z.string().email(),
     phone: z.string().optional(),
     roomId: z.string().min(1),
-    checkIn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    checkOut: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    // Shape only; the dates themselves are checked by parseStayDates below,
+    // because a regex cannot tell February from its 31st.
+    checkIn: z.string().min(1),
+    checkOut: z.string().min(1),
     adults: z.number().int().min(1).default(1),
     children: z.number().int().min(0).default(0),
     specialRequests: z.string().optional(),
@@ -464,10 +467,12 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
       if (!tenant || !tenant.isActive) return reply.status(404).send({ success: false, error: 'Resort not found' });
 
       const body = publicBookSchema.parse(request.body);
-      const checkIn = new Date(body.checkIn);
-      const checkOut = new Date(body.checkOut);
 
-      if (checkOut <= checkIn) return reply.status(400).send({ success: false, error: 'Check-out must be after check-in' });
+      const dates = parseStayDates(body);
+      if (!dates.ok) {
+        return reply.status(400).send({ success: false, error: dates.error, code: dates.code });
+      }
+      const { checkIn, checkOut } = dates;
 
       const room = await prisma.room.findFirst({ where: { id: body.roomId, tenantId: tenant.id, isActive: true } });
       if (!room) return reply.status(404).send({ success: false, error: 'Room not found' });
@@ -773,23 +778,16 @@ export async function publicWebsiteRoutes(app: FastifyInstance) {
     schema: { tags: ['website'], summary: 'Check room availability' },
     handler: async (request, reply) => {
       const { slug } = request.params as { slug: string };
-      const query = request.query as { checkIn?: string; checkOut?: string };
       const tenant = await prisma.tenant.findUnique({ where: { slug } });
       if (!tenant || !tenant.isActive) return reply.status(404).send({ success: false, error: 'Resort not found' });
 
-      if (!query.checkIn || !query.checkOut) {
-        return reply.status(400).send({ success: false, error: 'checkIn and checkOut required' });
+      // Three hand-written checks before this, and they still accepted the
+      // 31st of February. One rule now, the dashboard's (utils/stay-dates.ts).
+      const dates = parseStayDates(request.query);
+      if (!dates.ok) {
+        return reply.status(400).send({ success: false, error: dates.error, code: dates.code });
       }
-
-      const checkIn  = new Date(query.checkIn);
-      const checkOut = new Date(query.checkOut);
-
-      if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
-        return reply.status(400).send({ success: false, error: 'Invalid date format for checkIn or checkOut' });
-      }
-      if (checkOut <= checkIn) {
-        return reply.status(400).send({ success: false, error: 'checkOut must be after checkIn' });
-      }
+      const { checkIn, checkOut } = dates;
 
       const bookedRoomIds = await prisma.booking.findMany({
         where: {
