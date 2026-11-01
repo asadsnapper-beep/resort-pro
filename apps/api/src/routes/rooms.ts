@@ -68,6 +68,28 @@ export async function roomRoutes(app: FastifyInstance) {
       field: 'propertyId',
     });
 
+  /**
+   * One answer for "that number is taken", whichever check caught it.
+   *
+   * Room is `@@unique([tenantId, number])`, so the data was never at risk —
+   * but create and update both read first and wrote after, and nothing caught
+   * the constraint's refusal when two requests passed that read together.
+   * Prisma's P2002 reached the error handler as an unhandled fault and four
+   * simultaneous creates answered 201, 500, 500, 500
+   * (Room Management QA 2026-10-28, RM-007).
+   *
+   * A 500 is worse here than untidy: it tells the caller the server broke, so
+   * clients retry it — and a receptionist double-clicking a slow button is
+   * precisely who opens the window. Which of the two checks turned a request
+   * away is a timing accident nobody can branch on, so both say this.
+   */
+  const numberTaken = (reply: FastifyReply, number: string) =>
+    reply.status(409).send({
+      success: false,
+      error: `Room number ${number} is already in use.`,
+      code: 'ROOM_NUMBER_TAKEN',
+    });
+
   /* ── GET /api/rooms/stats ────────────────────────────────────────────────── */
   app.get('/stats', {
     schema: { tags: ['rooms'], summary: 'Room status counts', security: [{ bearerAuth: [] }] },
@@ -216,7 +238,7 @@ export async function roomRoutes(app: FastifyInstance) {
       const body = roomSchema.parse(request.body);
 
       const existing = await db.room.findFirst({ where: { number: body.number } });
-      if (existing) return reply.status(409).send({ success: false, error: 'Room number already exists' });
+      if (existing) return numberTaken(reply, body.number);
 
       // Plan limit check
       const { tenantId } = request.user as { tenantId: string };
@@ -234,8 +256,15 @@ export async function roomRoutes(app: FastifyInstance) {
         return unknownProperty(reply);
       }
 
-      const room = await db.room.create({ data: body });
-      return reply.status(201).send(ok(room, 'Room created'));
+      try {
+        const room = await db.room.create({ data: body });
+        return reply.status(201).send(ok(room, 'Room created'));
+      } catch (err) {
+        // The read above can go stale between here and the insert; the
+        // constraint is what actually decides, so translate its answer.
+        if ((err as { code?: string }).code === 'P2002') return numberTaken(reply, body.number);
+        throw err;
+      }
     },
   });
 
@@ -253,7 +282,7 @@ export async function roomRoutes(app: FastifyInstance) {
 
       if (body.number && body.number !== room.number) {
         const dup = await db.room.findFirst({ where: { number: body.number, id: { not: id } } });
-        if (dup) return reply.status(409).send({ success: false, error: 'Room number already exists' });
+        if (dup) return numberTaken(reply, body.number);
       }
 
       // Sent and non-null means reassign, so it is checked. Sent as null means
@@ -262,8 +291,18 @@ export async function roomRoutes(app: FastifyInstance) {
         return unknownProperty(reply);
       }
 
-      const updated = await db.room.update({ where: { id }, data: body });
-      return ok(updated, 'Room updated');
+      try {
+        const updated = await db.room.update({ where: { id }, data: body });
+        return ok(updated, 'Room updated');
+      } catch (err) {
+        // Renaming has the same read-then-write shape as creating, and the
+        // same constraint behind it. `number` is the room's only unique
+        // column, so a P2002 here is always two rooms reaching for it.
+        if ((err as { code?: string }).code === 'P2002') {
+          return numberTaken(reply, body.number ?? room.number);
+        }
+        throw err;
+      }
     },
   });
 
