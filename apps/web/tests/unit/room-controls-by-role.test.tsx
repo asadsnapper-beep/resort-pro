@@ -143,6 +143,65 @@ describe('Edit Room and Delete in the detail sheet', () => {
   });
 });
 
+describe('a guest who has overstayed', () => {
+  // The API counts the overstay (RM-008); this panel is where the desk reads
+  // it. An overdue guest used to be missing from here altogether, so the room
+  // said Occupied and named nobody.
+  const checkedIn = (over: Record<string, unknown>) => ({
+    ...room,
+    status: 'OCCUPIED',
+    currentBooking: {
+      id: 'b1', confirmationNo: 'RP-1', status: 'CHECKED_IN',
+      checkIn: '2026-10-28', checkOut: '2026-10-31', adults: 1, children: 0,
+      overdueNights: 0, dueOutToday: false,
+      guest: { id: 'g1', firstName: 'Shamim', lastName: 'Rahman', email: 's@x.com' },
+      ...over,
+    },
+  });
+
+  function mountWith(over: Record<string, unknown>) {
+    role = 'OWNER';
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={client}>
+        <RoomDetailSheet
+          room={checkedIn(over) as never}
+          onClose={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()}
+          onStatusChange={vi.fn()} statusLoading={false}
+        />
+      </QueryClientProvider>,
+    );
+  }
+
+  it('is named, and the overstay is spelled out', () => {
+    mountWith({ overdueNights: 2 });
+
+    expect(screen.getByText(/Shamim/)).toBeTruthy();
+    expect(screen.getByText(/2 nights past checkout/i)).toBeTruthy();
+  });
+
+  it('says night, not nights, for a single one', () => {
+    mountWith({ overdueNights: 1 });
+
+    expect(screen.getByText(/1 night past checkout/i)).toBeTruthy();
+  });
+
+  it('says due out today for a guest leaving today, not overstaying', () => {
+    mountWith({ overdueNights: 0, dueOutToday: true });
+
+    expect(screen.getByText(/due out today/i)).toBeTruthy();
+    expect(screen.queryByText(/past checkout/i)).toBeNull();
+  });
+
+  it('says neither for a stay still running', () => {
+    mountWith({ overdueNights: 0, dueOutToday: false });
+
+    expect(screen.getByText(/Currently Occupied/i)).toBeTruthy();
+    expect(screen.queryByText(/past checkout/i)).toBeNull();
+    expect(screen.queryByText(/due out today/i)).toBeNull();
+  });
+});
+
 describe('before the role is known', () => {
   it('shows no mutation control while the store is still rehydrating', () => {
     // `useAuthStore` is persisted, so `user` is null for a tick on a cold

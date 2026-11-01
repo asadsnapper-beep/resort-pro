@@ -46,6 +46,9 @@ function getVideoEmbed(url: string): { type: 'youtube' | 'vimeo' | 'direct'; src
 interface CurrentBooking {
   id: string; confirmationNo: string; status: string;
   checkIn: string; checkOut: string; adults: number; children: number;
+  /** Whole days past the scheduled departure; 0 when the stay is on time. */
+  overdueNights?: number;
+  dueOutToday?: boolean;
   guest: { id: string; firstName: string; lastName: string; email: string; phone?: string };
 }
 
@@ -89,6 +92,13 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
   const amenities = room.amenities ?? [];
   const videos    = room.videos    ?? [];
   const booking   = room.currentBooking ?? null;
+  /**
+   * A guest past their checkout used to vanish from this panel entirely, so
+   * the room read Occupied with nobody named in it (RM-008). They are shown
+   * now, and saying so plainly is the point — an unremarked overstay is how
+   * the room gets handed to the next arrival.
+   */
+  const overdueNights = booking?.overdueNights ?? 0;
 
   const typeMeta   = ROOM_TYPE_META[room.type]   ?? ROOM_TYPE_META.STANDARD;
   const statusMeta = STATUS_META[room.status]     ?? STATUS_META.AVAILABLE;
@@ -181,13 +191,21 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
             {/* Current booking */}
             {booking && (
               <div className="rounded-[12px] border p-4 space-y-3"
-                style={booking.status === 'CHECKED_IN'
-                  ? { background: 'var(--rp-teal-soft)', borderColor: 'rgba(35,118,106,0.2)' }
-                  : { background: '#fffdf6', borderColor: 'rgba(184,144,64,0.2)' }}>
+                style={overdueNights > 0
+                  ? { background: 'var(--rp-red-bg)', borderColor: 'rgba(200,60,60,0.25)' }
+                  : booking.status === 'CHECKED_IN'
+                    ? { background: 'var(--rp-teal-soft)', borderColor: 'rgba(35,118,106,0.2)' }
+                    : { background: '#fffdf6', borderColor: 'rgba(184,144,64,0.2)' }}>
                 <div className="flex items-center justify-between">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.07em]"
-                    style={{ color: booking.status === 'CHECKED_IN' ? '#23766a' : '#b89040' }}>
-                    {booking.status === 'CHECKED_IN' ? '🏠 Currently Occupied' : '📅 Upcoming Booking'}
+                    style={{ color: overdueNights > 0
+                      ? '#c43c3c'
+                      : booking.status === 'CHECKED_IN' ? '#23766a' : '#b89040' }}>
+                    {overdueNights > 0
+                      ? `⚠️ Overstaying — ${overdueNights} ${overdueNights === 1 ? 'night' : 'nights'} past checkout`
+                      : booking.status === 'CHECKED_IN'
+                        ? (booking.dueOutToday ? '🏠 Currently Occupied · due out today' : '🏠 Currently Occupied')
+                        : '📅 Upcoming Booking'}
                   </p>
                   <button onClick={() => router.push(`/dashboard/bookings?id=${booking.id}`)}
                     className="transition-opacity hover:opacity-70" style={{ color: 'var(--rp-text-muted)' }}>
