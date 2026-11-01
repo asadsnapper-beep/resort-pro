@@ -8,7 +8,8 @@ import {
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
-import type { Room } from '@resort-pro/types';
+import { canRoom, type Room } from '@resort-pro/types';
+import { useAuthStore } from '@/store/auth';
 
 const ROOM_TYPE_META: Record<string, { bg: string; border: string; text: string }> = {
   STANDARD: { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)' },
@@ -62,6 +63,14 @@ interface Props {
 }
 
 export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChange, statusLoading }: Props) {
+  /**
+   * Edit needs Owner or Manager, Delete needs Owner — the API has always said
+   * so, and this footer used to show both to anyone who could open the sheet.
+   * The table it reads is the one `requireRole` is given. (RM-005.)
+   */
+  const { user } = useAuthStore();
+  const canEdit   = canRoom(user?.role, 'update');
+  const canDelete = canRoom(user?.role, 'delete');
   const router = useRouter();
   const [activeVideo, setActiveVideo] = useState(0);
   const [mounted, setMounted] = useState(false);
@@ -291,17 +300,28 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
         </div>
 
         {/* Footer */}
-        <div className="flex shrink-0 gap-3 px-5 py-4" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
-          <button onClick={() => onEdit(room)}
-            className="flex flex-1 items-center justify-center gap-2 rounded-[9px] border py-2 text-[13px] font-medium transition-colors hover:bg-[#f4f1eb]"
-            style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
-            <Pencil className="h-4 w-4" /> Edit Room
-          </button>
-          <button onClick={() => onDelete(room)}
-            className="flex items-center justify-center rounded-[9px] border px-3 py-2 transition-colors hover:bg-[#fef2f2]"
-            style={{ borderColor: 'rgba(200,60,60,0.15)', color: '#c43c3c' }}>
-            <Trash2 className="h-4 w-4" />
-          </button>
+        <div className="flex shrink-0 items-center gap-3 px-5 py-4" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+          {canEdit && (
+            <button onClick={() => onEdit(room)}
+              className="flex flex-1 items-center justify-center gap-2 rounded-[9px] border py-2 text-[13px] font-medium transition-colors hover:bg-[#f4f1eb]"
+              style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
+              <Pencil className="h-4 w-4" /> Edit Room
+            </button>
+          )}
+          {canDelete && (
+            <button onClick={() => onDelete(room)} aria-label="Delete room"
+              className="flex items-center justify-center rounded-[9px] border px-3 py-2 transition-colors hover:bg-[#fef2f2]"
+              style={{ borderColor: 'rgba(200,60,60,0.15)', color: '#c43c3c' }}>
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+          {!canEdit && (
+            // Say why, rather than leaving a bare strip where two buttons were.
+            // Status changes are still this person's to make, and are above.
+            <p className="text-[12.5px]" style={{ color: 'var(--rp-text-muted)' }}>
+              Only an owner or manager can edit rooms. You can still change this room&rsquo;s status.
+            </p>
+          )}
         </div>
       </div>
     </>
