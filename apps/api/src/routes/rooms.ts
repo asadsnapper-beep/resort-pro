@@ -7,6 +7,7 @@ import { checkRoomLimit } from '../utils/entitlement';
 import { matchAllTerms } from '../utils/search-terms';
 import { propertyScope } from '../utils/property-scope';
 import { sellableRoomWhere } from '../utils/room-saleability';
+import { roomBlocker } from '../utils/room-state';
 import { parseStayDates } from '../utils/stay-dates';
 
 const roomSchema = z.object({
@@ -339,12 +340,23 @@ export async function roomRoutes(app: FastifyInstance) {
        * refused until somebody checks the guest out, which is the one action
        * that actually ends the occupancy.
        *
-       * Deliberately narrow: this guard is about the guest, not about every
-       * invariant the status field has. A room marked Maintenance with no work
-       * order, and housekeeping marking an occupied room clean, are the same
-       * family of bug (RM-004) and are not touched here.
+       * The guest is the widest of several vetoes. The others are narrower,
+       * and all say the same thing: **Available is a claim, and this endpoint
+       * does not let anyone make it while the room is still blocked.** Open
+       * maintenance, a clean in progress and a booking that covers today each
+       * refuse it with their own code; utils/room-state.ts holds the order and
+       * the wording, and every other place that writes a room's status derives
+       * it from the same question. (RM-004.)
+       *
+       * Asking for Maintenance by hand now also opens a ticket, because the
+       * audit's complaint was not the status — it was a room off sale "with no
+       * actionable work order". A blocked room is one somebody can be sent to.
        */
-      const tenantId = (request.user as { tenantId: string }).tenantId;
+      const { tenantId, sub: userId } = request.user as { tenantId: string; sub: string };
+      const tenant = await prisma.tenant.findUnique({
+        where:  { id: tenantId },
+        select: { timezone: true },
+      });
 
       let updated;
       try {
@@ -362,24 +374,42 @@ export async function roomRoutes(app: FastifyInstance) {
               AND "status"::text IN ('PENDING', 'CONFIRMED', 'CHECKED_IN')
             FOR UPDATE`;
 
-          if (status !== 'OCCUPIED') {
-            const checkedIn = await tx.booking.findFirst({
-              where: { tenantId, roomId: id, status: 'CHECKED_IN' },
-              select: {
-                confirmationNo: true,
-                guest: { select: { firstName: true, lastName: true } },
+          const blocker = await roomBlocker(tx, {
+            tenantId,
+            roomId:     id,
+            timezone:   tenant?.timezone ?? undefined,
+            roomNumber: room.number,
+          });
+
+          // A guest refuses every status but OCCUPIED; the rest refuse only
+          // the claim that the room is ready. Marking a room held for tonight
+          // as Cleaning is honest work, and must not be in anybody's way.
+          const contradicted = blocker !== null && (
+            blocker.code === 'ROOM_HAS_CHECKED_IN_GUEST'
+              ? status !== 'OCCUPIED'
+              : status === 'AVAILABLE'
+          );
+          if (contradicted) {
+            throw Object.assign(new Error(blocker.error), {
+              statusCode: 409,
+              code: blocker.code,
+            });
+          }
+
+          // Blocking by hand opens the work order the audit found missing. If
+          // one is already open this is a no-op the front desk does by habit,
+          // and must not pile up duplicates.
+          if (status === 'MAINTENANCE' && blocker?.code !== 'ROOM_HAS_OPEN_MAINTENANCE') {
+            await tx.maintenanceTicket.create({
+              data: {
+                tenantId,
+                roomId:      id,
+                issueType:   'OTHER',
+                description: `Room ${room.number} was blocked from the room page`,
+                priority:    'NORMAL',
+                createdBy:   userId,
               },
             });
-            if (checkedIn) {
-              const guest = `${checkedIn.guest.firstName} ${checkedIn.guest.lastName}`.trim();
-              throw Object.assign(
-                new Error(
-                  `Room ${room.number} has a guest checked in (${guest}, booking ` +
-                  `${checkedIn.confirmationNo}). Check them out before changing the room's status.`,
-                ),
-                { statusCode: 409, code: 'ROOM_HAS_CHECKED_IN_GUEST' },
-              );
-            }
           }
 
           return tx.room.update({ where: { id }, data: { status } });
@@ -387,10 +417,12 @@ export async function roomRoutes(app: FastifyInstance) {
       } catch (err: unknown) {
         const e = err as { statusCode?: number; message?: string; code?: string };
         if (e.statusCode === 409) {
+          // The code travels with the blocker rather than being assumed here,
+          // so the caller can tell a guest apart from an open work order.
           return reply.status(409).send({
             success: false,
             error: e.message,
-            code: 'ROOM_HAS_CHECKED_IN_GUEST',
+            code: e.code ?? 'ROOM_HAS_CHECKED_IN_GUEST',
           });
         }
         // Another transaction touched the same booking or room first. Say so

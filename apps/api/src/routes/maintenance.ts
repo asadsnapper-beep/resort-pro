@@ -4,6 +4,7 @@ import { prisma } from '@resort-pro/database';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { ok } from '../utils/response';
 import type { JwtPayload } from '@resort-pro/types';
+import { recomputeRoomStatus, type RoomStateClient } from '../utils/room-state';
 
 const createSchema = z.object({
   roomId: z.string(),
@@ -20,21 +21,27 @@ const updateSchema = z.object({
   priority: z.enum(['URGENT', 'HIGH', 'NORMAL', 'LOW']).optional(),
 });
 
-/** When all open tickets for a room are resolved, restore its status.
- *  If a guest is currently checked in → OCCUPIED; otherwise → AVAILABLE.
+/**
+ * Re-derive the room's status from everything still open on it.
+ *
+ * This replaces `restoreRoomIfClear`, which counted tickets and asked about a
+ * checked-in guest — and never about the person still cleaning the room. It
+ * sent a room being cleaned straight back to Available.
+ * (Room Management QA 2026-10-28, RM-004.)
+ *
+ * `client` must be the tenant-scoped client, so the write it makes cannot
+ * reach another resort's room.
  */
-async function restoreRoomIfClear(tenantId: string, roomId: string) {
-  const openCount = await prisma.maintenanceTicket.count({
-    where: { tenantId, roomId, status: { not: 'RESOLVED' } },
+async function syncRoom(client: RoomStateClient, tenantId: string, roomId: string) {
+  const tenant = await prisma.tenant.findUnique({
+    where:  { id: tenantId },
+    select: { timezone: true },
   });
-  if (openCount === 0) {
-    const activeBooking = await prisma.booking.findFirst({
-      where: { tenantId, roomId, status: 'CHECKED_IN' },
-      select: { id: true },
-    });
-    const newStatus = activeBooking ? 'OCCUPIED' : 'AVAILABLE';
-    await prisma.room.update({ where: { id: roomId }, data: { status: newStatus } });
-  }
+  await recomputeRoomStatus(client, {
+    tenantId,
+    roomId,
+    timezone: tenant?.timezone ?? undefined,
+  });
 }
 
 export async function maintenanceRoutes(app: FastifyInstance) {
@@ -103,20 +110,36 @@ export async function maintenanceRoutes(app: FastifyInstance) {
       const room = await db.room.findFirst({ where: { id: body.roomId } });
       if (!room) return reply.status(404).send({ error: 'Room not found' });
 
-      const ticket = await db.maintenanceTicket.create({
-        data: {
-          roomId: body.roomId,
-          issueType: body.issueType,
-          description: body.description,
-          priority: body.priority,
-          assignedTo: body.assignedTo ?? null,
-          createdBy: userId,
-        },
-        include: { room: { select: { id: true, name: true, number: true } } },
-      });
+      // The ticket and the room's status are one fact, so they are written
+      // together: a ticket whose room never came off sale is the bug this is
+      // here to stop.
+      const ticket = await db.$transaction(async (tx) => {
+        const created = await tx.maintenanceTicket.create({
+          data: {
+            // Spelled out because a transaction client's types do not carry
+            // the relaxation the request-scoped client has; the extension
+            // injects the same value either way.
+            tenantId,
+            roomId: body.roomId,
+            issueType: body.issueType,
+            description: body.description,
+            priority: body.priority,
+            assignedTo: body.assignedTo ?? null,
+            createdBy: userId,
+          },
+          include: { room: { select: { id: true, name: true, number: true } } },
+        });
 
-      // Set room status to MAINTENANCE
-      await db.room.update({ where: { id: body.roomId }, data: { status: 'MAINTENANCE' } });
+        // Not a blind write to MAINTENANCE any more. A guest asleep in the
+        // room outranks a dripping tap: logging the fault must not erase them
+        // from the board, which is exactly what this used to do, straight past
+        // the guard RM-001 had just put on the room endpoint. The fault is
+        // still recorded, and the first recompute after the room empties is
+        // the one that takes it off sale.
+        await syncRoom(tx as unknown as RoomStateClient, tenantId, body.roomId);
+
+        return created;
+      });
 
       return reply.status(201).send({ success: true, data: ticket });
     },
@@ -152,7 +175,7 @@ export async function maintenanceRoutes(app: FastifyInstance) {
 
       // If status was set to RESOLVED via this endpoint, also restore room if clear
       if (body.status === 'RESOLVED') {
-        await restoreRoomIfClear(tenantId, existing.roomId);
+        await syncRoom(db, tenantId, existing.roomId);
       }
 
       return ok(ticket);
@@ -180,7 +203,7 @@ export async function maintenanceRoutes(app: FastifyInstance) {
       });
 
       // Restore room status if no other open tickets remain
-      await restoreRoomIfClear(tenantId, existing.roomId);
+      await syncRoom(db, tenantId, existing.roomId);
 
       return ok(ticket);
     },
@@ -199,7 +222,7 @@ export async function maintenanceRoutes(app: FastifyInstance) {
       if (!existing) return reply.status(404).send({ error: 'Ticket not found' });
 
       await db.maintenanceTicket.delete({ where: { id } });
-      await restoreRoomIfClear(tenantId, existing.roomId);
+      await syncRoom(db, tenantId, existing.roomId);
 
       return ok({ deleted: true });
     },
