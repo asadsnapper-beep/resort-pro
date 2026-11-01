@@ -13,7 +13,8 @@ import { formatCurrency } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { Plus, BedDouble, Users, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PageShell, PageHeader } from '@/components/patterns';
-import type { Room } from '@resort-pro/types';
+import { canRoom, type Room } from '@resort-pro/types';
+import { useAuthStore } from '@/store/auth';
 import { useRoomTypeLabels } from '@/hooks/use-room-type-labels';
 
 interface RoomWithBooking extends Room {
@@ -61,6 +62,15 @@ const stats_default = { total: 0, available: 0, occupied: 0, cleaning: 0, mainte
 
 export default function RoomsPage() {
   const queryClient = useQueryClient();
+  /**
+   * The API refuses create, edit and delete for a Receptionist, and this page
+   * used to offer all three anyway — so the journey was "fill the whole form,
+   * then read a 403". The policy is not restated here; `ROOM_CAPABILITIES` in
+   * @resort-pro/types is the same table `requireRole` is given.
+   * (Room Management QA 2026-10-28, RM-005.)
+   */
+  const { user } = useAuthStore();
+  const canCreate = canRoom(user?.role, 'create');
   const { resolvedTheme } = useTheme();
   const { getLabel: getRoomTypeLabel } = useRoomTypeLabels();
   const isDark = resolvedTheme === 'dark';
@@ -155,7 +165,7 @@ export default function RoomsPage() {
         title="Rooms & Villas"
         subtitle="Manage your resort accommodations"
         align="end"
-        actions={
+        actions={canCreate ? (
           <button
             onClick={() => setAddOpen(true)}
             className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#f8fafc] transition-opacity hover:opacity-80"
@@ -163,7 +173,7 @@ export default function RoomsPage() {
           >
             <Plus className="h-[13px] w-[13px]" strokeWidth={2.5} /> Add Room
           </button>
-        }
+        ) : undefined}
       />
 
       {/* Stats bar — clickable filters */}
@@ -250,13 +260,13 @@ export default function RoomsPage() {
               className="rounded-[8px] border px-4 py-[7px] text-[12.5px] font-medium bg-white dark:bg-white/5" style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text)' }}>
               Clear filters
             </button>
-          ) : (
+          ) : canCreate ? (
             <button onClick={() => setAddOpen(true)}
               className="flex items-center gap-1.5 rounded-[9px] px-4 py-[9px] text-[13px] font-medium text-[#f8fafc]"
               style={{ background: 'var(--rp-btn-accent)' }}>
               <Plus className="h-[13px] w-[13px]" /> Add Room
             </button>
-          )}
+          ) : null}
         </div>
       ) : (
         <>
@@ -265,7 +275,7 @@ export default function RoomsPage() {
               const statusStyle = ROOM_STATUS_PILL[room.status] ?? ROOM_STATUS_PILL.AVAILABLE;
               const typeStyle   = ROOM_TYPE_STYLE[room.type]   ?? ROOM_TYPE_STYLE.STANDARD;
               return (
-                <div key={room.id}
+                <div key={room.id} data-testid="room-card"
                   className="group cursor-pointer overflow-hidden rounded-[14px] border transition-shadow hover:shadow-md bg-white dark:bg-white/5" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}
                   onClick={() => openDetail(room)}>
 

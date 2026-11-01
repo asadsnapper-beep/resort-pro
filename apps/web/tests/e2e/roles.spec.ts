@@ -35,6 +35,17 @@ test.describe('OWNER role', () => {
     await expect(page.getByText('Monthly Revenue')).toBeVisible({ timeout: 8000 });
   });
 
+  test('is offered Add Room, Edit Room and Delete', async () => {
+    const page = shared.page;
+    await page.goto('/dashboard/rooms');
+    await expect(page.getByRole('button', { name: 'Add Room' }).first())
+      .toBeVisible({ timeout: 10000 });
+
+    await page.getByTestId('room-card').first().click();
+    await expect(page.getByRole('button', { name: 'Edit Room' })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByRole('button', { name: 'Delete room' })).toBeVisible();
+  });
+
   test('can access Roles & Team page', async () => {
     const page = shared.page;
     // /dashboard/roles is a server-redirect shim to /dashboard/staff — the
@@ -115,6 +126,27 @@ test.describe('RECEPTIONIST role', () => {
     // Inventory is filtered out of RECEPTIONIST's nav items entirely, so it
     // never renders regardless of the Restaurant group's collapse state.
     await expect(await navItem(page, 'Inventory')).not.toBeVisible();
+  });
+
+  /**
+   * The journey the room audit actually walked: open Add Room, fill the form,
+   * submit, read a 403. The API was right and the page was offering a control
+   * it would refuse. (Room Management QA 2026-10-28, RM-005.)
+   */
+  test('is not offered Add Room, Edit Room or Delete', async () => {
+    const page = shared.page;
+    await page.goto('/dashboard/rooms');
+    await expect(page.getByText('Rooms & Villas')).toBeVisible({ timeout: 10000 });
+
+    await expect(page.getByRole('button', { name: 'Add Room' })).toHaveCount(0);
+
+    // The sheet's controls go with it, and say why rather than leaving a
+    // bare strip where two buttons used to be.
+    await page.getByTestId('room-card').first().click();
+    await expect(page.getByText('Change Status')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByRole('button', { name: 'Edit Room' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Delete room' })).toHaveCount(0);
+    await expect(page.getByText(/only an owner or manager can edit rooms/i)).toBeVisible();
   });
 });
 

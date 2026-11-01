@@ -9,6 +9,7 @@ import { propertyScope } from '../utils/property-scope';
 import { sellableRoomWhere } from '../utils/room-saleability';
 import { roomBlocker } from '../utils/room-state';
 import { parseStayDates } from '../utils/stay-dates';
+import { ROOM_CAPABILITIES } from '@resort-pro/types';
 
 const roomSchema = z.object({
   number:       z.string().min(1).max(10),
@@ -233,7 +234,7 @@ export async function roomRoutes(app: FastifyInstance) {
   /* ── POST /api/rooms ─────────────────────────────────────────────────────── */
   app.post('/', {
     schema: { tags: ['rooms'], summary: 'Create room', security: [{ bearerAuth: [] }] },
-    preHandler: requireRole('OWNER', 'MANAGER'),
+    preHandler: requireRole(...ROOM_CAPABILITIES.create),
     handler: async (request, reply) => {
       const { db } = request;
       const body = roomSchema.parse(request.body);
@@ -272,7 +273,7 @@ export async function roomRoutes(app: FastifyInstance) {
   /* ── PATCH /api/rooms/:id ────────────────────────────────────────────────── */
   app.patch('/:id', {
     schema: { tags: ['rooms'], summary: 'Update room', security: [{ bearerAuth: [] }] },
-    preHandler: requireRole('OWNER', 'MANAGER'),
+    preHandler: requireRole(...ROOM_CAPABILITIES.update),
     handler: async (request, reply) => {
       const { db } = request;
       const { id } = request.params as { id: string };
@@ -310,7 +311,7 @@ export async function roomRoutes(app: FastifyInstance) {
   /* ── PATCH /api/rooms/:id/status ─────────────────────────────────────────── */
   app.patch('/:id/status', {
     schema: { tags: ['rooms'], summary: 'Update room status', security: [{ bearerAuth: [] }] },
-    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
+    preHandler: requireRole(...ROOM_CAPABILITIES.changeStatus),
     handler: async (request, reply) => {
       const { db } = request;
       const { id } = request.params as { id: string };
@@ -444,7 +445,7 @@ export async function roomRoutes(app: FastifyInstance) {
   /* ── DELETE /api/rooms/:id ───────────────────────────────────────────────── */
   app.delete('/:id', {
     schema: { tags: ['rooms'], summary: 'Delete (deactivate) room', security: [{ bearerAuth: [] }] },
-    preHandler: requireRole('OWNER'),
+    preHandler: requireRole(...ROOM_CAPABILITIES.delete),
     handler: async (request, reply) => {
       const { db } = request;
       const { id } = request.params as { id: string };
