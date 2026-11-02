@@ -187,14 +187,28 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
           <form onSubmit={handleSubmit(submit)} id="room-form">
             <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
-              {/* Row 1: Number + Name + Floor + Guests + Price */}
-              <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 80px 90px 110px', gap: '12px', alignItems: 'start' }}>
-                <div>
+              {/*
+                Row 1: Number + Name + Floor + Guests + Price.
+
+                Two columns on a phone, the original five from tablet width up.
+                It used to be five fixed columns at every size — `100px 1fr
+                80px 90px 110px` plus four 12px gaps — which on an iPhone 14 is
+                129px wider than the space it has. The modal body clips rather
+                than scrolls horizontally, so Price/Night sat off the edge with
+                no way to reach it and a mobile owner could not add a room at
+                all. (Room Management QA 2026-10-28, RM-009.)
+
+                The three text-bearing fields take the full width below `md`
+                and only the two small numerics share a row, so nothing is
+                squeezed to the point of being unreadable.
+              */}
+              <div className="grid grid-cols-2 items-start gap-3 md:grid-cols-[100px_1fr_80px_90px_110px]">
+                <div className="col-span-2 md:col-span-1">
                   <label className={lbl}>Room #</label>
                   <input {...register('number')} placeholder="101" className={inp} />
                   {errors.number && <p className={err}>{errors.number.message}</p>}
                 </div>
-                <div>
+                <div className="col-span-2 md:col-span-1">
                   <label className={lbl}>Name</label>
                   <input {...register('name')} placeholder="Ocean View Suite" className={inp} />
                   {errors.name && <p className={err}>{errors.name.message}</p>}
@@ -208,7 +222,7 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
                   <input {...register('maxOccupancy')} type="number" min={1} max={20} className={inp} />
                   {errors.maxOccupancy && <p className={err}>{errors.maxOccupancy.message}</p>}
                 </div>
-                <div>
+                <div className="col-span-2 md:col-span-1">
                   <label className={lbl}>Price/Night</label>
                   <div style={{ position: 'relative' }}>
                     <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '13px', color: 'var(--rp-text-muted)' }}>$</span>
@@ -222,7 +236,14 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
               {/* Room Type */}
               <div>
                 <label className={lbl}>Room Type</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '8px' }}>
+                {/*
+                  Three across on a phone, six from `md` up. Plain CSS `1fr`
+                  will not shrink past its content, so six of these pushed
+                  69px out of a 295px column on an iPhone — the rest of the
+                  overflow RM-009 measured, once the field row above it was
+                  fixed. Tailwind's columns are `minmax(0, 1fr)`, which can.
+                */}
+                <div className="grid grid-cols-3 gap-2 md:grid-cols-6">
                   {ROOM_TYPES.map(t => {
                     const m = TYPE_META[t];
                     const active = selectedType === t;
