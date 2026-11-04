@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import { canRoom, type Room } from '@resort-pro/types';
 import { useAuthStore } from '@/store/auth';
 import { useDialogA11y } from '@/hooks/use-dialog-a11y';
+import { useCurrency } from '@/hooks/use-currency';
 
 const ROOM_TYPE_META: Record<string, { bg: string; border: string; text: string }> = {
   STANDARD: { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)' },
@@ -75,6 +76,7 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
   const { user } = useAuthStore();
   const canEdit   = canRoom(user?.role, 'update');
   const canDelete = canRoom(user?.role, 'delete');
+  const { currency } = useCurrency();
   const router = useRouter();
   const [activeVideo, setActiveVideo] = useState(0);
   const [mounted, setMounted] = useState(false);
@@ -195,7 +197,7 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
             {/* Stats */}
             <div className="grid grid-cols-3 gap-2.5">
               {[
-                { Icon: Tag, label: 'Per Night',   value: formatCurrency(Number(room.basePrice)) },
+                { Icon: Tag, label: 'Per Night',   value: formatCurrency(Number(room.basePrice), currency) },
                 { Icon: Users,      label: 'Max Guests',  value: `${room.maxOccupancy} guests` },
                 { Icon: Building2,  label: 'Floor',       value: room.floor ? `Floor ${room.floor}` : '—' },
               ].map(({ Icon, label, value }) => (
