@@ -36,7 +36,7 @@ export async function propertyRoutes(app: FastifyInstance) {
           take: limit,
           orderBy: { name: 'asc' },
           include: {
-            _count: { select: { rooms: true } },
+            _count: { select: { rooms: { where: { isActive: true } } } },
             rooms: { where: { isActive: true }, select: { status: true } },
           },
         }),
@@ -68,7 +68,7 @@ export async function propertyRoutes(app: FastifyInstance) {
 
       const property = await db.property.findFirst({
         where: { id, tenantId },
-        include: { _count: { select: { rooms: true } } },
+        include: { _count: { select: { rooms: { where: { isActive: true } } } } },
       });
       if (!property) return reply.status(404).send({ success: false, error: 'Property not found' });
 
@@ -142,7 +142,7 @@ export async function propertyRoutes(app: FastifyInstance) {
 
       const property = await db.property.findFirst({
         where: { id, tenantId },
-        include: { _count: { select: { rooms: true } } },
+        include: { _count: { select: { rooms: { where: { isActive: true } } } } },
       });
       if (!property) return reply.status(404).send({ success: false, error: 'Property not found' });
       if (property._count.rooms > 0) {
