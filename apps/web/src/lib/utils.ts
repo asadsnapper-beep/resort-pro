@@ -30,6 +30,17 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   PHP: '₱',
 };
 
+/**
+ * The symbol a bare amount should be prefixed with, for a field that collects
+ * a number rather than displaying a formatted one.
+ *
+ * Falls back to the code itself — "KRW 1200" is ungainly but it is honest,
+ * whereas a dollar sign in front of a won figure is a wrong number.
+ */
+export function currencySymbol(currency = 'BDT'): string {
+  return CURRENCY_SYMBOLS[currency] ?? currency;
+}
+
 export function formatCurrency(amount: number, currency = 'BDT') {
   const sym = CURRENCY_SYMBOLS[currency];
   if (sym) {

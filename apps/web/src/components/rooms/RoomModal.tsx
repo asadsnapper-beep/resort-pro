@@ -10,6 +10,7 @@ import { X, Plus, Film, Loader2, BedDouble, Zap, Crown, Home, Leaf, Waves } from
 import { useQuery } from '@tanstack/react-query';
 import { propertyApi } from '@/lib/api';
 import { useRoomTypeLabels } from '@/hooks/use-room-type-labels';
+import { useCurrency } from '@/hooks/use-currency';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 import { useDialogA11y } from '@/hooks/use-dialog-a11y';
 import type { Room } from '@resort-pro/types';
@@ -62,6 +63,9 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const { getLabel: getRoomTypeLabel } = useRoomTypeLabels();
+  // Was a literal '$'. A resort billing in taka was asked for a price in
+  // dollars and shown the figure back in taka on its own room cards.
+  const { currency, symbol: currencySign } = useCurrency();
   const [mounted, setMounted] = useState(false);
   const [amenities,    setAmenities]    = useState<string[]>([]);
   const [amenityInput, setAmenityInput] = useState('');
@@ -261,10 +265,20 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
                   <div style={{ position: 'relative' }}>
                     {/* The symbol is decoration beside a labelled field; read
                         aloud it would land between the label and the value. */}
-                    <span aria-hidden="true" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '13px', color: 'var(--rp-text-muted)' }}>$</span>
+                    <span aria-hidden="true" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '13px', color: 'var(--rp-text-muted)' }}>{currencySign}</span>
                     <input id={fieldId('basePrice')} {...register('basePrice')} type="number" step="0.01" min={0}
-                      className={inp} style={{ paddingLeft: '24px' }} />
+                      /* The symbol is decoration, so the currency is named here
+                         instead — otherwise the field reads as a bare number
+                         and nothing says which money it is in. */
+                      aria-describedby={fieldId('price-currency')}
+                      className={inp}
+                      /* Widened with the symbol: 'A$' and 'د.إ' are not one
+                         character, and the text used to run underneath. */
+                      style={{ paddingLeft: `${16 + currencySign.length * 8}px` }} />
                   </div>
+                  <span id={fieldId('price-currency')} className="sr-only">
+                    Price per night in {currency}
+                  </span>
                   {errors.basePrice && <p role="alert" className={err}>{errors.basePrice.message}</p>}
                 </div>
               </div>

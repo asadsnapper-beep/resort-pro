@@ -10,6 +10,7 @@ import { ConfirmModal } from '@/components/ui/modal';
 import { RoomModal } from '@/components/rooms/RoomModal';
 import { RoomDetailSheet } from '@/components/rooms/RoomDetailSheet';
 import { formatCurrency } from '@/lib/utils';
+import { useCurrency } from '@/hooks/use-currency';
 import { toast } from '@/hooks/use-toast';
 import { Plus, BedDouble, Users, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PageShell, PageHeader } from '@/components/patterns';
@@ -71,6 +72,8 @@ export default function RoomsPage() {
    */
   const { user } = useAuthStore();
   const canCreate = canRoom(user?.role, 'create');
+  // The resort's own currency, not formatCurrency's BDT default.
+  const { currency } = useCurrency();
   const { resolvedTheme } = useTheme();
   const { getLabel: getRoomTypeLabel } = useRoomTypeLabels();
   const isDark = resolvedTheme === 'dark';
@@ -353,7 +356,7 @@ export default function RoomsPage() {
                         <Users className="h-3.5 w-3.5" /> {room.maxOccupancy}
                       </span>
                       <span className="flex items-center gap-1">
-                        {formatCurrency(Number(room.basePrice))}/night
+                        {formatCurrency(Number(room.basePrice), currency)}/night
                       </span>
                     </div>
 
