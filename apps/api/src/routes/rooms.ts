@@ -11,6 +11,21 @@ import { roomBlocker } from '../utils/room-state';
 import { parseStayDates } from '../utils/stay-dates';
 import { tenantToday, tenantDayOffset } from '../utils/tenant-day';
 import { ROOM_CAPABILITIES } from '@resort-pro/types';
+import { mediaUrl } from '../utils/media-url';
+
+/*
+  What the Add Room modal already shows on screen — "0 / 8", "0 / 4" — now
+  said once more where it is actually enforced. Two numbers that disagree is
+  the reported bug wearing a different hat, so these are the same numbers.
+
+  Amenities had no limit anywhere, in the form or here. Fifty is well past
+  what any room lists and well short of what a script can write.
+  (Room Management QA 2026-10-28, RM-012.)
+*/
+const MAX_IMAGES = 8;
+const MAX_VIDEOS = 4;
+const MAX_AMENITIES = 50;
+const MAX_AMENITY_LENGTH = 60;
 
 const roomSchema = z.object({
   number:       z.string().min(1).max(10),
@@ -20,9 +35,17 @@ const roomSchema = z.object({
   maxOccupancy: z.number().int().min(1).max(20),
   basePrice:    z.number().positive(),
   description:  z.string().optional(),
-  amenities:    z.array(z.string()).default([]),
-  images:       z.array(z.string()).default([]),
-  videos:       z.array(z.string().url('Each video must be a valid URL')).default([]),
+  amenities:    z.array(
+                  z.string().trim()
+                    .min(1, 'An amenity cannot be blank')
+                    .max(MAX_AMENITY_LENGTH, `An amenity must be under ${MAX_AMENITY_LENGTH} characters`),
+                ).max(MAX_AMENITIES, `A room can list at most ${MAX_AMENITIES} amenities`).default([]),
+  images:       z.array(mediaUrl('Each photo'))
+                  .max(MAX_IMAGES, `A room can have at most ${MAX_IMAGES} photos`).default([]),
+  // `.url()` was already here and was not enough: it is `new URL()`, which
+  // parses `javascript:` and `data:` happily. See utils/media-url.ts.
+  videos:       z.array(mediaUrl('Each video'))
+                  .max(MAX_VIDEOS, `A room can have at most ${MAX_VIDEOS} videos`).default([]),
   /**
    * The property this room belongs to, for a resort group with more than one.
    *

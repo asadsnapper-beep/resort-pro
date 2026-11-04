@@ -13,7 +13,7 @@ import { useRoomTypeLabels } from '@/hooks/use-room-type-labels';
 import { useCurrency } from '@/hooks/use-currency';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 import { useDialogA11y } from '@/hooks/use-dialog-a11y';
-import type { Room } from '@resort-pro/types';
+import { isHttpUrl, MAX_MEDIA_URL_LENGTH, type Room } from '@resort-pro/types';
 
 const ROOM_TYPES = ['STANDARD', 'DELUXE', 'SUITE', 'VILLA', 'COTTAGE', 'BUNGALOW'] as const;
 
@@ -51,9 +51,14 @@ const AMENITY_SUGGESTIONS = [
   'Jacuzzi', 'Kitchen', 'Living Room', 'Private Pool', 'Garden View', 'Safe Box', 'Bathtub',
 ];
 
-function isValidUrl(s: string) {
-  try { new URL(s); return true; } catch { return false; }
-}
+/*
+  Was `new URL(s)` and nothing else, which is not a check: it parses
+  `javascript:` and `data:` happily, and the API — which used the same
+  one-liner on `videos` — then stored them. Both ends ask
+  `@resort-pro/types` now, so the form cannot accept something the save
+  will refuse. (RM-012.)
+*/
+const isValidUrl = isHttpUrl;
 
 const inp = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9px] text-[13px] text-[#18231f] placeholder:text-[#b5afa7] focus:outline-none focus:ring-2 focus:ring-[#23766a]/30';
 const lbl = 'block text-[11px] font-semibold uppercase tracking-[0.06em] mb-1.5 text-[#8aa29a]';
@@ -150,7 +155,8 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
   const addVideo = () => {
     const t = videoInput.trim();
     if (!t) return;
-    if (!isValidUrl(t)) { setVideoError('Enter a valid URL'); return; }
+    if (!isValidUrl(t)) { setVideoError('Enter a http:// or https:// link'); return; }
+    if (t.length > MAX_MEDIA_URL_LENGTH) { setVideoError('That link is too long'); return; }
     if (videos.includes(t)) { setVideoError('Already added'); return; }
     setVideos(p => [...p, t]); setVideoInput(''); setVideoError('');
   };
