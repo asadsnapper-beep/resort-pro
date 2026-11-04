@@ -342,7 +342,14 @@ jobs:
         # fields stay inside the modal on an iPhone (Room Management QA
         # 2026-10-28, RM-009) — a layout regression no unit test can see,
         # and one this list is the only thing that would catch.
-        run: pnpm exec playwright test tests/e2e/roles.spec.ts tests/e2e/landing.spec.ts tests/e2e/crm.spec.ts tests/e2e/website-builder.spec.ts tests/e2e/room-modal-mobile.spec.ts --reporter=github
+        #
+        # room-dialog-a11y.spec.ts is the same argument for behaviour instead
+        # of layout: dialog roles, label associations, Escape, and focus kept
+        # inside the overlay (RM-010). Two of those assertions pass on Chrome
+        # and fail on WebKit — the focus trap had to be rewritten twice before
+        # Mobile Safari agreed with it — so it earns its place in a list that
+        # runs both projects.
+        run: pnpm exec playwright test tests/e2e/roles.spec.ts tests/e2e/landing.spec.ts tests/e2e/crm.spec.ts tests/e2e/website-builder.spec.ts tests/e2e/room-modal-mobile.spec.ts tests/e2e/room-dialog-a11y.spec.ts --reporter=github
 
       - name: Upload Playwright report on failure
         if: failure()

@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { useDialogA11y } from '@/hooks/use-dialog-a11y';
 
 interface ModalShellProps {
   open: boolean;
@@ -44,7 +45,15 @@ export function ModalShell({
   const titleId = useId();
   const descriptionId = useId();
   const [isDark, setIsDark] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
+
+  /*
+    Escape, focus in, focus restored — this component already had all three,
+    written out by hand. What it did not have was a Tab trap, so focus walked
+    off the end of every modal in the app into the page behind the backdrop.
+    Moving the four behaviours into one hook closed that for all of them at
+    once and is why this file got shorter rather than longer. (RM-010.)
+  */
+  const panelRef = useDialogA11y<HTMLDivElement>({ open, onClose, ready: mounted });
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -55,42 +64,6 @@ export function ModalShell({
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => obs.disconnect();
   }, []);
-
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => { document.body.style.overflow = ''; };
-  }, [open]);
-
-  // Escape closes. Clicking the backdrop already did; the keyboard had no way
-  // out at all, which for a dialog covering the screen is a trap.
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
-
-  // Focus moves into the dialog when it opens and back to whatever opened it
-  // when it closes. Without the second half, dismissing a modal dropped focus
-  // onto document.body and a keyboard user restarted from the top of the page.
-  //
-  // `mounted` is in the deps because the first render returns null: the panel
-  // does not exist until the render after it flips.
-  useEffect(() => {
-    if (!open || !mounted) return;
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-    const panel = panelRef.current;
-    // Three consumers autoFocus a field inside the dialog. Taking focus away
-    // from them would be a regression dressed as an improvement.
-    if (panel && !panel.contains(document.activeElement)) panel.focus();
-    return () => {
-      if (previouslyFocused && document.contains(previouslyFocused)) previouslyFocused.focus();
-    };
-  }, [open, mounted]);
 
   if (!mounted || !open) return null;
 
