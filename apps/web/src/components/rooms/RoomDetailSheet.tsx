@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useId } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X, BedDouble, Users, Tag, Building2, Pencil, Trash2,
@@ -10,6 +10,7 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { canRoom, type Room } from '@resort-pro/types';
 import { useAuthStore } from '@/store/auth';
+import { useDialogA11y } from '@/hooks/use-dialog-a11y';
 
 const ROOM_TYPE_META: Record<string, { bg: string; border: string; text: string }> = {
   STANDARD: { bg: 'var(--rp-surface-3)', border: 'var(--rp-border-md)',      text: 'var(--rp-text-muted)' },
@@ -80,11 +81,20 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
 
   useEffect(() => { setMounted(true); }, []);
 
-  useEffect(() => {
-    if (room) { document.body.style.overflow = 'hidden'; }
-    else { document.body.style.overflow = ''; }
-    return () => { document.body.style.overflow = ''; };
-  }, [room]);
+  /*
+    The sheet slides over the whole screen on a phone and over most of it on a
+    desktop, and announced itself as nothing at all: no dialog role, no name,
+    no Escape, no focus moved in or restored, and Tab walked out of it into the
+    room grid behind. (Room Management QA 2026-10-28, RM-010.)
+  */
+  const uid = useId();
+  const titleId = `${uid}-title`;
+  const panelRef = useDialogA11y<HTMLDivElement>({
+    // `room` is both the data and the open flag for this component.
+    open: !!room,
+    onClose,
+    ready: mounted,
+  });
 
   if (!room || !mounted) return null;
 
@@ -105,10 +115,20 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
 
   const sheet = (
     <>
-      <div className="fixed inset-0 z-40" onClick={onClose}
+      {/* The backdrop is a click target, not content: it duplicates the close
+          button, so a screen reader reading it out would offer the same action
+          twice with no name on one of them. */}
+      <div className="fixed inset-0 z-40" onClick={onClose} aria-hidden="true"
         style={{ background: 'rgba(27,52,47,0.3)', backdropFilter: 'blur(3px)' }} />
 
-      <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[420px] flex-col bg-white"
+      <div ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        /* Named by the room's own heading further down, so two rooms' sheets
+           are distinguishable and the name cannot drift from what is shown. */
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[420px] flex-col bg-white"
         style={{ boxShadow: '-8px 0 40px rgba(27,52,47,0.18)' }}>
 
         {/* Header */}
@@ -121,10 +141,10 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
             </span>
             <span className="font-mono text-[13px]" style={{ color: 'rgba(255,255,255,0.5)' }}>#{room.number}</span>
           </div>
-          <button onClick={onClose}
+          <button onClick={onClose} type="button" aria-label="Close"
             className="flex h-[28px] w-[28px] items-center justify-center rounded-full hover:bg-white/10 transition-colors"
             style={{ color: 'rgba(255,255,255,0.6)' }}>
-            <X className="h-4 w-4" />
+            <X aria-hidden="true" className="h-4 w-4" />
           </button>
         </div>
 
@@ -152,7 +172,7 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
           ) : (
             <div className="flex aspect-video w-full items-center justify-center"
               style={{ background: '#e8f4f2' }}>
-              <BedDouble className="h-16 w-16" style={{ color: '#9bbdb7' }} strokeWidth={1.5} />
+              <BedDouble aria-hidden="true" className="h-16 w-16" style={{ color: '#9bbdb7' }} strokeWidth={1.5} />
             </div>
           )}
 
@@ -161,7 +181,7 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
             {/* Title + status */}
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h2 className="font-display text-[20px] font-semibold leading-tight" style={{ color: 'var(--rp-text)' }}>{room.name}</h2>
+                <h2 id={titleId} className="font-display text-[20px] font-semibold leading-tight" style={{ color: 'var(--rp-text)' }}>{room.name}</h2>
                 {room.description && (
                   <p className="mt-1 text-[13px] leading-relaxed" style={{ color: 'var(--rp-text-muted)' }}>{room.description}</p>
                 )}
@@ -181,7 +201,7 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
               ].map(({ Icon, label, value }) => (
                 <div key={label} className="rounded-[12px] p-3 text-center"
                   style={{ background: 'var(--rp-surface-3)' }}>
-                  <Icon className="mx-auto mb-1.5 h-4 w-4" style={{ color: '#23766a' }} />
+                  <Icon aria-hidden="true" className="mx-auto mb-1.5 h-4 w-4" style={{ color: '#23766a' }} />
                   <p className="text-[10.5px]" style={{ color: 'var(--rp-text-muted)' }}>{label}</p>
                   <p className="mt-0.5 text-[13px] font-semibold" style={{ color: 'var(--rp-text)' }}>{value}</p>
                 </div>
@@ -208,13 +228,14 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
                         : '📅 Upcoming Booking'}
                   </p>
                   <button onClick={() => router.push(`/dashboard/bookings?id=${booking.id}`)}
+                    type="button" aria-label={`Open booking ${booking.confirmationNo}`}
                     className="transition-opacity hover:opacity-70" style={{ color: 'var(--rp-text-muted)' }}>
-                    <ExternalLink className="h-3.5 w-3.5" />
+                    <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
                   </button>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border bg-white">
-                    <User className="h-4 w-4" style={{ color: 'var(--rp-text-muted)' }} />
+                    <User aria-hidden="true" className="h-4 w-4" style={{ color: 'var(--rp-text-muted)' }} />
                   </div>
                   <div>
                     <p className="text-[13.5px] font-semibold" style={{ color: 'var(--rp-text)' }}>
@@ -225,11 +246,11 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-[12px]">
                   <div className="flex items-center gap-1.5" style={{ color: 'var(--rp-text-muted)' }}>
-                    <CalendarDays className="h-3.5 w-3.5" />
+                    <CalendarDays aria-hidden="true" className="h-3.5 w-3.5" />
                     <span>Check-in: <strong style={{ color: 'var(--rp-text)' }}>{formatDate(booking.checkIn)}</strong></span>
                   </div>
                   <div className="flex items-center gap-1.5" style={{ color: 'var(--rp-text-muted)' }}>
-                    <CalendarDays className="h-3.5 w-3.5" />
+                    <CalendarDays aria-hidden="true" className="h-3.5 w-3.5" />
                     <span>Check-out: <strong style={{ color: 'var(--rp-text)' }}>{formatDate(booking.checkOut)}</strong></span>
                   </div>
                 </div>
@@ -259,13 +280,17 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
             {videos.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <Film className="h-4 w-4" style={{ color: '#9bbdb7' }} />
+                  <Film aria-hidden="true" className="h-4 w-4" style={{ color: '#9bbdb7' }} />
                   <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em]" style={{ color: 'var(--rp-text-muted)' }}>Videos</p>
                 </div>
                 {videos.length > 1 && (
                   <div className="flex gap-1 mb-3">
                     {videos.map((_, i) => (
-                      <button key={i} onClick={() => setActiveVideo(i)}
+                      /* A 1.5px-tall button with no content: the clearest case
+                         of a control that exists only visually. */
+                      <button key={i} onClick={() => setActiveVideo(i)} type="button"
+                        aria-label={`Show video ${i + 1}`}
+                        aria-current={i === activeVideo ? 'true' : undefined}
                         className="h-1.5 flex-1 rounded-full transition-colors"
                         style={{ background: i === activeVideo ? '#23766a' : '#e8e5e0' }} />
                     ))}
@@ -284,12 +309,13 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
                 {videos.length > 1 && (
                   <div className="mt-2 space-y-1">
                     {videos.map((url, i) => (
-                      <button key={i} onClick={() => setActiveVideo(i)}
+                      <button key={i} onClick={() => setActiveVideo(i)} type="button"
+                        aria-current={i === activeVideo ? 'true' : undefined}
                         className="flex w-full items-center gap-2 rounded-[8px] px-3 py-2 text-left text-[12px] transition-colors"
                         style={i === activeVideo
                           ? { background: 'var(--rp-teal-bg)', color: '#23766a', fontWeight: 500 }
                           : { color: 'var(--rp-text-muted)' }}>
-                        <Film className="h-3 w-3 shrink-0" />
+                        <Film aria-hidden="true" className="h-3 w-3 shrink-0" />
                         <span className="truncate">{url}</span>
                       </button>
                     ))}
@@ -300,15 +326,18 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
 
             {/* Change Status */}
             <div>
-              <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] mb-2.5" style={{ color: 'var(--rp-text-muted)' }}>Change Status</p>
-              <div className="flex flex-wrap gap-2">
+              <p id={`${uid}-status`} className="text-[10.5px] font-semibold uppercase tracking-[0.08em] mb-2.5" style={{ color: 'var(--rp-text-muted)' }}>Change Status</p>
+              {/* "Cleaning" on its own reads as a label. Grouped under the
+                  heading, it reads as the action it is. */}
+              <div role="group" aria-labelledby={`${uid}-status`} className="flex flex-wrap gap-2">
                 {STATUS_ACTIONS.filter(s => s.status !== room.status).map(({ status, label, Icon, bg, border, text }) => (
                   <button key={status}
+                    type="button"
                     disabled={statusLoading}
                     onClick={() => onStatusChange(room.id, status)}
                     className="flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[12.5px] font-medium transition-colors disabled:opacity-50 hover:opacity-80"
                     style={{ background: bg, borderColor: border, color: text }}>
-                    <Icon className="h-3.5 w-3.5" />
+                    <Icon aria-hidden="true" className="h-3.5 w-3.5" />
                     {label}
                   </button>
                 ))}
@@ -320,17 +349,17 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
         {/* Footer */}
         <div className="flex shrink-0 items-center gap-3 px-5 py-4" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
           {canEdit && (
-            <button onClick={() => onEdit(room)}
+            <button onClick={() => onEdit(room)} type="button"
               className="flex flex-1 items-center justify-center gap-2 rounded-[9px] border py-2 text-[13px] font-medium transition-colors hover:bg-[#f4f1eb]"
               style={{ borderColor: 'var(--rp-border-md)', color: 'var(--rp-text-subtle)' }}>
-              <Pencil className="h-4 w-4" /> Edit Room
+              <Pencil aria-hidden="true" className="h-4 w-4" /> Edit Room
             </button>
           )}
           {canDelete && (
-            <button onClick={() => onDelete(room)} aria-label="Delete room"
+            <button onClick={() => onDelete(room)} type="button" aria-label="Delete room"
               className="flex items-center justify-center rounded-[9px] border px-3 py-2 transition-colors hover:bg-[#fef2f2]"
               style={{ borderColor: 'rgba(200,60,60,0.15)', color: '#c43c3c' }}>
-              <Trash2 className="h-4 w-4" />
+              <Trash2 aria-hidden="true" className="h-4 w-4" />
             </button>
           )}
           {!canEdit && (

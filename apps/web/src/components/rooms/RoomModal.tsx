@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { createPortal } from 'react-dom';
 import { useForm } from 'react-hook-form';
@@ -11,6 +11,7 @@ import { useQuery } from '@tanstack/react-query';
 import { propertyApi } from '@/lib/api';
 import { useRoomTypeLabels } from '@/hooks/use-room-type-labels';
 import { ImageUpload } from '@/components/ui/ImageUpload';
+import { useDialogA11y } from '@/hooks/use-dialog-a11y';
 import type { Room } from '@resort-pro/types';
 
 const ROOM_TYPES = ['STANDARD', 'DELUXE', 'SUITE', 'VILLA', 'COTTAGE', 'BUNGALOW'] as const;
@@ -81,6 +82,31 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
 
   useEffect(() => { setMounted(true); }, []);
 
+  /*
+    Stable per-instance ids. The visible labels were plain `<label>` text with
+    nothing tying them to a field, so `getByLabel('Room #')` — and a screen
+    reader reading the form — found nothing, and clicking a label did not focus
+    its input. (Room Management QA 2026-10-28, RM-010.)
+
+    `useId` rather than literal ids because Add and Edit can both be mounted in
+    the same tree during a transition, and duplicate ids silently attach a
+    label to the wrong one.
+  */
+  const uid = useId();
+  const fieldId = (name: string) => `${uid}-${name}`;
+  const titleId = `${uid}-dialog-title`;
+  /*
+    `-dialog-` and not `-description`: the header subtitle and the form's own
+    Description field would otherwise mint the same id, and `htmlFor` resolves
+    to whichever comes first in the document — the subtitle. The label looked
+    right in the markup and attached to a paragraph. The test caught it.
+  */
+  const descriptionId = `${uid}-dialog-description`;
+
+  // Escape, focus in and back out, and Tab kept inside. The modal had the
+  // scroll lock and nothing else: Tab left it on the first press.
+  const panelRef = useDialogA11y<HTMLDivElement>({ open, onClose, ready: mounted });
+
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { type: 'STANDARD', maxOccupancy: 2, basePrice: 100 },
@@ -110,15 +136,6 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
     }
     setAmenityInput(''); setVideoInput(''); setVideoError('');
   }, [room, reset, open]);
-
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => { document.body.style.overflow = ''; };
-  }, [open]);
 
   const addAmenity = (a: string) => {
     const t = a.trim();
@@ -150,7 +167,19 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
       }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
+      {/* The panel is the dialog, not the backdrop. Before this, a screen
+          reader saw a stack of plain divs: a modal that visually takes over
+          the screen did not exist as a modal, which is what the audit's role
+          query reported. */}
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        /* Focusable programmatically only, so opening the modal can place
+           focus on it without adding a stop to the page's tab order. */
+        tabIndex={-1}
         style={{
           position: 'relative',
           width: '100%',
@@ -168,17 +197,22 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
         {/* ── Header ───────────────────────────────────────────────────── */}
         <div style={{ background: 'var(--rp-btn-accent)', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div>
-            <h2 style={{ fontFamily: 'var(--font-display, serif)', fontSize: '17px', fontWeight: 500, color: 'var(--rp-btn-accent-text)', margin: 0 }}>
+            <h2 id={titleId} style={{ fontFamily: 'var(--font-display, serif)', fontSize: '17px', fontWeight: 500, color: 'var(--rp-btn-accent-text)', margin: 0 }}>
               {room ? `Edit — ${room.name}` : 'Add Room'}
             </h2>
-            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
+            <p id={descriptionId} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
               {room ? 'Update room details and media' : 'Add a new room or villa to your resort'}
             </p>
           </div>
-          <button onClick={onClose} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px', width: '28px', borderRadius: '50%', border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}
+          {/* `type="button"` as well as a name: inside a modal whose body is a
+              form, a bare <button> is a submit button. It is outside the
+              <form> element here, so it happened not to submit — a fragile
+              thing to leave depending on where the markup sits. */}
+          <button onClick={onClose} type="button" aria-label="Close"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px', width: '28px', borderRadius: '50%', border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)') }
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent') }>
-            <X style={{ width: '16px', height: '16px' }} />
+            <X aria-hidden="true" style={{ width: '16px', height: '16px' }} />
           </button>
         </div>
 
@@ -204,38 +238,47 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
               */}
               <div className="grid grid-cols-2 items-start gap-3 md:grid-cols-[100px_1fr_80px_90px_110px]">
                 <div className="col-span-2 md:col-span-1">
-                  <label className={lbl}>Room #</label>
-                  <input {...register('number')} placeholder="101" className={inp} />
-                  {errors.number && <p className={err}>{errors.number.message}</p>}
+                  <label htmlFor={fieldId('number')} className={lbl}>Room #</label>
+                  <input id={fieldId('number')} {...register('number')} placeholder="101" className={inp} />
+                  {errors.number && <p role="alert" className={err}>{errors.number.message}</p>}
                 </div>
                 <div className="col-span-2 md:col-span-1">
-                  <label className={lbl}>Name</label>
-                  <input {...register('name')} placeholder="Ocean View Suite" className={inp} />
-                  {errors.name && <p className={err}>{errors.name.message}</p>}
+                  <label htmlFor={fieldId('name')} className={lbl}>Name</label>
+                  <input id={fieldId('name')} {...register('name')} placeholder="Ocean View Suite" className={inp} />
+                  {errors.name && <p role="alert" className={err}>{errors.name.message}</p>}
                 </div>
                 <div>
-                  <label className={lbl}>Floor</label>
-                  <input {...register('floor')} type="number" placeholder="1" className={inp} />
+                  <label htmlFor={fieldId('floor')} className={lbl}>Floor</label>
+                  <input id={fieldId('floor')} {...register('floor')} type="number" placeholder="1" className={inp} />
                 </div>
                 <div>
-                  <label className={lbl}>Guests</label>
-                  <input {...register('maxOccupancy')} type="number" min={1} max={20} className={inp} />
-                  {errors.maxOccupancy && <p className={err}>{errors.maxOccupancy.message}</p>}
+                  <label htmlFor={fieldId('maxOccupancy')} className={lbl}>Guests</label>
+                  <input id={fieldId('maxOccupancy')} {...register('maxOccupancy')} type="number" min={1} max={20} className={inp} />
+                  {errors.maxOccupancy && <p role="alert" className={err}>{errors.maxOccupancy.message}</p>}
                 </div>
                 <div className="col-span-2 md:col-span-1">
-                  <label className={lbl}>Price/Night</label>
+                  <label htmlFor={fieldId('basePrice')} className={lbl}>Price/Night</label>
                   <div style={{ position: 'relative' }}>
-                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '13px', color: 'var(--rp-text-muted)' }}>$</span>
-                    <input {...register('basePrice')} type="number" step="0.01" min={0}
+                    {/* The symbol is decoration beside a labelled field; read
+                        aloud it would land between the label and the value. */}
+                    <span aria-hidden="true" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '13px', color: 'var(--rp-text-muted)' }}>$</span>
+                    <input id={fieldId('basePrice')} {...register('basePrice')} type="number" step="0.01" min={0}
                       className={inp} style={{ paddingLeft: '24px' }} />
                   </div>
-                  {errors.basePrice && <p className={err}>{errors.basePrice.message}</p>}
+                  {errors.basePrice && <p role="alert" className={err}>{errors.basePrice.message}</p>}
                 </div>
               </div>
 
               {/* Room Type */}
-              <div>
-                <label className={lbl}>Room Type</label>
+              <div role="group" aria-labelledby={fieldId('type-label')}>
+                {/*
+                  Six buttons, not a field — so this is a group label rather
+                  than a `<label>`, which must point at a form control and
+                  pointed at nothing. The buttons carry `aria-pressed` so the
+                  chosen type is announced as chosen; the colour and ring were
+                  the only thing saying so before.
+                */}
+                <span id={fieldId('type-label')} className={lbl}>Room Type</span>
                 {/*
                   Three across on a phone, six from `md` up. Plain CSS `1fr`
                   will not shrink past its content, so six of these pushed
@@ -249,6 +292,7 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
                     const active = selectedType === t;
                     return (
                       <button key={t} type="button"
+                        aria-pressed={active}
                         onClick={() => { setSelectedType(t); setValue('type', t); }}
                         style={{
                           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
@@ -258,7 +302,7 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
                           transition: 'all 0.15s',
                         }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', borderRadius: '7px', background: active ? 'rgba(255,255,255,0.6)' : 'var(--rp-surface-4)' }}>
-                          <m.Icon style={{ width: '14px', height: '14px', color: active ? m.text : 'var(--rp-text-faint)' }} />
+                          <m.Icon aria-hidden="true" style={{ width: '14px', height: '14px', color: active ? m.text : 'var(--rp-text-faint)' }} />
                         </div>
                         <span style={{ fontSize: '11px', fontWeight: 600, color: active ? m.text : 'var(--rp-text-muted)' }}>{getRoomTypeLabel(t)}</span>
                       </button>
@@ -271,8 +315,9 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
               {/* Property (only shown if multi-property is enabled) */}
               {properties.length > 0 && (
                 <div>
-                  <label className={lbl}>Property</label>
+                  <label htmlFor={fieldId('property')} className={lbl}>Property</label>
                   <select
+                    id={fieldId('property')}
                     value={propertyId}
                     onChange={e => setPropertyId(e.target.value)}
                     className={inp}
@@ -287,23 +332,23 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
 
               {/* Description */}
               <div>
-                <label className={lbl}>Description</label>
-                <textarea {...register('description')} rows={2}
+                <label htmlFor={fieldId('description')} className={lbl}>Description</label>
+                <textarea id={fieldId('description')} {...register('description')} rows={2}
                   placeholder="Describe the room experience…"
                   className={inp} style={{ resize: 'none' }} />
               </div>
 
               {/* Amenities */}
               <div>
-                <label className={lbl}>Amenities</label>
+                <label htmlFor={fieldId('amenity')} className={lbl}>Amenities</label>
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-                  <input value={amenityInput} onChange={e => setAmenityInput(e.target.value)}
+                  <input id={fieldId('amenity')} value={amenityInput} onChange={e => setAmenityInput(e.target.value)}
                     placeholder="Type custom amenity…"
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAmenity(amenityInput); } }}
                     className={inp} />
-                  <button type="button" onClick={() => addAmenity(amenityInput)}
+                  <button type="button" onClick={() => addAmenity(amenityInput)} aria-label="Add amenity"
                     style={{ flexShrink: 0, width: '38px', height: '38px', borderRadius: '8px', border: 'none', background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Plus style={{ width: '16px', height: '16px' }} />
+                    <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                   </button>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -311,6 +356,9 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
                     const selected = amenities.includes(a);
                     return (
                       <button key={a} type="button"
+                        /* The chips toggle. The only thing that said which
+                           were on was a tint and a × instead of a +. */
+                        aria-pressed={selected}
                         onClick={() => selected ? setAmenities(p => p.filter(x => x !== a)) : addAmenity(a)}
                         style={{
                           display: 'inline-flex', alignItems: 'center', gap: '4px',
@@ -320,7 +368,9 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
                           border: `1px solid ${selected ? 'rgba(35,118,106,0.3)' : 'var(--rp-border-md)'}`,
                           color: selected ? '#23766a' : 'var(--rp-text-muted)',
                         }}>
-                        {selected ? <X style={{ width: '10px', height: '10px' }} /> : '+'}
+                        {selected
+                          ? <X aria-hidden="true" style={{ width: '10px', height: '10px' }} />
+                          : <span aria-hidden="true">+</span>}
                         {a}
                       </button>
                     );
@@ -331,7 +381,9 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
               {/* Photos */}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                  <label className={lbl} style={{ margin: 0 }}>Photos</label>
+                  {/* `<label>` with no control again — the gallery below is a
+                      grid of buttons and an upload widget, not one input. */}
+                  <span className={lbl} style={{ margin: 0 }}>Photos</span>
                   <span style={{ fontSize: '11.5px', color: 'var(--rp-text-faint)' }}>{images.length} / 8</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
@@ -340,9 +392,13 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
                       className="group">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      {/* Numbered, because eight of these otherwise read as
+                          eight identical "Remove photo" buttons with nothing
+                          to tell them apart. */}
                       <button type="button" onClick={() => setImages(p => p.filter((_, idx) => idx !== i))}
+                        aria-label={`Remove photo ${i + 1}`}
                         style={{ position: 'absolute', top: '4px', right: '4px', width: '20px', height: '20px', borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.65)', color: 'var(--rp-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <X style={{ width: '10px', height: '10px' }} />
+                        <X aria-hidden="true" style={{ width: '10px', height: '10px' }} />
                       </button>
                     </div>
                   ))}
@@ -357,38 +413,46 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Film style={{ width: '13px', height: '13px', color: '#9bbdb7' }} />
-                    <label className={lbl} style={{ margin: 0 }}>Videos</label>
+                    <Film aria-hidden="true" style={{ width: '13px', height: '13px', color: '#9bbdb7' }} />
+                    <label htmlFor={fieldId('video')} className={lbl} style={{ margin: 0 }}>Videos</label>
                   </div>
                   <span style={{ fontSize: '11.5px', color: 'var(--rp-text-faint)' }}>{videos.length} / 4</span>
                 </div>
-                <p style={{ fontSize: '11.5px', color: 'var(--rp-text-faint)', marginBottom: '8px' }}>YouTube, Vimeo, or direct MP4 link</p>
+                {/* Pointed at by the input below, so the accepted formats are
+                    read out with the field instead of being passed over. */}
+                <p id={fieldId('video-hint')} style={{ fontSize: '11.5px', color: 'var(--rp-text-faint)', marginBottom: '8px' }}>YouTube, Vimeo, or direct MP4 link</p>
                 {videos.length < 4 && (
                   <div style={{ display: 'flex', gap: '8px', marginBottom: videoError ? '4px' : '8px' }}>
-                    <input value={videoInput}
+                    <input id={fieldId('video')} value={videoInput}
                       onChange={e => { setVideoInput(e.target.value); setVideoError(''); }}
                       placeholder="https://youtube.com/watch?v=…"
+                      /* The refusal below is the one thing a sighted user can
+                         see and a screen-reader user could not: it appears
+                         after the field they are standing in. */
+                      aria-describedby={videoError ? `${fieldId('video-hint')} ${fieldId('video-error')}` : fieldId('video-hint')}
+                      aria-invalid={videoError ? true : undefined}
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addVideo(); } }}
                       className={inp} />
-                    <button type="button" onClick={addVideo}
+                    <button type="button" onClick={addVideo} aria-label="Add video"
                       style={{ flexShrink: 0, width: '38px', height: '38px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.08)', background: 'var(--rp-surface-3)', color: 'var(--rp-text-subtle)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Plus style={{ width: '16px', height: '16px' }} />
+                      <Plus aria-hidden="true" style={{ width: '16px', height: '16px' }} />
                     </button>
                   </div>
                 )}
-                {videoError && <p className={err} style={{ marginBottom: '6px' }}>{videoError}</p>}
+                {videoError && <p id={fieldId('video-error')} role="alert" className={err} style={{ marginBottom: '6px' }}>{videoError}</p>}
                 {videos.length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     {videos.map((url, i) => (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '9px', border: '1px solid rgba(0,0,0,0.06)', background: 'var(--rp-surface-3)' }}>
-                        <Film style={{ width: '13px', height: '13px', color: '#9bbdb7', flexShrink: 0 }} />
+                        <Film aria-hidden="true" style={{ width: '13px', height: '13px', color: '#9bbdb7', flexShrink: 0 }} />
                         <a href={url} target="_blank" rel="noopener noreferrer"
                           style={{ flex: 1, fontSize: '12px', color: '#23766a', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', textDecoration: 'none' }}>
                           {url}
                         </a>
                         <button type="button" onClick={() => setVideos(p => p.filter((_, idx) => idx !== i))}
+                          aria-label={`Remove video ${i + 1}`}
                           style={{ flexShrink: 0, border: 'none', background: 'transparent', color: 'var(--rp-text-faint)', cursor: 'pointer', display: 'flex' }}>
-                          <X style={{ width: '13px', height: '13px' }} />
+                          <X aria-hidden="true" style={{ width: '13px', height: '13px' }} />
                         </button>
                       </div>
                     ))}
@@ -407,7 +471,7 @@ export function RoomModal({ open, onClose, onSubmit, loading, room }: Props) {
           </button>
           <button type="submit" form="room-form" disabled={loading}
             style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 20px', borderRadius: '9px', border: 'none', background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)', fontSize: '13px', fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1 }}>
-            {loading && <Loader2 style={{ width: '14px', height: '14px', animation: 'spin 1s linear infinite' }} />}
+            {loading && <Loader2 aria-hidden="true" style={{ width: '14px', height: '14px', animation: 'spin 1s linear infinite' }} />}
             {room ? 'Save Changes' : 'Add Room'}
           </button>
         </div>

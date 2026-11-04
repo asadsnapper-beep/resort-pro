@@ -153,7 +153,21 @@ export default function RoomsPage() {
 
   const openDetail = async (room: RoomWithBooking) => {
     setSelectedRoom(room);
-    try { const res = await roomsApi.get(room.id); setSelectedRoom(res.data?.data ?? room); } catch { /* keep cached */ }
+    try {
+      const res = await roomsApi.get(room.id);
+      /*
+        Only if this room is still the one on screen. The cached row is shown
+        at once and the full one — the row that carries the current booking —
+        replaces it when the request lands, and that second write used to be
+        unconditional: closing the sheet inside that window set the room to
+        null and the late response **reopened it**. Found by a test that
+        pressed Escape straight after opening, which failed about one run in
+        three on Mobile Safari and never on Chrome, because the window is as
+        wide as the request is slow. The same write also used to overwrite
+        whichever other room had been opened in the meantime.
+      */
+      setSelectedRoom(prev => (prev?.id === room.id ? (res.data?.data ?? room) : prev));
+    } catch { /* keep cached */ }
   };
 
   const resetFilters = () => { setSearchInput(''); setStatusFilter(''); setTypeFilter(''); setPage(1); };
@@ -275,9 +289,32 @@ export default function RoomsPage() {
               const statusStyle = ROOM_STATUS_PILL[room.status] ?? ROOM_STATUS_PILL.AVAILABLE;
               const typeStyle   = ROOM_TYPE_STYLE[room.type]   ?? ROOM_TYPE_STYLE.STANDARD;
               return (
+                /*
+                  A `<div>` with an `onClick` is not a control: it is not in
+                  the tab order and Enter does nothing, so the only way into a
+                  room's detail sheet was a mouse. Found while fixing the
+                  sheet's own dialog semantics (RM-010) — and the sheet cannot
+                  hand focus back on close to something that cannot hold it.
+
+                  `role="button"` and `tabIndex` rather than a real `<button>`:
+                  the card contains an <img> and a block of headings, and a
+                  button may not contain that kind of content. Space and Enter
+                  are handled explicitly because only a real button gets them
+                  for free.
+                */
                 <div key={room.id} data-testid="room-card"
-                  className="group cursor-pointer overflow-hidden rounded-[14px] border transition-shadow hover:shadow-md bg-white dark:bg-white/5" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}
-                  onClick={() => openDetail(room)}>
+                  role="button" tabIndex={0}
+                  aria-label={`Room ${room.number} — ${room.name}`}
+                  className="group cursor-pointer overflow-hidden rounded-[14px] border transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rp-brand bg-white dark:bg-white/5" style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}
+                  onClick={() => openDetail(room)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      // Space scrolls the page otherwise, which on a grid of
+                      // cards moves the one being activated out of view.
+                      e.preventDefault();
+                      openDetail(room);
+                    }
+                  }}>
 
                   {/* Image / placeholder */}
                   {room.images?.[0] ? (
