@@ -212,6 +212,46 @@ describe('a room is not declared ready while something still blocks it', () => {
     expect(await storedStatus(roomId)).toBe('MAINTENANCE');
   });
 
+  it('refuses Available while a between-stay clean is only waiting', async () => {
+    /*
+      Added by RM-013, because the journey test found this was not true.
+
+      Every case in this file set a task to IN_PROGRESS by hand, so the state a
+      real checkout actually produces — a PENDING clean, nobody assigned yet —
+      was the one state never exercised, and it did not block. The room went to
+      CLEANING and a PATCH straight back to AVAILABLE was accepted: a room with
+      the last guest's towels still in it, back on sale.
+
+      A clean nobody has started is not less of a blocker than one half-done.
+    */
+    const roomId = await makeRoom();
+    const taskId = await makeTask(roomId);
+
+    // Deliberately NOT moved to IN_PROGRESS.
+    const task = await prisma.housekeepingTask.findUnique({
+      where: { id: taskId }, select: { status: true },
+    });
+    expect(task?.status).toBe('PENDING');
+
+    const res = await setStatus(roomId, 'AVAILABLE');
+
+    expect(res.statusCode).toBe(409);
+    expect(body(res).code).toBe('ROOM_IS_BEING_CLEANED');
+  });
+
+  it('does not refuse Available for a clean that was skipped', async () => {
+    // The other half of the same rule: SKIPPED is somebody deciding the room
+    // did not need cleaning, which is an answer rather than an omission.
+    const roomId = await makeRoom();
+    const taskId = await makeTask(roomId);
+    await setTaskStatus(taskId, 'SKIPPED');
+
+    const res = await setStatus(roomId, 'AVAILABLE');
+
+    expect(res.statusCode, res.body).toBe(200);
+    expect(await storedStatus(roomId)).toBe('AVAILABLE');
+  });
+
   it('refuses Available while a between-stay clean is in progress', async () => {
     const roomId = await makeRoom();
     const taskId = await makeTask(roomId);

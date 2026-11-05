@@ -133,11 +133,27 @@ export async function roomBlocker(
     };
   }
 
+  /*
+    PENDING as well as IN_PROGRESS, and this was wrong until the lifecycle
+    journey walked it (RM-013). A checkout creates its clean as PENDING — so
+    the one state this rule exists for, a room somebody has just vacated and
+    nobody has touched, was the one state it did not cover. The room went to
+    CLEANING, and a PATCH straight back to AVAILABLE was accepted, because
+    "being cleaned" was read as "somebody is in there with a mop" rather than
+    "this room has not been cleaned yet". A room nobody has started on is
+    strictly dirtier than one half-done.
+
+    Every suite before this set IN_PROGRESS by hand, so none of them could see
+    it; nothing was ever decided about PENDING, it simply never arrived.
+
+    COMPLETED and SKIPPED are both still clear: a skipped clean is somebody
+    deciding the room did not need one, which is an answer, not an omission.
+  */
   const cleaning = await client.housekeepingTask.findFirst({
     where: {
       tenantId,
       roomId,
-      status: 'IN_PROGRESS',
+      status: { in: ['PENDING', 'IN_PROGRESS'] },
       type: { in: [...BETWEEN_STAY_TYPES] },
     },
     select: { id: true },
@@ -146,9 +162,12 @@ export async function roomBlocker(
     return {
       code: 'ROOM_IS_BEING_CLEANED',
       status: 'CLEANING',
+      // Worded for both: the task may be waiting as well as under way, and
+      // "is still being cleaned" would be a lie about a room nobody has
+      // reached yet.
       error:
-        `${room} is still being cleaned. Complete the housekeeping task to put ` +
-        `the room back on sale.`,
+        `${room} has not been cleaned since the last guest. Complete the ` +
+        `housekeeping task to put the room back on sale.`,
     };
   }
 
