@@ -349,7 +349,14 @@ jobs:
         # and fail on WebKit — the focus trap had to be rewritten twice before
         # Mobile Safari agreed with it — so it earns its place in a list that
         # runs both projects.
-        run: pnpm exec playwright test tests/e2e/roles.spec.ts tests/e2e/landing.spec.ts tests/e2e/crm.spec.ts tests/e2e/website-builder.spec.ts tests/e2e/room-modal-mobile.spec.ts tests/e2e/room-dialog-a11y.spec.ts --reporter=github
+        #
+        # auth.spec.ts and dashboard.spec.ts were never listed here at all.
+        # Sixteen test runs that pass and guarded nothing, for as long as this
+        # list has existed (RM-013). Listing them is the whole fix; they
+        # needed no changes. The `e2e-spec-list` job below now fails the build
+        # if a spec file is ever outside this list again without a stated
+        # reason, because every addition above was somebody noticing by hand.
+        run: pnpm exec playwright test tests/e2e/roles.spec.ts tests/e2e/landing.spec.ts tests/e2e/crm.spec.ts tests/e2e/website-builder.spec.ts tests/e2e/room-modal-mobile.spec.ts tests/e2e/room-dialog-a11y.spec.ts tests/e2e/auth.spec.ts tests/e2e/dashboard.spec.ts --reporter=github
 
       - name: Upload Playwright report on failure
         if: failure()
@@ -496,3 +503,32 @@ jobs:
 
       - name: Assert the backup can reach the application's database
         run: node scripts/check-backup-credentials.mjs --show
+
+  # ── Every E2E spec is run, or excluded for a stated reason ──────────────────
+  #
+  # The E2E job names its specs one path at a time, so a new file is never
+  # executed and a renamed one stops being executed — silently, with a green
+  # build. Three specs had to be noticed and added by hand before this existed,
+  # and two more (auth, dashboard) were outside the list for months: sixteen
+  # passing test runs that guarded nothing. (Room Management QA, RM-013.)
+  #
+  # Its own job rather than a step in e2e-tests, because that job waits on the
+  # API tests: a forgotten spec should be reported in seconds, not ten minutes.
+  #
+  # Plain node, no dependencies — so, like the jobs above, it must not touch
+  # the package-manager cache.
+  e2e-spec-list:
+    name: E2E spec list complete
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          package-manager-cache: false
+
+      - name: Assert no spec file is invisible to CI
+        run: node scripts/check-e2e-spec-list.mjs

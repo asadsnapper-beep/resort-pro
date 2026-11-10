@@ -152,13 +152,30 @@ test.describe('OWNER role · the room overlays are dialogs', () => {
 
     // And the refusal a sighted user sees is attached to the field, so it is
     // read out to somebody standing in it rather than passed over.
-    await page.getByLabel('Videos', { exact: true }).fill('not a url');
+    const videos = page.getByLabel('Videos', { exact: true });
+    await videos.fill('not a url');
     await dialog.getByRole('button', { name: 'Add video', exact: true }).click();
-    await expect(page.getByLabel('Videos', { exact: true }))
-      .toHaveAttribute('aria-invalid', 'true');
-    // Scoped to the dialog: a toast elsewhere on the page is also an alert.
-    await expect(dialog.getByRole('alert').filter({ hasText: 'valid URL' }))
-      .toHaveCount(1);
+    await expect(videos).toHaveAttribute('aria-invalid', 'true');
+
+    /*
+      Checked by association rather than by its words. This assertion used to
+      match the message's text, and RM-012 then changed that message from
+      "Enter a valid URL" to one that names the schemes — so the test failed
+      on a change that improved exactly the thing it was guarding. The copy
+      belongs to the field; what this test is for is that a screen reader is
+      told about it. So: the id the field points at is an element that exists,
+      carries role="alert", and is not empty.
+    */
+    const describedBy = await videos.getAttribute('aria-describedby');
+    const errorId = (describedBy ?? '').split(/\s+/).find(id => id.endsWith('-video-error'));
+    expect(errorId, 'the field does not point at an error message').toBeTruthy();
+
+    // `[id="..."]` and not `#...`: React's useId() mints ids like ":r3:", and
+    // a colon is not legal in a CSS id selector — `#:r3:-video-error` matches
+    // nothing at all, silently. The attribute selector takes the id verbatim.
+    const alert = dialog.locator(`[id="${errorId}"]`);
+    await expect(alert).toHaveAttribute('role', 'alert');
+    await expect(alert).not.toBeEmpty();
   });
 
   test('the toggles say which of them are on', async () => {

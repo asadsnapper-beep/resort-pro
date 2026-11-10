@@ -1,5 +1,14 @@
 /**
- * Whether the Add Room price field asks for money in the resort's currency.
+ * What the Add Room form accepts, in the two places the audit found it
+ * disagreeing with the API: the price field's currency (RM-011) and the video
+ * link's validation (RM-012).
+ *
+ * Renamed from `room-price-currency` when the second one arrived. Both are the
+ * same shape of defect — a rule the form states one way and the server states
+ * another — so they are read together here, against the same real store.
+ *
+ * ── RM-011 ──
+ * Whether the price field asks for money in the resort's currency.
  *
  * It prefixed a literal `$` at every resort, while the room cards beside it
  * ran the same number through `formatCurrency`. The audit read that as "the
@@ -16,7 +25,7 @@
  * `useCurrency` would assert that a stub returns what the stub was given.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { RoomModal } from '@/components/rooms/RoomModal';
 import { useAuthStore } from '@/store/auth';
 import { currencySymbol, formatCurrency } from '@/lib/utils';
@@ -37,7 +46,9 @@ vi.hoisted(() => {
       setItem: (k: string, v: string) => void jar.set(k, String(v)),
       removeItem: (k: string) => void jar.delete(k),
       clear: () => jar.clear(),
-      key: (i: number) => [...jar.keys()][i] ?? null,
+      // Array.from, not a spread: this tsconfig does not have
+      // downlevelIteration, so spreading a Map iterator is a type error.
+      key: (i: number) => Array.from(jar.keys())[i] ?? null,
       get length() { return jar.size; },
     },
   });
@@ -74,6 +85,52 @@ const prefix = () => {
 
 beforeEach(() => signInWith('BDT'));
 afterEach(() => cleanup());
+
+describe('the video link the form will accept', () => {
+  /*
+    `isValidUrl` was `new URL(s)` and nothing else, so the form took
+    `javascript:` and `data:` and handed them to a save that — once RM-012
+    put a real check on the API — refuses them with a 400. A form that
+    accepts what the server rejects is the same class of bug RM-005 and
+    RM-012 are both about, just pointing the other way. Both ends ask
+    `@resort-pro/types` now. (RM-012.)
+  */
+  const addVideo = (url: string) => {
+    const input = screen.getByLabelText('Videos') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: url } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add video' }));
+  };
+
+  it.each([
+    'javascript:alert(1)',
+    'data:text/html;base64,PHNjcmlwdD4=',
+    'file:///etc/passwd',
+    'not a url at all',
+  ])('refuses %s before the save can', url => {
+    signInWith('BDT');
+    open();
+    addVideo(url);
+
+    expect(screen.getByRole('alert').textContent).toMatch(/http/i);
+    expect(screen.queryByRole('button', { name: 'Remove video 1' })).toBeNull();
+  });
+
+  it('still takes an ordinary https link', () => {
+    signInWith('BDT');
+    open();
+    addVideo('https://youtube.com/watch?v=dQw4w9WgXcQ');
+
+    expect(screen.getByRole('button', { name: 'Remove video 1' })).toBeTruthy();
+  });
+
+  it('refuses a link longer than the column will hold', () => {
+    signInWith('BDT');
+    open();
+    addVideo(`https://youtube.com/${'a'.repeat(2100)}`);
+
+    expect(screen.getByRole('alert').textContent).toMatch(/too long/i);
+  });
+});
 
 describe('the Add Room price field', () => {
   it('shows taka for a resort billing in taka', () => {

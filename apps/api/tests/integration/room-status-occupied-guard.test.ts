@@ -255,6 +255,18 @@ describe('a room with no guest inside it', () => {
   });
 
   it('can be changed once the guest has checked out', async () => {
+    /*
+      This test is about the *guest* veto letting go, and it used to prove that
+      by asking for AVAILABLE and getting a 200. That stopped being the right
+      proof: a real checkout leaves a housekeeping task behind, and since
+      RM-013 a waiting between-stay clean refuses AVAILABLE in its own right.
+      So the room is no longer free to be called ready the instant the guest
+      walks out — it is free of *the guest*, which is what RM-001 was about.
+
+      Asking for CLEANING is the honest version of the same question: every
+      status but AVAILABLE is accepted once the guest has gone, and none of
+      them was while the guest was in the room.
+    */
     const roomId = await makeRoom();
     const bookingId = await makeBooking(roomId, { first: 'Departed', last: 'Guest' });
     await checkIn(bookingId);
@@ -263,10 +275,17 @@ describe('a room with no guest inside it', () => {
     });
     expect(out.statusCode).toBe(200);
 
-    const res = await setStatus(roomId, 'AVAILABLE');
+    const res = await setStatus(roomId, 'CLEANING');
 
-    expect(res.statusCode).toBe(200);
-    expect(await storedStatus(roomId)).toBe('AVAILABLE');
+    expect(res.statusCode, res.body).toBe(200);
+    expect(await storedStatus(roomId)).toBe('CLEANING');
+
+    // And the one status that is still refused is refused for the clean, not
+    // for the guest — a different code, which is the whole point of having
+    // codes.
+    const ready = await setStatus(roomId, 'AVAILABLE');
+    expect(ready.statusCode).toBe(409);
+    expect(body(ready).code).toBe('ROOM_IS_BEING_CLEANED');
   });
 
   it('is unaffected by another room having a guest in it', async () => {
