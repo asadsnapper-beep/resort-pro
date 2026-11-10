@@ -12,6 +12,7 @@
  */
 
 import { prisma } from '@resort-pro/database';
+import { Prisma } from '@prisma/client';
 import { PLAN_PRICING } from '@resort-pro/types';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -266,7 +267,14 @@ export async function applyPlanFlagsToTenant(tenantId: string, planKey: string):
   }
 }
 
-/** Check if tenant has reached room limit */
+/**
+ * How full this tenant's room allowance is, right now.
+ *
+ * A **report**, not a gate. It answers with a count that was true when it was
+ * taken, and anything that creates a room between the answer and the insert
+ * makes it a lie — which is exactly the bug RM-007 describes. Use
+ * `withRoomQuota` to actually create a room; use this to draw a progress bar.
+ */
 export async function checkRoomLimit(tenantId: string): Promise<{ allowed: boolean; limit: number; current: number }> {
   const entitlement = await resolveTenantEntitlement(tenantId);
   if (entitlement.roomLimit === -1) return { allowed: true, limit: -1, current: 0 };
@@ -277,6 +285,92 @@ export async function checkRoomLimit(tenantId: string): Promise<{ allowed: boole
     limit: entitlement.roomLimit,
     current,
   };
+}
+
+/**
+ * A tenant has reached the number of rooms its plan pays for.
+ *
+ * Carries the numbers so the route can answer with them rather than asking
+ * again — a second count would be a different moment, and could disagree.
+ */
+export class RoomLimitReached extends Error {
+  constructor(readonly limit: number, readonly current: number) {
+    super(`Room limit reached. Your plan allows ${limit} rooms. Upgrade to add more.`);
+    this.name = 'RoomLimitReached';
+  }
+}
+
+/**
+ * Advisory-lock namespace. Arbitrary, and only has to differ from any other
+ * advisory lock this application takes — there are none today, so this is the
+ * first, and the constant exists so that the second one has to pick another.
+ */
+const ROOM_QUOTA_LOCK = 21069; // 0x524D, "RM"
+
+/**
+ * Create a room with this tenant's room count held still.
+ *
+ * The ceiling used to be
+ *
+ *     const { allowed } = await checkRoomLimit(tenantId);   // a COUNT
+ *     ...
+ *     await db.room.create({ data: body });                 // an INSERT
+ *
+ * with nothing holding the two together. Every request in flight read the same
+ * count, every one was under the ceiling, and every one inserted: eight
+ * simultaneous creates against a five-room plan left the resort with **ten
+ * rooms**, no error anywhere, and nothing that would ever reconcile it,
+ * because the ceiling is only consulted on the way in. (RM-007.)
+ *
+ * Unlike the duplicate-room-number half of that finding, there is no database
+ * constraint to lean on — "at most five rows with this tenantId" is not
+ * something Postgres can be asked to enforce — so the count and the insert
+ * have to be made one operation.
+ *
+ * **A per-tenant advisory lock rather than Serializable**, which is what the
+ * booking routes use. Both are correct; they fail differently. Serializable
+ * detects this (it is textbook write-skew: each transaction reads rows the
+ * other is about to insert) but it detects it *afterwards*, by aborting the
+ * loser with a serialization failure — so the caller has to be given either a
+ * retry loop or a 409 that means "try again", when the honest answer is a 403
+ * that means "this is as many rooms as your plan has". The lock asks the
+ * question before the work instead: the losers queue, re-count, see the
+ * winner's row, and are told the truth the first time. A burst of eight
+ * produces one 201 and seven 403s, with no retries and no aborted
+ * transactions.
+ *
+ * The lock is per tenant, so two resorts never wait for each other; two
+ * tenants whose ids happen to hash alike occasionally will, which costs
+ * milliseconds and changes no answer.
+ *
+ * An unlimited plan takes no lock and opens no transaction. There is nothing
+ * to count, and turning "no ceiling" into a queue would be a tax on exactly
+ * the customers who pay the most.
+ *
+ * `write` receives a client it must pass `tenantId` to explicitly: this runs
+ * on the unscoped client, as every other transaction in this codebase does,
+ * because the tenant extension does not reach inside `$transaction`.
+ */
+export async function withRoomQuota<T>(
+  tenantId: string,
+  write: (client: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  const { roomLimit } = await resolveTenantEntitlement(tenantId);
+  if (roomLimit === -1) return write(prisma);
+
+  return prisma.$transaction(async (tx) => {
+    // Held until this transaction ends, however it ends — commit, rollback or
+    // a connection dropped mid-flight. Nothing has to release it by hand.
+    // `$executeRaw`, not `$queryRaw`: pg_advisory_xact_lock() returns void,
+    // and Prisma cannot deserialize a void column — it fails the request with
+    // a 500 rather than taking the lock.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${ROOM_QUOTA_LOCK}::int, hashtext(${tenantId})::int)`;
+
+    const current = await tx.room.count({ where: { tenantId, isActive: true } });
+    if (current >= roomLimit) throw new RoomLimitReached(roomLimit, current);
+
+    return write(tx);
+  });
 }
 
 /** Check if tenant has reached its property limit. */
