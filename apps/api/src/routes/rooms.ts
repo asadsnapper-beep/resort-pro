@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma, Prisma } from '@resort-pro/database';
 import { requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams } from '../utils/response';
-import { checkRoomLimit } from '../utils/entitlement';
+import { withRoomQuota, RoomLimitReached } from '../utils/entitlement';
 import { matchAllTerms } from '../utils/search-terms';
 import { propertyScope } from '../utils/property-scope';
 import { sellableRoomWhere } from '../utils/room-saleability';
@@ -324,28 +324,42 @@ export async function roomRoutes(app: FastifyInstance) {
       const existing = await db.room.findFirst({ where: { number: body.number } });
       if (existing) return numberTaken(reply, body.number);
 
-      // Plan limit check
       const { tenantId } = request.user as { tenantId: string };
-      const limitCheck = await checkRoomLimit(tenantId);
-      if (!limitCheck.allowed) {
-        return reply.status(403).send({
-          success: false,
-          error: `Room limit reached. Your plan allows ${limitCheck.limit} rooms. Upgrade to add more.`,
-          code: 'ROOM_LIMIT_REACHED',
-          data: { limit: limitCheck.limit, current: limitCheck.current } as unknown,
-        });
-      }
 
       if (body.propertyId && !(await assignablePropertyExists(db, body.propertyId))) {
         return unknownProperty(reply);
       }
 
       try {
-        const room = await db.room.create({ data: body });
+        /*
+         * The plan ceiling is counted and the room is inserted as one
+         * operation. It used to be a `checkRoomLimit()` above and a
+         * `create()` below with nothing joining them, so concurrent requests
+         * all read the same count, all passed, and all inserted — eight at
+         * once put ten rooms on a five-room plan. `withRoomQuota` holds the
+         * count still; see utils/entitlement.ts for why it takes a lock
+         * rather than relying on Serializable the way the booking routes do.
+         *
+         * `tenantId` is passed explicitly because this runs on the unscoped
+         * client — the tenant extension does not reach inside a transaction.
+         */
+        const room = await withRoomQuota(tenantId, tx =>
+          tx.room.create({ data: { ...body, tenantId } }),
+        );
         return reply.status(201).send(ok(room, 'Room created'));
       } catch (err) {
-        // The read above can go stale between here and the insert; the
-        // constraint is what actually decides, so translate its answer.
+        if (err instanceof RoomLimitReached) {
+          return reply.status(403).send({
+            success: false,
+            error: err.message,
+            code: 'ROOM_LIMIT_REACHED',
+            data: { limit: err.limit, current: err.current } as unknown,
+          });
+        }
+        // The duplicate-number read above can go stale between here and the
+        // insert; the constraint is what actually decides, so translate its
+        // answer. (The ceiling has no equivalent constraint to lean on, which
+        // is why it needed the lock instead.)
         if ((err as { code?: string }).code === 'P2002') return numberTaken(reply, body.number);
         throw err;
       }
