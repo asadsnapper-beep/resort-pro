@@ -13,6 +13,7 @@ export type AdminNotificationType =
   | 'tenant_deletion_requested'
   | 'invoice_creation_failed'
   | 'guest_email_failed'
+  | 'trial_email_failed'
   | 'theme_purchased';
 
 interface CreateNotificationArgs {

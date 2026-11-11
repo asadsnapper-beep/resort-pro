@@ -10,8 +10,14 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { prisma } from '@resort-pro/database';
 
 const sent: string[] = [];
+// `sendEmail` resolves `{ id, error }` — never `{ ok: true }`. The old mock
+// returned a shape the real function cannot produce, which is why these suites
+// could not have noticed the cron discarding the result. `isEmailConfigured`
+// is mocked true: these tests are about what gets sent, not about a server
+// with no provider, which has its own suite.
 vi.mock('../../src/services/email', () => ({
-  sendEmail: vi.fn(async (m: any) => { sent.push(m.to); return { ok: true }; }),
+  isEmailConfigured: () => true,
+  sendEmail: vi.fn(async (m: any) => { sent.push(m.to); return { id: `mock-${sent.length}`, error: null }; }),
 }));
 
 const { runTrialEmailCron } = await import('../../src/services/trial-emails');
