@@ -146,7 +146,14 @@ export default function InvoicePage() {
       qc.invalidateQueries({ queryKey: ['invoice', id] });
       toast({ title: `Invoice emailed to ${d.sentTo}` });
     },
-    onError: () => toast({ title: 'Failed to send email', variant: 'destructive' }),
+    // The server now says *why* — "no email provider configured" is something
+    // the desk can act on (print the folio, tell the owner), where a bare
+    // "failed" leaves them guessing whether to try again.
+    onError: (err: { response?: { data?: { error?: string } } }) => toast({
+      title: 'Invoice not sent',
+      description: err?.response?.data?.error ?? 'Please try again.',
+      variant: 'destructive',
+    }),
   });
 
   const { mutate: deleteExtra } = useMutation({
