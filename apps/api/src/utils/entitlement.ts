@@ -405,9 +405,12 @@ export const STAFF_QUOTA: PlanQuota = {
  * ids happen to hash alike occasionally will, which costs milliseconds and
  * changes no answer.
  *
- * An unlimited plan takes no lock and opens no transaction. There is nothing
- * to count, and turning "no ceiling" into a queue would be a tax on exactly
- * the customers who pay the most.
+ * An unlimited plan takes no lock. There is nothing to count, and turning "no
+ * ceiling" into a queue would be a tax on exactly the customers who pay the
+ * most. It still opens a transaction, so that `write` can rely on being
+ * atomic whatever plan the caller is on — a callback that inserts a user and
+ * then that user's staff row must not be able to leave half of itself behind
+ * on Enterprise only.
  *
  * `write` receives a client it must pass `tenantId` to explicitly: this runs
  * on the unscoped client, as every other transaction in this codebase does,
@@ -419,7 +422,7 @@ export async function withQuota<T>(
   write: (client: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> {
   const limit = quota.limitOf(await resolveTenantEntitlement(tenantId));
-  if (limit === -1) return write(prisma);
+  if (limit === -1) return prisma.$transaction((tx) => write(tx));
 
   return prisma.$transaction(async (tx) => {
     // Held until this transaction ends, however it ends — commit, rollback or

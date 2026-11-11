@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { createHash, randomBytes } from 'crypto';
 import { prisma } from '@resort-pro/database';
 import { requireAuth } from '../middleware/auth';
-import { getPlanConfigs } from '../utils/entitlement';
+import { getPlanConfigs, withQuota, STAFF_QUOTA, PlanLimitReached } from '../utils/entitlement';
 import { ok, validate } from '../utils/response';
 import { sendEmail } from '../services/email';
 import { createAdminNotification } from '../utils/notifications';
@@ -930,30 +930,66 @@ export async function authRoutes(app: FastifyInstance) {
       });
       if (existing) return reply.status(409).send({ success: false, error: 'Account already exists with this email.' });
 
+      // Hashed before the seat is claimed: bcrypt at 12 rounds is a quarter of
+      // a second, and the lock should be held for the inserts, not the hashing.
       const passwordHash = await bcrypt.hash(body.password, 12);
 
-      const user = await prisma.user.create({
-        data: {
-          tenantId: invite.tenantId,
-          email: invite.email,
-          passwordHash,
-          firstName: body.firstName,
-          lastName: body.lastName,
-          role: invite.role,
-        },
-      });
+      let user: Awaited<ReturnType<typeof prisma.user.create>>;
+      try {
+        /*
+         * The plan's seat is counted here, which it was not at all before.
+         * This endpoint created the account without consulting the ceiling, so
+         * the staff limit held only against the dashboard's Add Staff form and
+         * not against the path most staff actually arrive through: an owner on
+         * a two-seat plan could invite fifty people and all fifty got
+         * accounts, with nothing in the system ever noticing.
+         *
+         * Marking the invite used happens inside the same transaction, so a
+         * refusal leaves the link alive — the owner's fix is to upgrade, and
+         * the person they invited should not then need inviting again.
+         */
+        user = await withQuota(invite.tenantId, STAFF_QUOTA, async (tx) => {
+          const created = await tx.user.create({
+            data: {
+              tenantId: invite.tenantId,
+              email: invite.email,
+              passwordHash,
+              firstName: body.firstName,
+              lastName: body.lastName,
+              role: invite.role,
+            },
+          });
 
-      if (invite.role === 'SHAREHOLDER' && invite.ownershipPercent) {
-        await prisma.shareholderProfile.create({
-          data: {
-            userId: user.id,
-            tenantId: invite.tenantId,
-            ownershipPercent: invite.ownershipPercent,
-          },
+          if (invite.role === 'SHAREHOLDER' && invite.ownershipPercent) {
+            await tx.shareholderProfile.create({
+              data: {
+                userId: created.id,
+                tenantId: invite.tenantId,
+                ownershipPercent: invite.ownershipPercent,
+              },
+            });
+          }
+
+          await tx.staffInvite.update({ where: { id: invite.id }, data: { used: true } });
+          return created;
         });
+      } catch (err) {
+        if (err instanceof PlanLimitReached) {
+          // Phrased for the invitee, who is not the person who can upgrade.
+          return reply.status(403).send({
+            success: false,
+            error: 'This resort has no staff seats left. Ask whoever invited you to upgrade the plan, then open this link again.',
+            code: err.code,
+            data: { limit: err.limit, current: err.current } as unknown,
+          });
+        }
+        // The read above can go stale between here and the insert, and
+        // `@@unique([tenantId, email])` is what actually decides.
+        if ((err as { code?: string }).code === 'P2002') {
+          return reply.status(409).send({ success: false, error: 'Account already exists with this email.' });
+        }
+        throw err;
       }
-
-      await prisma.staffInvite.update({ where: { id: invite.id }, data: { used: true } });
 
       const tenant = await prisma.tenant.findUnique({ where: { id: invite.tenantId }, select: { slug: true, name: true } });
 

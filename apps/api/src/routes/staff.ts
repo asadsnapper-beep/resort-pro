@@ -3,7 +3,7 @@ import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { prisma } from '@resort-pro/database';
-import { checkStaffLimit } from '../utils/entitlement';
+import { withQuota, STAFF_QUOTA, PlanLimitReached } from '../utils/entitlement';
 import { requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams } from '../utils/response';
 import { sendEmail } from '../services/email';
@@ -67,48 +67,77 @@ export async function staffRoutes(app: FastifyInstance) {
       const { tenantId } = request.user as JwtPayload;
       const body = createStaffSchema.parse(request.body);
 
-      // Plan limit check
-      const limitCheck = await checkStaffLimit(tenantId);
-      if (!limitCheck.allowed) {
-        return reply.status(403).send({
-          success: false,
-          error: `Staff limit reached. Your plan allows ${limitCheck.limit} staff seats. Upgrade to add more.`,
-          code: 'STAFF_LIMIT_REACHED',
-          data: { limit: limitCheck.limit, current: limitCheck.current },
-        });
-      }
-
       // user.findFirst scoped by db — checks within this tenant
       const existing = await db.user.findFirst({ where: { email: body.email } });
       if (existing) return reply.status(409).send({ success: false, error: 'Email already in use' });
 
+      // Hashed before the quota is taken, not inside it: bcrypt at 12 rounds
+      // is a quarter of a second, and a lock that other requests queue behind
+      // should be held for two inserts, not for the hashing.
       const passwordHash = await bcrypt.hash(body.password, 12);
 
-      const user = await db.user.create({
-        data: {
-          email: body.email,
-          passwordHash,
-          firstName: body.firstName,
-          lastName: body.lastName,
-          role: body.role,
-        },
-      });
+      try {
+        /*
+         * The seat is counted and the user is inserted as one operation. It
+         * used to be a `checkStaffLimit()` above and a `create()` below with
+         * nothing joining them, so concurrent requests all read the same
+         * count, all passed, and all inserted — eight at once put nine people
+         * on a two-seat plan. See utils/entitlement.ts for why `withQuota`
+         * takes a lock rather than relying on Serializable.
+         *
+         * The user and their staff row are now written together, which they
+         * were not before: a failure in the second statement used to leave a
+         * user who could sign in but had no staff record.
+         *
+         * `tenantId` is passed explicitly because this runs on the unscoped
+         * client — the tenant extension does not reach inside a transaction.
+         */
+        const staff = await withQuota(tenantId, STAFF_QUOTA, async (tx) => {
+          const user = await tx.user.create({
+            data: {
+              tenantId,
+              email: body.email,
+              passwordHash,
+              firstName: body.firstName,
+              lastName: body.lastName,
+              role: body.role,
+            },
+          });
 
-      const staff = await db.staff.create({
-        data: {
-          userId: user.id,
-          department: body.department,
-          position: body.position,
-          phone: body.phone,
-          hireDate: new Date(body.hireDate),
-          shiftStartTime: body.shiftStartTime,
-          baseSalary: body.baseSalary,
-          deviceUserId: body.deviceUserId,
-        },
-        include: { user: { select: { email: true, firstName: true, lastName: true } } },
-      });
+          return tx.staff.create({
+            data: {
+              tenantId,
+              userId: user.id,
+              department: body.department,
+              position: body.position,
+              phone: body.phone,
+              hireDate: new Date(body.hireDate),
+              shiftStartTime: body.shiftStartTime,
+              baseSalary: body.baseSalary,
+              deviceUserId: body.deviceUserId,
+            },
+            include: { user: { select: { email: true, firstName: true, lastName: true } } },
+          });
+        });
 
-      return reply.status(201).send(ok(staff, 'Staff member created'));
+        return reply.status(201).send(ok(staff, 'Staff member created'));
+      } catch (err) {
+        if (err instanceof PlanLimitReached) {
+          return reply.status(403).send({
+            success: false,
+            error: err.message,
+            code: err.code,
+            data: { limit: err.limit, current: err.current } as unknown,
+          });
+        }
+        // The duplicate-email read above can go stale between here and the
+        // insert, and `@@unique([tenantId, email])` is what actually decides.
+        // Two requests claiming one address used to leave the loser a 500.
+        if ((err as { code?: string }).code === 'P2002') {
+          return reply.status(409).send({ success: false, error: 'Email already in use' });
+        }
+        throw err;
+      }
     },
   });
 
