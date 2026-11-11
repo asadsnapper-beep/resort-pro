@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams } from '../utils/response';
-import { checkPropertyLimit } from '../utils/entitlement';
+import { withQuota, PROPERTY_QUOTA, PlanLimitReached } from '../utils/entitlement';
 import type { JwtPayload } from '@resort-pro/types';
 
 const propertySchema = z.object({
@@ -84,26 +84,46 @@ export async function propertyRoutes(app: FastifyInstance) {
       const { db } = request;
       const { tenantId } = request.user as JwtPayload;
 
-      const limitCheck = await checkPropertyLimit(tenantId);
-      if (!limitCheck.allowed) {
-        return reply.status(403).send({
-          success: false,
-          error: `Property limit reached. Your plan allows ${limitCheck.limit} properties. Upgrade to add more.`,
-          code: 'PROPERTY_LIMIT_REACHED',
-          upgradeRequired: true,
-          data: { limit: limitCheck.limit, current: limitCheck.current },
-        });
-      }
-
       const body = propertySchema.parse(request.body);
 
       const existing = await db.property.findFirst({ where: { tenantId, slug: body.slug } });
       if (existing) return reply.status(409).send({ success: false, error: 'A property with this slug already exists' });
 
-      const property = await db.property.create({
-        data: { tenantId, ...body },
-      });
-      return reply.status(201).send(ok(property, 'Property created'));
+      try {
+        /*
+         * The plan ceiling is counted and the property is inserted as one
+         * operation. It used to be a `checkPropertyLimit()` above and a
+         * `create()` below with nothing joining them, so concurrent requests
+         * all read the same count, all passed, and all inserted — eight at
+         * once put nine properties on a five-property plan. See
+         * utils/entitlement.ts for why `withQuota` takes a lock rather than
+         * relying on Serializable the way the booking routes do.
+         *
+         * `tenantId` is passed explicitly because this runs on the unscoped
+         * client — the tenant extension does not reach inside a transaction.
+         */
+        const property = await withQuota(tenantId, PROPERTY_QUOTA, tx =>
+          tx.property.create({ data: { tenantId, ...body } }),
+        );
+        return reply.status(201).send(ok(property, 'Property created'));
+      } catch (err) {
+        if (err instanceof PlanLimitReached) {
+          return reply.status(403).send({
+            success: false,
+            error: err.message,
+            code: err.code,
+            upgradeRequired: true,
+            data: { limit: err.limit, current: err.current } as unknown,
+          });
+        }
+        // The duplicate-slug read above can go stale between here and the
+        // insert, and `@@unique([tenantId, slug])` is what actually decides.
+        // Two requests claiming one slug used to leave the loser a 500.
+        if ((err as { code?: string }).code === 'P2002') {
+          return reply.status(409).send({ success: false, error: 'A property with this slug already exists' });
+        }
+        throw err;
+      }
     },
   });
 
