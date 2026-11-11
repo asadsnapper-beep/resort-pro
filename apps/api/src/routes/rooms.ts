@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma, Prisma } from '@resort-pro/database';
 import { requireRole } from '../middleware/auth';
 import { ok, paginated, parsePageParams } from '../utils/response';
-import { withRoomQuota, RoomLimitReached } from '../utils/entitlement';
+import { withQuota, ROOM_QUOTA, PlanLimitReached } from '../utils/entitlement';
 import { matchAllTerms } from '../utils/search-terms';
 import { propertyScope } from '../utils/property-scope';
 import { sellableRoomWhere } from '../utils/room-saleability';
@@ -336,23 +336,23 @@ export async function roomRoutes(app: FastifyInstance) {
          * operation. It used to be a `checkRoomLimit()` above and a
          * `create()` below with nothing joining them, so concurrent requests
          * all read the same count, all passed, and all inserted — eight at
-         * once put ten rooms on a five-room plan. `withRoomQuota` holds the
+         * once put ten rooms on a five-room plan. `withQuota` holds the
          * count still; see utils/entitlement.ts for why it takes a lock
          * rather than relying on Serializable the way the booking routes do.
          *
          * `tenantId` is passed explicitly because this runs on the unscoped
          * client — the tenant extension does not reach inside a transaction.
          */
-        const room = await withRoomQuota(tenantId, tx =>
+        const room = await withQuota(tenantId, ROOM_QUOTA, tx =>
           tx.room.create({ data: { ...body, tenantId } }),
         );
         return reply.status(201).send(ok(room, 'Room created'));
       } catch (err) {
-        if (err instanceof RoomLimitReached) {
+        if (err instanceof PlanLimitReached) {
           return reply.status(403).send({
             success: false,
             error: err.message,
-            code: 'ROOM_LIMIT_REACHED',
+            code: err.code,
             data: { limit: err.limit, current: err.current } as unknown,
           });
         }

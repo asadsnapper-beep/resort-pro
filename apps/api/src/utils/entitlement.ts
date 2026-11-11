@@ -273,7 +273,8 @@ export async function applyPlanFlagsToTenant(tenantId: string, planKey: string):
  * A **report**, not a gate. It answers with a count that was true when it was
  * taken, and anything that creates a room between the answer and the insert
  * makes it a lie — which is exactly the bug RM-007 describes. Use
- * `withRoomQuota` to actually create a room; use this to draw a progress bar.
+ * `withQuota(tenantId, ROOM_QUOTA, …)` to actually create a room; use this to
+ * draw a progress bar.
  */
 export async function checkRoomLimit(tenantId: string): Promise<{ allowed: boolean; limit: number; current: number }> {
   const entitlement = await resolveTenantEntitlement(tenantId);
@@ -288,29 +289,87 @@ export async function checkRoomLimit(tenantId: string): Promise<{ allowed: boole
 }
 
 /**
- * A tenant has reached the number of rooms its plan pays for.
+ * A tenant has reached the number of something its plan pays for.
  *
  * Carries the numbers so the route can answer with them rather than asking
  * again — a second count would be a different moment, and could disagree.
  */
-export class RoomLimitReached extends Error {
-  constructor(readonly limit: number, readonly current: number) {
-    super(`Room limit reached. Your plan allows ${limit} rooms. Upgrade to add more.`);
-    this.name = 'RoomLimitReached';
+export class PlanLimitReached extends Error {
+  constructor(
+    /** The wire code the route answers with, e.g. `ROOM_LIMIT_REACHED`. */
+    readonly code: string,
+    readonly limit: number,
+    readonly current: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'PlanLimitReached';
   }
 }
 
 /**
- * Advisory-lock namespace. Arbitrary, and only has to differ from any other
- * advisory lock this application takes — there are none today, so this is the
- * first, and the constant exists so that the second one has to pick another.
+ * One plan allowance: where its ceiling is written down, how the rows under it
+ * are counted, and what the owner is told once it is full.
  */
-const ROOM_QUOTA_LOCK = 21069; // 0x524D, "RM"
+export interface PlanQuota {
+  /** Wire code the route answers with. */
+  readonly code: string;
+  /**
+   * Advisory-lock namespace. The number is arbitrary; what matters is that it
+   * differs from the other quotas', so a resort adding a property never
+   * queues behind the same resort adding a room. `hashtext(tenantId)` fills
+   * the lock's second half, which is what keeps two resorts out of each
+   * other's way.
+   */
+  readonly lock: number;
+  /** Which allowance in the resolved entitlement is this quota's ceiling. */
+  readonly limitOf: (entitlement: TenantEntitlement) => number;
+  /** How many the tenant has right now. Counted inside the lock. */
+  readonly count: (client: Prisma.TransactionClient, tenantId: string) => Promise<number>;
+  /** What the owner is told. `limit` is the number their plan allows. */
+  readonly message: (limit: number) => string;
+}
 
 /**
- * Create a room with this tenant's room count held still.
+ * The Free plan allows exactly one property, so "allows 1 properties" is a
+ * string a real customer reads. Plan limits are admin-editable, so any of
+ * these can be 1.
+ */
+const plural = (n: number, one: string, many = `${one}s`) => (n === 1 ? one : many);
+
+export const ROOM_QUOTA: PlanQuota = {
+  code: 'ROOM_LIMIT_REACHED',
+  lock: 21069, // 0x524D, "RM"
+  limitOf: (e) => e.roomLimit,
+  count: (client, tenantId) => client.room.count({ where: { tenantId, isActive: true } }),
+  message: (limit) => `Room limit reached. Your plan allows ${limit} ${plural(limit, 'room')}. Upgrade to add more.`,
+};
+
+export const PROPERTY_QUOTA: PlanQuota = {
+  code: 'PROPERTY_LIMIT_REACHED',
+  lock: 21070,
+  limitOf: (e) => e.propertyLimit,
+  // Property has no isActive column — deleting one deletes the row — so every
+  // row a tenant owns is a property it is using.
+  count: (client, tenantId) => client.property.count({ where: { tenantId } }),
+  message: (limit) => `Property limit reached. Your plan allows ${limit} ${plural(limit, 'property', 'properties')}. Upgrade to add more.`,
+};
+
+export const STAFF_QUOTA: PlanQuota = {
+  code: 'STAFF_LIMIT_REACHED',
+  lock: 21071,
+  limitOf: (e) => e.staffLimit,
+  // Users rather than Staff rows: a seat is somebody who can sign in, and the
+  // owner holds one. Deactivating a staff member hands the seat back, which is
+  // why only the active ones are counted.
+  count: (client, tenantId) => client.user.count({ where: { tenantId, isActive: true } }),
+  message: (limit) => `Staff limit reached. Your plan allows ${limit} staff ${plural(limit, 'seat')}. Upgrade to add more.`,
+};
+
+/**
+ * Do the write with this tenant's count of that thing held still.
  *
- * The ceiling used to be
+ * Every ceiling in this file used to be enforced like this:
  *
  *     const { allowed } = await checkRoomLimit(tenantId);   // a COUNT
  *     ...
@@ -320,11 +379,13 @@ const ROOM_QUOTA_LOCK = 21069; // 0x524D, "RM"
  * count, every one was under the ceiling, and every one inserted: eight
  * simultaneous creates against a five-room plan left the resort with **ten
  * rooms**, no error anywhere, and nothing that would ever reconcile it,
- * because the ceiling is only consulted on the way in. (RM-007.)
+ * because the ceiling is only consulted on the way in. (RM-007.) The property
+ * ceiling measured the same way — eight at once past a five-property plan left
+ * nine — and the staff ceiling has the same shape.
  *
- * Unlike the duplicate-room-number half of that finding, there is no database
- * constraint to lean on — "at most five rows with this tenantId" is not
- * something Postgres can be asked to enforce — so the count and the insert
+ * Unlike a duplicate room number or a duplicate property slug, there is no
+ * database constraint to lean on: "at most five rows with this tenantId" is
+ * not something Postgres can be asked to enforce. So the count and the insert
  * have to be made one operation.
  *
  * **A per-tenant advisory lock rather than Serializable**, which is what the
@@ -339,9 +400,10 @@ const ROOM_QUOTA_LOCK = 21069; // 0x524D, "RM"
  * produces one 201 and seven 403s, with no retries and no aborted
  * transactions.
  *
- * The lock is per tenant, so two resorts never wait for each other; two
- * tenants whose ids happen to hash alike occasionally will, which costs
- * milliseconds and changes no answer.
+ * The lock is per tenant and per quota, so two resorts never wait for each
+ * other and one resort's rooms never wait on its properties; two tenants whose
+ * ids happen to hash alike occasionally will, which costs milliseconds and
+ * changes no answer.
  *
  * An unlimited plan takes no lock and opens no transaction. There is nothing
  * to count, and turning "no ceiling" into a queue would be a tax on exactly
@@ -351,12 +413,13 @@ const ROOM_QUOTA_LOCK = 21069; // 0x524D, "RM"
  * on the unscoped client, as every other transaction in this codebase does,
  * because the tenant extension does not reach inside `$transaction`.
  */
-export async function withRoomQuota<T>(
+export async function withQuota<T>(
   tenantId: string,
+  quota: PlanQuota,
   write: (client: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> {
-  const { roomLimit } = await resolveTenantEntitlement(tenantId);
-  if (roomLimit === -1) return write(prisma);
+  const limit = quota.limitOf(await resolveTenantEntitlement(tenantId));
+  if (limit === -1) return write(prisma);
 
   return prisma.$transaction(async (tx) => {
     // Held until this transaction ends, however it ends — commit, rollback or
@@ -364,16 +427,24 @@ export async function withRoomQuota<T>(
     // `$executeRaw`, not `$queryRaw`: pg_advisory_xact_lock() returns void,
     // and Prisma cannot deserialize a void column — it fails the request with
     // a 500 rather than taking the lock.
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${ROOM_QUOTA_LOCK}::int, hashtext(${tenantId})::int)`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${quota.lock}::int, hashtext(${tenantId})::int)`;
 
-    const current = await tx.room.count({ where: { tenantId, isActive: true } });
-    if (current >= roomLimit) throw new RoomLimitReached(roomLimit, current);
+    const current = await quota.count(tx, tenantId);
+    if (current >= limit) {
+      throw new PlanLimitReached(quota.code, limit, current, quota.message(limit));
+    }
 
     return write(tx);
   });
 }
 
-/** Check if tenant has reached its property limit. */
+/**
+ * How full this tenant's property allowance is, right now.
+ *
+ * A **report**, not a gate, for the same reason as `checkRoomLimit` above: the
+ * count is true when taken and a lie the moment anything else inserts. Create
+ * a property with `withQuota(tenantId, PROPERTY_QUOTA, …)`.
+ */
 export async function checkPropertyLimit(tenantId: string): Promise<{ allowed: boolean; limit: number; current: number }> {
   const entitlement = await resolveTenantEntitlement(tenantId);
   if (entitlement.propertyLimit === -1) return { allowed: true, limit: -1, current: 0 };
@@ -386,7 +457,12 @@ export async function checkPropertyLimit(tenantId: string): Promise<{ allowed: b
   };
 }
 
-/** Check if tenant has reached staff limit */
+/**
+ * How full this tenant's staff allowance is, right now.
+ *
+ * A **report**, not a gate — see `checkRoomLimit`. Add a staff seat with
+ * `withQuota(tenantId, STAFF_QUOTA, …)`.
+ */
 export async function checkStaffLimit(tenantId: string): Promise<{ allowed: boolean; limit: number; current: number }> {
   const entitlement = await resolveTenantEntitlement(tenantId);
   if (entitlement.staffLimit === -1) return { allowed: true, limit: -1, current: 0 };
