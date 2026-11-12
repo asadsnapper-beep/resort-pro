@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { requireRole } from '../middleware/auth';
 import { ok } from '../utils/response';
-import { tenantTodayRange } from '../utils/tenant-day';
+import { tenantTodayRange, safeTimezone } from '../utils/tenant-day';
+import type { JwtPayload } from '@resort-pro/types';
 
 export async function frontDeskRoutes(app: FastifyInstance) {
 
@@ -11,13 +12,24 @@ export async function frontDeskRoutes(app: FastifyInstance) {
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { db } = request;
+      const { tenantId } = request.user as JwtPayload;
 
       // checkIn/checkOut are `@db.Date`. Deriving the day from
       // `toISOString()` took the UTC calendar date, which in Asia/Dhaka is
       // still yesterday between midnight and 6am — handing the night shift
       // yesterday's arrival list at exactly the hours they rely on it.
       // utils/tenant-day.ts resolves the day in the resort's own timezone.
-      const todayRange = tenantTodayRange();
+      //
+      // That timezone has to be this resort's, not the `Asia/Dhaka` default:
+      // read with the default, a resort in America/New_York was told it was
+      // already tomorrow, and the date in this answer is what the Front Desk
+      // header prints and what the Walk-In modal defaults its dates to.
+      const tenant = await db.tenant.findUnique({
+        where: { id: tenantId },
+        select: { timezone: true },
+      });
+      const timezone = safeTimezone(tenant?.timezone);
+      const todayRange = tenantTodayRange(timezone);
 
       const guestSelect = {
         id: true, firstName: true, lastName: true, phone: true, email: true,
@@ -80,6 +92,7 @@ export async function frontDeskRoutes(app: FastifyInstance) {
 
       return ok({
         date:     todayRange.gte.toISOString().split('T')[0],
+        timezone,
         roomStats,
         totalGuests,
         arrivals: {

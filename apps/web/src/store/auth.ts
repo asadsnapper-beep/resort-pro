@@ -15,6 +15,13 @@ interface Tenant {
   taxRate?: number;
   onboardingStep?: number;
   onboardingCompletedAt?: string | null;
+  /**
+   * The resort's own timezone, which is what decides what day it is here.
+   * Optional because a session signed in before the server started sending it
+   * still has a persisted tenant without one — see lib/resort-day.ts for what
+   * happens then.
+   */
+  timezone?: string | null;
 }
 
 interface AuthState {
