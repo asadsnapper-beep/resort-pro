@@ -96,19 +96,39 @@ jobs:
       name: staging
       url: https://resortpro.webcoronet.com
 
+    # The host every Portainer call below talks to. Only the URL is set at job
+    # level; PORTAINER_TOKEN stays on the individual steps that need it, so it
+    # is not handed to the checkout or the compose-stamping step.
+    env:
+      PORTAINER_URL: https://docker.webcoronet.com
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # scripts/portainer-get.sh checks the HTTP status and that the body is
+      # JSON before anything is piped to jq. This call used to be a bare
+      # `curl -s | jq`, so when Portainer was unreachable the whole log said
+      # `jq: parse error: Invalid numeric literal at line 1, column 6` and
+      # named neither the status nor the body. See the script's header.
       - name: Get Portainer stack ID
         id: stack
+        env:
+          PORTAINER_TOKEN: ${{ secrets.PORTAINER_TOKEN }}
         run: |
-          STACK_ID=$(curl -s \
-            -H "X-API-Key: ${{ secrets.PORTAINER_TOKEN }}" \
-            "https://docker.webcoronet.com/api/stacks" \
-            | jq -r '.[] | select(.Name=="resortpro-staging") | .Id')
+          STACKS=$(scripts/portainer-get.sh /api/stacks)
+
+          # An answer that is JSON but not a list of stacks must not read as
+          # "there is no such stack" — the next step would then create a second
+          # one beside the stack that is actually running.
+          if ! echo "$STACKS" | jq -e 'type == "array"' >/dev/null; then
+            echo "::error::/api/stacks answered JSON that is not a list of stacks, so whether resortpro-staging exists is unknown. Refusing to guess."
+            exit 1
+          fi
+
+          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="resortpro-staging") | .Id')
           echo "id=$STACK_ID" >> $GITHUB_OUTPUT
-          echo "Stack ID: $STACK_ID"
+          echo "Stack ID: ${STACK_ID:-<none — the stack will be created>}"
 
       # Root cause (confirmed live, 2026-07-27 — see plan/theme-studio-and-design-service.md
       # sibling investigation notes): Portainer decides whether to recreate a
@@ -134,12 +154,18 @@ jobs:
 
       - name: Create stack if not exists
         if: steps.stack.outputs.id == ''
+        env:
+          PORTAINER_TOKEN: ${{ secrets.PORTAINER_TOKEN }}
         run: |
           # Get endpoint ID (local environment)
-          ENDPOINT_ID=$(curl -s \
-            -H "X-API-Key: ${{ secrets.PORTAINER_TOKEN }}" \
-            "https://docker.webcoronet.com/api/endpoints" \
-            | jq -r '.[0].Id')
+          ENDPOINT_ID=$(scripts/portainer-get.sh /api/endpoints | jq -r '.[0].Id // empty')
+
+          # `.[0].Id` on an empty list is null, which used to be interpolated
+          # into the create URL as `endpointId=null`.
+          if [ -z "$ENDPOINT_ID" ]; then
+            echo "::error::/api/endpoints returned no environment, so there is nowhere to create the stack."
+            exit 1
+          fi
 
           echo "Endpoint ID: $ENDPOINT_ID"
 
@@ -164,17 +190,21 @@ jobs:
 
       - name: Update existing stack
         if: steps.stack.outputs.id != ''
+        env:
+          PORTAINER_TOKEN: ${{ secrets.PORTAINER_TOKEN }}
         run: |
           STACK_ID=${{ steps.stack.outputs.id }}
           COMPOSE_CONTENT=$(cat /tmp/docker-compose.staging.deploy.yml)
 
           # Read the stack once: the endpoint id and the environment come from
           # the same response.
-          STACK_JSON=$(curl -s \
-            -H "X-API-Key: ${{ secrets.PORTAINER_TOKEN }}" \
-            "https://docker.webcoronet.com/api/stacks/${STACK_ID}")
+          STACK_JSON=$(scripts/portainer-get.sh "/api/stacks/${STACK_ID}")
 
-          ENDPOINT_ID=$(echo "$STACK_JSON" | jq -r '.EndpointId')
+          ENDPOINT_ID=$(echo "$STACK_JSON" | jq -r '.EndpointId // empty')
+          if [ -z "$ENDPOINT_ID" ]; then
+            echo "::error::Stack ${STACK_ID} came back without an EndpointId, so the update has no environment to target."
+            exit 1
+          fi
 
           # Carry the existing environment forward. This PUT used to send
           # `"env": []`, which is not "leave it alone" — it is "delete
@@ -243,12 +273,15 @@ jobs:
       # minute or two later. Ten tries, fifteen seconds apart — two and a half
       # minutes, against a stack update that has been taking around two.
       - name: Verify Portainer stored this commit
+        env:
+          PORTAINER_TOKEN: ${{ secrets.PORTAINER_TOKEN }}
         run: |
           for attempt in $(seq 1 10); do
-            STORED=$(curl -s \
-              -H "X-API-Key: ${{ secrets.PORTAINER_TOKEN }}" \
-              "https://docker.webcoronet.com/api/stacks/${{ steps.stack.outputs.id }}/file" \
-              | jq -r '.StackFileContent // ""')
+            # `|| true` on purpose: this loop exists because the answer arrives
+            # late, so one unreachable moment has to cost one attempt rather
+            # than the whole step. The helper has already said what it saw.
+            STORED=$(scripts/portainer-get.sh "/api/stacks/${{ steps.stack.outputs.id }}/file" \
+              | jq -r '.StackFileContent // ""' || true)
 
             if echo "$STORED" | grep -q "resort-pro-api:dev-${GITHUB_SHA}"; then
               echo "Portainer stack pins dev-${GITHUB_SHA} (after ${attempt} check(s))"
