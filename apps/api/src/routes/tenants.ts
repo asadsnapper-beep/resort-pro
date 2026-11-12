@@ -502,24 +502,20 @@ export async function tenantRoutes(app: FastifyInstance) {
     schema: { tags: ['tenant'], summary: 'Get feature flags for this tenant', security: [{ bearerAuth: [] }] },
     preHandler: requireRole('OWNER', 'MANAGER', 'SHAREHOLDER', 'RECEPTIONIST', 'MARKETER', 'DEVELOPER', 'STAFF'),
     handler: async (request) => {
-      const { db } = request;
       const { tenantId } = request.user as JwtPayload;
-      const rows = await db.tenantFeatureFlag.findMany({
-        where: { enabled: true },
-        select: { flag: true },
-      });
-      // Return as a flat set of enabled flag keys — easy to check in the dashboard
-      const enabledFlags = new Set(rows.map((r) => r.flag));
-      // Also include any flags that are defaultOn and have no override row
-      for (const def of FLAG_REGISTRY) {
-        if (def.defaultOn) enabledFlags.add(def.flag);
-      }
-      // But respect explicit disabled overrides
-      const allRows = await db.tenantFeatureFlag.findMany({ where: {}, select: { flag: true, enabled: true } });
-      for (const row of allRows) {
-        if (!row.enabled) enabledFlags.delete(row.flag);
-      }
-      return ok(Array.from(enabledFlags));
+      // Same resolver requireFlag() gates on: registry defaults, then the
+      // plan's flags, then per-tenant overrides. This endpoint used to build
+      // its own set from TenantFeatureFlag rows plus `defaultOn` and never
+      // looked at the plan, so a tenant on a paid plan with no override row
+      // was allowed through the gate and absent from this list — the dashboard
+      // then hid features the tenant was paying for.
+      const entitlement = await resolveTenantEntitlement(tenantId);
+      // Still a flat array of enabled flag keys: the one consumer
+      // (apps/web/src/hooks/use-feature-flag.ts) reads it straight into a Set.
+      const enabledFlags = Object.entries(entitlement.flags)
+        .filter(([, enabled]) => enabled)
+        .map(([flag]) => flag);
+      return ok(enabledFlags);
     },
   });
 
