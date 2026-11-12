@@ -130,7 +130,7 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
            are distinguishable and the name cannot drift from what is shown. */
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[420px] flex-col bg-white"
+        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[420px] flex-col bg-rp-modal"
         style={{ boxShadow: '-8px 0 40px rgba(27,52,47,0.18)' }}>
 
         {/* Header */}
@@ -236,7 +236,7 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
                   </button>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border bg-white">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border bg-rp-surface">
                     <User aria-hidden="true" className="h-4 w-4" style={{ color: 'var(--rp-text-muted)' }} />
                   </div>
                   <div>
