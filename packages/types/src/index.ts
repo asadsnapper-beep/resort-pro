@@ -48,7 +48,10 @@ export type TenantPlan = 'FREE' | 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';
 
 // ─── Room ────────────────────────────────────────────────────────────────────
 export type RoomType = 'STANDARD' | 'DELUXE' | 'SUITE' | 'VILLA' | 'COTTAGE' | 'BUNGALOW';
-export type RoomStatus = 'AVAILABLE' | 'OCCUPIED' | 'MAINTENANCE' | 'RESERVED';
+// CLEANING was missing here while `RoomStatus` in schema.prisma, the status
+// filter and the detail sheet's buttons all had it, so the one status the
+// blocker rule has to name was the one this union could not express.
+export type RoomStatus = 'AVAILABLE' | 'OCCUPIED' | 'CLEANING' | 'MAINTENANCE' | 'RESERVED';
 
 export interface Room {
   id: string;

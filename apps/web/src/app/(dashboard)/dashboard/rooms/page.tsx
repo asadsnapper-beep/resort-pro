@@ -14,7 +14,7 @@ import { useCurrency } from '@/hooks/use-currency';
 import { toast } from '@/hooks/use-toast';
 import { Plus, BedDouble, Users, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PageShell, PageHeader } from '@/components/patterns';
-import { canRoom, type Room } from '@resort-pro/types';
+import { canRoom, type Room, type RoomBlockerReport } from '@resort-pro/types';
 import { useAuthStore } from '@/store/auth';
 import { useRoomTypeLabels } from '@/hooks/use-room-type-labels';
 
@@ -24,6 +24,8 @@ interface RoomWithBooking extends Room {
     checkIn: string; checkOut: string; adults: number; children: number;
     guest: { id: string; firstName: string; lastName: string; email: string; phone?: string };
   } | null;
+  /** Only `GET /rooms/:id` reports this; the list endpoint does not. */
+  blocker?: RoomBlockerReport | null;
 }
 
 const ROOM_TYPE_LABELS: Record<string, string> = {
@@ -121,6 +123,35 @@ export default function RoomsPage() {
     queryClient.invalidateQueries({ queryKey: ['properties'] });
   };
 
+  /**
+   * Re-read the room the sheet is showing.
+   *
+   * `GET /rooms/:id` carries what the list does not: the current booking, and
+   * the blocker the Change Status buttons are filtered by. Patching the status
+   * in place was enough while nothing was filtered on — but setting a room to
+   * Maintenance opens a ticket, and a stale blocker then goes on offering the
+   * Available the endpoint has just started refusing.
+   *
+   * The write below applies only if this room is still the one on screen. That
+   * guard is not new and must not be dropped: the cached row is shown at once
+   * and the full one replaces it when the request lands, and that second write
+   * used to be unconditional — closing the sheet inside that window set the
+   * room to null and the late response **reopened it**. Found by a test that
+   * pressed Escape straight after opening, which failed about one run in three
+   * on Mobile Safari and never on Chrome, because the window is as wide as the
+   * request is slow. It also used to overwrite whichever other room had been
+   * opened in the meantime.
+   */
+  const refreshDetail = async (id: string) => {
+    try {
+      const res = await roomsApi.get(id);
+      const fresh = res.data?.data;
+      if (!fresh) return;
+      setSelectedRoom(prev => (prev?.id === id ? fresh : prev));
+    } catch { /* keep what is on screen */ }
+  };
+
+
   const createMutation = useMutation({
     mutationFn: (data: unknown) => roomsApi.create(data),
     onSuccess: () => { invalidate(); toast({ title: 'Room added successfully' }); setAddOpen(false); },
@@ -137,7 +168,15 @@ export default function RoomsPage() {
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => roomsApi.updateStatus(id, status),
-    onSuccess: (_, vars) => { invalidate(); toast({ title: 'Status updated' }); if (selectedRoom) setSelectedRoom(r => r ? { ...r, status: vars.status as Room['status'] } : null); },
+    onSuccess: (_, vars) => {
+      invalidate();
+      toast({ title: 'Status updated' });
+      if (selectedRoom) {
+        // The pill moves at once; the blocker catches up from the server.
+        setSelectedRoom(r => r ? { ...r, status: vars.status as Room['status'] } : null);
+        void refreshDetail(vars.id);
+      }
+    },
     // The server refuses a status that contradicts a checked-in guest, and
     // says which guest and which booking. Swallowing that for a flat "Failed
     // to update status" left the front desk with a dead dropdown and no idea
@@ -156,21 +195,7 @@ export default function RoomsPage() {
 
   const openDetail = async (room: RoomWithBooking) => {
     setSelectedRoom(room);
-    try {
-      const res = await roomsApi.get(room.id);
-      /*
-        Only if this room is still the one on screen. The cached row is shown
-        at once and the full one — the row that carries the current booking —
-        replaces it when the request lands, and that second write used to be
-        unconditional: closing the sheet inside that window set the room to
-        null and the late response **reopened it**. Found by a test that
-        pressed Escape straight after opening, which failed about one run in
-        three on Mobile Safari and never on Chrome, because the window is as
-        wide as the request is slow. The same write also used to overwrite
-        whichever other room had been opened in the meantime.
-      */
-      setSelectedRoom(prev => (prev?.id === room.id ? (res.data?.data ?? room) : prev));
-    } catch { /* keep cached */ }
+    await refreshDetail(room.id);
   };
 
   const resetFilters = () => { setSearchInput(''); setStatusFilter(''); setTypeFilter(''); setPage(1); };
