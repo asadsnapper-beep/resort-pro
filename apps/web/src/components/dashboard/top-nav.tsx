@@ -83,6 +83,7 @@ export function TopNav() {
     if (!next) searchTriggerRef.current?.focus();
   }, []);
   const { theme, setTheme } = useTheme();
+  const isDark = theme === 'dark';
   const { sidebarCollapsed, toggleSidebar } = useUiStore();
 
   return (
@@ -120,13 +121,19 @@ export function TopNav() {
           <PropertySwitcher />
           <ElectronStatusBadge />
 
+          {/* The icon alone said nothing to a screen reader — the button
+              announced as "button". It is modelled as a one-shot action
+              rather than an on/off state (one click sets the other theme,
+              and the icon already shows the destination), so the name says
+              what the click will do instead of carrying aria-pressed. */}
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            onClick={() => setTheme(isDark ? 'light' : 'dark')}
+            aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
             className="h-8 w-8 text-[#94aab9] hover:text-resort-900 dark:hover:text-white"
           >
-            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
 
           <NotificationBell />
