@@ -4,7 +4,7 @@
  */
 import { prisma } from '@resort-pro/database';
 import { bill } from '../services/billing';
-import type { DeliveryAttempt } from './delivery';
+import { deliveryVerdict, type DeliveryAttempt } from './delivery';
 import { sendEmail } from '../services/email';
 import { calculateNights } from './booking';
 import { createAdminNotification } from './notifications';
@@ -354,7 +354,7 @@ export async function sendCheckoutEmail(bookingId: string) {
   `;
 
   try {
-    await sendEmail({
+    const verdict = deliveryVerdict(await sendEmail({
       to: booking.guest.email,
       subject: `Thank you for your stay — Invoice ${invoiceNumber}`,
       html: wrapGuest({
@@ -365,7 +365,16 @@ export async function sendCheckoutEmail(bookingId: string) {
         footerText: settings.footerText,
         body,
       }),
-    });
+    }));
+
+    // `sendEmail` resolves `{ id, error }` and never throws, so the release
+    // below — and the `trackGuestEmail` wrapper at the call site, which only
+    // sees a rejection — could not fire for the failure that actually
+    // happens: a provider that refuses, or no provider at all. The claim
+    // stayed stamped on a guest who never got their invoice, and the claim is
+    // what stops anyone sending it later. Both recoveries were already
+    // written and both were unreachable; this is what reaches them.
+    if (!verdict.delivered) throw new Error(verdict.error);
   } catch (err) {
     // Release the claim so the invoice can be sent later. This deliberately
     // re-opens the small duplicate-send window: a guest receiving their
