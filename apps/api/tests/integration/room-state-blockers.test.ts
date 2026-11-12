@@ -456,3 +456,172 @@ describe("a booking that covers today keeps its room labelled Reserved", () => {
     expect(await storedStatus(roomId)).toBe('AVAILABLE');
   });
 });
+
+/**
+ * Whether the room screens can know what the endpoint will refuse.
+ *
+ * The rule above is enforced, and the detail sheet could not see it. It read
+ * `GET /api/rooms/:id`, which returned the room and its `currentBooking` and
+ * nothing about the work open on the room, so it offered every status but the
+ * current one. A receptionist looking at an occupied room was handed Cleaning,
+ * Maintenance, Reserved and Available, and all four came back 409 — the shape
+ * of RM-005, driven by the room's state instead of the user's role.
+ *
+ * So the read now answers the same question the write asks, from the same
+ * `roomBlocker`. These tests pin both halves: the code and message the read
+ * reports, and that it is the code the write actually refuses with. A second
+ * copy of the rule on either side would drift, and the copy that drifts wide
+ * is the one that offers a dead control.
+ *
+ * Written and run against the unmodified route first: all nine failed, each
+ * because `data.blocker` was `undefined` — the field did not exist. The
+ * refusals the agreement tests compare against were already correct; what was
+ * missing was any way for a caller to find out about them before clicking.
+ */
+describe('GET /api/rooms/:id reports what is blocking the room', () => {
+  const getRoom = (roomId: string) =>
+    app.inject({ method: 'GET', url: `/api/rooms/${roomId}`, headers: auth() });
+
+  const blockerOf = async (roomId: string) => {
+    const res = await getRoom(roomId);
+    expect(res.statusCode).toBe(200);
+    return body(res).data.blocker as { code: string; status: string; error: string } | null;
+  };
+
+  it('reports nothing for a room with nothing open on it', async () => {
+    // Before: `undefined` — the field was absent, so the sheet could not tell
+    // "nothing blocks this room" from "this room was never asked about".
+    const roomId = await makeRoom();
+
+    expect(await blockerOf(roomId)).toBeNull();
+  });
+
+  it('names the guest who is in the room', async () => {
+    const roomId = await makeRoom();
+    const bookingId = await makeBooking(roomId, 0);
+    await checkInGuest(bookingId);
+
+    const blocker = await blockerOf(roomId);
+
+    expect(blocker?.code).toBe('ROOM_HAS_CHECKED_IN_GUEST');
+    expect(blocker?.status).toBe('OCCUPIED');
+    // The sheet shows this sentence verbatim, so it has to say who and which
+    // booking — "Check them out" is the one action that ends the occupancy.
+    expect(blocker?.error).toContain('State Guest');
+    expect(blocker?.error).toMatch(/check them out/i);
+  });
+
+  it('names the maintenance that is still open', async () => {
+    const roomId = await makeRoom();
+    await makeTicket(roomId, 'Air conditioner is dead');
+
+    const res = await getRoom(roomId);
+    const { number, blocker } = body(res).data;
+
+    expect(blocker?.code).toBe('ROOM_HAS_OPEN_MAINTENANCE');
+    expect(blocker?.status).toBe('MAINTENANCE');
+    expect(blocker?.error).toContain('Air conditioner is dead');
+    // The sheet shows this beside buttons for one room, so a bare "This room"
+    // is not enough — `roomBlocker` says that only when nobody passes a
+    // number, and this read has the room in hand.
+    expect(blocker?.error).toContain(`Room ${number}`);
+  });
+
+  it('reports the clean that is in progress', async () => {
+    const roomId = await makeRoom();
+    const taskId = await makeTask(roomId);
+    await setTaskStatus(taskId, 'IN_PROGRESS');
+
+    const blocker = await blockerOf(roomId);
+
+    expect(blocker?.code).toBe('ROOM_IS_BEING_CLEANED');
+    expect(blocker?.status).toBe('CLEANING');
+  });
+
+  it('reports a booking that holds the room today', async () => {
+    const roomId = await makeRoom();
+    await makeBooking(roomId, 0);
+
+    const blocker = await blockerOf(roomId);
+
+    expect(blocker?.code).toBe('ROOM_IS_HELD_TODAY');
+    expect(blocker?.status).toBe('RESERVED');
+  });
+
+  it('does not report a clean done around a guest as a blocker', async () => {
+    // The read must draw the same DAILY/TURNDOWN distinction as the write, or
+    // the sheet hides Available on a room the endpoint would have accepted.
+    const roomId = await makeRoom();
+    const created = await app.inject({
+      method: 'POST', url: '/api/housekeeping', headers: auth(),
+      payload: { roomId, type: 'DAILY', scheduledDate: dateStr(0) },
+    });
+    await setTaskStatus(body(created).data.id as string, 'IN_PROGRESS');
+
+    expect(await blockerOf(roomId)).toBeNull();
+  });
+
+  it('still returns the room and its current booking', async () => {
+    // The blocker is added alongside what the sheet already reads, not
+    // instead of it.
+    const roomId = await makeRoom();
+    const bookingId = await makeBooking(roomId, 0);
+    await checkInGuest(bookingId);
+
+    const room = body(await getRoom(roomId)).data;
+
+    expect(room.number).toBeTruthy();
+    expect(room.currentBooking?.id).toBe(bookingId);
+  });
+});
+
+describe('the blocker the read reports is the one the write refuses with', () => {
+  const blockerOf = async (roomId: string) => {
+    const res = await app.inject({
+      method: 'GET', url: `/api/rooms/${roomId}`, headers: auth(),
+    });
+    return body(res).data.blocker as { code: string } | null;
+  };
+
+  it('agrees about a guest, who refuses every status but Occupied', async () => {
+    const roomId = await makeRoom();
+    const bookingId = await makeBooking(roomId, 0);
+    await checkInGuest(bookingId);
+    const reported = await blockerOf(roomId);
+
+    for (const status of ['AVAILABLE', 'CLEANING', 'MAINTENANCE', 'RESERVED']) {
+      const res = await setStatus(roomId, status);
+      expect(res.statusCode, `${status} should be refused`).toBe(409);
+      expect(body(res).code).toBe(reported?.code);
+    }
+
+    // And the one it does allow is the one the blocker names.
+    expect((await setStatus(roomId, 'OCCUPIED')).statusCode).toBe(200);
+  });
+
+  it('agrees about maintenance, which refuses only Available', async () => {
+    const roomId = await makeRoom();
+    await makeTicket(roomId);
+    const reported = await blockerOf(roomId);
+
+    const refused = await setStatus(roomId, 'AVAILABLE');
+    expect(refused.statusCode).toBe(409);
+    expect(body(refused).code).toBe(reported?.code);
+
+    // Marking a blocked room as Cleaning is honest work and stays allowed, so
+    // the sheet must keep offering it.
+    expect((await setStatus(roomId, 'CLEANING')).statusCode).toBe(200);
+  });
+
+  it('agrees about a hold, which refuses only Available', async () => {
+    const roomId = await makeRoom();
+    await makeBooking(roomId, 0);
+    const reported = await blockerOf(roomId);
+
+    const refused = await setStatus(roomId, 'AVAILABLE');
+    expect(refused.statusCode).toBe(409);
+    expect(body(refused).code).toBe(reported?.code);
+
+    expect((await setStatus(roomId, 'CLEANING')).statusCode).toBe(200);
+  });
+});

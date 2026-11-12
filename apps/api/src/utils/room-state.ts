@@ -1,4 +1,5 @@
 import type { Prisma } from '@resort-pro/database';
+import type { RoomBlockerCode } from '@resort-pro/types';
 import { tenantToday } from './tenant-day';
 
 /**
@@ -48,12 +49,15 @@ export type RoomStatus = Extract<NonNullable<Prisma.RoomWhereInput['status']>, s
  */
 export const BETWEEN_STAY_TYPES = ['CHECKOUT', 'DEEP_CLEAN', 'CHECKIN'] as const;
 
-/** A machine-readable reason a room cannot be declared ready. */
-export type RoomBlockerCode =
-  | 'ROOM_HAS_CHECKED_IN_GUEST'
-  | 'ROOM_HAS_OPEN_MAINTENANCE'
-  | 'ROOM_IS_BEING_CLEANED'
-  | 'ROOM_IS_HELD_TODAY';
+/**
+ * A machine-readable reason a room cannot be declared ready.
+ *
+ * The codes themselves live in @resort-pro/types, beside `blockerRefuses`,
+ * because `GET /api/rooms/:id` reports one to the detail sheet and the sheet
+ * has to know which statuses it rules out. The order and the wording stay
+ * here, where the database is.
+ */
+export type { RoomBlockerCode };
 
 export type RoomBlocker = {
   code: RoomBlockerCode;

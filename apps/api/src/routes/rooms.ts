@@ -9,8 +9,8 @@ import { propertyScope } from '../utils/property-scope';
 import { sellableRoomWhere } from '../utils/room-saleability';
 import { roomBlocker } from '../utils/room-state';
 import { parseStayDates } from '../utils/stay-dates';
-import { tenantToday, tenantDayOffset } from '../utils/tenant-day';
-import { ROOM_CAPABILITIES } from '@resort-pro/types';
+import { tenantToday, tenantDayOffset, safeTimezone } from '../utils/tenant-day';
+import { ROOM_CAPABILITIES, blockerRefuses } from '@resort-pro/types';
 import { mediaUrl } from '../utils/media-url';
 
 /*
@@ -261,7 +261,11 @@ export async function roomRoutes(app: FastifyInstance) {
         where:  { id: tenantId },
         select: { timezone: true },
       });
-      const today = tenantToday(tenant?.timezone ?? undefined);
+      // `Tenant.timezone` is free text and `Intl` throws on a value it does
+      // not recognise, which here would be a 500 on the room detail sheet.
+      // The same guard the Front Desk reads its day through.
+      const timezone = safeTimezone(tenant?.timezone);
+      const today = tenantToday(timezone);
 
       const withGuest = {
         guest: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
@@ -280,7 +284,7 @@ export async function roomRoutes(app: FastifyInstance) {
         where: {
           roomId: id,
           status:   { in: ['CONFIRMED', 'PENDING'] },
-          checkIn:  { lte: tenantDayOffset(7, tenant?.timezone ?? undefined) },
+          checkIn:  { lte: tenantDayOffset(7, timezone) },
           checkOut: { gt: today },
         },
         orderBy: { checkIn: 'asc' },
@@ -293,8 +297,34 @@ export async function roomRoutes(app: FastifyInstance) {
       // because the `??` looks like the load-bearing line and is not.
       const booking = occupant ?? upcoming;
 
+      /**
+       * What this room's own state refuses, so the detail sheet can stop
+       * offering it.
+       *
+       * Change Status rendered every status but the current one. This endpoint's
+       * sibling `PATCH /:id/status` has refused several of them since RM-001 and
+       * RM-004 — a checked-in guest leaves Occupied as the only one it accepts,
+       * and open maintenance, a clean in progress or a booking that holds the
+       * room today each refuse Available — and the sheet had no way to know. A
+       * receptionist on an occupied room was handed four buttons and four 409s:
+       * RM-005's defect again, decided by the room's state instead of the
+       * user's role.
+       *
+       * It is the same `roomBlocker` the write consults, not a second reading
+       * of the same tables. The client turns the code into a decision with
+       * `blockerRefuses`, which the write asks too — one rule, one wording, and
+       * no copy left to drift wide and offer a dead control.
+       */
+      const blocker = await roomBlocker(db, {
+        tenantId,
+        roomId:     id,
+        timezone,
+        roomNumber: room.number,
+      });
+
       return ok({
         ...room,
+        blocker,
         currentBooking: booking && {
           ...booking,
           /**
@@ -478,15 +508,11 @@ export async function roomRoutes(app: FastifyInstance) {
             roomNumber: room.number,
           });
 
-          // A guest refuses every status but OCCUPIED; the rest refuse only
-          // the claim that the room is ready. Marking a room held for tonight
-          // as Cleaning is honest work, and must not be in anybody's way.
-          const contradicted = blocker !== null && (
-            blocker.code === 'ROOM_HAS_CHECKED_IN_GUEST'
-              ? status !== 'OCCUPIED'
-              : status === 'AVAILABLE'
-          );
-          if (contradicted) {
+          // Which statuses a blocker rules out is asked of @resort-pro/types,
+          // because `GET /:id` hands the same question to the detail sheet. A
+          // copy here is a copy that drifts, and the one that drifts wide is
+          // the one that offers a button this endpoint will refuse. (RM-005.)
+          if (blocker !== null && blockerRefuses(blocker.code, status)) {
             throw Object.assign(new Error(blocker.error), {
               statusCode: 409,
               code: blocker.code,
