@@ -6,6 +6,7 @@ import { ok, paginated, parsePageParams, validate } from '../utils/response';
 import { generateConfirmationNo, calculateNights } from '../utils/booking';
 import { parseStayDates } from '../utils/stay-dates';
 import { sendEmail } from '../services/email';
+import { deliveryVerdict } from '../utils/delivery';
 import {
   sendBookingConfirmation,
   sendCheckoutEmail,
@@ -1582,9 +1583,11 @@ export async function bookingRoutes(app: FastifyInstance) {
       const cur = booking.tenant.currency;
       const fmt = (n: number) => `${cur} ${n.toFixed(2)}`;
 
-      // Generate invoice number if not yet assigned
+      // Generate invoice number if not yet assigned. The number is the
+      // document's identity and is persisted now; `invoiceSentAt` is not,
+      // because nothing has been sent yet.
       const invoiceNumber = booking.invoiceNumber ?? `INV-${booking.confirmationNo}`;
-      await db.booking.update({ where: { id }, data: { invoiceNumber, invoiceSentAt: new Date() } });
+      await db.booking.update({ where: { id }, data: { invoiceNumber } });
 
       const foodRows = booking.foodOrders.flatMap(o => o.items).map(i =>
         `<tr><td style="padding:4px 8px">${i.menuItem.name} ×${i.quantity}</td><td style="padding:4px 8px;text-align:right">${fmt(i.quantity * Number(i.unitPrice))}</td></tr>`
@@ -1639,9 +1642,27 @@ export async function bookingRoutes(app: FastifyInstance) {
         </div>
       `;
 
-      await sendEmail({ to: booking.guest.email, subject: `Invoice ${invoiceNumber} — ${booking.tenant.name}`, html });
+      // `sendEmail` never throws; it answers `{ id, error }`. This route used
+      // to discard that answer, stamp `invoiceSentAt`, and tell the desk the
+      // folio had reached the guest — even on a server with no email provider,
+      // where nothing had been sent at all. A desk that believes the invoice
+      // went out does not hand the guest a printed copy.
+      const verdict = deliveryVerdict(await sendEmail({
+        to: booking.guest.email,
+        subject: `Invoice ${invoiceNumber} — ${booking.tenant.name}`,
+        html,
+      }));
 
-      return reply.send({ success: true, data: { invoiceNumber, sentTo: booking.guest.email } });
+      if (!verdict.delivered) {
+        return reply.status(verdict.status).send({
+          success: false, error: verdict.error, code: verdict.code,
+          data: { invoiceNumber } as unknown,
+        });
+      }
+
+      await db.booking.update({ where: { id }, data: { invoiceSentAt: new Date() } });
+
+      return reply.send({ success: true, data: { invoiceNumber, sentTo: booking.guest.email, id: verdict.id } });
     },
   });
 

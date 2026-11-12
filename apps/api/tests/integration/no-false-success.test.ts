@@ -134,6 +134,75 @@ describe('an SMS provider offered in Settings but not built', () => {
   });
 });
 
+describe('the guest invoice email', () => {
+  /**
+   * This one is worse than a wrong message on screen. The route stamped
+   * `invoiceSentAt` *before* calling the provider, threw the provider's answer
+   * away, and answered `{ success: true, sentTo: <guest> }`. So on this very
+   * server — no provider configured, nothing sent — the folio was recorded as
+   * delivered and the desk was told the guest had it. Nobody hands over a
+   * printed copy after being told that.
+   */
+  const bookingFor = async (email: string) => {
+    const room = await prisma.room.create({
+      data: { tenantId, number: `NFS-${Math.random().toString(36).slice(2, 7)}`, name: 'Invoice Room', basePrice: 4000 },
+    });
+    const guest = await prisma.guest.create({
+      data: { tenantId, firstName: 'Folio', lastName: 'Guest', email },
+    });
+    return prisma.booking.create({
+      data: {
+        tenantId, roomId: room.id, guestId: guest.id,
+        checkIn: new Date('2029-03-01'), checkOut: new Date('2029-03-02'),
+        totalAmount: 4000, paidAmount: 4000, status: 'CHECKED_OUT',
+        confirmationNo: `NFS-${Math.random().toString(36).slice(2, 10).toUpperCase()}`,
+      },
+    });
+  };
+
+  it('refuses to claim the folio reached the guest', async () => {
+    const booking = await bookingFor(`folio-${Date.now()}@test.com`);
+
+    const res = await app.inject({
+      method: 'POST', url: `/api/bookings/${booking.id}/invoice/send-email`, headers: auth(),
+    });
+
+    expect(res.statusCode).toBe(503);
+    const body = JSON.parse(res.body);
+    expect(body.success).toBe(false);
+    expect(body.code).toBe('DELIVERY_NOT_CONFIGURED');
+    // The old response was 200 with { success: true, sentTo: <guest email> }.
+    expect(body.data?.sentTo).toBeUndefined();
+  });
+
+  it('leaves invoiceSentAt unset, so the stay is not filed as invoiced', async () => {
+    const booking = await bookingFor(`folio-stamp-${Date.now()}@test.com`);
+
+    await app.inject({
+      method: 'POST', url: `/api/bookings/${booking.id}/invoice/send-email`, headers: auth(),
+    });
+
+    const after = await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } });
+    expect(after.invoiceSentAt).toBeNull();
+  });
+
+  it('still assigns the invoice number, which is the document and not the send', async () => {
+    // The desk needs the number to print or re-send. Withholding it would
+    // trade one wrong answer for a different kind of unusable one.
+    const booking = await bookingFor(`folio-number-${Date.now()}@test.com`);
+    expect(booking.invoiceNumber).toBeNull();
+
+    const res = await app.inject({
+      method: 'POST', url: `/api/bookings/${booking.id}/invoice/send-email`, headers: auth(),
+    });
+
+    const expected = `INV-${booking.confirmationNo}`;
+    expect(JSON.parse(res.body).data?.invoiceNumber).toBe(expected);
+    const after = await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } });
+    expect(after.invoiceNumber).toBe(expected);
+  });
+});
+
 describe('input validation', () => {
   it('still validates its input before saying anything about delivery', async () => {
     // A missing number is the caller's mistake and must not be reported as a

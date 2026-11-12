@@ -14,6 +14,22 @@ if (!EMAIL_ENABLED) {
   console.warn('[email] RESEND_API_KEY not configured — outgoing emails are DISABLED. Set RESEND_API_KEY and verify your domain in Resend to enable password reset, receipts, and lifecycle emails.');
 }
 
+/**
+ * Whether this server can send at all.
+ *
+ * Callers that *claim* something before sending need to ask this first. The
+ * trial cron wrote its one-per-tenant-per-stage log row, then sent, then
+ * discarded the result — so on a server with no provider every trial warning
+ * was permanently recorded as sent while nothing left the building, and the
+ * unique constraint meant it could never be attempted again.
+ *
+ * This is the same flag `sendEmail` uses, exported rather than duplicated: a
+ * second copy of the rule would drift from the one that decides.
+ */
+export function isEmailConfigured(): boolean {
+  return EMAIL_ENABLED;
+}
+
 /* ── Template variable replacer ─────────────────────────────────────────────── */
 export function renderTemplate(html: string, vars: Record<string, string>): string {
   return html.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? '');

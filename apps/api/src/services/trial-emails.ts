@@ -13,7 +13,9 @@
 
 import { prisma } from '@resort-pro/database';
 import { PLAN_PRICING } from '@resort-pro/types';
-import { sendEmail } from './email';
+import { sendEmail, isEmailConfigured } from './email';
+import { deliveryVerdict } from '../utils/delivery';
+import { createAdminNotification } from '../utils/notifications';
 
 const APP_URL = process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:3000';
 const SUPPORT_EMAIL = 'support@resortpro.site';
@@ -277,6 +279,33 @@ export async function runTrialEmailCron(): Promise<void> {
 
   log('Starting trial email cron...');
 
+  /**
+   * Nothing is claimed on a server that cannot send.
+   *
+   * Every stage is one-per-tenant-for-ever, enforced by a unique constraint.
+   * So when the worker runs with no provider configured — which is exactly
+   * what happens if it boots before the key is set — claiming first burned
+   * every tenant's warning, expiry notice and win-back permanently, having
+   * attempted nothing. Trials would then quietly end with nobody told.
+   *
+   * Bailing out before the first claim leaves the whole schedule intact for
+   * whenever a provider does exist. It is loud about it, because a worker
+   * that silently sends no lifecycle mail for weeks is its own incident.
+   */
+  if (!isEmailConfigured()) {
+    log('No email provider configured — nothing claimed and nothing sent. Set RESEND_API_KEY.');
+    await createAdminNotification({
+      type: 'trial_email_failed',
+      title: 'Trial lifecycle emails are not being sent',
+      message:
+        'The trial email cron ran on a server with no email provider configured, so no trial '
+        + 'warning, expiry or win-back mail is going out. Nothing was marked as sent, so the '
+        + 'full schedule still works once RESEND_API_KEY is set.',
+      linkPath: '/admin/tenants',
+    });
+    return;
+  }
+
   await suppressBacklogOnFirstRun(log);
 
 
@@ -313,6 +342,7 @@ export async function runTrialEmailCron(): Promise<void> {
 
   let sent = 0;
   let skipped = 0;
+  const failures: { stage: string; to: string; reason: string }[] = [];
 
   /**
    * Send `stage` to this tenant at most once, ever.
@@ -323,6 +353,12 @@ export async function runTrialEmailCron(): Promise<void> {
    * both pass. Claiming first also means a send that throws is not retried on
    * the next tick — for lifecycle mail, silently missing one is much cheaper
    * than mailing an owner the same thing twice.
+   *
+   * That trade stands. What did not: the result of the send was discarded, so
+   * `sent++` and the "Sent …" line ran whether or not the provider took the
+   * message. The operator read a count of sends that had not happened, and the
+   * claimed row left no way to find out which owners were never warned. The
+   * claim stays; the bookkeeping is now honest about it.
    */
   const sendOnce = async (
     tenantId: string,
@@ -338,7 +374,17 @@ export async function runTrialEmailCron(): Promise<void> {
       if (e?.code === 'P2002') { skipped++; return; } // already sent
       throw e;
     }
-    await sendEmail({ to, subject, html });
+
+    const verdict = deliveryVerdict(await sendEmail({ to, subject, html }));
+    if (!verdict.delivered) {
+      // The stage stays claimed on purpose — see above; a retry next tick is
+      // how an owner gets the same mail twice. It is recorded as a failure so
+      // somebody can follow it up by hand.
+      failures.push({ stage, to, reason: verdict.error });
+      log(`FAILED ${label} to ${to} — ${verdict.error}`);
+      return;
+    }
+
     log(`Sent ${label} to ${to}`);
     sent++;
   };
@@ -408,5 +454,23 @@ export async function runTrialEmailCron(): Promise<void> {
     }
   }
 
-  log(`Done — ${sent} email(s) sent, ${skipped} already sent earlier`);
+  if (failures.length > 0) {
+    const lines = failures.map(f => `${f.stage} → ${f.to}: ${f.reason}`).join('\n');
+    log(`${failures.length} email(s) FAILED:\n${lines}`);
+    // One notification per run, not per message: a dead provider fails every
+    // send in the batch, and a hundred rows would bury the one fact that
+    // matters. The dashboard row is written even when the mirror email cannot
+    // go out — which is the case being reported.
+    await createAdminNotification({
+      type: 'trial_email_failed',
+      title: `${failures.length} trial lifecycle email(s) failed to send`,
+      message:
+        `The trial cron claimed these stages and the provider did not take them, so each stage `
+        + `is recorded as sent and will not be attempted again. Follow up by hand:\n${lines}`,
+      metadata: { failures },
+      linkPath: '/admin/tenants',
+    });
+  }
+
+  log(`Done — ${sent} email(s) sent, ${skipped} already sent earlier, ${failures.length} failed`);
 }
