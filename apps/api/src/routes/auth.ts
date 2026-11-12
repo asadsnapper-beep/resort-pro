@@ -336,6 +336,7 @@ export async function authRoutes(app: FastifyInstance) {
           isActive: tenant.isActive,
           onboardingStep: tenant.onboardingStep,
           onboardingCompletedAt: tenant.onboardingCompletedAt,
+          timezone: tenant.timezone,
         },
       }, 'Check your email to verify your account.'));
     },
@@ -403,6 +404,7 @@ export async function authRoutes(app: FastifyInstance) {
           isActive: tenant.isActive,
           onboardingStep: tenant.onboardingStep,
           onboardingCompletedAt: tenant.onboardingCompletedAt,
+          timezone: tenant.timezone,
         },
       }, 'Email verified successfully.'));
     },
@@ -532,6 +534,11 @@ export async function authRoutes(app: FastifyInstance) {
           isActive: tenant.isActive,
           onboardingStep: tenant.onboardingStep,
           onboardingCompletedAt: tenant.onboardingCompletedAt,
+          // The dashboard needs the resort's own timezone to know what day it
+          // is: without it the Walk-In modal defaulted to the UTC date and the
+          // Front Desk header to the browser's, neither of which is the
+          // resort's. See apps/web/src/lib/resort-day.ts.
+          timezone: tenant.timezone,
         },
       });
     },
@@ -678,6 +685,7 @@ export async function authRoutes(app: FastifyInstance) {
           isActive: tenant.isActive,
           onboardingStep: tenant.onboardingStep,
           onboardingCompletedAt: tenant.onboardingCompletedAt,
+          timezone: tenant.timezone,
         },
       });
     },

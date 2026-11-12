@@ -6,6 +6,8 @@ import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bookingsApi, roomsApi, guestsApi, ratePlansApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
+import { resortToday, resortDayAfter } from '@/lib/resort-day';
+import { useAuthStore } from '@/store/auth';
 import { useToast } from '@/hooks/use-toast';
 import {
   X, UserPlus, BedDouble, Loader2, CheckCircle2,
@@ -29,13 +31,6 @@ interface WalkInForm {
   skipEmail: boolean;
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
-const tomorrow = () => {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
-};
-const dayAfter = (d: string) => new Date(new Date(d).getTime() + 86_400_000).toISOString().slice(0, 10);
 
 interface Props {
   onClose: () => void;
@@ -54,6 +49,14 @@ const inp = 'w-full rounded-[8px] border border-black/5 bg-[#f4f1eb] px-3 py-[9p
 const lbl = 'block text-[11px] font-semibold uppercase tracking-[0.06em] mb-1.5 text-[#64748b]';
 
 export function WalkInModal({ onClose }: Props) {
+  /**
+   * Dates default to the resort's own today, not the browser's and not UTC.
+   * The UTC date put a walk-in on yesterday for every resort east of UTC
+   * between midnight and 6am — and availability now turns on the resort's day,
+   * so a date one out asks about the wrong day's rooms. lib/resort-day.ts.
+   */
+  const resortTimezone = useAuthStore((s) => s.tenant?.timezone);
+  const today = resortToday(resortTimezone);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const [mounted, setMounted] = useState(false);
@@ -67,7 +70,7 @@ export function WalkInModal({ onClose }: Props) {
   const { toast } = useToast();
 
   const [form, setForm] = useState<WalkInForm>({
-    checkIn: today(), checkOut: tomorrow(),
+    checkIn: today, checkOut: resortDayAfter(today),
     firstName: '', lastName: '', email: '', phone: '',
     roomId: '', adults: 1, children: 0, notes: '',
     paymentMethod: 'CASH', autoCheckIn: true, skipEmail: true,
@@ -79,7 +82,7 @@ export function WalkInModal({ onClose }: Props) {
   // Check-out follows check-in by one night until the guest picks something
   // later themselves — matches Front Desk's Walk-in and New Booking.
   const setCheckIn = (ci: string) => {
-    setForm(f => ({ ...f, checkIn: ci, checkOut: f.checkOut > ci ? f.checkOut : dayAfter(ci) }));
+    setForm(f => ({ ...f, checkIn: ci, checkOut: f.checkOut > ci ? f.checkOut : resortDayAfter(ci) }));
   };
 
   const [pendingDoc, setPendingDoc] = useState<PendingDocument | null>(null);
@@ -234,11 +237,11 @@ export function WalkInModal({ onClose }: Props) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
               <label className={lbl}>Check-in</label>
-              <input type="date" value={form.checkIn} min={today()} onChange={e => setCheckIn(e.target.value)} className={inp} />
+              <input type="date" value={form.checkIn} min={today} onChange={e => setCheckIn(e.target.value)} className={inp} />
             </div>
             <div>
               <label className={lbl}>Check-out</label>
-              <input type="date" value={form.checkOut} min={form.checkIn ? dayAfter(form.checkIn) : today()} onChange={e => set('checkOut', e.target.value)} className={inp} />
+              <input type="date" value={form.checkOut} min={form.checkIn ? resortDayAfter(form.checkIn) : today} onChange={e => set('checkOut', e.target.value)} className={inp} />
             </div>
           </div>
 
