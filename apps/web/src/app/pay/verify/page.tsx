@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { CheckCircle2, XCircle, Loader2, AlertCircle, RotateCcw } from 'lucide-react';
 import axios from 'axios';
+import { PublicStatusShell } from '@/components/brand/PublicStatusShell';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -82,8 +83,8 @@ function VerifyInner() {
   if (pageStatus === 'loading') {
     return (
       <div className="text-center">
-        <div className="w-20 h-20 rounded-full bg-[#f0faf8] flex items-center justify-center mx-auto mb-5">
-          <Loader2 className="w-10 h-10 text-[#1a6b5e] animate-spin" />
+        <div className="w-20 h-20 rounded-full bg-[#f7fee7] flex items-center justify-center mx-auto mb-5">
+          <Loader2 className="h-10 w-10 animate-spin text-lime-600" />
         </div>
         <h1 className="text-xl font-bold text-gray-800 mb-2">Verifying Payment</h1>
         <p className="text-sm text-gray-500">Please wait while we confirm your payment...</p>
@@ -101,7 +102,7 @@ function VerifyInner() {
         {slug && (
           <button
             onClick={() => router.push(`/${slug}`)}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#1a6b5e] text-white px-5 py-2.5 text-sm font-semibold hover:bg-[#145a4f]">
+            className="inline-flex items-center gap-2 rounded-full bg-lime-400 px-5 py-2.5 text-sm font-extrabold text-resort-900 hover:bg-lime-300">
             Return to Resort
           </button>
         )}
@@ -127,16 +128,16 @@ function VerifyInner() {
             Amount paid: <strong className="text-gray-700">{result.currency} {result.amount.toLocaleString()}</strong>
           </p>
         )}
-        <div className="rounded-xl bg-[#f0faf8] border border-[#b2ddd6] p-4 text-sm text-[#1a6b5e] mb-6">
+        <div className="mb-6 rounded-2xl border border-lime-200 bg-lime-50 p-4 text-sm text-resort-900">
           <p className="font-semibold mb-1">Booking Confirmed!</p>
           <p>Thank you for your payment. You will receive a confirmation email shortly.</p>
-          <p className="text-xs text-[#1a6b5e]/70 mt-1">Bookings ID: <span className="font-mono">{bookingId}</span></p>
+          <p className="text-xs text-[#0e223c]/70 mt-1">Bookings ID: <span className="font-mono">{bookingId}</span></p>
         </div>
         <div className="space-y-2">
           {slug && (
             <button
               onClick={() => router.push(`/${slug}`)}
-              className="w-full rounded-xl bg-[#1a6b5e] text-white py-3 text-sm font-semibold hover:bg-[#145a4f] transition-colors">
+              className="w-full rounded-full bg-lime-400 py-3 text-sm font-extrabold text-resort-900 transition-colors hover:bg-lime-300">
               Return to Resort Website
             </button>
           )}
@@ -160,7 +161,7 @@ function VerifyInner() {
           {slug && bookingId && (
             <button
               onClick={() => router.push(`/${slug}/checkout?bookingId=${bookingId}`)}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#1a6b5e] text-white py-3 text-sm font-semibold hover:bg-[#145a4f] transition-colors">
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-lime-400 py-3 text-sm font-extrabold text-resort-900 transition-colors hover:bg-lime-300">
               <RotateCcw className="w-4 h-4" /> Try Again
             </button>
           )}
@@ -192,7 +193,7 @@ function VerifyInner() {
       {slug && (
         <button
           onClick={() => router.push(`/${slug}`)}
-          className="w-full rounded-xl bg-[#1a6b5e] text-white py-3 text-sm font-semibold hover:bg-[#145a4f] transition-colors">
+          className="w-full rounded-full bg-lime-400 py-3 text-sm font-extrabold text-resort-900 transition-colors hover:bg-lime-300">
           Return to Resort Website
         </button>
       )}
@@ -203,17 +204,15 @@ function VerifyInner() {
 // ─── Page wrapper ─────────────────────────────────────────────────────────────
 export default function VerifyPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1a6b5e] via-[#145a4f] to-[#0d3d36] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
+    <PublicStatusShell eyebrow="Secure checkout" title="Confirming your payment." description="We’re checking the payment gateway and will update your booking automatically." icon={<CheckCircle2 className="h-6 w-6" />}>
         <Suspense fallback={
           <div className="text-center">
-            <Loader2 className="w-8 h-8 animate-spin text-[#1a6b5e] mx-auto mb-3" />
+            <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-lime-600" />
             <p className="text-sm text-gray-500">Loading...</p>
           </div>
         }>
           <VerifyInner />
         </Suspense>
-      </div>
-    </div>
+    </PublicStatusShell>
   );
 }

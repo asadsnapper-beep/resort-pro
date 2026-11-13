@@ -1,6 +1,11 @@
 package site.resortpro.android.feature.walkin
 
 import java.io.IOException
+import java.io.File
+import okhttp3.MultipartBody
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import retrofit2.Response
@@ -12,6 +17,8 @@ import site.resortpro.android.core.network.RateQuoteDto
 import site.resortpro.android.core.network.RoomDto
 import site.resortpro.android.core.network.WalkInBookingDto
 import site.resortpro.android.core.network.WalkInRequest
+
+class UploadIdentityMismatchException : Exception("Server returned an unexpected upload identity")
 
 class WalkInRepository(
     private val api: AuthApi,
@@ -27,6 +34,32 @@ class WalkInRepository(
 
     suspend fun create(request: WalkInRequest): WalkInBookingDto = call {
         api.createWalkIn(request).requireData()
+    }
+
+    suspend fun uploadImage(guestId: String, bookingId: String, docType: String, file: File) = call {
+        val type = "text/plain".toMediaType()
+        val part = MultipartBody.Part.createFormData("file", "capture.jpg", file.asRequestBody("image/jpeg".toMediaType()))
+        val uploaded = api.uploadGuestImage(guestId, docType.toRequestBody(type), bookingId.toRequestBody(type), part).requireData()
+        if (uploaded.docType != docType || uploaded.bookingId != bookingId) {
+            throw ApiException(409, null, "Image was saved without the expected type or booking. Check guest documents before uploading again.")
+        }
+        uploaded
+    }
+
+    suspend fun supportsSafeRetry(): Boolean = try {
+        api.guestImageCapabilities().body()?.data?.idempotencyVersion == 1
+    } catch (_: IOException) {
+        false
+    }
+
+    suspend fun uploadSavedImage(guestId: String, bookingId: String, docType: String, uploadId: String, bytes: ByteArray) = call {
+        val type = "text/plain".toMediaType()
+        val part = MultipartBody.Part.createFormData("file", "capture.jpg", bytes.toRequestBody("image/jpeg".toMediaType()))
+        val uploaded = api.uploadGuestImage(guestId, docType.toRequestBody(type), bookingId.toRequestBody(type), part, uploadId).requireData()
+        if (uploaded.id != uploadId || uploaded.docType != docType || uploaded.bookingId != bookingId) {
+            throw UploadIdentityMismatchException()
+        }
+        uploaded
     }
 
     private suspend fun <T> call(block: suspend () -> T): T = try {

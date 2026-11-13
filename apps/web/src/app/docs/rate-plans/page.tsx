@@ -170,7 +170,7 @@ export default function RatePlansPage() {
         </li>
       </ul>
       <div className="info-box">
-        <strong>Tip:</strong> Check the <a href="/docs/reports" className="text-[#1a6b5e] underline">Reports page</a> monthly
+        <strong>Tip:</strong> Check the <a href="/docs/reports" className="text-lime-700 underline">Reports page</a> monthly
         to see your ADR (Average Daily Rate) and RevPAR. These numbers tell you whether your rate
         plans are working.
       </div>

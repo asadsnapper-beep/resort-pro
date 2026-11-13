@@ -69,6 +69,7 @@ class RoomsViewModel(
         mutableState.update {
             it.copy(
                 checkIn = value.take(10),
+                availableRooms = null,
                 validation = it.validation.copy(checkInError = null),
                 availabilityError = null,
             )
@@ -79,6 +80,7 @@ class RoomsViewModel(
         mutableState.update {
             it.copy(
                 checkOut = value.take(10),
+                availableRooms = null,
                 validation = it.validation.copy(checkOutError = null),
                 availabilityError = null,
             )
@@ -87,28 +89,26 @@ class RoomsViewModel(
 
     fun checkAvailability() {
         val current = mutableState.value
+        if (current.isAvailabilityLoading) return
         val validation = AvailabilityValidator.validate(current.checkIn, current.checkOut)
         if (!validation.isValid) {
             mutableState.update { it.copy(validation = validation) }
             return
         }
 
+        mutableState.update {
+            it.copy(isAvailabilityLoading = true, availabilityError = null, validation = validation, availableRooms = null)
+        }
         viewModelScope.launch {
-            mutableState.update {
-                it.copy(
-                    isAvailabilityLoading = true,
-                    availabilityError = null,
-                    validation = validation,
-                )
-            }
             runCatching { repository.checkAvailability(current.checkIn, current.checkOut) }
                 .onSuccess { rooms ->
                     mutableState.update {
-                        it.copy(isAvailabilityLoading = false, availableRooms = rooms)
+                        if (it.checkIn == current.checkIn && it.checkOut == current.checkOut) it.copy(isAvailabilityLoading = false, availableRooms = rooms) else it.copy(isAvailabilityLoading = false)
                     }
                 }
                 .onFailure { error ->
                     mutableState.update {
+                        if (it.checkIn != current.checkIn || it.checkOut != current.checkOut) return@update it.copy(isAvailabilityLoading = false)
                         it.copy(
                             isAvailabilityLoading = false,
                             availabilityError = error.message ?: "Could not check availability.",

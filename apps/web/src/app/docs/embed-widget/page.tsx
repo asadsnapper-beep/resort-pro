@@ -169,7 +169,7 @@ export default function EmbedWidgetPage() {
       <table>
         <thead><tr><th>Attribute</th><th>What it does</th><th>Example</th></tr></thead>
         <tbody>
-          <tr><td><code>data-color</code></td><td>Changes the widget's primary color</td><td><code>#1a6b5e</code></td></tr>
+          <tr><td><code>data-color</code></td><td>Changes the widget's primary color</td><td><code>#0e223c</code></td></tr>
           <tr><td><code>data-currency</code></td><td>Changes the currency shown</td><td><code>BDT</code>, <code>USD</code></td></tr>
           <tr><td><code>data-whatsapp</code></td><td>Adds WhatsApp button (CTA only)</td><td><code>+8801700000000</code></td></tr>
         </tbody>

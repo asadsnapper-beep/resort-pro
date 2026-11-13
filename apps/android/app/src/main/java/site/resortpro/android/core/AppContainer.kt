@@ -22,8 +22,11 @@ import site.resortpro.android.feature.rooms.RoomsRepository
 import site.resortpro.android.feature.housekeeping.HousekeepingRepository
 import site.resortpro.android.feature.housekeeping.HousekeepingSyncWorker
 import site.resortpro.android.feature.walkin.WalkInRepository
+import site.resortpro.android.feature.walkin.PendingGuestImages
+import site.resortpro.android.feature.guests.GuestsRepository
 
 class AppContainer(context: Context) {
+    val pendingGuestImages = PendingGuestImages(context)
     private val json = Json {
         ignoreUnknownKeys = true
         explicitNulls = false
@@ -80,6 +83,8 @@ class AppContainer(context: Context) {
         json = json,
         cacheDao = database.cacheDao(),
     )
+
+    val guestsRepository = GuestsRepository(authApi)
 
     val housekeepingRepository = HousekeepingRepository(
         api = authApi,

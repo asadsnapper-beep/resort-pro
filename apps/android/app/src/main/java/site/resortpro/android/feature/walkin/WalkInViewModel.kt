@@ -6,16 +6,21 @@ import androidx.lifecycle.viewModelScope
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
 import site.resortpro.android.core.network.ApiException
 import site.resortpro.android.core.network.RateQuoteDto
 import site.resortpro.android.core.network.RoomDto
 import site.resortpro.android.core.network.WalkInBookingDto
 import site.resortpro.android.core.network.WalkInRequest
+import site.resortpro.android.BuildConfig
 import site.resortpro.android.feature.rooms.AvailabilityValidator
 
 data class WalkInUiState(
@@ -40,6 +45,13 @@ data class WalkInUiState(
     val conflictMessage: String? = null,
     val submissionUncertain: Boolean = false,
     val createdBooking: WalkInBookingDto? = null,
+    val guestPhotoPath: String? = null,
+    val documentPhotoPath: String? = null,
+    val documentType: String = "NATIONAL_ID",
+    val uploadingImages: Boolean = false,
+    val imageUploadMessage: String? = null,
+    val pendingImageCount: Int = 0,
+    val pendingImageError: String? = null,
 ) {
     val selectedRoom: RoomDto? get() = availableRooms.firstOrNull { it.id == selectedRoomId }
     val nights: Int get() = nightsBetween(checkIn, checkOut)
@@ -49,15 +61,58 @@ data class WalkInUiState(
 
 class WalkInViewModel(
     private val repository: WalkInRepository,
+    private val pending: PendingGuestImages,
+    private val tenantId: String,
+    private val userId: String,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(WalkInUiState())
     val state: StateFlow<WalkInUiState> = mutableState.asStateFlow()
     private var prepared = false
 
+    init { refreshPending() }
+
+    private fun refreshPending() {
+        viewModelScope.launch {
+            try {
+                check(tenantId.isNotBlank() && userId.isNotBlank())
+                val count = withContext(Dispatchers.IO) { pending.list(storageTenant(), userId).size }
+                mutableState.update { it.copy(pendingImageCount = count, pendingImageError = null) }
+            } catch (error: CancellationException) { throw error }
+            catch (_: Exception) {
+                mutableState.update { it.copy(pendingImageError = "Saved photos cannot be read on this device. Contact your administrator; do not retake them until guest documents are checked.") }
+            }
+        }
+    }
+
+    private fun storageTenant() = "${BuildConfig.API_BASE_URL}|$tenantId"
+
     fun prepare() {
         if (prepared) return
         prepared = true
-        checkAvailability()
+    }
+
+    fun validateStay(): Boolean {
+        val current = mutableState.value
+        val dates = AvailabilityValidator.validate(current.checkIn, current.checkOut)
+        mutableState.update { it.copy(validation = it.validation.copy(checkInError = dates.checkInError, checkOutError = dates.checkOutError)) }
+        return dates.isValid
+    }
+
+    fun validateRoom(): Boolean {
+        val current = mutableState.value
+        val room = current.selectedRoom
+        val roomError = if (room == null) "Select an available room." else null
+        val occupancyError = if (room != null && current.adults + current.children > room.maxOccupancy) {
+            "This room allows up to ${room.maxOccupancy} guests."
+        } else null
+        mutableState.update { it.copy(validation = it.validation.copy(roomError = roomError, occupancyError = occupancyError)) }
+        return roomError == null && occupancyError == null && current.quote != null && !current.isLoadingQuote
+    }
+
+    fun validateGuest(): Boolean {
+        val error = if (mutableState.value.guestName.isBlank()) "Guest name is required." else null
+        mutableState.update { it.copy(validation = it.validation.copy(guestNameError = error)) }
+        return error == null
     }
 
     fun updateGuestName(value: String) = mutableState.update {
@@ -65,6 +120,20 @@ class WalkInViewModel(
     }
 
     fun updateGuestPhone(value: String) = mutableState.update { it.copy(guestPhone = value.take(30)) }
+
+    fun setPhoto(path: String, isDocument: Boolean) {
+        val old = if (isDocument) mutableState.value.documentPhotoPath else mutableState.value.guestPhotoPath
+        if (old != path) old?.let { File(it).delete() }
+        mutableState.update { if (isDocument) it.copy(documentPhotoPath = path) else it.copy(guestPhotoPath = path) }
+    }
+
+    fun removePhoto(isDocument: Boolean) {
+        val path = if (isDocument) mutableState.value.documentPhotoPath else mutableState.value.guestPhotoPath
+        path?.let { File(it).delete() }
+        mutableState.update { if (isDocument) it.copy(documentPhotoPath = null) else it.copy(guestPhotoPath = null) }
+    }
+
+    fun selectDocumentType(value: String) = mutableState.update { it.copy(documentType = value) }
 
     fun updateCheckIn(value: String) {
         mutableState.update {
@@ -74,6 +143,8 @@ class WalkInViewModel(
                 availableRooms = emptyList(),
                 hasAvailabilityResult = false,
                 quote = null,
+                isLoadingRooms = false,
+                isLoadingQuote = false,
                 validation = it.validation.copy(checkInError = null, roomError = null),
                 conflictMessage = null,
             )
@@ -88,6 +159,8 @@ class WalkInViewModel(
                 availableRooms = emptyList(),
                 hasAvailabilityResult = false,
                 quote = null,
+                isLoadingRooms = false,
+                isLoadingQuote = false,
                 validation = it.validation.copy(checkOutError = null, roomError = null),
                 conflictMessage = null,
             )
@@ -149,6 +222,7 @@ class WalkInViewModel(
             }
             runCatching { repository.availableRooms(current.checkIn, current.checkOut) }
                 .onSuccess { rooms ->
+                    if (mutableState.value.checkIn != current.checkIn || mutableState.value.checkOut != current.checkOut) return@onSuccess
                     mutableState.update {
                         it.copy(
                             isLoadingRooms = false,
@@ -159,6 +233,7 @@ class WalkInViewModel(
                     rooms.firstOrNull()?.let { selectRoom(it.id) }
                 }
                 .onFailure { error ->
+                    if (mutableState.value.checkIn != current.checkIn || mutableState.value.checkOut != current.checkOut) return@onFailure
                     mutableState.update {
                         it.copy(isLoadingRooms = false, errorMessage = error.message ?: "Could not check availability.")
                     }
@@ -182,12 +257,12 @@ class WalkInViewModel(
             runCatching { repository.quote(roomId, current.checkIn, current.checkOut) }
                 .onSuccess { quote ->
                     mutableState.update {
-                        if (it.selectedRoomId == roomId) it.copy(isLoadingQuote = false, quote = quote) else it
+                        if (it.selectedRoomId == roomId && it.checkIn == current.checkIn && it.checkOut == current.checkOut) it.copy(isLoadingQuote = false, quote = quote) else it
                     }
                 }
                 .onFailure { error ->
                     mutableState.update {
-                        if (it.selectedRoomId == roomId) {
+                        if (it.selectedRoomId == roomId && it.checkIn == current.checkIn && it.checkOut == current.checkOut) {
                             it.copy(isLoadingQuote = false, errorMessage = error.message ?: "Could not load the rate quote.")
                         } else {
                             it
@@ -199,7 +274,7 @@ class WalkInViewModel(
 
     fun submit() {
         val current = mutableState.value
-        if (current.isSubmitting || current.submissionUncertain || current.createdBooking != null) return
+        if (current.isSubmitting || current.uploadingImages || current.submissionUncertain || current.createdBooking != null) return
         val validation = WalkInValidator.validate(
             guestName = current.guestName,
             checkIn = current.checkIn,
@@ -243,7 +318,8 @@ class WalkInViewModel(
         viewModelScope.launch {
             runCatching { repository.create(request) }
                 .onSuccess { booking ->
-                    mutableState.update { it.copy(isSubmitting = false, createdBooking = booking) }
+                    mutableState.update { it.copy(isSubmitting = false, createdBooking = booking, uploadingImages = it.guestPhotoPath != null || it.documentPhotoPath != null) }
+                    uploadCapturedImages(booking)
                 }
                 .onFailure { error ->
                     mutableState.update {
@@ -274,16 +350,104 @@ class WalkInViewModel(
     }
 
     fun startAnother() {
-        mutableState.value = WalkInUiState()
+        removePhoto(false)
+        removePhoto(true)
+        mutableState.value = WalkInUiState(pendingImageCount = mutableState.value.pendingImageCount, pendingImageError = mutableState.value.pendingImageError)
         prepared = false
         prepare()
     }
 
-    class Factory(private val repository: WalkInRepository) : ViewModelProvider.Factory {
+    private suspend fun uploadCapturedImages(booking: WalkInBookingDto) {
+        val current = mutableState.value
+        val images = listOfNotNull(
+            current.guestPhotoPath?.let { Triple(it, "GUEST_PHOTO", "Guest photo") },
+            current.documentPhotoPath?.let { Triple(it, current.documentType, "ID photo") },
+        )
+        val failed = mutableListOf<String>()
+        for ((path, type, label) in images) {
+            val file = File(path)
+            try {
+                check(tenantId.isNotBlank() && userId.isNotBlank())
+                withContext(Dispatchers.IO) { pending.save(storageTenant(), userId, booking.guestId, booking.id, type, file) }
+                file.delete()
+                mutableState.update { if (type == "GUEST_PHOTO") it.copy(guestPhotoPath = null) else it.copy(documentPhotoPath = null) }
+            } catch (error: CancellationException) { throw error }
+            catch (_: Exception) { failed += label }
+        }
+        if (images.size > failed.size) uploadPending()
+        mutableState.update {
+            it.copy(
+                uploadingImages = false,
+                imageUploadMessage = if (failed.isNotEmpty()) "${failed.joinToString()} could not be saved securely. Booking is confirmed. These temporary photos are removed when you leave; check guest documents and retake if needed." else it.imageUploadMessage,
+            )
+        }
+        refreshPending()
+    }
+
+    fun retryPendingImages() {
+        if (mutableState.value.uploadingImages) return
+        mutableState.update { it.copy(uploadingImages = true, imageUploadMessage = null) }
+        viewModelScope.launch {
+            try { uploadPending() }
+            finally { mutableState.update { it.copy(uploadingImages = false) }; refreshPending() }
+        }
+    }
+
+    fun discardPendingImages() {
+        if (mutableState.value.uploadingImages) return
+        mutableState.update { it.copy(uploadingImages = true) }
+        viewModelScope.launch {
+            try {
+                check(tenantId.isNotBlank() && userId.isNotBlank())
+                withContext(Dispatchers.IO) { pending.list(storageTenant(), userId).forEach(pending::remove) }
+                mutableState.update { it.copy(imageUploadMessage = "Saved photos removed from this device. Existing server documents were not changed.") }
+            } catch (error: CancellationException) { throw error }
+            catch (_: Exception) { mutableState.update { it.copy(imageUploadMessage = "Could not remove saved photos. Contact your administrator.") } }
+            finally { mutableState.update { it.copy(uploadingImages = false) }; refreshPending() }
+        }
+    }
+
+    private suspend fun uploadPending() {
+        try {
+            check(tenantId.isNotBlank() && userId.isNotBlank())
+            val items = withContext(Dispatchers.IO) { pending.list(storageTenant(), userId) }
+            if (items.isEmpty()) return
+            if (!repository.supportsSafeRetry()) {
+                mutableState.update { it.copy(imageUploadMessage = "Photos are encrypted on this device. Upload will be available when the server supports safe retry; please try again later.") }
+                return
+            }
+            for (item in items) {
+                if (item.quarantined) {
+                    mutableState.update { it.copy(imageUploadMessage = "A photo needs manual review. Check guest documents and contact your administrator before trying again.") }
+                    continue
+                }
+                try {
+                    repository.uploadSavedImage(item.guestId, item.bookingId, item.docType, item.id, pending.bytes(item))
+                } catch (error: UploadIdentityMismatchException) {
+                    withContext(Dispatchers.IO) { pending.quarantine(item) }
+                    mutableState.update { it.copy(imageUploadMessage = "The server returned an unexpected response. This photo is paused; check guest documents and contact your administrator.") }
+                    return
+                }
+                withContext(Dispatchers.IO) { pending.remove(item) }
+            }
+            if (items.none { it.quarantined }) mutableState.update { it.copy(imageUploadMessage = "Guest photos uploaded.") }
+        } catch (error: CancellationException) { throw error }
+        catch (_: Exception) {
+            mutableState.update { it.copy(imageUploadMessage = "Upload not confirmed. The encrypted photos remain on this device; retry when connected. Check guest documents if the server response was unexpected.") }
+        }
+    }
+
+    override fun onCleared() {
+        mutableState.value.guestPhotoPath?.let { File(it).delete() }
+        mutableState.value.documentPhotoPath?.let { File(it).delete() }
+        super.onCleared()
+    }
+
+    class Factory(private val repository: WalkInRepository, private val pending: PendingGuestImages, private val tenantId: String, private val userId: String) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             require(modelClass.isAssignableFrom(WalkInViewModel::class.java))
-            return WalkInViewModel(repository) as T
+            return WalkInViewModel(repository, pending, tenantId, userId) as T
         }
     }
 }

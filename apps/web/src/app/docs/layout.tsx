@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-white font-sans antialiased">
+    <div className="min-h-screen bg-[#f8f6f1] font-sans text-resort-900 antialiased">
       {children}
     </div>
   );

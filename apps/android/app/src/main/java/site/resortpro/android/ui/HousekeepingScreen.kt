@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -22,6 +23,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.text.DateFormat
@@ -79,8 +83,8 @@ fun HousekeepingScreen(
                 }
                 Text(
                     stringResource(R.string.hk_title),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontFamily = FontFamily.Serif,
                 )
                 Text(
                     if (state.isStaffView) stringResource(R.string.hk_my_tasks) else session.tenant?.name ?: stringResource(R.string.app_name),
@@ -99,17 +103,39 @@ fun HousekeepingScreen(
                 }
             }
 
+            if (!state.isLoading && loadError == null && state.syncedAt != null) {
+                item {
+                    HousekeepingSummary(
+                        tasks = state.tasks,
+                        isStaffView = state.isStaffView,
+                    )
+                }
+            }
+
+            if (state.queuedTaskIds.isNotEmpty()) item {
+                HousekeepingMessageCard(
+                    title = stringResource(R.string.hk_sync_pending, state.queuedTaskIds.size),
+                    message = stringResource(R.string.hk_sync_pending_body),
+                )
+            }
+
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    HousekeepingFilter.entries.forEach { filter ->
-                        FilterChip(
-                            selected = state.filter == filter,
-                            onClick = { viewModel.selectFilter(filter) },
-                            label = { Text(filter.label()) },
-                        )
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (state.isStaffView) stringResource(R.string.hk_my_tasks) else stringResource(R.string.hk_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                        TextButton(onClick = viewModel::retry, enabled = !state.isLoading && state.updatingTaskIds.isEmpty()) { Text(stringResource(R.string.hk_refresh)) }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        HousekeepingFilter.entries.forEach { filter ->
+                            FilterChip(
+                                selected = state.filter == filter,
+                                onClick = { viewModel.selectFilter(filter) },
+                                label = { Text(filter.label()) },
+                            )
+                        }
                     }
                 }
             }
@@ -126,7 +152,7 @@ fun HousekeepingScreen(
             }
 
             when {
-                state.isLoading -> item { HousekeepingLoadingCard() }
+                state.isLoading || (state.syncedAt == null && loadError == null) -> item { HousekeepingLoadingCard() }
                 loadError != null -> item {
                     HousekeepingMessageCard(stringResource(R.string.hk_load_failed), loadError, isError = true)
                     TextButton(onClick = viewModel::retry) { Text(stringResource(R.string.action_try_again)) }
@@ -174,14 +200,49 @@ fun HousekeepingScreen(
 }
 
 @Composable
-private fun HousekeepingTaskCard(
+private fun HousekeepingSummary(tasks: List<HousekeepingTaskDto>, isStaffView: Boolean) {
+    val remaining = tasks.count { !HousekeepingPolicy.isFinished(it.status) }
+    val inProgress = tasks.count { it.status == "IN_PROGRESS" }
+    val completed = tasks.count { it.status == "COMPLETED" }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    ) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text(stringResource(R.string.hk_workboard), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+            Text(
+                if (isStaffView) stringResource(R.string.hk_my_tasks) else stringResource(R.string.hk_overview),
+                style = MaterialTheme.typography.titleLarge,
+                fontFamily = FontFamily.Serif,
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                HousekeepingMetric(remaining, stringResource(R.string.hk_remaining), Modifier.weight(1f))
+                HousekeepingMetric(inProgress, stringResource(R.string.hk_in_progress_short), Modifier.weight(1f))
+                HousekeepingMetric(completed, stringResource(R.string.hk_completed_short), Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun HousekeepingMetric(value: Int, label: String, modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(value.toString(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+        Text(label, style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+@Composable
+internal fun HousekeepingTaskCard(
     task: HousekeepingTaskDto,
     isUpdating: Boolean,
     isQueued: Boolean,
     isStaffView: Boolean,
     onUpdateStatus: (String) -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(7.dp),
@@ -218,11 +279,15 @@ private fun HousekeepingTaskCard(
                         )
                     }
                 }
-                Text(
-                    task.status.displayLabel(),
-                    color = housekeepingStatusColor(task.status),
-                    fontWeight = FontWeight.SemiBold,
-                )
+                Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.secondaryContainer) {
+                    Text(
+                        stringResource(R.string.hk_status_label, task.status.displayLabel()),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
 
             // Every row on a housekeeper's own list said "Assigned to Rina
@@ -252,6 +317,8 @@ private fun HousekeepingTaskCard(
                     CircularProgressIndicator(modifier = Modifier.height(20.dp), strokeWidth = 2.dp)
                     Text(stringResource(R.string.hk_updating), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+            } else if (isQueued) {
+                Text(stringResource(R.string.hk_queue_blocked), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else if (actions.isNotEmpty()) {
                 if (isStaffView) {
                     // Full-width buttons at the foot of the card: 56dp so they
@@ -320,13 +387,6 @@ private fun HousekeepingMessageCard(title: String, message: String, isError: Boo
             Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
-}
-
-@Composable
-private fun housekeepingStatusColor(status: String) = when (status) {
-    "COMPLETED" -> MaterialTheme.colorScheme.primary
-    "SKIPPED" -> MaterialTheme.colorScheme.error
-    else -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 
 @Composable

@@ -57,7 +57,14 @@ class AuthRefreshTest {
         val baseUrl = server.url("/")
         cookieJar.saveFromResponse(
             baseUrl,
-            listOf(Cookie.Builder().name("refreshToken").value("cookie").domain(baseUrl.host).path("/").build()),
+            listOf(
+                Cookie.Builder()
+                    .name("rp_refresh")
+                    .value("cookie")
+                    .domain(baseUrl.host)
+                    .path("/api/auth")
+                    .build(),
+            ),
         )
         val refresh = RefreshCoordinator(OkHttpClient.Builder().cookieJar(cookieJar).build(), baseUrl, Json, store, cookieJar)
         val client = OkHttpClient.Builder()

@@ -23,6 +23,8 @@ data class RoomsLoadResult(
     val truncated: Boolean,
 )
 
+data class RoomDetailResult(val room: RoomDto, val fromCache: Boolean, val syncedAt: Long)
+
 @Serializable
 private data class RoomsCachePayload(
     val rooms: List<RoomDto>,
@@ -82,6 +84,16 @@ class RoomsRepository(
         api.roomAvailability(checkIn, checkOut).requireData()
     } catch (error: IOException) {
         throw NetworkUnavailableException(error)
+    }
+
+    suspend fun roomDetails(roomId: String, tenantId: String): RoomDetailResult = try {
+        RoomDetailResult(api.roomDetails(roomId).requireData(), false, System.currentTimeMillis())
+    } catch (error: IOException) {
+        val entry = cacheDao.get(cacheKey(ROOMS_CACHE, tenantId)) ?: throw NetworkUnavailableException(error)
+        val payload = runCatching { json.decodeFromString<RoomsCachePayload>(entry.payload) }.getOrNull()
+            ?: throw NetworkUnavailableException(error)
+        val room = payload.rooms.firstOrNull { it.id == roomId } ?: throw NetworkUnavailableException(error)
+        RoomDetailResult(room, true, entry.syncedAt)
     }
 
     private fun Response<PaginatedRoomEnvelope>.requireRoomPage(): RoomPage {

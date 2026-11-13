@@ -68,6 +68,7 @@ import { offersRoutes, publicOffersRoutes } from './routes/offers';
 import { discoveryRoutes } from './routes/discovery';
 import { syncRoutes } from './routes/sync';
 import { guestDocumentRoutes } from './routes/guestDocuments';
+import { mobileGuestViewRoutes } from './routes/mobileGuestViews';
 import { idScanRoutes }         from './routes/idScan';
 import { restaurantTableRoutes } from './routes/restaurantTables';
 import { publicTableRoutes } from './routes/publicTable';
@@ -335,6 +336,7 @@ export async function buildApp() {
   await app.register(propertyRoutes, { prefix: '/api/properties' });
   await app.register(bookingRoutes, { prefix: '/api/bookings' });
   await app.register(guestRoutes,         { prefix: '/api/guests' });
+  await app.register(mobileGuestViewRoutes, { prefix: '/api/mobile' });
   await app.register(guestDocumentRoutes, { prefix: '/api/guests' });
   await app.register(idScanRoutes,         { prefix: '/api/guests' });
   await app.register(staffRoutes, { prefix: '/api/staff' });

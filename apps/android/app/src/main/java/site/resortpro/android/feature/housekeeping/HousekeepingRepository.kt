@@ -23,6 +23,7 @@ data class HousekeepingLoadResult(
     val tasks: List<HousekeepingTaskDto>,
     val syncedAt: Long,
     val fromCache: Boolean,
+    val queuedTaskIds: Set<String> = emptySet(),
 )
 
 data class HousekeepingStatusResult(
@@ -56,21 +57,19 @@ class HousekeepingRepository(
         } else {
             tasks
         }
-        val pendingByTask = outboxDao.all()
-            .filter { it.tenantId == tenantId && it.userId == userId }
-            .associateBy { it.taskId }
-        val displayed = scopedTasks.map { task ->
-            pendingByTask[task.id]?.let { task.copy(status = it.targetStatus) } ?: task
-        }
+        val pendingByTask = HousekeepingPolicy.scopedPending(outboxDao.all(), tenantId, userId)
+        val displayed = HousekeepingPolicy.withPendingStatuses(scopedTasks, pendingByTask)
         val syncedAt = System.currentTimeMillis()
         cacheDao.upsert(
             CacheEntryEntity(
                 cacheKey = housekeepingCacheKey(tenantId, role, userId),
-                payload = json.encodeToString(HousekeepingCachePayload(displayed)),
+                // Keep the last server-confirmed snapshot separate from the
+                // pending overlay, so a rejected update is not cached as fact.
+                payload = json.encodeToString(HousekeepingCachePayload(scopedTasks)),
                 syncedAt = syncedAt,
             ),
         )
-        HousekeepingLoadResult(displayed, syncedAt, fromCache = false)
+        HousekeepingLoadResult(displayed, syncedAt, fromCache = false, queuedTaskIds = pendingByTask.keys)
     } catch (error: IOException) {
         val entry = cacheDao.get(housekeepingCacheKey(tenantId, role, userId))
             ?: throw NetworkUnavailableException(error)
@@ -79,7 +78,9 @@ class HousekeepingRepository(
                 cacheDao.delete(entry.cacheKey)
                 throw NetworkUnavailableException(error)
             }
-        HousekeepingLoadResult(payload.tasks, entry.syncedAt, fromCache = true)
+        val pending = HousekeepingPolicy.scopedPending(outboxDao.all(), tenantId, userId)
+        val displayed = HousekeepingPolicy.withPendingStatuses(payload.tasks, pending)
+        HousekeepingLoadResult(displayed, entry.syncedAt, fromCache = true, queuedTaskIds = pending.keys)
     }
 
     suspend fun updateStatus(
@@ -110,13 +111,25 @@ class HousekeepingRepository(
                 queuedAt = System.currentTimeMillis(),
             ),
         )
-        updateCachedTask(tenantId, role, userId, optimistic)
         scheduleOutbox()
         HousekeepingStatusResult(optimistic, queued = true)
     }
 
     suspend fun flushOutbox(): Boolean {
-        for (pending in outboxDao.all()) {
+        val queued = outboxDao.all()
+        if (queued.isEmpty()) return true
+        // A worker may wake after sign-out or another account's sign-in.
+        // Never send the previous user's queued actions using that session.
+        val currentUser = try {
+            api.me().requireData()
+        } catch (_: IOException) {
+            return false
+        } catch (_: ApiException) {
+            return false
+        }
+        val tenantId = currentUser.tenantId ?: return false
+        val matching = queued.filter { it.tenantId == tenantId && it.userId == currentUser.id }
+        for (pending in matching) {
             try {
                 val updated = api.updateHousekeepingStatus(
                     id = pending.taskId,
@@ -141,7 +154,8 @@ class HousekeepingRepository(
                 outboxDao.delete(pending.taskId)
             }
         }
-        return true
+        // Leave other accounts' entries untouched until their owner returns.
+        return matching.size == queued.size
     }
 
     private suspend fun updateCachedTask(

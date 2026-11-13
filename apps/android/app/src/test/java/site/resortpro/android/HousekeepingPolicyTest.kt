@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import site.resortpro.android.core.network.HousekeepingTaskDto
+import site.resortpro.android.core.database.HousekeepingOutboxEntity
 import site.resortpro.android.feature.housekeeping.HousekeepingFilter
 import site.resortpro.android.feature.housekeeping.HousekeepingPolicy
 
@@ -38,6 +39,19 @@ class HousekeepingPolicyTest {
             HousekeepingPolicy.filter(tasks, HousekeepingFilter.COMPLETED).map { it.id },
         )
         assertEquals(tasks, HousekeepingPolicy.filter(tasks, HousekeepingFilter.ALL))
+    }
+
+    @Test
+    fun pendingStatusesAreScopedToAccountAndRestoredOnReload() {
+        val queue = listOf(
+            HousekeepingOutboxEntity("one", "tenant-a", "user-a", "STAFF", "PENDING", "IN_PROGRESS", 1),
+            HousekeepingOutboxEntity("two", "tenant-a", "user-b", "STAFF", "PENDING", "COMPLETED", 2),
+            HousekeepingOutboxEntity("three", "tenant-b", "user-a", "STAFF", "PENDING", "SKIPPED", 3),
+        )
+        val pending = HousekeepingPolicy.scopedPending(queue, "tenant-a", "user-a")
+        assertEquals(setOf("one"), pending.keys)
+        val restored = HousekeepingPolicy.withPendingStatuses(listOf(task("one", "PENDING"), task("two", "PENDING")), pending)
+        assertEquals(listOf("IN_PROGRESS", "PENDING"), restored.map { it.status })
     }
 
     private fun task(id: String, status: String) = HousekeepingTaskDto(

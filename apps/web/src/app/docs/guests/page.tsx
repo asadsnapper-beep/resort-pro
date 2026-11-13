@@ -36,7 +36,7 @@ export default function GuestsPage() {
       <div className="info-box">
         <strong>Privacy:</strong> Guest data is stored securely and is only visible to your team.
         Guests can request their data or ask to be removed under GDPR/data protection rules —
-        see the <a href="/docs/crm#gdpr-and-unsubscribe" className="text-[#1a6b5e] underline">CRM guide</a> for details.
+        see the <a href="/docs/crm#gdpr-and-unsubscribe" className="text-lime-700 underline">CRM guide</a> for details.
       </div>
 
       {/* ── 2. What is stored ─────────────────────────────────────────── */}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Organic Brand Post Designer"
+  short_description: "Create human, distinctive social post visuals"
+  default_prompt: "Use $organic-brand-post-designer to design a distinctive on-brand social post that does not look AI-generated."

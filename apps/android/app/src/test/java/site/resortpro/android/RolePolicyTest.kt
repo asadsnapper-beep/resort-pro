@@ -53,4 +53,20 @@ class RolePolicyTest {
         assertEquals(false, RolePolicy.canCreateWalkIn("STAFF"))
         assertEquals(false, RolePolicy.canCreateWalkIn("SHAREHOLDER"))
     }
+
+    @Test
+    fun guestAccessMatchesBackendRoleGuard() {
+        assertEquals(true, RolePolicy.canViewGuests("OWNER"))
+        assertEquals(true, RolePolicy.canViewGuests("MANAGER"))
+        assertEquals(true, RolePolicy.canViewGuests("RECEPTIONIST"))
+        assertEquals(false, RolePolicy.canViewGuests("STAFF"))
+        assertEquals(false, RolePolicy.canViewGuests("SHAREHOLDER"))
+        assertEquals(false, RolePolicy.canViewGuests("UNKNOWN"))
+    }
+
+    @Test fun bookingPaymentAccessMatchesFrontDeskPolicy() {
+        for (role in listOf("OWNER", "MANAGER", "RECEPTIONIST")) assertEquals(true, RolePolicy.canViewBookingPayment(role))
+        for (role in listOf("STAFF", "SHAREHOLDER", "UNKNOWN")) assertEquals(false, RolePolicy.canViewBookingPayment(role))
+        assertEquals(false, RolePolicy.canViewAnalytics("RECEPTIONIST"))
+    }
 }

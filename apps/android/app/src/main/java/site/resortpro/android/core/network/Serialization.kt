@@ -9,6 +9,7 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.builtins.nullable
 
 object FlexibleDoubleSerializer : KSerializer<Double> {
     override val descriptor: SerialDescriptor =
@@ -25,3 +26,5 @@ object FlexibleDoubleSerializer : KSerializer<Double> {
         encoder.encodeDouble(value)
     }
 }
+
+object FlexibleNullableDoubleSerializer : KSerializer<Double?> by FlexibleDoubleSerializer.nullable

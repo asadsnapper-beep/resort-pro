@@ -22,7 +22,9 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix = ".debug"
+            // Run device UI tests in a separate package so test setup/cleanup
+            // can never clear the user's signed-in debug app data.
+            applicationIdSuffix = if (project.findProperty("isolatedUiTest") == "true") ".uitest" else ".debug"
             versionNameSuffix = "-debug"
             // 10.0.2.2 is the emulator's alias for the host machine, and means
             // nothing on a real phone — so the debug build could only ever talk
@@ -73,6 +75,7 @@ dependencies {
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.biometric)
+    implementation(libs.androidx.fragment)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

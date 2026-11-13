@@ -1,6 +1,11 @@
 package site.resortpro.android.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,7 +15,9 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -19,14 +26,18 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import site.resortpro.android.R
 import site.resortpro.android.feature.auth.AuthUiState
 import site.resortpro.android.ui.components.NoticeCard
@@ -43,14 +54,23 @@ fun LoginScreen(
     val keyboard = LocalSoftwareKeyboardController.current
     Scaffold(modifier = Modifier.statusBarsPadding()) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp),
+            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(padding).padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.Center,
         ) {
             item {
-                Text("ResortPro", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 30.dp)) {
+                    Box(Modifier.size(45.dp).background(Color(0xFF143D35), RoundedCornerShape(15.dp)), contentAlignment = Alignment.Center) {
+                        Text("R", color = Color(0xFFD5E9DA), fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 27.sp)
+                    }
+                    Column(Modifier.padding(start = 11.dp)) {
+                        Text("RESORTPRO", fontWeight = FontWeight.ExtraBold, fontSize = 12.sp, letterSpacing = 1.8.sp)
+                        Text("YOUR RESORT, IN SYNC", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp, letterSpacing = 1.sp)
+                    }
+                }
+                Text("Welcome back.", fontFamily = FontFamily.Serif, fontSize = 36.sp, lineHeight = 42.sp, color = MaterialTheme.colorScheme.onBackground)
                 Text(
-                    stringResource(R.string.login_tagline),
-                    modifier = Modifier.padding(top = 8.dp, bottom = 28.dp),
+                    "A smoother day at your resort starts here.",
+                    modifier = Modifier.padding(top = 8.dp, bottom = 26.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 when {
@@ -98,14 +118,16 @@ fun LoginScreen(
                 Spacer(Modifier.height(20.dp))
                 Button(
                     onClick = { keyboard?.hide(); onSubmit() },
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A6B5E), contentColor = Color.White),
                     enabled = !state.isSubmitting,
                 ) {
                     if (state.isSubmitting) CircularProgressIndicator(Modifier.height(22.dp), strokeWidth = 2.dp)
                     else Text(stringResource(R.string.login_submit))
                 }
                 Text(
-                    stringResource(R.string.login_roles),
+                    "Made for the people who make every stay special.",
                     modifier = Modifier.padding(top = 24.dp, bottom = 32.dp),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -134,6 +156,7 @@ private fun LoginField(
         supportingText = (error ?: helper)?.let { { Text(it) } },
         isError = error != null,
         singleLine = true,
+        shape = RoundedCornerShape(15.dp),
         keyboardOptions = KeyboardOptions(keyboardType = type, imeAction = ImeAction.Next),
     )
 }

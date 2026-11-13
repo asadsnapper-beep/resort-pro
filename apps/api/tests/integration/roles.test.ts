@@ -115,6 +115,30 @@ describe('F&B Orders — role permissions', () => {
   });
 });
 
+describe('Guest image privacy', () => {
+  it('stores a guest photo as a private document and denies staff access', async () => {
+    const guest = await prisma.guest.create({
+      data: { tenantId, firstName: 'Image', lastName: 'Test', email: `image-${slug}@test.com` },
+    });
+    const boundary = 'resortpro-test-boundary';
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+    const payload = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="docType"\r\n\r\nGUEST_PHOTO\r\n--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="test.png"\r\nContent-Type: image/png\r\n\r\n`),
+      png,
+      Buffer.from(`\r\n--${boundary}--\r\n`),
+    ]);
+    const upload = await app.inject({ method: 'POST', url: `/api/guests/${guest.id}/documents`, headers: { authorization: `Bearer ${tokens.OWNER}`, 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
+    expect(upload.statusCode).toBe(201);
+    const doc = JSON.parse(upload.body).data;
+    expect(doc.docType).toBe('GUEST_PHOTO');
+    const signed = new URL(doc.imageUrl);
+    expect((await app.inject({ method: 'GET', url: signed.pathname })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'GET', url: `${signed.pathname}${signed.search}` })).statusCode).toBe(200);
+    expect((await req('GET', `/api/guests/${guest.id}/documents`, 'STAFF')).statusCode).toBe(403);
+    expect((await req('DELETE', `/api/guests/${guest.id}/documents/${doc.id}`, 'OWNER')).statusCode).toBe(200);
+  });
+});
+
 // ── Housekeeping ──────────────────────────────────────────────────────────────
 describe('Housekeeping — role permissions', () => {
   it('STAFF can GET /api/housekeeping', async () => {

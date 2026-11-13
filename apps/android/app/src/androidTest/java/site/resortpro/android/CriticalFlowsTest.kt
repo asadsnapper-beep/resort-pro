@@ -3,10 +3,12 @@ package site.resortpro.android
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
@@ -34,25 +36,28 @@ class CriticalFlowsTest {
         var submissions = 0
         compose.setContent {
             ResortProTheme {
-                WalkInSubmissionControls(
-                    canSubmit = true,
-                    isSubmitting = submitting,
-                    submissionUncertain = uncertain,
-                    onSubmit = { submissions += 1; submitting = true },
-                    onAcknowledgeUncertain = { uncertain = false },
-                )
+                Column {
+                    WalkInSubmissionControls(
+                        canSubmit = true,
+                        isSubmitting = submitting,
+                        submissionUncertain = uncertain,
+                        onSubmit = { submissions += 1; submitting = true },
+                        onAcknowledgeUncertain = { uncertain = false },
+                    )
+                }
             }
         }
 
-        compose.onNodeWithText("Check in guest").performClick()
-        compose.onNodeWithText("Check in guest").assertIsNotEnabled()
-        compose.onNodeWithText("Check in guest").performClick()
+        compose.onNodeWithTag("walkInSubmit").performClick()
+        compose.onNodeWithTag("walkInSubmit").assertIsNotEnabled()
+        compose.onNodeWithTag("walkInSubmit").performClick()
         assertEquals(1, submissions)
 
         compose.runOnIdle { submitting = false; uncertain = true }
-        compose.onNodeWithText("Check in guest").assertIsNotEnabled()
-        compose.onNodeWithText("I checked Front Desk — allow retry").assertIsDisplayed().performClick()
-        compose.onNodeWithText("I checked Front Desk — allow retry").assertDoesNotExist()
+        compose.onNodeWithTag("walkInSubmit").assertIsNotEnabled()
+        compose.onNodeWithText("I checked Front Desk — allow retry").assertIsDisplayed()
+        compose.onNodeWithTag("walkInAcknowledgeUncertain").performClick()
+        compose.runOnIdle { assertEquals(false, uncertain) }
     }
 
     @Test
@@ -73,6 +78,8 @@ class CriticalFlowsTest {
                         onOpenHousekeeping = {},
                         onOpenWalkIn = {},
                         onLogout = {},
+                        onEnableAppLock = {},
+                        onDeclineAppLock = {},
                     )
                 } else {
                     LoginScreen(

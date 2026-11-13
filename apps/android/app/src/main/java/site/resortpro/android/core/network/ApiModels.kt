@@ -58,6 +58,65 @@ data class TenantDto(
 data class DashboardData(val stats: DashboardStats)
 
 @Serializable
+data class AnalyticsData(
+    val kpis: AnalyticsKpis,
+    val revenueByMonth: List<RevenuePoint> = emptyList(),
+    val bySources: List<BookingSource> = emptyList(),
+)
+
+@Serializable
+data class AnalyticsKpis(
+    val mtdRevenue: Double = 0.0,
+    val revenueGrowth: Double = 0.0,
+    val occupancyRate: Double = 0.0,
+    val adr: Double = 0.0,
+    val totalBookings30: Int = 0,
+    val mtdExpenses: Double = 0.0,
+)
+
+@Serializable
+data class RevenuePoint(val month: String, val revenue: Double)
+
+@Serializable
+data class BookingSource(val source: String, val count: Int)
+
+@Serializable
+data class GuestImageUpload(val id: String, val docType: String, val bookingId: String? = null)
+
+@Serializable
+data class GuestImageCapabilities(val idempotencyVersion: Int = 0)
+
+@Serializable
+data class GuestSummaryDto(val id: String, val firstName: String, val lastName: String, val phone: String? = null, val email: String? = null)
+
+@Serializable
+data class GuestSearchEnvelope(val success: Boolean, val data: List<GuestSummaryDto> = emptyList(), val pagination: PaginationMeta? = null, val error: String? = null)
+
+@Serializable
+data class GuestSearchRequest(val search: String, val page: Int, val limit: Int = 20)
+
+@Serializable
+data class GuestBookingRoomDto(val number: String, val name: String)
+
+@Serializable
+data class GuestBookingDto(val id: String, val confirmationNo: String, val status: String, val checkIn: String, val checkOut: String, val room: GuestBookingRoomDto? = null)
+
+@Serializable
+data class GuestDetailsDto(val id: String, val firstName: String, val lastName: String, val phone: String? = null, val email: String? = null, val bookings: List<GuestBookingDto> = emptyList())
+
+@Serializable
+data class BookingGuestDto(val firstName: String, val lastName: String)
+
+@Serializable
+data class BookingDetailsDto(
+    val id: String, val confirmationNo: String, val status: String, val checkIn: String, val checkOut: String,
+    val adults: Int, val children: Int, val guest: BookingGuestDto, val room: GuestBookingRoomDto,
+    val paymentStatus: String? = null,
+    @Serializable(with = FlexibleNullableDoubleSerializer::class) val totalAmount: Double? = null,
+    @Serializable(with = FlexibleNullableDoubleSerializer::class) val paidAmount: Double? = null,
+)
+
+@Serializable
 data class DashboardStats(
     val totalRooms: Int = 0,
     val availableRooms: Int = 0,

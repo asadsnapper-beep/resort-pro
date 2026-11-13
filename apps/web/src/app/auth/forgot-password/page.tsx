@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { KeyRound, ArrowLeft, CheckCircle } from 'lucide-react';
+import { PublicStatusShell, publicFieldClass, publicPrimaryButtonClass } from '@/components/brand/PublicStatusShell';
 
 const schema = z.object({
   slug: z.string().min(1, 'Resort slug required'),
@@ -42,51 +43,39 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1a6b5e] via-[#145a4f] to-[#0d3d36] flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-[#1a6b5e] to-[#145a4f] px-8 py-8 text-center">
-            <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <KeyRound className="w-7 h-7 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold text-white">Forgot Password?</h1>
-            <p className="text-[#a8d5cf] mt-1 text-sm">We'll send you a reset link</p>
-          </div>
-
-          <div className="p-8">
+    <PublicStatusShell eyebrow="Account recovery" title="Reset your password." description="Enter your workspace and email. We’ll send a secure reset link if the account exists." icon={<KeyRound className="h-6 w-6" />}>
             {sent ? (
               <div className="text-center">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle className="w-8 h-8 text-green-600" />
+                <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-lime-100">
+                  <CheckCircle className="h-8 w-8 text-lime-700" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-800 mb-2">Check your email</h3>
-                <p className="text-gray-500 text-sm mb-6">
+                <h3 className="font-editorial text-2xl font-medium text-resort-900">Check your email</h3>
+                <p className="mb-7 mt-3 text-sm leading-6 text-slate-500">
                   If an account exists for that email, we've sent a password reset link. Check your inbox (and spam folder).
                 </p>
                 <Link href="/auth/login">
-                  <Button variant="outline" className="w-full">Back to Login</Button>
+                  <Button variant="outline" className="h-12 w-full rounded-full border-resort-900/15">Back to Login</Button>
                 </Link>
               </div>
             ) : (
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Resort Slug</label>
+                  <label className="mb-1.5 block text-sm font-bold text-resort-900">Workspace</label>
                   <Input
                     {...register('slug')}
                     placeholder="your-resort-name"
-                    className={errors.slug ? 'border-red-400' : ''}
+                    className={`${publicFieldClass} ${errors.slug ? 'border-red-400' : ''}`}
                   />
                   {errors.slug && <p className="text-red-500 text-xs mt-1">{errors.slug.message}</p>}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Email Address</label>
+                  <label className="mb-1.5 block text-sm font-bold text-resort-900">Email address</label>
                   <Input
                     {...register('email')}
                     type="email"
                     placeholder="owner@resort.com"
-                    className={errors.email ? 'border-red-400' : ''}
+                    className={`${publicFieldClass} ${errors.email ? 'border-red-400' : ''}`}
                   />
                   {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
                 </div>
@@ -94,20 +83,17 @@ export default function ForgotPasswordPage() {
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-[#1a6b5e] hover:bg-[#145a4f] text-white"
+                  className={publicPrimaryButtonClass}
                 >
                   {loading ? 'Sending...' : 'Send Reset Link'}
                 </Button>
 
-                <Link href="/auth/login" className="flex items-center justify-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mt-2">
+                <Link href="/auth/login" className="mt-2 flex items-center justify-center gap-1.5 text-sm font-bold text-slate-500 hover:text-resort-900">
                   <ArrowLeft className="w-4 h-4" />
                   Back to Login
                 </Link>
               </form>
             )}
-          </div>
-        </div>
-      </div>
-    </div>
+    </PublicStatusShell>
   );
 }

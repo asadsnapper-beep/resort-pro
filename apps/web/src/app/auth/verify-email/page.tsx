@@ -8,6 +8,7 @@ import { authApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
+import { PublicStatusShell, publicPrimaryButtonClass } from '@/components/brand/PublicStatusShell';
 
 type Status = 'waiting' | 'verifying' | 'verified' | 'error';
 
@@ -59,32 +60,29 @@ function VerifyEmailContent() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-resort-900 to-resort-700 p-4">
-      <section className="w-full max-w-md rounded-2xl border border-white/10 bg-white/10 p-8 text-center backdrop-blur-sm">
-        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-gold-400">
-          {status === 'verified' ? <CheckCircle className="h-7 w-7" /> : <Mail className="h-7 w-7" />}
-        </div>
-        <h1 className="font-display text-2xl font-bold text-white">
+    <PublicStatusShell eyebrow="Email security" title={status === 'verified' ? 'Email verified.' : status === 'error' ? 'Link needs attention.' : 'Verify your email.'} description="One quick check keeps your resort workspace and guest data protected." icon={status === 'verified' ? <CheckCircle className="h-6 w-6" /> : <Mail className="h-6 w-6" />}>
+      <section className="text-center">
+        <h2 className="text-lg font-extrabold text-resort-900">
           {status === 'waiting' && 'Verify your email'}
           {status === 'verifying' && 'Verifying your email'}
           {status === 'verified' && 'Email verified'}
           {status === 'error' && 'Verification link problem'}
-        </h1>
+        </h2>
 
         {status === 'waiting' && (
           <>
-            <p className="mt-3 text-sm leading-6 text-white/60">
-              We sent a verification link to <strong className="text-white/90">{email || 'your email address'}</strong>.
+            <p className="mt-3 text-sm leading-6 text-slate-500">
+              We sent a verification link to <strong className="text-resort-900">{email || 'your email address'}</strong>.
               Open it to continue with resort setup.
             </p>
-            <Button type="button" variant="gold" className="mt-6 w-full" loading={resending} disabled={!email || !workspace} onClick={resend}>
+            <Button type="button" className={`mt-6 ${publicPrimaryButtonClass}`} loading={resending} disabled={!email || !workspace} onClick={resend}>
               Resend verification email
             </Button>
           </>
         )}
 
         {(status === 'verifying' || status === 'verified') && (
-          <div className="mt-5 flex items-center justify-center gap-2 text-sm text-white/70">
+          <div className="mt-5 flex items-center justify-center gap-2 text-sm text-slate-500">
             {status === 'verifying' && <Loader2 className="h-4 w-4 animate-spin" />}
             <span>{message || 'Please wait…'}</span>
           </div>
@@ -93,13 +91,13 @@ function VerifyEmailContent() {
         {status === 'error' && (
           <>
             <p role="alert" className="mt-3 text-sm leading-6 text-red-300">{message}</p>
-            <Link href="/auth/login" className="mt-6 inline-block text-sm font-medium text-gold-400 hover:text-gold-300">
+            <Link href="/auth/login" className="mt-6 inline-block text-sm font-extrabold text-resort-900 underline decoration-lime-500 decoration-2 underline-offset-4">
               Return to sign in
             </Link>
           </>
         )}
       </section>
-    </main>
+    </PublicStatusShell>
   );
 }
 

@@ -8,7 +8,7 @@
 
 import type { FastifyInstance } from 'fastify';
 import { requireRole } from '../middleware/auth';
-import { uploadToStorage, deleteFromStorage } from '../services/storage';
+import { uploadToStorage, deleteFromStorage, getStorageConfig } from '../services/storage';
 import { signUploadUrl } from '../utils/signed-upload-url';
 import type { JwtPayload } from '@resort-pro/types';
 
@@ -17,10 +17,15 @@ const ALLOWED_DOC_TYPES = new Set([
   'NATIONAL_ID',
   'DRIVERS_LICENSE',
   'VISA',
+  'GUEST_PHOTO',
   'OTHER',
 ]);
 
 export async function guestDocumentRoutes(app: FastifyInstance) {
+  app.get('/document-upload-capabilities', {
+    preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
+    handler: async (_request, reply) => reply.send({ success: true, data: { idempotencyVersion: 1 } }),
+  });
   // ── Upload document ───────────────────────────────────────────────────────
   app.post<{ Params: { id: string } }>('/:id/documents', {
     schema: { tags: ['guests'], summary: 'Upload guest document', security: [{ bearerAuth: [] }] },
@@ -36,12 +41,23 @@ export async function guestDocumentRoutes(app: FastifyInstance) {
         return reply.status(404).send({ success: false, error: 'Guest not found' });
       }
 
+      // The local /uploads route verifies short-lived signatures. A public
+      // S3/R2 URL does not go through that route, so never put identity
+      // images there until private object delivery is configured separately.
+      if ((await getStorageConfig()).driver !== 'local') {
+        return reply.status(503).send({ success: false, error: 'Private guest image storage is not configured.' });
+      }
+
       // Parse multipart
       const parts = request.parts();
       let fileBuffer: Buffer | null = null;
       let mimeType = 'image/jpeg';
       let docType = 'OTHER';
       let bookingId: string | undefined;
+      const uploadId = request.headers['idempotency-key'];
+      if (uploadId !== undefined && (typeof uploadId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(uploadId))) {
+        return reply.status(400).send({ success: false, error: 'Invalid idempotency key' });
+      }
 
       for await (const part of parts) {
         if (part.type === 'file' && part.fieldname === 'file') {
@@ -65,38 +81,62 @@ export async function guestDocumentRoutes(app: FastifyInstance) {
       }
 
       // If a bookingId was supplied (walk-in / new-booking flows attach the
-      // doc at creation time), confirm it actually belongs to this guest —
-      // otherwise silently drop it rather than link to the wrong stay.
+      // doc at creation time), confirm it actually belongs to this guest.
+      // Reject a mismatch so the client cannot mistake an unlinked upload
+      // for a photo attached to the intended stay.
       if (bookingId) {
         const booking = await db.booking.findFirst({ where: { id: bookingId, guestId } });
-        if (!booking) bookingId = undefined;
+        if (!booking) return reply.status(404).send({ success: false, error: 'Booking not found for guest' });
       }
 
       if (!fileBuffer || fileBuffer.byteLength === 0) {
         return reply.status(400).send({ success: false, error: 'No file uploaded' });
       }
 
-      if (fileBuffer.byteLength > 10 * 1024 * 1024) {
-        return reply.status(400).send({ success: false, error: 'File too large (max 10 MB)' });
+      if (fileBuffer.byteLength > 5 * 1024 * 1024) {
+        return reply.status(400).send({ success: false, error: 'File too large (max 5 MB)' });
       }
 
       if (!ALLOWED_DOC_TYPES.has(docType)) {
         docType = 'OTHER';
       }
 
+      // A client-generated UUID doubles as the document primary key. The
+      // unique database constraint arbitrates concurrent retries as well as
+      // retries after the server committed but the response was lost.
+      const existingUpload = async () => uploadId
+        ? db.guestDocument.findFirst({ where: { id: uploadId } })
+        : null;
+      const respondToExisting = (doc: NonNullable<Awaited<ReturnType<typeof existingUpload>>>) => {
+        if (doc.guestId !== guestId || doc.docType !== docType || (doc.bookingId ?? undefined) !== bookingId) {
+          return reply.status(409).send({ success: false, error: 'Idempotency key already used for another document' });
+        }
+        return reply.status(200).send({ success: true, data: {
+          id: doc.id, imageUrl: signUploadUrl(doc.imageUrl), docType: doc.docType,
+          bookingId: doc.bookingId, uploadedAt: doc.uploadedAt,
+        } });
+      };
+      const existing = await existingUpload();
+      if (existing) return respondToExisting(existing);
+
       // Save to storage (guest-docs folder)
-      const result = await uploadToStorage(fileBuffer, mimeType, 'guest-docs', tenantId);
+      const result = await uploadToStorage(fileBuffer, mimeType, 'guest-docs', tenantId, `${request.protocol}://${request.hostname}`);
 
       // Create DB record
-      const doc = await db.guestDocument.create({
-        data: {
-          guestId,
-          docType,
-          imageUrl: result.url,
-          uploadedBy,
-          bookingId,
-        },
-      });
+      let doc;
+      try {
+        doc = await db.guestDocument.create({
+          data: { ...(uploadId ? { id: uploadId } : {}), guestId, docType, imageUrl: result.url, uploadedBy, bookingId },
+        });
+      } catch (error) {
+        await deleteFromStorage(result.key);
+        if (uploadId && typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
+          const winner = await existingUpload();
+          if (winner) return respondToExisting(winner);
+          return reply.status(409).send({ success: false, error: 'Idempotency key already in use' });
+        }
+        throw error;
+      }
 
       return reply.status(201).send({
         success: true,

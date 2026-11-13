@@ -3,6 +3,7 @@ package site.resortpro.android.feature.auth
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -12,6 +13,7 @@ import site.resortpro.android.core.network.ApiEnvelope
 import site.resortpro.android.core.network.ApiException
 import site.resortpro.android.core.network.AuthApi
 import site.resortpro.android.core.network.DashboardData
+import site.resortpro.android.core.network.AnalyticsData
 import site.resortpro.android.core.network.LoginData
 import site.resortpro.android.core.network.LoginRequest
 import site.resortpro.android.core.network.NetworkUnavailableException
@@ -29,6 +31,12 @@ data class AuthenticatedSession(
     val user: UserDto,
     val tenant: TenantDto? = null,
 )
+
+sealed interface SessionRestoreResult {
+    data class Restored(val session: AuthenticatedSession) : SessionRestoreResult
+    data object NoSession : SessionRestoreResult
+    data object RetryRequired : SessionRestoreResult
+}
 
 sealed interface HomeContent {
     data class Operations(
@@ -73,6 +81,12 @@ object RolePolicy {
 
     fun canCreateWalkIn(role: String): Boolean =
         role in setOf("OWNER", "MANAGER", "RECEPTIONIST")
+
+    fun canViewGuests(role: String): Boolean = role in setOf("OWNER", "MANAGER", "RECEPTIONIST")
+
+    fun canViewBookingPayment(role: String): Boolean = role in setOf("OWNER", "MANAGER", "RECEPTIONIST")
+
+    fun canViewAnalytics(role: String): Boolean = role in setOf("OWNER", "MANAGER")
 }
 
 class AuthRepository(
@@ -93,22 +107,28 @@ class AuthRepository(
         return AuthenticatedSession(user = data.user, tenant = data.tenant)
     }
 
-    suspend fun restoreSession(): AuthenticatedSession? = withContext(Dispatchers.IO) {
-        if (!cookieJar.hasRefreshCookie(baseUrl)) return@withContext null
+    suspend fun restoreSession(): SessionRestoreResult = withContext(Dispatchers.IO) {
+        if (!cookieJar.hasRefreshCookie(baseUrl)) return@withContext SessionRestoreResult.NoSession
         val refreshed = refreshCoordinator.refreshToken(failedToken = null)
-            ?: return@withContext null
+            ?: return@withContext if (cookieJar.hasRefreshCookie(baseUrl)) SessionRestoreResult.RetryRequired else SessionRestoreResult.NoSession
         sessionStore.setAccessToken(refreshed)
 
         try {
             val response = api.me()
-            AuthenticatedSession(user = response.requireData())
+            SessionRestoreResult.Restored(AuthenticatedSession(user = response.requireData()))
         } catch (_: IOException) {
             // Keep the encrypted refresh cookie. A temporary offline state must
             // not destroy an otherwise valid session.
-            null
+            SessionRestoreResult.RetryRequired
         } catch (error: ApiException) {
-            if (error.status in setOf(400, 401, 403)) refreshCoordinator.clearSession()
-            null
+            if (error.status in setOf(400, 401, 403)) {
+                refreshCoordinator.clearSession()
+                SessionRestoreResult.NoSession
+            } else SessionRestoreResult.RetryRequired
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            SessionRestoreResult.RetryRequired
         }
     }
 
@@ -161,6 +181,8 @@ class AuthRepository(
         runCatching { networkCall(api::logout) }
         refreshCoordinator.clearSession()
     }
+
+    suspend fun loadAnalytics(): AnalyticsData = networkCall(api::analytics).requireData()
 
     fun clearLocalSession() {
         refreshCoordinator.clearSession()

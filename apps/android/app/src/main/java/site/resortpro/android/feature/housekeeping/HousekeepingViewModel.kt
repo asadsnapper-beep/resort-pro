@@ -65,6 +65,7 @@ class HousekeepingViewModel(
                             tasks = result.tasks,
                             syncedAt = result.syncedAt,
                             fromCache = result.fromCache,
+                            queuedTaskIds = result.queuedTaskIds,
                         )
                     }
                 }
@@ -95,7 +96,7 @@ class HousekeepingViewModel(
         val role = currentRole ?: return
         val userId = currentUserId ?: return
         val tenantId = currentTenantId ?: return
-        if (taskId in mutableState.value.updatingTaskIds) return
+        if (taskId in mutableState.value.updatingTaskIds || taskId in mutableState.value.queuedTaskIds) return
         if (newStatus !in HousekeepingPolicy.allowedNextStatuses(original.status)) return
 
         mutableState.update { state ->

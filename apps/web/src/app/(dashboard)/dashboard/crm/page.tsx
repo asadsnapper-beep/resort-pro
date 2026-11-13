@@ -52,6 +52,8 @@ const STATUS_META: Record<string, { bg: string; border: string; text: string }> 
   SCHEDULED: { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
   SENDING:   { bg: 'var(--rp-coral-bg)', border: 'rgba(184,114,74,0.2)',  text: '#b8724a' },
   SENT:      { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153' },
+  PARTIAL:   { bg: 'var(--rp-amber-bg)', border: 'var(--rp-border-md)', text: 'var(--rp-text-muted)' },
+  FAILED:    { bg: 'var(--rp-red-bg)', border: 'var(--rp-border-md)', text: 'var(--rp-danger)' },
   PAUSED:    { bg: 'var(--rp-amber-bg)', border: 'rgba(184,144,64,0.2)',  text: '#b89040' },
   CANCELLED: { bg: 'var(--rp-red-bg)', border: 'rgba(200,60,60,0.15)', text: '#c43c3c' },
   ACTIVE:    { bg: 'var(--rp-teal-bg)', border: 'rgba(24,49,83,0.2)',  text: '#183153' },
@@ -132,20 +134,25 @@ function ContactsTab({ token }: { token: string }) {
   const [total, setTotal]     = useState(0);
   const [search, setSearch]   = useState('');
   const [tierFilter, setTier] = useState('');
+  const [page, setPage]       = useState(1);
+  const [pages, setPages]     = useState(1);
   const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState('');
 
   const fetchGuests = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
-      const params = new URLSearchParams({ limit: '20' });
+      const params = new URLSearchParams({ limit: '20', page: String(page) });
       if (search) params.set('search', search);
       if (tierFilter) params.set('tier', tierFilter);
       const res = await api.get(`/crm/contacts?${params}`, { headers: { Authorization: `Bearer ${token}` } });
       setGuests(res.data.data.guests);
       setTotal(res.data.data.total);
-    } catch { /* ignore */ }
+      setPages(res.data.data.pages || 1);
+    } catch { setError('Failed to load contacts. Please retry.'); }
     setLoading(false);
-  }, [token, search, tierFilter]);
+  }, [token, search, tierFilter, page]);
 
   useEffect(() => { fetchGuests(); }, [fetchGuests]);
 
@@ -159,10 +166,10 @@ function ContactsTab({ token }: { token: string }) {
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: '#aac0d0' }} />
-          <input value={search} onChange={e => setSearch(e.target.value)}
+          <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
             placeholder="Search by name or email…" className={inputCls + ' pl-9'} />
         </div>
-        <select value={tierFilter} onChange={e => setTier(e.target.value)} className={inputCls + ' max-w-[160px] cursor-pointer'}>
+        <select value={tierFilter} onChange={e => { setTier(e.target.value); setPage(1); }} className={inputCls + ' max-w-[160px] cursor-pointer'}>
           <option value="">All Tiers</option>
           {Object.entries(TIER_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
@@ -176,6 +183,7 @@ function ContactsTab({ token }: { token: string }) {
       <p className="text-[12.5px] text-[#64748b] dark:text-[#a9c1d0]">
         <span className="font-semibold text-[#183153] dark:text-[#f8fafc]">{total}</span> total contacts
       </p>
+      {error && <p role="alert" className="text-rp-meta text-rp-danger">{error}</p>}
 
       <div className="rounded-[14px] border bg-white overflow-hidden"
         style={{ borderColor: 'var(--rp-border)', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
@@ -197,7 +205,7 @@ function ContactsTab({ token }: { token: string }) {
                 {guests.map(g => {
                   const tier = TIER_CONFIG[g.score?.tier ?? 'STANDARD'];
                   const TierIcon = tier.Icon;
-                  const subscribed = g.consent?.subscribed !== false;
+                  const subscribed = g.consent?.subscribed === true;
                   return (
                     <tr key={g.id} className="transition-colors hover:bg-[#faf9f7] dark:hover:bg-white/5"
                       style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
@@ -241,7 +249,7 @@ function ContactsTab({ token }: { token: string }) {
                       <td className="px-5 py-3">
                         {subscribed
                           ? <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: '#183153' }}><CheckCircle className="h-3 w-3" /> Subscribed</span>
-                          : <span className="inline-flex items-center gap-1 text-[12px] text-[#94a3b8] dark:text-[#7f99ab]"><X className="h-3 w-3" /> Unsubscribed</span>}
+                          : <span className="inline-flex items-center gap-1 text-[12px] text-[#94a3b8] dark:text-[#7f99ab]"><X className="h-3 w-3" /> {g.consent ? 'Unsubscribed' : 'No consent'}</span>}
                       </td>
                       <td className="px-5 py-3">
                         <button onClick={() => recalcScore(g.id)} title="Recalculate score"
@@ -257,6 +265,15 @@ function ContactsTab({ token }: { token: string }) {
           </div>
         )}
       </div>
+      {pages > 1 && (
+        <div className="flex items-center justify-end gap-3">
+          <button disabled={page === 1 || loading} onClick={() => setPage(p => Math.max(1, p - 1))}
+            className="rounded-rp-ctrl border border-rp-border-md px-3 py-1.5 text-rp-meta text-rp-subtle disabled:opacity-40">Previous</button>
+          <span className="text-rp-meta text-rp-muted">Page {page} of {pages}</span>
+          <button disabled={page === pages || loading} onClick={() => setPage(p => Math.min(pages, p + 1))}
+            className="rounded-rp-ctrl border border-rp-border-md px-3 py-1.5 text-rp-meta text-rp-subtle disabled:opacity-40">Next</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -275,10 +292,11 @@ function CampaignsTab({ token }: { token: string }) {
 
   const fetch = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
       const res = await api.get('/crm/campaigns', { headers: { Authorization: `Bearer ${token}` } });
       setCampaigns(res.data.data);
-    } catch { /* ignore */ }
+    } catch { setError('Failed to load campaigns. Please retry.'); }
     setLoading(false);
   }, [token]);
 
@@ -299,9 +317,10 @@ function CampaignsTab({ token }: { token: string }) {
     setSending(id);
     try {
       const res = await api.post(`/crm/campaigns/${id}/send`, {}, { headers: { Authorization: `Bearer ${token}` } });
-      alert(`✅ Sent to ${res.data.data.sent} guests`);
+      const { sent, failed, status } = res.data.data;
+      alert(status === 'SENT' ? `✅ Sent to ${sent} guests` : `⚠️ Sent: ${sent}, failed: ${failed}. Status: ${status}`);
       fetch();
-    } catch { alert('Failed to send campaign'); }
+    } catch (err: any) { alert(err?.response?.data?.error ?? 'Failed to send campaign'); }
     setSending(null);
   };
 
@@ -313,6 +332,7 @@ function CampaignsTab({ token }: { token: string }) {
 
   return (
     <div className="space-y-4">
+      {error && !showNew && <p role="alert" className="text-rp-meta text-rp-danger">{error}</p>}
       <div className="flex justify-end">
         <button onClick={() => setShowNew(true)}
           className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium hover:opacity-90"
@@ -401,14 +421,14 @@ function CampaignsTab({ token }: { token: string }) {
                   </div>
                 )}
                 <div className="flex items-center gap-2 shrink-0">
-                  {(c.status === 'DRAFT' || c.status === 'SCHEDULED') && (
+                  {['DRAFT', 'SCHEDULED', 'FAILED'].includes(c.status) && (
                     <button onClick={() => sendCampaign(c.id)} disabled={sending === c.id}
                       className="flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-[12px] font-medium hover:opacity-90 disabled:opacity-60"
                       style={{ background: 'var(--rp-btn-accent)', color: 'var(--rp-btn-accent-text)' }}>
                       {sending === c.id ? 'Sending…' : <><Send className="h-3 w-3" /> Send Now</>}
                     </button>
                   )}
-                  {['DRAFT', 'SCHEDULED'].includes(c.status) && (
+                  {['DRAFT', 'SCHEDULED', 'FAILED'].includes(c.status) && (
                     <button onClick={() => deleteCampaign(c.id)}
                       className="flex h-[28px] w-[28px] items-center justify-center rounded-[7px] transition-colors hover:bg-[#fef2f2] text-[#94a3b8] dark:text-[#7f99ab]">
                       <Trash2 className="h-3.5 w-3.5" />
@@ -435,13 +455,15 @@ function SequencesTab({ token }: { token: string }) {
   const [form, setForm]     = useState({ name: '', trigger: 'BOOKING_CONFIRMED' });
   const [stepForm, setStepForm] = useState({ subject: '', html: '', delayDays: 0 });
   const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState('');
 
   const fetch = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
       const res = await api.get('/crm/sequences', { headers: { Authorization: `Bearer ${token}` } });
       setSequences(res.data.data);
-    } catch { /* ignore */ }
+    } catch { setError('Failed to load sequences. Please retry.'); }
     setLoading(false);
   }, [token]);
 
@@ -453,7 +475,7 @@ function SequencesTab({ token }: { token: string }) {
     try {
       await api.post('/crm/sequences', form, { headers: { Authorization: `Bearer ${token}` } });
       setShowNew(false); setForm({ name: '', trigger: 'BOOKING_CONFIRMED' }); fetch();
-    } catch { /* ignore */ }
+    } catch (err: any) { setError(err?.response?.data?.error ?? 'Failed to create sequence'); }
     setSaving(false);
   };
 
@@ -465,13 +487,16 @@ function SequencesTab({ token }: { token: string }) {
 
   const addStep = async (seqId: string) => {
     if (!stepForm.subject || !stepForm.html) return;
-    await api.post(`/crm/sequences/${seqId}/steps`, stepForm, { headers: { Authorization: `Bearer ${token}` } });
-    setStepForm({ subject: '', html: '', delayDays: 0 });
-    fetch();
+    try {
+      await api.post(`/crm/sequences/${seqId}/steps`, stepForm, { headers: { Authorization: `Bearer ${token}` } });
+      setStepForm({ subject: '', html: '', delayDays: 0 });
+      fetch();
+    } catch (err: any) { setError(err?.response?.data?.error ?? 'Failed to add sequence step'); }
   };
 
   return (
     <div className="space-y-4">
+      {error && <p role="alert" className="text-rp-meta text-rp-danger">{error}</p>}
       <div className="flex justify-end">
         <button onClick={() => setShowNew(true)}
           className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium hover:opacity-90"
@@ -627,25 +652,27 @@ function TemplatesTab({ token }: { token: string }) {
   const [showNew, setShowNew]     = useState(false);
   const [form, setForm]   = useState({ name: '', subject: '', html: '', preheader: '' });
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const fetch = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
       const res = await api.get('/crm/templates', { headers: { Authorization: `Bearer ${token}` } });
       setTemplates(res.data.data);
-    } catch { /* ignore */ }
+    } catch { setError('Failed to load templates. Please retry.'); }
     setLoading(false);
   }, [token]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
   const createTemplate = async () => {
-    if (!form.name || !form.subject || !form.html) return;
-    setSaving(true);
+    if (!form.name || !form.subject || !form.html) { setError('Name, subject and HTML body are required'); return; }
+    setSaving(true); setError('');
     try {
       await api.post('/crm/templates', form, { headers: { Authorization: `Bearer ${token}` } });
       setShowNew(false); setForm({ name: '', subject: '', html: '', preheader: '' }); fetch();
-    } catch { /* ignore */ }
+    } catch (err: any) { setError(err?.response?.data?.error ?? 'Failed to create template'); }
     setSaving(false);
   };
 
@@ -657,6 +684,7 @@ function TemplatesTab({ token }: { token: string }) {
 
   return (
     <div className="space-y-4">
+      {error && <p role="alert" className="text-rp-meta text-rp-danger">{error}</p>}
       <div className="flex justify-end">
         <button onClick={() => setShowNew(true)}
           className="flex items-center gap-2 rounded-[9px] px-4 py-2 text-[13px] font-medium hover:opacity-90"
@@ -760,6 +788,7 @@ function AnalyticsTab({ token }: { token: string }) {
   }, [token]);
 
   const runAutomation = async () => {
+    if (!confirm('Run birthday and anniversary automation now? This can send real guest emails.')) return;
     setAutomating(true); setAutoResult(null);
     try {
       const res = await api.post('/crm/automation/run-daily', {}, { headers: { Authorization: `Bearer ${token}` } });

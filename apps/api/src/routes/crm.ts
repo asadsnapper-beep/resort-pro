@@ -360,20 +360,29 @@ export async function crmRoutes(app: FastifyInstance) {
   // Assign / remove tags from a guest
   app.post('/contacts/:id/tags', { preHandler: pre }, async (request, reply) => {
     const { db } = request;
+    const { tenantId } = request.user as JwtPayload;
     const { id } = request.params as { id: string };
     const body = z.object({ tagId: z.string().uuid(), action: z.enum(['add', 'remove']) }).parse(request.body);
 
-    const guest = await db.guest.findFirst({ where: { id } });
+    const [guest, tag] = await Promise.all([
+      db.guest.findFirst({ where: { id } }),
+      db.guestTag.findFirst({ where: { id: body.tagId } }),
+    ]);
     if (!guest) return reply.status(404).send({ success: false, error: 'Guest not found' });
+    if (!tag) return reply.status(404).send({ success: false, error: 'Tag not found' });
 
+    // GuestTagRelation has no tenantId column, so use the base client only
+    // after both parents have been proven to belong to this tenant.
     if (body.action === 'add') {
-      await db.guestTagRelation.upsert({
+      await prisma.guestTagRelation.upsert({
         where:  { guestId_tagId: { guestId: id, tagId: body.tagId } },
         create: { guestId: id, tagId: body.tagId },
         update: {},
       });
     } else {
-      await db.guestTagRelation.deleteMany({ where: { guestId: id, tagId: body.tagId } });
+      await prisma.guestTagRelation.deleteMany({
+        where: { guestId: id, tagId: body.tagId, guest: { tenantId }, tag: { tenantId } },
+      });
     }
     return ok(null, `Tag ${body.action}ed`);
   });
@@ -383,7 +392,10 @@ export async function crmRoutes(app: FastifyInstance) {
   app.get('/templates', { preHandler: pre }, async (request) => {
     const { db } = request;
     const { tenantId } = request.user as JwtPayload;
-    let templates = await db.emailTemplate.findMany({ where: {}, orderBy: { isDefault: 'desc', createdAt: 'asc' } });
+    let templates = await db.emailTemplate.findMany({
+      where: {},
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+    });
 
     // ── Lazy-init: first visit → create default templates ──────────────────
     if (templates.length === 0) {
@@ -391,7 +403,10 @@ export async function crmRoutes(app: FastifyInstance) {
         data: DEFAULT_EMAIL_TEMPLATES.map(t => ({ ...t, tenantId })),
         skipDuplicates: true,
       });
-      templates = await db.emailTemplate.findMany({ where: {}, orderBy: { isDefault: 'desc', createdAt: 'asc' } });
+      templates = await db.emailTemplate.findMany({
+        where: {},
+        orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+      });
     }
 
     return ok(templates);
@@ -486,12 +501,21 @@ export async function crmRoutes(app: FastifyInstance) {
       select: { id: true, firstName: true, email: true },
     });
 
+    if (guests.length === 0) {
+      return reply.status(409).send({
+        success: false,
+        error: 'No explicitly subscribed guests match this campaign audience',
+      });
+    }
+
     // Get tenant info for branding
     const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { name: true } });
     const wc     = await (db as any).websiteContent.findUnique({ where: { tenantId }, select: { primaryColor: true, accentColor: true } });
 
     await db.campaign.update({ where: { id }, data: { status: 'SENDING', recipientCount: guests.length } });
-    await db.campaignStats.upsert({
+    // CampaignStats is tenant-owned through Campaign and has no tenantId
+    // column of its own. The campaign ownership check above is the boundary.
+    await prisma.campaignStats.upsert({
       where:  { campaignId: id },
       create: { campaignId: id, sent: 0 },
       update: {},
@@ -521,16 +545,26 @@ export async function crmRoutes(app: FastifyInstance) {
       if (!error) sent++;
     }
 
-    await db.campaign.update({ where: { id }, data: { status: 'SENT', sentAt: new Date() } });
-    await db.campaignStats.update({ where: { campaignId: id }, data: { sent } });
+    const finalStatus = sent === guests.length ? 'SENT' : sent === 0 ? 'FAILED' : 'PARTIAL';
+    await db.campaign.update({
+      where: { id },
+      data: { status: finalStatus, sentAt: sent > 0 ? new Date() : null },
+    });
+    await prisma.campaignStats.update({ where: { campaignId: id }, data: { sent } });
 
-    return ok({ sent, total: guests.length }, 'Campaign sent');
+    return ok(
+      { sent, failed: guests.length - sent, total: guests.length, status: finalStatus },
+      finalStatus === 'SENT' ? 'Campaign sent' : 'Campaign delivery completed with failures',
+    );
   });
 
-  app.delete('/campaigns/:id', { preHandler: pre }, async (request) => {
+  app.delete('/campaigns/:id', { preHandler: pre }, async (request, reply) => {
     const { db } = request;
     const { id } = request.params as { id: string };
-    await db.campaign.deleteMany({ where: { id, status: { in: ['DRAFT', 'SCHEDULED'] } } });
+    const deleted = await db.campaign.deleteMany({ where: { id, status: { in: ['DRAFT', 'SCHEDULED', 'FAILED'] } } });
+    if (!deleted.count) {
+      return reply.status(404).send({ success: false, error: 'Deletable campaign not found' });
+    }
     return ok(null, 'Campaign deleted');
   });
 
@@ -548,7 +582,7 @@ export async function crmRoutes(app: FastifyInstance) {
 
   const sequenceSchema = z.object({
     name:        z.string().min(1),
-    trigger:     z.enum(['BOOKING_CONFIRMED', 'PRE_ARRIVAL', 'CHECK_IN', 'POST_STAY', 'WIN_BACK', 'BIRTHDAY', 'MANUAL']),
+    trigger:     z.enum(['BOOKING_CONFIRMED', 'PRE_ARRIVAL', 'CHECK_IN', 'POST_STAY', 'WIN_BACK', 'BIRTHDAY', 'ANNIVERSARY', 'MANUAL']),
     triggerMeta: z.record(z.any()).optional(),
   });
 
@@ -569,7 +603,7 @@ export async function crmRoutes(app: FastifyInstance) {
 
   // Add a step to a sequence
   app.post('/sequences/:id/steps', { preHandler: pre }, async (request, reply) => {
-    const { db } = request;
+    const { tenantId } = request.user as JwtPayload;
     const { id } = request.params as { id: string };
     const body = z.object({
       subject:    z.string().min(1),
@@ -578,13 +612,18 @@ export async function crmRoutes(app: FastifyInstance) {
       templateId: z.string().uuid().optional(),
     }).parse(request.body);
 
-    const seq = await db.sequence.findFirst({ where: { id } });
+    const seq = await prisma.sequence.findFirst({ where: { id, tenantId } });
     if (!seq) return reply.status(404).send({ success: false, error: 'Sequence not found' });
+    if (body.templateId) {
+      const template = await prisma.emailTemplate.findFirst({ where: { id: body.templateId, tenantId } });
+      if (!template) return reply.status(404).send({ success: false, error: 'Template not found' });
+    }
 
-    const lastStep = await db.sequenceStep.findFirst({ where: { sequenceId: id }, orderBy: { stepOrder: 'desc' } });
+    // SequenceStep is tenant-owned through Sequence and has no tenantId column.
+    const lastStep = await prisma.sequenceStep.findFirst({ where: { sequenceId: id }, orderBy: { stepOrder: 'desc' } });
     const stepOrder = (lastStep?.stepOrder ?? 0) + 1;
 
-    const step = await db.sequenceStep.create({ data: { sequenceId: id, stepOrder, subject: body.subject, html: body.html, delayDays: body.delayDays, ...(body.templateId ? { templateId: body.templateId } : {}) } });
+    const step = await prisma.sequenceStep.create({ data: { sequenceId: id, stepOrder, subject: body.subject, html: body.html, delayDays: body.delayDays, ...(body.templateId ? { templateId: body.templateId } : {}) } });
     return ok(step, 'Step added');
   });
 
@@ -803,6 +842,7 @@ export async function crmRoutes(app: FastifyInstance) {
 
   app.get('/analytics', { preHandler: pre }, async (request) => {
     const { db } = request;
+    const { tenantId } = request.user as JwtPayload;
 
     const [
       totalContacts,
@@ -815,8 +855,8 @@ export async function crmRoutes(app: FastifyInstance) {
       db.guest.count({ where: {} }),
       db.emailConsent.count({ where: { subscribed: true } }),
       db.guestScore.groupBy({ by: ['tier'], where: {}, _count: { tier: true } }),
-      db.campaignStats.findMany({
-        where: {},
+      prisma.campaignStats.findMany({
+        where: { campaign: { tenantId } },
         include: { campaign: { select: { name: true, sentAt: true } } },
         orderBy: { campaign: { sentAt: 'desc' } },
         take: 5,

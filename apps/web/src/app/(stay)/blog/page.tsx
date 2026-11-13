@@ -58,9 +58,10 @@ export default function BlogPage() {
       <BlogListSchema posts={posts} />
 
       {/* Hero */}
-      <div className="bg-gradient-to-r from-[#1a6b5e] to-[#145a4f] text-white px-4 py-10">
+      <div className="bg-resort-900 px-4 py-16 text-white sm:py-20">
         <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-2xl sm:text-3xl font-bold mb-2">Travel Blog</h1>
+          <span className="text-xs font-extrabold uppercase tracking-[0.18em] text-lime-300">ResortPro Stay</span>
+          <h1 className="mb-3 mt-4 font-editorial text-5xl font-medium leading-none sm:text-7xl">Travel stories worth the journey.</h1>
           <p className="text-white/70 text-sm sm:text-base max-w-xl mx-auto">
             Resort guides, eco-travel tips, and destination stories from across South Asia
           </p>
@@ -79,7 +80,7 @@ export default function BlogPage() {
             {posts[0] && (
               <Link
                 href={`/blog/${posts[0].slug}`}
-                className="group block bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-lg transition-all overflow-hidden">
+                className="group block overflow-hidden rounded-[2rem] border border-black/5 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-xl">
                 {posts[0].coverImage && (
                   <div className="h-52 sm:h-64 overflow-hidden">
                     <img
@@ -97,7 +98,7 @@ export default function BlogPage() {
                       </span>
                     ))}
                   </div>
-                  <h2 className="text-xl font-bold text-gray-800 group-hover:text-[#1a6b5e] transition-colors mb-2">
+                  <h2 className="mb-2 font-editorial text-3xl font-medium text-resort-900 transition-colors group-hover:text-lime-700">
                     {posts[0].title}
                   </h2>
                   <p className="text-gray-500 text-sm mb-4 line-clamp-2">{posts[0].description}</p>
@@ -105,7 +106,7 @@ export default function BlogPage() {
                     <span className="flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5" /> {posts[0].readTime} min read
                     </span>
-                    <span className="flex items-center gap-1 text-[#1a6b5e] font-semibold">
+                    <span className="flex items-center gap-1 font-bold text-lime-700">
                       Read article <ArrowRight className="w-3.5 h-3.5" />
                     </span>
                   </div>
@@ -119,7 +120,7 @@ export default function BlogPage() {
                 <Link
                   key={post.slug}
                   href={`/blog/${post.slug}`}
-                  className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-[#b2ddd6] transition-all overflow-hidden">
+                  className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-[#d9f99d] transition-all overflow-hidden">
                   {post.coverImage && (
                     <div className="h-36 overflow-hidden">
                       <img
@@ -137,7 +138,7 @@ export default function BlogPage() {
                         </span>
                       ))}
                     </div>
-                    <h3 className="text-sm font-bold text-gray-800 group-hover:text-[#1a6b5e] transition-colors mb-1 line-clamp-2">
+                    <h3 className="text-sm font-bold text-gray-800 group-hover:text-[#0e223c] transition-colors mb-1 line-clamp-2">
                       {post.title}
                     </h3>
                     <p className="text-xs text-gray-400 line-clamp-2 mb-3">{post.description}</p>

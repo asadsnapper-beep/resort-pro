@@ -1,6 +1,7 @@
 package site.resortpro.android.feature.housekeeping
 
 import site.resortpro.android.core.network.HousekeepingTaskDto
+import site.resortpro.android.core.database.HousekeepingOutboxEntity
 
 enum class HousekeepingFilter(val status: String?) {
     ALL(null),
@@ -22,4 +23,10 @@ object HousekeepingPolicy {
 
     /** Nothing more for the person holding the phone to do about it. */
     fun isFinished(status: String): Boolean = status == "COMPLETED" || status == "SKIPPED"
+
+    fun scopedPending(items: List<HousekeepingOutboxEntity>, tenantId: String, userId: String): Map<String, HousekeepingOutboxEntity> =
+        items.filter { it.tenantId == tenantId && it.userId == userId }.associateBy { it.taskId }
+
+    fun withPendingStatuses(tasks: List<HousekeepingTaskDto>, pending: Map<String, HousekeepingOutboxEntity>): List<HousekeepingTaskDto> =
+        tasks.map { task -> pending[task.id]?.let { task.copy(status = it.targetStatus) } ?: task }
 }

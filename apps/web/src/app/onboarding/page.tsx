@@ -11,6 +11,7 @@ import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
+import { BrandLogo } from '@/components/brand/BrandLogo';
 import {
   Building2, Clock, BedDouble, ChevronRight, ChevronLeft,
   CheckCircle, Loader2, ArrowRight, SkipForward, Copy, Check,
@@ -74,18 +75,18 @@ function StepBar({ current, total }: { current: number; total: number }) {
           <div key={s.label} className="flex items-center flex-1">
             <div className={`flex flex-col items-center gap-1 flex-1 ${i < total - 1 ? '' : ''}`}>
               <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-                done ? 'bg-[#1a6b5e] text-white' :
-                active ? 'bg-[#d4a853] text-white ring-4 ring-[#d4a853]/20' :
+                done ? 'bg-resort-900 text-white' :
+                active ? 'bg-lime-400 text-resort-900 ring-4 ring-lime-400/20' :
                 'bg-gray-100 text-gray-400'
               }`}>
                 {done ? <CheckCircle className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
               </div>
-              <span className={`text-xs font-medium ${active ? 'text-[#1a6b5e]' : done ? 'text-[#1a6b5e]' : 'text-gray-400'}`}>
+              <span className={`text-xs font-bold ${active || done ? 'text-resort-900' : 'text-gray-400'}`}>
                 {s.label}
               </span>
             </div>
             {i < steps.length - 1 && (
-              <div className={`h-0.5 flex-1 -mt-5 mx-1 ${done ? 'bg-[#1a6b5e]' : 'bg-gray-200'}`} />
+              <div className={`mx-1 -mt-5 h-0.5 flex-1 ${done ? 'bg-resort-900' : 'bg-gray-200'}`} />
             )}
           </div>
         );
@@ -139,19 +140,19 @@ function Step1({ onNext }: { onNext: () => void }) {
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Currency</label>
-          <select {...register('currency')} className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a6b5e]">
+          <select {...register('currency')} className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0e223c]">
             {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Timezone</label>
-          <select {...register('timezone')} className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a6b5e]">
+          <select {...register('timezone')} className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0e223c]">
             {TIMEZONES.map(t => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
           </select>
         </div>
       </div>
 
-      <Button type="submit" disabled={saving} className="w-full bg-[#1a6b5e] hover:bg-[#145a4f] text-white mt-2">
+      <Button type="submit" disabled={saving} className="mt-2 h-12 w-full rounded-full bg-lime-400 font-extrabold text-resort-900 hover:bg-lime-300">
         {saving ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Saving...</> : <>Save & Continue <ChevronRight className="w-4 h-4 ml-1" /></>}
       </Button>
     </form>
@@ -192,7 +193,7 @@ function Step2({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
           <div className="flex flex-wrap gap-1.5 mt-2">
             {PRESET_CHECKINS.map(t => (
               <button key={t} type="button" onClick={() => (document.querySelector('input[name="checkInTime"]') as HTMLInputElement)!.value = t}
-                className="text-xs px-2.5 py-1 rounded-full border border-gray-200 hover:border-[#1a6b5e] hover:text-[#1a6b5e] transition-colors">
+                className="text-xs px-2.5 py-1 rounded-full border border-gray-200 hover:border-[#0e223c] hover:text-[#0e223c] transition-colors">
                 {t}
               </button>
             ))}
@@ -205,7 +206,7 @@ function Step2({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
           <div className="flex flex-wrap gap-1.5 mt-2">
             {PRESET_CHECKOUTS.map(t => (
               <button key={t} type="button" onClick={() => (document.querySelector('input[name="checkOutTime"]') as HTMLInputElement)!.value = t}
-                className="text-xs px-2.5 py-1 rounded-full border border-gray-200 hover:border-[#1a6b5e] hover:text-[#1a6b5e] transition-colors">
+                className="text-xs px-2.5 py-1 rounded-full border border-gray-200 hover:border-[#0e223c] hover:text-[#0e223c] transition-colors">
                 {t}
               </button>
             ))}
@@ -213,7 +214,7 @@ function Step2({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
         </div>
       </div>
 
-      <div className="bg-[#f0faf8] border border-[#a8d5cf] rounded-xl p-4 text-sm text-[#1a6b5e]">
+      <div className="rounded-2xl border border-lime-200 bg-lime-50 p-4 text-sm text-resort-900">
         💡 You can always change these later in Settings → Property
       </div>
 
@@ -221,7 +222,7 @@ function Step2({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
         <Button type="button" variant="outline" onClick={onBack} className="flex-1">
           <ChevronLeft className="w-4 h-4 mr-1" /> Back
         </Button>
-        <Button type="submit" disabled={saving} className="flex-1 bg-[#1a6b5e] hover:bg-[#145a4f] text-white">
+        <Button type="submit" disabled={saving} className="flex-1 rounded-full bg-lime-400 font-extrabold text-resort-900 hover:bg-lime-300">
           {saving ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Saving...</> : <>Save & Continue <ChevronRight className="w-4 h-4 ml-1" /></>}
         </Button>
       </div>
@@ -272,7 +273,7 @@ function Step3({ onNext, onBack, onSkip }: { onNext: () => void; onBack: () => v
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Room Type</label>
-          <select {...register('type')} className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a6b5e]">
+          <select {...register('type')} className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0e223c]">
             {ROOM_TYPES.map(t => <option key={t} value={t}>{t.charAt(0) + t.slice(1).toLowerCase()}</option>)}
           </select>
         </div>
@@ -298,7 +299,7 @@ function Step3({ onNext, onBack, onSkip }: { onNext: () => void; onBack: () => v
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Description <span className="text-gray-400 font-normal">(optional)</span></label>
         <textarea {...register('description')} rows={2}
           placeholder="Spacious room with ocean view and private balcony..."
-          className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a6b5e] resize-none"
+          className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0e223c] resize-none"
         />
       </div>
 
@@ -306,7 +307,7 @@ function Step3({ onNext, onBack, onSkip }: { onNext: () => void; onBack: () => v
         <Button type="button" variant="outline" onClick={onBack} className="flex-[0_0_auto] px-4">
           <ChevronLeft className="w-4 h-4" />
         </Button>
-        <Button type="submit" disabled={saving} className="flex-1 bg-[#1a6b5e] hover:bg-[#145a4f] text-white">
+        <Button type="submit" disabled={saving} className="flex-1 rounded-full bg-lime-400 font-extrabold text-resort-900 hover:bg-lime-300">
           {saving ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Adding...</> : <>Add Room & Finish <CheckCircle className="w-4 h-4 ml-1.5" /></>}
         </Button>
         <Button type="button" variant="outline" onClick={onSkip} className="flex-[0_0_auto] px-4 text-gray-400 hover:text-gray-600">
@@ -346,10 +347,10 @@ function DoneScreen({ onGo, slug, resortName, requiresCheckout }: { onGo: () => 
 
   return (
     <div className="text-center py-2">
-      <div className="w-20 h-20 bg-gradient-to-br from-[#1a6b5e] to-[#145a4f] rounded-full flex items-center justify-center mx-auto mb-5 shadow-lg">
-        <CheckCircle className="w-10 h-10 text-white" />
+      <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-lime-400 shadow-lg">
+        <CheckCircle className="h-10 w-10 text-resort-900" />
       </div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-1.5">
+      <h2 className="mb-2 font-editorial text-4xl font-medium text-resort-900">
         {isBn ? <>আপনার সাইট এখন LIVE! 🎉</> : <>Your site is LIVE! 🎉</>}
       </h2>
       <p className="text-gray-500 mb-6">
@@ -360,12 +361,12 @@ function DoneScreen({ onGo, slug, resortName, requiresCheckout }: { onGo: () => 
 
       {/* Live URL card */}
       {siteUrl && (
-        <div className="flex items-center gap-2 rounded-xl border border-[#a8d5cf] bg-[#f0faf8] px-4 py-3 mb-4">
-          <span className="flex-1 truncate text-left text-sm font-semibold text-[#1a6b5e]">{siteUrl}</span>
+        <div className="mb-4 flex items-center gap-2 rounded-2xl border border-lime-200 bg-lime-50 px-4 py-3">
+          <span className="flex-1 truncate text-left text-sm font-bold text-resort-900">{siteUrl}</span>
           <button
             onClick={copyLink}
             title="Copy link"
-            className="flex shrink-0 items-center gap-1 rounded-lg border border-[#a8d5cf] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#1a6b5e] transition-colors hover:bg-[#e7f5f2]"
+            className="flex shrink-0 items-center gap-1 rounded-lg border border-[#d9f99d] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#0e223c] transition-colors hover:bg-[#ecfccb]"
           >
             {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
             {copied ? (isBn ? 'কপি হয়েছে' : 'Copied') : (isBn ? 'কপি' : 'Copy')}
@@ -373,7 +374,7 @@ function DoneScreen({ onGo, slug, resortName, requiresCheckout }: { onGo: () => 
           <a
             href={siteUrl} target="_blank" rel="noopener noreferrer"
             title="Open site"
-            className="flex shrink-0 items-center gap-1 rounded-lg border border-[#a8d5cf] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#1a6b5e] transition-colors hover:bg-[#e7f5f2]"
+            className="flex shrink-0 items-center gap-1 rounded-lg border border-[#d9f99d] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#0e223c] transition-colors hover:bg-[#ecfccb]"
           >
             <ExternalLink className="h-3.5 w-3.5" /> {isBn ? 'খুলুন' : 'Open'}
           </a>
@@ -443,24 +444,27 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-start justify-center p-4 pt-12">
+    <div className="relative flex min-h-screen items-start justify-center overflow-hidden bg-[#f8f6f1] p-4 pb-16 pt-10 sm:pt-14">
+      <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full border border-resort-900/10" />
+      <div className="pointer-events-none absolute -bottom-40 -left-32 h-96 w-96 rounded-full border border-lime-500/25" />
       <div className="w-full max-w-xl">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#1a6b5e] text-white font-bold text-xl mb-4 shadow-md">R</div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <div className="mb-7 flex justify-center"><BrandLogo /></div>
+          <span className="text-xs font-extrabold uppercase tracking-[0.18em] text-lime-700">Guided setup</span>
+          <h1 className="mt-3 font-editorial text-4xl font-medium leading-none text-resort-900 sm:text-5xl">
             Welcome, {user?.firstName || 'there'}! 👋
           </h1>
           <p className="text-gray-500 mt-1">Let's set up <strong>{tenant?.name}</strong> in just a few steps</p>
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl shadow-lg p-8">
+        <div className="rounded-[2rem] border border-black/5 bg-white p-6 shadow-[0_24px_70px_rgba(14,34,60,0.1)] sm:p-8">
           {step < 3 && <StepBar current={step} total={3} />}
 
           {step < 3 && (
             <div className="mb-6">
-              <h2 className="text-lg font-semibold text-gray-900">{STEP_META[step].title}</h2>
+              <h2 className="font-editorial text-2xl font-medium text-resort-900">{STEP_META[step].title}</h2>
               <p className="text-sm text-gray-500 mt-0.5">{STEP_META[step].subtitle}</p>
             </div>
           )}

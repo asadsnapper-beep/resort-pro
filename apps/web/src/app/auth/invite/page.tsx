@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/store/auth';
 import { toast } from '@/hooks/use-toast';
 import { Users, Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { PublicStatusShell, publicFieldClass, publicPrimaryButtonClass } from '@/components/brand/PublicStatusShell';
 
 const schema = z.object({
   firstName: z.string().min(1, 'First name required'),
@@ -77,8 +78,8 @@ function InviteForm() {
 
   if (status === 'loading') {
     return (
-      <div className="p-12 flex flex-col items-center gap-3">
-        <Loader2 className="w-8 h-8 text-[#1a6b5e] animate-spin" />
+      <div className="flex flex-col items-center gap-3 py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-lime-600" />
         <p className="text-gray-500 text-sm">Validating invite...</p>
       </div>
     );
@@ -86,7 +87,7 @@ function InviteForm() {
 
   if (status === 'invalid') {
     return (
-      <div className="p-8 text-center">
+      <div className="py-6 text-center">
         <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <AlertCircle className="w-7 h-7 text-red-500" />
         </div>
@@ -97,37 +98,37 @@ function InviteForm() {
   }
 
   return (
-    <div className="p-8">
-      <div className="bg-[#f0faf8] border border-[#a8d5cf] rounded-xl p-4 mb-6">
-        <p className="text-sm text-[#1a6b5e]">
+    <div>
+      <div className="mb-6 rounded-2xl border border-lime-200 bg-lime-50 p-4">
+        <p className="text-sm text-resort-900">
           You've been invited to join <strong>{invite?.tenant.name}</strong> as a{' '}
           <span className="capitalize font-semibold">{invite?.role.toLowerCase()}</span>
         </p>
-        <p className="text-xs text-[#1a6b5e]/70 mt-0.5">{invite?.email}</p>
+        <p className="mt-1 text-xs text-resort-900/60">{invite?.email}</p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">First Name</label>
-            <Input {...register('firstName')} placeholder="John" className={errors.firstName ? 'border-red-400' : ''} />
+            <label className="mb-1.5 block text-sm font-bold text-resort-900">First name</label>
+            <Input {...register('firstName')} placeholder="John" className={`${publicFieldClass} ${errors.firstName ? 'border-red-400' : ''}`} />
             {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName.message}</p>}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Last Name</label>
-            <Input {...register('lastName')} placeholder="Smith" className={errors.lastName ? 'border-red-400' : ''} />
+            <label className="mb-1.5 block text-sm font-bold text-resort-900">Last name</label>
+            <Input {...register('lastName')} placeholder="Smith" className={`${publicFieldClass} ${errors.lastName ? 'border-red-400' : ''}`} />
             {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName.message}</p>}
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+          <label className="mb-1.5 block text-sm font-bold text-resort-900">Password</label>
           <div className="relative">
             <Input
               {...register('password')}
               type={showPw ? 'text' : 'password'}
               placeholder="Min 8 chars, 1 uppercase, 1 number"
-              className={errors.password ? 'border-red-400 pr-10' : 'pr-10'}
+              className={`${publicFieldClass} pr-10 ${errors.password ? 'border-red-400' : ''}`}
             />
             <button type="button" onClick={() => setShowPw(p => !p)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -138,17 +139,17 @@ function InviteForm() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirm Password</label>
+          <label className="mb-1.5 block text-sm font-bold text-resort-900">Confirm password</label>
           <Input
             {...register('confirmPassword')}
             type={showPw ? 'text' : 'password'}
             placeholder="Repeat password"
-            className={errors.confirmPassword ? 'border-red-400' : ''}
+            className={`${publicFieldClass} ${errors.confirmPassword ? 'border-red-400' : ''}`}
           />
           {errors.confirmPassword && <p className="text-red-500 text-xs mt-1">{errors.confirmPassword.message}</p>}
         </div>
 
-        <Button type="submit" disabled={submitting} className="w-full bg-[#1a6b5e] hover:bg-[#145a4f] text-white mt-2">
+        <Button type="submit" disabled={submitting} className={`mt-2 ${publicPrimaryButtonClass}`}>
           {submitting ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Creating account...</> : 'Accept Invite & Join'}
         </Button>
       </form>
@@ -158,21 +159,10 @@ function InviteForm() {
 
 export default function InvitePage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1a6b5e] via-[#145a4f] to-[#0d3d36] flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-          <div className="bg-gradient-to-r from-[#1a6b5e] to-[#145a4f] px-8 py-8 text-center">
-            <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Users className="w-7 h-7 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold text-white">Join the Team</h1>
-            <p className="text-[#a8d5cf] mt-1 text-sm">Create your account to get started</p>
-          </div>
-          <Suspense fallback={<div className="p-8 text-center text-gray-400">Loading...</div>}>
-            <InviteForm />
-          </Suspense>
-        </div>
-      </div>
-    </div>
+    <PublicStatusShell eyebrow="Team invitation" title="Join your resort team." description="Create your secure staff account and step straight into the shared workspace." icon={<Users className="h-6 w-6" />}>
+      <Suspense fallback={<div className="py-8 text-center text-slate-400">Loading…</div>}>
+        <InviteForm />
+      </Suspense>
+    </PublicStatusShell>
   );
 }

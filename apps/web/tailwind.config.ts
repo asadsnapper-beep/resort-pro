@@ -152,6 +152,7 @@ const config: Config = {
       fontFamily: {
         sans: ['Nunito', 'system-ui', 'sans-serif'],
         display: ['Nunito', 'system-ui', 'sans-serif'],
+        editorial: ['Playfair Display', 'Georgia', 'serif'],
         bitcount: ['Bitcount Prop Single', 'monospace'],
       },
       keyframes: {

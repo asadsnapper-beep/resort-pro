@@ -279,11 +279,14 @@ export function startAutomationEngine() {
 }
 
 // ─── On-demand: enroll on booking confirmed ───────────────────────────────────
-export async function enrollOnBookingConfirmed(tenantId: string, guestId: string, meta: {
-  confirmationNo: string; roomName: string; checkIn: string; checkOut: string;
-}) {
+async function enrollOnEvent(
+  tenantId: string,
+  guestId: string,
+  trigger: 'BOOKING_CONFIRMED' | 'CHECK_IN',
+  meta: Record<string, string>,
+) {
   const sequences = await prisma.sequence.findMany({
-    where: { tenantId, trigger: 'BOOKING_CONFIRMED', status: 'ACTIVE' },
+    where: { tenantId, trigger, status: 'ACTIVE' },
     select: { id: true },
   });
 
@@ -294,11 +297,16 @@ export async function enrollOnBookingConfirmed(tenantId: string, guestId: string
       update: { status: 'ACTIVE', currentStep: 0, completedAt: null, triggerMeta: meta },
     }).catch(() => {});
   }
+}
 
-  // Ensure consent record exists (opted in by booking)
-  await prisma.emailConsent.upsert({
-    where:  { guestId },
-    create: { tenantId, guestId, subscribed: true },
-    update: {},
-  });
+export async function enrollOnBookingConfirmed(tenantId: string, guestId: string, meta: {
+  confirmationNo: string; roomName: string; checkIn: string; checkOut: string;
+}) {
+  await enrollOnEvent(tenantId, guestId, 'BOOKING_CONFIRMED', meta);
+}
+
+export async function enrollOnCheckIn(tenantId: string, guestId: string, meta: {
+  confirmationNo: string; roomName: string; checkIn: string; checkOut: string;
+}) {
+  await enrollOnEvent(tenantId, guestId, 'CHECK_IN', meta);
 }

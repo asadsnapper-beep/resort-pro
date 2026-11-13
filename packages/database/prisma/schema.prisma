@@ -2072,6 +2072,8 @@ enum CampaignStatus {
   SCHEDULED
   SENDING
   SENT
+  PARTIAL
+  FAILED
   PAUSED
   CANCELLED
 }

@@ -21,6 +21,7 @@ import { createAdminNotification } from '../utils/notifications';
 import { nextDocumentNumber } from '../utils/sequence';
 import type { JwtPayload } from '@resort-pro/types';
 import { matchAllTerms } from '../utils/search-terms';
+import { enrollOnBookingConfirmed, enrollOnCheckIn } from '../services/automation';
 
 /* ── Auto-create invoice when a booking is confirmed ────────────────────── */
 async function autoCreateInvoice(bookingId: string, tenantId: string) {
@@ -476,6 +477,15 @@ export async function bookingRoutes(app: FastifyInstance) {
         trackGuestEmail('confirmation', booking.id, tenantId, sendBookingConfirmation(booking.id));
       }
 
+      const sequenceMeta = {
+        confirmationNo: booking.confirmationNo,
+        roomName: (booking as typeof booking & { room: { name: string } }).room.name,
+        checkIn: booking.checkIn.toISOString().split('T')[0],
+        checkOut: booking.checkOut.toISOString().split('T')[0],
+      };
+      await enrollOnBookingConfirmed(tenantId, booking.guestId, sequenceMeta).catch(() => {});
+      if (body.autoCheckIn) await enrollOnCheckIn(tenantId, booking.guestId, sequenceMeta).catch(() => {});
+
       // Auto-generate invoice draft (fire-and-forget)
       autoCreateInvoice(booking.id, tenantId).catch(() => {});
 
@@ -511,7 +521,7 @@ export async function bookingRoutes(app: FastifyInstance) {
     preHandler: requireRole('OWNER', 'MANAGER', 'RECEPTIONIST'),
     handler: async (request, reply) => {
       const { db } = request;
-      const { sub: checkedInByStaff } = request.user as JwtPayload;
+      const { tenantId, sub: checkedInByStaff } = request.user as JwtPayload;
       const { id } = request.params as { id: string };
       const body = z.object({
         deposit:   z.number().optional(),
@@ -560,6 +570,13 @@ export async function bookingRoutes(app: FastifyInstance) {
             })]
           : []),
       ]);
+
+      await enrollOnCheckIn(tenantId, booking.guestId, {
+        confirmationNo: booking.confirmationNo,
+        roomName: updated.room.name,
+        checkIn: booking.checkIn.toISOString().split('T')[0],
+        checkOut: booking.checkOut.toISOString().split('T')[0],
+      }).catch(() => {});
 
       return ok(updated, 'Guest checked in');
     },

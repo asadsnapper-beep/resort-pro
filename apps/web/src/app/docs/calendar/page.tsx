@@ -160,7 +160,7 @@ export default function CalendarPage() {
         manager.
       </p>
       <p>
-        See the <a href="/docs/channels" className="text-[#1a6b5e] underline">Channels guide</a> for
+        See the <a href="/docs/channels" className="text-lime-700 underline">Channels guide</a> for
         step-by-step instructions on connecting your listings and keeping everything in sync automatically.
       </p>
 

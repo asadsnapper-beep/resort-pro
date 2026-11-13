@@ -15,6 +15,7 @@ import site.resortpro.android.core.security.LastResortStore
 
 data class AuthUiState(
     val isRestoring: Boolean = true,
+    val restoreRetryRequired: Boolean = false,
     val isSubmitting: Boolean = false,
     val slug: String = "",
     val email: String = "",
@@ -135,9 +136,15 @@ class AuthViewModel(
         }
     }
 
-    private fun restoreSession() {
+    fun restoreSession() {
+        if (mutableState.value.restoreRetryRequired) mutableState.update { it.copy(isRestoring = true, restoreRetryRequired = false) }
         viewModelScope.launch {
-            val session = repository.restoreSession()
+            val result = repository.restoreSession()
+            if (result == SessionRestoreResult.RetryRequired) {
+                mutableState.update { it.copy(isRestoring = false, restoreRetryRequired = true) }
+                return@launch
+            }
+            val session = (result as? SessionRestoreResult.Restored)?.session
             // A password was typed once, days ago. If the resort turned the lock
             // on, prove it is still the same person before showing anything.
             if (session != null && appLock.isEnabled()) {
@@ -149,6 +156,11 @@ class AuthViewModel(
             mutableState.update { it.copy(isRestoring = false, session = session) }
             if (session != null) loadHome(session)
         }
+    }
+
+    fun signInInstead() {
+        repository.clearLocalSession()
+        mutableState.update { it.copy(isRestoring = false, restoreRetryRequired = false, session = null) }
     }
 
     /**

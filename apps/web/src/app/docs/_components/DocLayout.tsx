@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import { ArrowLeft, BookOpen } from 'lucide-react';
+import { BrandLogo } from '@/components/brand/BrandLogo';
 
 // Palette matches the landing page's design system
 // (claude.ai/design/p/d56b55b0-882c-44d6-aecd-3667a5499d43 — "ResortPro Landing.dc.html").
-const NAVY = '#14314D';
-const GOLD = '#CFA153';
+const NAVY = '#0e223c';
+const LIME = '#65a30d';
 
 interface TocItem {
   id: string;
@@ -25,32 +26,23 @@ export function DocLayout({ title, description, readTime, tag, tagColor, toc, ch
   return (
     <>
       {/* ── Nav ──────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-20 border-b border-[#EDE7DD] bg-white/90 backdrop-blur-sm">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-5">
+      <header className="sticky top-0 z-20 border-b border-[#e7e5df] bg-[#f8f6f1]/95 backdrop-blur-sm">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
           <div className="flex items-center gap-2.5">
-            <Link href="/" className="flex items-center gap-2.5">
-              <div
-                className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg"
-                style={{ background: NAVY }}
-              >
-                <span className="text-sm font-bold" style={{ color: GOLD }}>R</span>
-              </div>
-              <span className="font-extrabold" style={{ color: NAVY }}>ResortPro</span>
-            </Link>
+            <Link href="/" className="flex items-center"><BrandLogo size="sm" /></Link>
             <span className="text-[#EDE7DD]">/</span>
             <Link href="/docs" className="text-sm text-[#5B6B79] transition-colors hover:opacity-70">Help Center</Link>
           </div>
           <Link
             href="/dashboard"
-            className="rounded-lg px-3.5 py-1.5 text-xs font-semibold text-white transition-colors"
-            style={{ background: NAVY }}
+            className="rounded-full bg-lime-400 px-4 py-2 text-xs font-extrabold text-resort-900 transition-colors hover:bg-lime-300"
           >
             Go to Dashboard
           </Link>
         </div>
       </header>
 
-      <div className="mx-auto max-w-6xl px-5 py-10">
+      <div className="mx-auto max-w-6xl px-5 py-12">
         <div className="flex gap-10">
 
           {/* ── Sidebar (TOC) ─────────────────────────────────────────────── */}
@@ -71,7 +63,7 @@ export function DocLayout({ title, description, readTime, tag, tagColor, toc, ch
                   <a
                     key={item.id}
                     href={`#${item.id}`}
-                    className="block rounded-lg px-3 py-1.5 text-sm text-[#5B6B79] transition-colors hover:bg-[#F7F3EE]"
+                    className="block rounded-xl px-3 py-2 text-sm text-[#5B6B79] transition-colors hover:bg-lime-50 hover:text-resort-900"
                     style={{ color: '#5B6B79' }}
                   >
                     {item.label}
@@ -98,7 +90,7 @@ export function DocLayout({ title, description, readTime, tag, tagColor, toc, ch
                   {tag}
                 </span>
               </div>
-              <h1 className="mb-3 text-3xl font-extrabold" style={{ color: NAVY }}>{title}</h1>
+              <h1 className="mb-4 font-editorial text-[clamp(2.6rem,6vw,4.6rem)] font-medium leading-[0.98] tracking-[-0.035em]" style={{ color: NAVY }}>{title}</h1>
               <p className="text-[#5B6B79]">{description}</p>
               <p className="mt-2 text-xs text-[#8B95A0]">{readTime}</p>
             </div>
@@ -120,7 +112,7 @@ export function DocLayout({ title, description, readTime, tag, tagColor, toc, ch
               <Link
                 href="/dashboard/support"
                 className="text-sm font-semibold hover:underline"
-                style={{ color: GOLD }}
+                style={{ color: LIME }}
               >
                 Need help? Open a ticket →
               </Link>
@@ -131,9 +123,10 @@ export function DocLayout({ title, description, readTime, tag, tagColor, toc, ch
 
       <style>{`
         .doc-content h2 {
-          font-size: 1.25rem;
-          font-weight: 700;
-          color: #111827;
+          font-size: 1.55rem;
+          font-family: var(--font-editorial), ui-serif, Georgia, serif;
+          font-weight: 500;
+          color: #0e223c;
           margin-top: 2.5rem;
           margin-bottom: 1rem;
           padding-bottom: 0.5rem;
@@ -179,8 +172,8 @@ export function DocLayout({ title, description, readTime, tag, tagColor, toc, ch
         .doc-content code {
           font-family: ui-monospace, monospace;
           font-size: 0.8125rem;
-          background: #F7F3EE;
-          color: #14314D;
+          background: #f7fee7;
+          color: #0e223c;
           padding: 0.125rem 0.375rem;
           border-radius: 0.25rem;
         }
@@ -201,8 +194,8 @@ export function DocLayout({ title, description, readTime, tag, tagColor, toc, ch
           border-radius: 0;
         }
         .doc-content blockquote {
-          border-left: 3px solid #CFA153;
-          background: #F7F3EE;
+          border-left: 3px solid #84cc16;
+          background: #f7fee7;
           border-radius: 0 0.5rem 0.5rem 0;
           padding: 0.875rem 1.25rem;
           margin-bottom: 1.25rem;
@@ -210,12 +203,12 @@ export function DocLayout({ title, description, readTime, tag, tagColor, toc, ch
           font-size: 0.9rem;
         }
         .doc-content .info-box {
-          border-left: 3px solid #14314D;
-          background: #F7F3EE;
+          border-left: 3px solid #0e223c;
+          background: #f8f6f1;
           border-radius: 0 0.5rem 0.5rem 0;
           padding: 0.875rem 1.25rem;
           margin-bottom: 1.25rem;
-          color: #14314D;
+          color: #0e223c;
           font-size: 0.9rem;
         }
         .doc-content strong {

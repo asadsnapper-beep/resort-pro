@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1780 512" role="img" aria-labelledby="title desc">
+  <title id="title">ResortPro</title>
+  <desc id="desc">ResortPro logo with a bold geometric R and a lowercase resortpro wordmark.</desc>
+  <path fill="#183153" d="M64 64h224c98 0 160 58 160 146 0 61-32 108-92 132l92 106H306l-82-108h-42v108H64V268h218c38 0 60-21 60-56s-22-56-60-56H182v60H64V64Z"/>
+  <text x="488" y="340" fill="#183153" font-family="Nunito, Avenir Next, Arial, sans-serif" font-size="270" font-weight="800" letter-spacing="-15">resortpro</text>
+</svg>
