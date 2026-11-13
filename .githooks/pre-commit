@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+#
+# What a markdown file cannot enforce.
+#
+# AGENTS.md and CLAUDE.md ask agents to branch before working, to keep binaries
+# out of history, and to keep this public repository free of credentials. Those
+# are instructions; this is the part that refuses.
+#
+# It cannot catch the failure that prompted it — 183 files left uncommitted for
+# two weeks — because nothing ran git at all, and a hook only fires when git
+# fires. See post-checkout for the nearest thing: a loud warning the next time
+# anyone does run it.
+#
+# Install: scripts/setup-hooks.sh   (sets core.hooksPath, one line, per clone)
+# Bypass:  git commit --no-verify   — or the named variable each check prints.
+set -uo pipefail
+
+fail=0
+say() { printf '\n\033[31m✗ %s\033[0m\n' "$1" >&2; }
+note() { printf '  %s\n' "$1" >&2; }
+
+# An override is a decision, not a refusal. Saying "refused" and then allowing
+# the commit anyway teaches people to ignore the hook.
+allowed() { printf '\n\033[33m⚠  %s — allowed by %s\033[0m\n' "$1" "$2" >&2; }
+
+branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo DETACHED)
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+
+# ── 1. Shared branches are not a workspace ──────────────────────────────────
+# The main checkout's working tree is shared between every session and agent.
+# A commit straight onto dev or main is how work becomes invisible.
+case "$branch" in
+  dev|main)
+    if [ "${ALLOW_COMMIT_ON_SHARED:-}" = "1" ]; then
+      allowed "Committing straight onto '$branch'" "ALLOW_COMMIT_ON_SHARED"
+    else
+      say "Direct commit on '$branch' is refused."
+      note "That working tree is shared. Branch first:"
+      note "    git switch -c fix/<short-description>"
+      note "To override deliberately: ALLOW_COMMIT_ON_SHARED=1 git commit ..."
+      fail=1
+    fi
+    ;;
+esac
+
+# ── 2. Credentials, in a public repository ──────────────────────────────────
+# Checked against the staged content, not the file on disk, so a secret cannot
+# be staged and then edited out of the working copy.
+secret_hits=$(git diff --cached -U0 -- $staged 2>/dev/null \
+  | grep '^+' | grep -v '^+++' \
+  | grep -nEI "re_[A-Za-z0-9]{15,}|sk_live_[A-Za-z0-9]{10,}|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|xoxb-[A-Za-z0-9-]{20,}|BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY" \
+  | grep -viE "example|placeholder|your_|xxxx|dummy|re_your" | head -3) || true
+if [ -n "$secret_hits" ]; then
+  if [ "${ALLOW_SECRET_PATTERN:-}" = "1" ]; then
+    allowed "A credential-shaped string is staged" "ALLOW_SECRET_PATTERN"
+  else
+    say "Something that looks like a credential is staged."
+    note "This repository is public, and git keeps every commit."
+    printf '%s\n' "$secret_hits" | sed 's/^/    /' | cut -c1-120 >&2
+    note "If it is genuinely not a secret: ALLOW_SECRET_PATTERN=1 git commit ..."
+    fail=1
+  fi
+fi
+
+# ── 3. Generated files and large binaries ───────────────────────────────────
+# Git keeps a binary forever and removing it later does not shrink the clone.
+# 26 MB of marketing PNGs and MP4s were found in the October pile; images
+# committed once before had to be removed again.
+generated=$(printf '%s\n' "$staged" | grep -iE '\.(tsbuildinfo|log)$|(^|/)\.env($|\.)|(^|/)node_modules/|(^|/)\.DS_Store$|(^|/)(dist|\.next|coverage)/' || true)
+if [ -n "$generated" ]; then
+  if [ "${ALLOW_GENERATED:-}" = "1" ]; then
+    allowed "Generated or local-only files are staged" "ALLOW_GENERATED"
+  else
+    say "Generated or local-only files are staged."
+    printf '%s\n' "$generated" | sed 's/^/    /' >&2
+    note "These belong in .gitignore, not in history."
+    note "To override: ALLOW_GENERATED=1 git commit ..."
+    fail=1
+  fi
+fi
+
+# Size, not extension: an app icon is fine, a 2 MB social-media render is not.
+limit=${MAX_BLOB_KB:-512}
+big=$(printf '%s\n' "$staged" | while IFS= read -r f; do
+  [ -f "$f" ] || continue
+  kb=$(( $(wc -c < "$f") / 1024 ))
+  [ "$kb" -gt "$limit" ] && printf '    %s KB  %s\n' "$kb" "$f"
+done) || true
+if [ -n "$big" ]; then
+  if [ -n "${MAX_BLOB_KB:-}" ]; then
+    allowed "Files over ${limit} KB are staged" "MAX_BLOB_KB=${MAX_BLOB_KB}"
+  else
+    say "Files larger than ${limit} KB are staged."
+    printf '%s\n' "$big" >&2
+    note "Application assets the build needs are fine — raise the ceiling for them:"
+    note "    MAX_BLOB_KB=2048 git commit ..."
+    fail=1
+  fi
+fi
+
+[ "$fail" = "0" ] && exit 0
+printf '\n\033[31mCommit refused.\033[0m See AGENTS.md → "Git: where to work".\n\n' >&2
+exit 1
