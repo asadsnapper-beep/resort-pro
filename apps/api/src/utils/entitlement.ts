@@ -13,6 +13,7 @@
 
 import { prisma } from '@resort-pro/database';
 import { PLAN_PRICING } from '@resort-pro/types';
+import { FLAG_REGISTRY } from './feature-flags';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -217,8 +218,17 @@ export async function resolveTenantEntitlement(tenantId: string): Promise<Tenant
   const staffLimit = planConfig?.staffLimit ?? 2;
   const aiMonthlyTokenCap = planConfig?.aiMonthlyTokenCap ?? 0;
 
-  // Start with plan's default flags
+  // Registry defaults first. `defaultOn` means "every tenant has this unless
+  // told otherwise", so it belongs below the plan rather than beside it —
+  // global_search shipped before the flag existed and no plan should have to
+  // list it to keep it. GET /tenant/flags used to apply these on its own,
+  // which is how the two readings of a tenant's flags drifted apart.
   const flags: Record<string, boolean> = {};
+  for (const def of FLAG_REGISTRY) {
+    if (def.defaultOn) flags[def.flag] = true;
+  }
+
+  // Then the plan's own flags
   for (const f of planConfig?.flags ?? []) {
     flags[f] = true;
   }
