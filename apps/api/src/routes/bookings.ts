@@ -25,13 +25,19 @@ import { round2 } from '../services/billing';
 import { resolveTenantEntitlement } from '../utils/entitlement';
 import { createAdminNotification } from '../utils/notifications';
 import { nextDocumentNumber } from '../utils/sequence';
+import { lockBookingInvoice } from '../utils/invoice-lock';
 import type { JwtPayload } from '@resort-pro/types';
 import { matchAllTerms } from '../utils/search-terms';
 import { notifyBookingConfirmed } from '../services/guest-notifications';
 import { enrollOnBookingConfirmed, enrollOnCheckIn } from '../services/automation';
 
 /* ── Auto-create invoice when a booking is confirmed ────────────────────── */
-async function autoCreateInvoice(bookingId: string, tenantId: string) {
+/**
+ * Exported because it is one of the two writers of a booking's invoice, and
+ * the test that proves they cannot both write has to drive this one directly:
+ * the routes fire it and forget it, so there is nothing to await from outside.
+ */
+export async function autoCreateInvoice(bookingId: string, tenantId: string) {
   try {
     // Skip if invoice already exists
     const existing = await prisma.invoice.findFirst({ where: { bookingId } });
@@ -81,16 +87,28 @@ async function autoCreateInvoice(bookingId: string, tenantId: string) {
     // findFirst/orderBy:desc approach could collide across tenants.
     const invoiceNumber = await nextDocumentNumber(tenantId, tenant.slug, 'INV');
 
-    await prisma.invoice.create({
-      data: {
-        invoiceNumber, tenantId, bookingId,
-        guestName:  `${booking.guest.firstName} ${booking.guest.lastName}`,
-        guestEmail: booking.guest.email ?? undefined,
-        guestPhone: booking.guest.phone ?? undefined,
-        status: 'DRAFT',
-        subtotal, taxRate, taxAmount: taxAmt, discountAmt: 0, total,
-        items: { create: lineItems as any },
-      },
+    // Written under the booking's invoice lock, not straight in. This runs
+    // fire-and-forget while the front desk is already working on the same
+    // booking, so the check that ran at the top of this function is stale by
+    // now — a check-out may have invoiced the stay itself in the meantime, and
+    // inserting over it is what used to abort the check-out's transaction and
+    // answer the desk a 500. See utils/invoice-lock.ts.
+    await prisma.$transaction(async (tx) => {
+      await lockBookingInvoice(tx, bookingId);
+      const raced = await tx.invoice.findFirst({ where: { bookingId }, select: { id: true } });
+      if (raced) return;
+
+      await tx.invoice.create({
+        data: {
+          invoiceNumber, tenantId, bookingId,
+          guestName:  `${booking.guest.firstName} ${booking.guest.lastName}`,
+          guestEmail: booking.guest.email ?? undefined,
+          guestPhone: booking.guest.phone ?? undefined,
+          status: 'DRAFT',
+          subtotal, taxRate, taxAmount: taxAmt, discountAmt: 0, total,
+          items: { create: lineItems as any },
+        },
+      });
     });
   } catch (err) {
     // Booking creation must not fail because of this — but don't let the
@@ -1035,13 +1053,43 @@ export async function bookingRoutes(app: FastifyInstance) {
             total: billed.grandTotal, paidAmount: billed.paidAmount,
           };
 
+          // Held until this transaction ends, and taken here rather than at the
+          // top so that pricing the stay does not keep a background draft
+          // waiting. All it has to cover is deciding this booking's invoice and
+          // writing it, which is the step that was racing.
+          await lockBookingInvoice(tx, id);
+
+          // `priorInvoice` was read before this transaction opened, because the
+          // invoice number has to be minted outside it. Everything since — the
+          // claim, the payment, pricing the stay — is time in which
+          // autoCreateInvoice, fired and forgotten at booking time, can commit
+          // this booking's draft. Branching on the stale read sent the create
+          // into a unique violation on `bookingId` and rolled the whole
+          // check-out back, so the desk saw a 500 and the bill was never
+          // frozen. Both writers now take the booking's invoice lock, so this
+          // re-read is the last word rather than a narrower guess —
+          // utils/invoice-lock.ts explains why a re-read on its own, a caught
+          // P2002 or an upsert could not do the job.
+          const current = await tx.invoice.findFirst({ where: { bookingId: id }, select: { id: true } });
+
+          // Only reachable if the invoice seen before the transaction has since
+          // been detached from the booking, which leaves us holding no number
+          // to create one with. Nothing does that during a check-out; say so
+          // truthfully and let the desk retry rather than fail on a null.
+          if (!current && !reservedNumber) {
+            throw Object.assign(
+              new Error('This booking’s invoice changed while checking out — please try again'),
+              { statusCode: 409 },
+            );
+          }
+
           // Not an upsert: Prisma validates the `create` branch even when it
           // takes `update`, so the null invoice number reserved only for the
           // create path would reject every checkout that already has a draft —
           // which, because autoCreateInvoice runs at booking time, is nearly
           // all of them.
-          const invoice = priorInvoice
-            ? await tx.invoice.update({ where: { id: priorInvoice.id }, data: totals })
+          const invoice = current
+            ? await tx.invoice.update({ where: { id: current.id }, data: totals })
             : await tx.invoice.create({
                 data: {
                   ...totals,
