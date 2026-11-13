@@ -53,6 +53,7 @@ import { searchRoutes } from './routes/search';
 import { startDemoRefreshCron } from './jobs/refresh-demo';
 import { adminRoutes } from './routes/admin';
 import { frontDeskRoutes } from './routes/frontDesk';
+import { mobileGuestViewRoutes } from './routes/mobileGuestViews';
 import { ratePlanRoutes } from './routes/ratePlans';
 import { maintenanceRoutes } from './routes/maintenance';
 import { reportRoutes } from './routes/reports';
@@ -392,6 +393,7 @@ export async function buildApp() {
   await app.register(stripeWebhookRoute, { prefix: '/api/stripe' });
   await app.register(adminRoutes, { prefix: '/api/admin' });
   await app.register(frontDeskRoutes, { prefix: '/api/front-desk' });
+  await app.register(mobileGuestViewRoutes, { prefix: '/api/mobile' });
   await registerFeatureRoutes('/api/rate-plans', 'rate_plans_module', ratePlanRoutes);
   await registerFeatureRoutes('/api/maintenance', 'maintenance_module', maintenanceRoutes);
   await app.register(reportRoutes, { prefix: '/api/reports' });

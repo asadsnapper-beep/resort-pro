@@ -19,7 +19,9 @@ function isInactiveSubscriptionWriteAllowed(request: FastifyRequest) {
     // opened and changes nothing a lapsed subscription should protect. Blocking
     // it would also bias the numbers exactly where they matter most: the
     // tenants having trouble would be the ones that stop reporting.
-    || (request.method === 'POST' && pathname === '/api/search/selected');
+    || (request.method === 'POST' && pathname === '/api/search/selected')
+    // This POST is read-only; the body keeps guest names out of URL logs.
+    || (request.method === 'POST' && pathname === '/api/mobile/guests/search');
 }
 
 /** Authenticate a tenant-scoped request and enforce subscription read-only mode. */
