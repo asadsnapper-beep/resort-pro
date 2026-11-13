@@ -37,7 +37,7 @@ export function Modal({ open, onClose, title, description, children, className }
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className={`relative w-full max-w-lg max-h-[90vh] flex flex-col rounded-[18px] bg-white shadow-2xl overflow-hidden ${className ?? ''}`}
+        className={`relative w-full max-w-lg max-h-[90vh] flex flex-col rounded-[18px] bg-rp-modal shadow-2xl overflow-hidden ${className ?? ''}`}
         style={{ boxShadow: '0 24px 64px rgba(24,49,83,0.28)' }}
         onClick={e => e.stopPropagation()}
       >
@@ -89,7 +89,7 @@ export function ConfirmModal({ open, onClose, onConfirm, title, description, con
       style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(24,49,83,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="w-full max-w-sm rounded-[18px] bg-white overflow-hidden"
+      <div className="w-full max-w-sm rounded-[18px] bg-rp-modal overflow-hidden"
         style={{ boxShadow: '0 24px 64px rgba(24,49,83,0.28)' }}
         onClick={e => e.stopPropagation()}>
         <div className="px-6 py-4" style={{ background: 'var(--rp-btn-accent)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
