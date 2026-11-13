@@ -543,10 +543,10 @@ export default function InvoiceDetailPage() {
       {showPayment && createPortal((
         <>
           <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={() => setShowPayment(false)} />
-          <div className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-50 max-w-md mx-auto bg-white rounded-2xl shadow-xl p-6 space-y-4">
+          <div className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-50 max-w-md mx-auto bg-rp-modal rounded-2xl shadow-xl p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-gray-900">Record Payment</h3>
-              <button onClick={() => setShowPayment(false)} className="text-gray-400 hover:text-gray-600">
+              <h3 className="font-bold text-rp-text">Record Payment</h3>
+              <button onClick={() => setShowPayment(false)} className="text-rp-faint hover:text-rp-muted">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -571,7 +571,7 @@ export default function InvoiceDetailPage() {
                 {(['CASH', 'CARD', 'BANK_TRANSFER'] as const).map(m => (
                   <button key={m} onClick={() => setPayForm(f => ({ ...f, method: m }))}
                     className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border-2 text-xs font-semibold transition-colors ${
-                      payForm.method === m ? 'border-resort-600 bg-resort-50 text-resort-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      payForm.method === m ? 'border-resort-600 bg-resort-50 text-resort-700' : 'border-rp-border-md text-rp-muted hover:border-gray-300'
                     }`}>
                     {METHOD_ICON[m]}
                     {m.replace('_', ' ')}

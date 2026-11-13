@@ -111,3 +111,42 @@ describe('an AI page while AI is switched off', () => {
     expect(await screen.findByText('AI Content')).toBeTruthy();
   });
 });
+
+/**
+ * The sheet goes through `createPortal` to `document.body`, which is outside
+ * `<main>`, so `.dark main .bg-white` in globals.css cannot reach it. The sign
+ * out button's `bg-white` therefore stayed a literal `#ffffff` in dark mode —
+ * a white slab at the bottom of a dark sheet. `bg-rp-surface` is the token
+ * whose value is exactly what that patch would have substituted.
+ *
+ * jsdom applies no stylesheet, so this asserts the class and the premise (that
+ * the button really is outside `<main>`), not a computed colour.
+ */
+describe('the sign out button in dark mode', () => {
+  it('uses a themed surface rather than a literal white', async () => {
+    getModules.mockResolvedValue({ data: { data: [] } });
+    open();
+
+    const button = await screen.findByText('Sign out');
+    expect(button.className).toContain('bg-rp-surface');
+    expect(button.className).not.toContain('bg-white');
+  });
+
+  it('still renders outside <main>, which is why the token is needed', async () => {
+    getModules.mockResolvedValue({ data: { data: [] } });
+    open();
+
+    const button = await screen.findByText('Sign out');
+    expect(button.closest('main')).toBeNull();
+  });
+
+  it('leaves the close button and drag handle their white overlays', async () => {
+    // `dark:bg-white/10` and `dark:bg-white/20` are meant to be white there,
+    // and `.dark .bg-white\/N` is not scoped to `<main>` anyway.
+    getModules.mockResolvedValue({ data: { data: [] } });
+    open();
+
+    const close = await screen.findByLabelText('Close menu');
+    expect(close.className).toContain('dark:bg-white/10');
+  });
+});
