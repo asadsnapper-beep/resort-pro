@@ -68,6 +68,7 @@ reach the checkout total. P0 is what unblocks all of them.
 | [online-payment.md](./online-payment.md) | Stripe + bKash payment integration | ✅ Built — Stripe + bKash + SSLCommerz সব real |
 | [corporate-accounts.md](./corporate-accounts.md) | Company/B2B client accounts — consolidated billing, credit terms, corporate rates (separate from one-off Group Bookings) | ✅ Built |
 | [reporting-analytics.md](./reporting-analytics.md) | Revenue, occupancy, room performance, guest analytics, scheduled email reports | ✅ Built |
+| [report-periods-and-custom-range.md](./report-periods-and-custom-range.md) | Daily, Monday–Sunday weekly, and inclusive custom-date reports; range-safe occupancy, separated cash/charge metrics, print/email/export rollout | ❌ Not built — current Reports page supports one day only |
 
 ---
 
@@ -100,6 +101,7 @@ reach the checkout total. P0 is what unblocks all of them.
 
 | File | কী আছে | Status |
 |------|---------|--------|
+| [email-delivery-smtp-master-plan.md](./email-delivery-smtp-master-plan.md) | Platform ও tenant SMTP, Resend, delivery tracking, reliable outbox, quotas, security এবং local → dev → main rollout | 📋 Proposed — quota ও plan policy approval pending |
 | [sms-whatsapp-notifications.md](./sms-whatsapp-notifications.md) | Booking confirmation, reminders via SMS + WhatsApp | 🟡 Partial — send infra আছে, automated booking-confirm trigger নাই |
 | [sms-whatsapp-billing.md](./sms-whatsapp-billing.md) | Per-tenant SMS quota, billing, BYOC credentials | ✅ Built |
 | [sms-whatsapp-marketing.md](./sms-whatsapp-marketing.md) | Bulk campaign manager, audience segments, templates | ✅ Built |
