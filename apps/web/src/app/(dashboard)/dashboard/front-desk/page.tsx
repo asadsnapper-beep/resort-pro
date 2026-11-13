@@ -11,6 +11,7 @@ import {
   Plus, Phone, Banknote, LayoutGrid, List, RefreshCw, AlertTriangle,
 } from 'lucide-react';
 import { PageShell, PageHeader } from '@/components/patterns';
+import { resortToday, resortDayAfter, formatResortDate } from '@/lib/resort-day';
 import { AddDocumentInline, type PendingDocument } from '@/components/guests/AddDocumentInline';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -507,12 +508,21 @@ type GuestMatch = {
 };
 
 // ── Walk-In Modal ──────────────────────────────────────────────────────────────
-function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+function WalkInModal({ today, onClose, onSuccess }: { today?: string; onClose: () => void; onSuccess: () => void }) {
   const { tenant } = useAuthStore();
   const qc = useQueryClient();
-  const todayStr = new Date().toISOString().split('T')[0];
-  const dayAfter = (d: string) => new Date(new Date(d).getTime() + 86_400_000).toISOString().split('T')[0];
-  const tomorrowStr = dayAfter(todayStr);
+  /**
+   * The resort's today — the day the desk is standing in.
+   *
+   * This was the UTC date, so between midnight and 6am in Asia/Dhaka a
+   * receptionist was handed yesterday's check-in without noticing, and the
+   * header above the modal said something else again. `today` is the date the
+   * /front-desk/today answer was built for, which is the same day its arrival
+   * list covers; the resort's timezone covers the moment that answer has not
+   * arrived.
+   */
+  const todayStr = today ?? resortToday(tenant?.timezone);
+  const tomorrowStr = resortDayAfter(todayStr);
 
   const [form, setForm] = useState({
     guestName: '', guestPhone: '', adults: 1, children: 0,
@@ -624,7 +634,7 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
   // already pushed check-out further out than that — and check-out can
   // never land on or before check-in (min enforces this in the input too).
   const setCheckIn = (ci: string) => {
-    setForm(f => ({ ...f, checkIn: ci, checkOut: f.checkOut > ci ? f.checkOut : dayAfter(ci) }));
+    setForm(f => ({ ...f, checkIn: ci, checkOut: f.checkOut > ci ? f.checkOut : resortDayAfter(ci) }));
   };
 
   // Switching to "Later" clears any typed advance — the backend never
@@ -733,7 +743,7 @@ function WalkInModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
               <input type="date" value={form.checkIn} min={todayStr} onChange={e => setCheckIn(e.target.value)} className={inputCls} />
             </ModalInput>
             <ModalInput label="Check-out">
-              <input type="date" value={form.checkOut} min={dayAfter(form.checkIn)} onChange={e => set('checkOut', e.target.value)} className={inputCls} />
+              <input type="date" value={form.checkOut} min={resortDayAfter(form.checkIn)} onChange={e => set('checkOut', e.target.value)} className={inputCls} />
             </ModalInput>
           </div>
           <ModalInput label="Room *">
@@ -965,7 +975,7 @@ export default function FrontDeskPage() {
         title="Front Desk"
         subtitle={
           <>
-            {d?.date ? new Date(d.date).toLocaleDateString('en-BD', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : ''}
+            {d?.date ? formatResortDate(d.date) : ''}
             {d?.totalGuests ? ` · ${d.totalGuests} guests in-house` : ''}
           </>
         }
@@ -1088,7 +1098,7 @@ export default function FrontDeskPage() {
 
       {checkInFor  && <CheckInModal  booking={checkInFor}  onClose={() => setCheckInFor(null)}  onSuccess={() => setCheckInFor(null)}  />}
       {checkOutFor && <CheckOutModal booking={checkOutFor} onClose={() => setCheckOutFor(null)} onSuccess={() => setCheckOutFor(null)} />}
-      {walkInOpen  && <WalkInModal onClose={() => setWalkInOpen(false)} onSuccess={() => setWalkInOpen(false)} />}
+      {walkInOpen  && <WalkInModal today={d?.date} onClose={() => setWalkInOpen(false)} onSuccess={() => setWalkInOpen(false)} />}
     </PageShell>
   );
 }

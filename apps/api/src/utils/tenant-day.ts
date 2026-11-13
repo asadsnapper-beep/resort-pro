@@ -18,6 +18,23 @@
  * midnight UTC of that date, which is how Postgres hands back a `date`.
  */
 
+/**
+ * `timezone` if `Intl` can resolve days in it, else `fallback`.
+ *
+ * `Tenant.timezone` is a free-text column, so a resort can be carrying a value
+ * `Intl` throws on. A bad row belongs in a day resolved the default way, not in
+ * a 500 that takes the whole Front Desk down.
+ */
+export function safeTimezone(timezone?: string | null, fallback = 'Asia/Dhaka'): string {
+  if (!timezone) return fallback;
+  try {
+    new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date());
+    return timezone;
+  } catch {
+    return fallback;
+  }
+}
+
 /** The resort's current calendar date, as midnight UTC of that date. */
 export function tenantToday(timezone = 'Asia/Dhaka'): Date {
   return startOfTenantDay(new Date(), timezone);

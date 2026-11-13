@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
-import { canRoom, type Room } from '@resort-pro/types';
+import { canRoom, blockerRefuses, type Room, type RoomBlockerReport } from '@resort-pro/types';
 import { useAuthStore } from '@/store/auth';
 import { useDialogA11y } from '@/hooks/use-dialog-a11y';
 import { useCurrency } from '@/hooks/use-currency';
@@ -56,6 +56,14 @@ interface CurrentBooking {
 
 interface RoomWithBooking extends Room {
   currentBooking?: CurrentBooking | null;
+  /**
+   * What the room's own state refuses, as `GET /api/rooms/:id` reports it.
+   *
+   * Optional rather than required: a newer bundle can be served against an API
+   * that has not been deployed yet, and the list endpoint does not report one.
+   * Absent means "not asked", and the sheet then behaves as it always did.
+   */
+  blocker?: RoomBlockerReport | null;
 }
 
 interface Props {
@@ -114,6 +122,22 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
 
   const typeMeta   = ROOM_TYPE_META[room.type]   ?? ROOM_TYPE_META.STANDARD;
   const statusMeta = STATUS_META[room.status]     ?? STATUS_META.AVAILABLE;
+
+  /**
+   * Change Status used to offer every status but the current one, and the API
+   * refuses several of them depending on what is standing in the room — a
+   * guest leaves Occupied as the only one it accepts, and open maintenance, a
+   * clean in progress or a booking that holds the room today each refuse
+   * Available. The buttons were all live and all came back 409. (RM-001,
+   * RM-004; the same defect as RM-005, decided by the room's state rather than
+   * the user's role.)
+   *
+   * `blockerRefuses` is the same predicate `PATCH /:id/status` asks, so this
+   * screen cannot offer a status that endpoint will turn down.
+   */
+  const blocker = room.blocker ?? null;
+  const refused = (status: string) =>
+    blocker !== null && blockerRefuses(blocker.code, status as Room['status']);
 
   const sheet = (
     <>
@@ -332,7 +356,7 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
               {/* "Cleaning" on its own reads as a label. Grouped under the
                   heading, it reads as the action it is. */}
               <div role="group" aria-labelledby={`${uid}-status`} className="flex flex-wrap gap-2">
-                {STATUS_ACTIONS.filter(s => s.status !== room.status).map(({ status, label, Icon, bg, border, text }) => (
+                {STATUS_ACTIONS.filter(s => s.status !== room.status && !refused(s.status)).map(({ status, label, Icon, bg, border, text }) => (
                   <button key={status}
                     type="button"
                     disabled={statusLoading}
@@ -344,6 +368,16 @@ export function RoomDetailSheet({ room, onClose, onEdit, onDelete, onStatusChang
                   </button>
                 ))}
               </div>
+              {blocker && (
+                // Say why, rather than leaving a heading above a gap — and with
+                // a checked-in guest there is nothing left to show at all,
+                // since Occupied is the only status the endpoint takes. The
+                // server's own sentence names the guest, the ticket or the
+                // booking, and the one action that clears it.
+                <p className="mt-2.5 text-[12.5px] leading-relaxed" style={{ color: 'var(--rp-text-muted)' }}>
+                  {blocker.error}
+                </p>
+              )}
             </div>
           </div>
         </div>

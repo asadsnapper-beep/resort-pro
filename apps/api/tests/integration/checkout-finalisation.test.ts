@@ -297,8 +297,15 @@ describe('side effects are claimed, not repeated', () => {
     // Count the actual sends. Asserting on invoiceSentAt would pass with the
     // guard removed, because the stamp does not move on a second send — it
     // has to be the email itself that is counted.
+    //
+    // The send is mocked as *delivered*. It used to call through to the real
+    // one, which on this server answers `email_disabled` and sends nothing —
+    // so "sent once" was being proved on a path where nothing was sent at
+    // all, and it only held because a failed send kept its claim. It does not
+    // any more, and it should not: an invoice that did not reach the guest
+    // has to be sendable again.
     const emailService = await import('../../src/services/email');
-    const spy = vi.spyOn(emailService, 'sendEmail');
+    const spy = vi.spyOn(emailService, 'sendEmail').mockResolvedValue({ id: 'mock-checkout', error: null });
     const { sendCheckoutEmail } = await import('../../src/utils/guest-emails');
 
     await sendCheckoutEmail(b.id);
@@ -307,6 +314,52 @@ describe('side effects are claimed, not repeated', () => {
     expect(spy.mock.calls.filter(([arg]) => arg.to === soloEmail)).toHaveLength(1);
     expect((await prisma.booking.findUniqueOrThrow({ where: { id: b.id } })).invoiceSentAt).not.toBeNull();
     spy.mockRestore();
+  });
+
+  it('releases the claim when the provider refuses, so it can be sent later', async () => {
+    /**
+     * The release path and the `trackGuestEmail` wrapper at the call site were
+     * both already written, and both only run on a thrown send. `sendEmail`
+     * resolves `{ id, error }` and never throws, so for the failure that
+     * actually happens — a refusal, or no provider at all — neither ran: the
+     * claim stayed stamped on a guest who never received their invoice, and
+     * the claim is what stops anybody sending it afterwards.
+     */
+    await prisma.emailSettings.upsert({
+      where: { tenantId }, create: { tenantId, sendCheckoutInvoice: true }, update: { sendCheckoutInvoice: true },
+    });
+    const refusedEmail = `refused-${Date.now()}@test.com`;
+    const guest = await prisma.guest.create({
+      data: { tenantId, firstName: 'Refused', lastName: 'Guest', email: refusedEmail },
+    });
+    const b = await prisma.booking.create({
+      data: {
+        tenantId, roomId: nextRoom(), guestId: guest.id,
+        checkIn: new Date('2029-02-10'), checkOut: new Date('2029-02-11'),
+        totalAmount: 5000, paidAmount: 5000, status: 'CHECKED_IN',
+        confirmationNo: `REF-${Math.random().toString(36).slice(2, 10).toUpperCase()}`,
+      },
+    });
+
+    const emailService = await import('../../src/services/email');
+    const { sendCheckoutEmail } = await import('../../src/utils/guest-emails');
+
+    const refuse = vi.spyOn(emailService, 'sendEmail')
+      .mockResolvedValue({ id: null, error: 'Recipient address is invalid' });
+
+    // It must reject, because that is what reaches trackGuestEmail at the
+    // call site and turns a lost invoice into an admin notification.
+    await expect(sendCheckoutEmail(b.id)).rejects.toThrow(/Recipient address is invalid/);
+    expect((await prisma.booking.findUniqueOrThrow({ where: { id: b.id } })).invoiceSentAt).toBeNull();
+    refuse.mockRestore();
+
+    // And once a provider takes it, the guest gets their invoice after all.
+    const accept = vi.spyOn(emailService, 'sendEmail').mockResolvedValue({ id: 'mock-retry', error: null });
+    await sendCheckoutEmail(b.id);
+
+    expect(accept.mock.calls.filter(([arg]) => arg.to === refusedEmail)).toHaveLength(1);
+    expect((await prisma.booking.findUniqueOrThrow({ where: { id: b.id } })).invoiceSentAt).not.toBeNull();
+    accept.mockRestore();
   });
 
   it('awards loyalty points once', async () => {
