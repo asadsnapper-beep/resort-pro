@@ -9,7 +9,7 @@ A real incident, not a hypothetical. On 30–31 October 2026 an agent run left
 directories are expanded. `git reflog` showed no activity there between
 5 September and 13 November — no commit, no branch switch — so the work had no
 home and nobody knew it existed for two weeks. By the time it was found, `dev`
-had moved 82 commits and `WalkInScreen.kt` had grown from 347 lines to 698, so
+had moved 288 commits and `WalkInScreen.kt` had grown from 347 lines to 698, so
 most of it was obsolete. Separating the roughly twenty files that still
 mattered took hours.
 
