@@ -43,7 +43,7 @@ internal fun BookingDetailsContent(state: BookingDetailsState, onBack: () -> Uni
             item { TextButton(onClick = onBack) { Text(stringResource(R.string.action_back)) }; Text(stringResource(R.string.booking_details_title), style = MaterialTheme.typography.headlineMedium, fontFamily = FontFamily.Serif) }
             when {
                 state.loading -> item { CircularProgressIndicator() }
-                state.error != null -> item { Column { Text(state.error, color = MaterialTheme.colorScheme.error); TextButton(onClick = onRetry) { Text(stringResource(R.string.action_try_again)) } } }
+                state.error != null -> item { Column { Text(state.error.text(), color = MaterialTheme.colorScheme.error); TextButton(onClick = onRetry) { Text(stringResource(R.string.action_try_again)) } } }
                 state.booking != null -> {
                     val booking = state.booking
                     item { Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.primaryContainer) {
