@@ -1,5 +1,80 @@
 # ResortPro — project instructions
 
+## Git: where to work, and what to leave behind
+
+Read this before touching a file.
+
+A real incident, not a hypothetical. On 30–31 October 2026 an agent run left
+**166 uncommitted entries** in the main checkout — 183 files once the untracked
+directories are expanded. `git reflog` showed no activity there between
+5 September and 13 November — no commit, no branch switch — so the work had no
+home and nobody knew it existed for two weeks. By the time it was found, `dev`
+had moved 288 commits and `WalkInScreen.kt` had grown from 347 lines to 698, so
+most of it was obsolete. Separating the roughly twenty files that still
+mattered took hours.
+
+It was parked on `park/agent-work-2026-10-30` rather than discarded; that
+commit message lists which files are genuinely missing from `dev`, which are
+byte-identical to it, and which are duplicates. Five rules prevent the next
+one.
+
+### 1. Never work on `dev` in the main checkout
+
+That working tree is shared. Files left in it sit on top of whatever branch it
+happens to be on, invisible to everyone. Branch first:
+
+```bash
+git switch -c fix/<short-description>
+```
+
+A separate worktree is better still.
+
+### 2. Start from today's `dev`, not from whatever is checked out
+
+```bash
+git fetch origin && git log --oneline -1 origin/dev
+```
+
+If the checkout is behind, branch from `origin/dev` rather than from `HEAD`.
+The October run was written against a 5 September base; that is the single
+reason most of it had to be thrown away rather than reviewed.
+
+### 3. Commit everything you touched, before you stop
+
+Finished or not. An unfinished branch is an ordinary thing. An uncommitted
+working tree is work waiting for a disk failure. If the task is incomplete, say
+so in the commit message and leave it on the branch.
+
+### 4. Never end a turn with a dirty tree
+
+```bash
+git status --porcelain
+```
+
+Empty, or you are not done. If you are deliberately leaving something
+untracked, name it in your reply so nobody has to work it out later.
+
+### 5. Say what you pushed and what you did not
+
+"Committed on `fix/x`, not pushed" is a complete and useful answer. Silence is
+what turns a branch into an archaeology problem.
+
+### Do not commit binaries or generated files
+
+Git keeps every version of a binary forever and this repository is public. The
+same October pile contained 26 MB of marketing PNGs and MP4s; images committed
+once before had to be removed again, and removing them does not shrink the
+repository. Images, video, build output and caches belong in `.gitignore`.
+
+Application assets that the build genuinely needs — logos, icons — are fine.
+The test is whether the file is produced by a tool or is an input to one.
+
+### This repository is public
+
+No server addresses, tailnet names, owner e-mail addresses, API keys, tokens or
+credentials in any file, commit message or pull-request description — including
+in planning documents and code comments. Scan before you commit, not after.
+
 ## Dashboard UI: use the design system, not raw values
 
 The 47 dashboard pages were built by copy-paste, which is why a single design

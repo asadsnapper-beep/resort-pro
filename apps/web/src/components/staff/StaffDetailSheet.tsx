@@ -82,7 +82,7 @@ export function StaffDetailSheet({ staff, onClose, onEdit, onDeactivate, onReact
   const sheet = (
     <>
       <div className="fixed inset-0 z-40" style={{ background: 'rgba(27,52,47,0.3)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white shadow-2xl"
+      <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-rp-modal shadow-2xl"
         style={{ boxShadow: '-8px 0 40px rgba(27,52,47,0.18)' }}>
 
         {/* Header */}
