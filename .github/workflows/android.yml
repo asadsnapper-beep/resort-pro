@@ -1,0 +1,95 @@
+name: Android
+
+# The Android app had no CI at all until now: ten unit-test files under
+# apps/android/app/src/test sat in the repository and nothing ever ran them,
+# and nothing ever compiled the app. Kotlin and Compose errors could only be
+# found by whoever happened to open Android Studio next.
+#
+# Unlike the web and API suites this one is path-filtered. A full Gradle build
+# downloads the Gradle distribution, the AndroidX dependencies and an SDK
+# platform, which is several minutes that a PR touching only apps/web should
+# not pay. The consequence is that this check is *skipped*, not failed, on
+# PRs that leave apps/android alone — so it must not be made a required
+# status check without that in mind.
+
+on:
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - 'apps/android/**'
+      - '.github/workflows/android.yml'
+  push:
+    branches: [main, dev]
+    paths:
+      - 'apps/android/**'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Android Build & Unit Tests ──────────────────────────────────────────────
+  android:
+    name: Android Build & Unit Tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: apps/android
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # The app sets sourceCompatibility/targetCompatibility to 17, but AGP
+      # 9.2.1 and Gradle 9.4.1 both want a 17+ JVM to *run* on, and 21 is what
+      # Android Studio ships as its bundled JBR — so 21 is what the app is
+      # actually built with day to day. Matching it here keeps CI honest.
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # Caches the Gradle distribution, the dependency cache and the build
+      # cache between runs, and validates the checked-in wrapper jar's
+      # checksum against Gradle's published list (on by default in v4).
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          build-scan-publish: false
+
+      # apps/android/local.properties is gitignored, so Gradle finds the SDK
+      # through these. The runner image pre-sets them and pre-accepts the SDK
+      # licences; AGP downloads the compileSdk 37 platform and build-tools
+      # itself on first use.
+      - name: Report the SDK location Gradle will use
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          ls "$ANDROID_HOME/licenses" 2>/dev/null || echo "no licences directory"
+
+      # setup-gradle manages the daemon's lifecycle and shuts it down at the
+      # end of the job, so the two gradlew invocations below share one warm JVM
+      # and one configuration pass instead of paying for both twice.
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest
+
+      # assembleDebug is the part that catches what the unit tests cannot: a
+      # Compose screen referring to a model field that no longer exists, a
+      # missing string resource, a navigation route that does not typecheck.
+      - name: Debug build
+        run: ./gradlew :app:assembleDebug
+
+      # Gradle's console output truncates multi-failure test runs, and the HTML
+      # report says which assertion failed and why.
+      - name: Upload test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-unit-test-report
+          path: apps/android/app/build/reports/tests/
+          retention-days: 7
+          if-no-files-found: ignore
