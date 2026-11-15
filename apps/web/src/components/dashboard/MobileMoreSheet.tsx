@@ -126,7 +126,7 @@ export function MobileMoreSheet({ open, onClose }: { open: boolean; onClose: () 
           {/* Sign out */}
           <button
             onClick={handleLogout}
-            className="mt-2 flex w-full items-center justify-center gap-2 rounded-[12px] border border-red-200 bg-white py-3 text-[13px] font-semibold text-red-600">
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-[12px] border border-red-200 bg-rp-surface py-3 text-[13px] font-semibold text-red-600">
             <LogOut className="h-4 w-4" /> Sign out
           </button>
         </div>

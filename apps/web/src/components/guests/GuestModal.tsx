@@ -87,19 +87,19 @@ export function GuestModal({ open, onClose, onSubmit, loading, guest }: Props) {
 
   const content = (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="w-full max-w-xl rounded-2xl bg-white overflow-hidden shadow-2xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <div className="w-full max-w-xl rounded-2xl bg-rp-modal overflow-hidden shadow-2xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-rp-border">
           <div>
-            <h2 className="font-semibold text-base text-gray-900">
+            <h2 className="font-semibold text-base text-rp-text">
               {guest ? 'Edit Guest' : 'Add Guest'}
             </h2>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-xs text-rp-muted mt-0.5">
               {guest ? `Editing ${guest.firstName} ${guest.lastName}` : 'Register a new guest profile'}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 hover:bg-gray-100 transition-colors"
+            className="rounded-lg p-1.5 hover:bg-rp-surface-3 transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -110,7 +110,7 @@ export function GuestModal({ open, onClose, onSubmit, loading, guest }: Props) {
         {/* Name */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">First Name</label>
+            <label className="mb-1 block text-sm font-medium text-rp-accent">First Name</label>
             <input
               {...register('firstName')}
               placeholder="John"
@@ -128,7 +128,7 @@ export function GuestModal({ open, onClose, onSubmit, loading, guest }: Props) {
             {errors.firstName && <p className="mt-1 text-xs text-red-500">{errors.firstName.message}</p>}
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Last Name</label>
+            <label className="mb-1 block text-sm font-medium text-rp-accent">Last Name</label>
             <input
               {...register('lastName')}
               placeholder="Smith"
@@ -150,7 +150,7 @@ export function GuestModal({ open, onClose, onSubmit, loading, guest }: Props) {
         {/* Contact */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+            <label className="mb-1 block text-sm font-medium text-rp-accent">Email</label>
             <input
               {...register('email')}
               type="email"
@@ -169,7 +169,7 @@ export function GuestModal({ open, onClose, onSubmit, loading, guest }: Props) {
             {errors.email && <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>}
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Phone</label>
+            <label className="mb-1 block text-sm font-medium text-rp-accent">Phone</label>
             <input
               {...register('phone')}
               placeholder="+1 234 567 8900"
@@ -190,7 +190,7 @@ export function GuestModal({ open, onClose, onSubmit, loading, guest }: Props) {
         {/* Nationality + ID */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Nationality</label>
+            <label className="mb-1 block text-sm font-medium text-rp-accent">Nationality</label>
             <input
               {...register('nationality')}
               placeholder="American"
@@ -207,7 +207,7 @@ export function GuestModal({ open, onClose, onSubmit, loading, guest }: Props) {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">ID Type</label>
+            <label className="mb-1 block text-sm font-medium text-rp-accent">ID Type</label>
             <select
               {...register('idType')}
               className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
@@ -221,7 +221,7 @@ export function GuestModal({ open, onClose, onSubmit, loading, guest }: Props) {
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">ID Number</label>
+          <label className="mb-1 block text-sm font-medium text-rp-accent">ID Number</label>
           <input
             {...register('idNumber')}
             placeholder="AB1234567"
@@ -240,7 +240,7 @@ export function GuestModal({ open, onClose, onSubmit, loading, guest }: Props) {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Address</label>
+            <label className="mb-1 block text-sm font-medium text-rp-accent">Address</label>
             <input
               {...register('address')}
               placeholder="123 Main St, New York, NY 10001"
@@ -257,7 +257,7 @@ export function GuestModal({ open, onClose, onSubmit, loading, guest }: Props) {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-sm font-medium text-rp-accent">
               Date of Birth
               <span className="ml-1 text-xs text-muted-foreground font-normal">(for birthday offers)</span>
             </label>
@@ -279,7 +279,7 @@ export function GuestModal({ open, onClose, onSubmit, loading, guest }: Props) {
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Notes</label>
+          <label className="mb-1 block text-sm font-medium text-rp-accent">Notes</label>
           <textarea
             {...register('notes')}
             rows={2}
