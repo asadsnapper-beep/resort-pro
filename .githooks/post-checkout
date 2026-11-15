@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+#
+# The nearest thing to catching work nobody committed.
+#
+# On 30–31 October 2026 an agent left 183 files uncommitted in the main
+# checkout and `git reflog` showed no activity there for two months, so nothing
+# fired and nobody knew. A hook cannot fix that — it only runs when git runs.
+# What it can do is make the state impossible to miss the next time somebody
+# does run git here.
+#
+# Silent when the tree is tidy.
+set -uo pipefail
+
+n=$(git status --porcelain 2>/dev/null | grep -cvE '^\?\? (content|reports)/$' || true)
+threshold=${DIRTY_TREE_WARN:-20}
+[ "${n:-0}" -le "$threshold" ] && exit 0
+
+branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo 'a detached HEAD')
+printf '\n\033[33m⚠  %s uncommitted entries in this working tree (on %s).\033[0m\n' "$n" "$branch" >&2
+printf '   That is how 183 files sat unnoticed for two weeks in October.\n' >&2
+printf '   If any of it is yours and worth keeping:\n' >&2
+printf '       git switch -c wip/<name> && git add -A && git commit\n' >&2
+printf '   See AGENTS.md → "Git: where to work". Raise the threshold with DIRTY_TREE_WARN.\n\n' >&2
+exit 0
