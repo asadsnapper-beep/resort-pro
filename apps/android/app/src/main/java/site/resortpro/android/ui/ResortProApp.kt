@@ -1,5 +1,6 @@
 package site.resortpro.android.ui
 
+import android.net.Uri
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -22,6 +23,9 @@ import site.resortpro.android.core.AppContainer
 import site.resortpro.android.feature.auth.AuthViewModel
 import site.resortpro.android.feature.auth.HomeKind
 import site.resortpro.android.feature.auth.RolePolicy
+import site.resortpro.android.feature.guests.GuestsViewModel
+import site.resortpro.android.feature.guests.GuestDetailsViewModel
+import site.resortpro.android.feature.guests.BookingDetailsViewModel
 import site.resortpro.android.feature.housekeeping.HousekeepingViewModel
 import site.resortpro.android.feature.rooms.RoomsViewModel
 import site.resortpro.android.feature.walkin.WalkInViewModel
@@ -30,6 +34,9 @@ import site.resortpro.android.ui.components.LoadingScreen
 private object Route {
     const val HOME = "home"
     const val ROOMS = "rooms"
+    const val GUESTS = "guests"
+    const val GUEST_DETAILS = "guest/{guestId}"
+    const val BOOKING_DETAILS = "booking/{bookingId}"
     const val HOUSEKEEPING = "housekeeping"
     const val WALK_IN = "walk-in"
 }
@@ -114,6 +121,7 @@ fun ResortProApp(viewModel: AuthViewModel, container: AppContainer, activity: Fr
                             onEnableAppLock = viewModel::enableAppLock,
                             onDeclineAppLock = viewModel::declineAppLock,
                             onLogout = viewModel::logout,
+                            onOpenGuests = permitted(RolePolicy.canViewGuests(session.user.role)) { navController.navigate(Route.GUESTS) },
                         )
                     }
                     composable(Route.ROOMS) {
@@ -140,6 +148,23 @@ fun ResortProApp(viewModel: AuthViewModel, container: AppContainer, activity: Fr
                             onBack = if (isFieldStaff) null else { { navController.navigateUp() } },
                             onLogout = viewModel::logout,
                         )
+                    }
+                    composable(Route.GUESTS) {
+                        if (!RolePolicy.canViewGuests(session.user.role)) { navController.popBackStack(); return@composable }
+                        val model: GuestsViewModel = viewModel(factory = GuestsViewModel.Factory(container.guestsRepository))
+                        GuestsScreen(model, navController::navigateUp) { id -> navController.navigate("guest/${Uri.encode(id)}") }
+                    }
+                    composable(Route.GUEST_DETAILS) { entry ->
+                        if (!RolePolicy.canViewGuests(session.user.role)) { navController.popBackStack(); return@composable }
+                        val id = entry.arguments?.getString("guestId") ?: return@composable
+                        val model: GuestDetailsViewModel = viewModel(factory = GuestDetailsViewModel.Factory(container.guestsRepository, id))
+                        GuestDetailsScreen(model, navController::navigateUp) { id -> navController.navigate("booking/${Uri.encode(id)}") }
+                    }
+                    composable(Route.BOOKING_DETAILS) { entry ->
+                        if (!RolePolicy.canViewGuests(session.user.role)) { navController.popBackStack(); return@composable }
+                        val id = entry.arguments?.getString("bookingId") ?: return@composable
+                        val model: BookingDetailsViewModel = viewModel(factory = BookingDetailsViewModel.Factory(container.guestsRepository, id))
+                        BookingDetailsScreen(model, navController::navigateUp, true)
                     }
                     composable(Route.WALK_IN) {
                         if (!RolePolicy.canCreateWalkIn(session.user.role)) {

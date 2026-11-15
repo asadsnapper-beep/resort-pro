@@ -81,4 +81,6 @@ private fun BookingInfoCard(title: String, content: @Composable () -> Unit) {
     }
 }
 
-private fun bookingMoney(amount: Double): String = "৳" + NumberFormat.getNumberInstance(Locale.forLanguageTag("en-BD")).apply { maximumFractionDigits = 2 }.format(amount)
+// The booking API does not provide a currency. Do not invent one for the resort.
+private fun bookingMoney(amount: Double): String =
+    NumberFormat.getNumberInstance().apply { maximumFractionDigits = 2 }.format(amount)

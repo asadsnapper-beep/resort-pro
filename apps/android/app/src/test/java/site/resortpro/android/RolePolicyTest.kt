@@ -46,6 +46,16 @@ class RolePolicyTest {
     }
 
     @Test
+    fun guestAccessMatchesMobileApi() {
+        assertEquals(true, RolePolicy.canViewGuests("OWNER"))
+        assertEquals(true, RolePolicy.canViewGuests("MANAGER"))
+        assertEquals(true, RolePolicy.canViewGuests("RECEPTIONIST"))
+        assertEquals(false, RolePolicy.canViewGuests("STAFF"))
+        assertEquals(false, RolePolicy.canViewGuests("SHAREHOLDER"))
+        assertEquals(false, RolePolicy.canViewGuests("UNKNOWN"))
+    }
+
+    @Test
     fun walkInAccessMatchesBackendRoleGuard() {
         assertEquals(true, RolePolicy.canCreateWalkIn("OWNER"))
         assertEquals(true, RolePolicy.canCreateWalkIn("MANAGER"))

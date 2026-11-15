@@ -35,6 +35,15 @@ interface AuthApi {
         @Query("limit") limit: Int = 100,
     ): Response<PaginatedRoomEnvelope>
 
+    @POST("api/mobile/guests/search")
+    suspend fun searchGuests(@Body request: GuestSearchRequest): Response<GuestSearchEnvelope>
+
+    @GET("api/mobile/guests/{id}")
+    suspend fun guestDetails(@Path("id") guestId: String): Response<ApiEnvelope<GuestDetailsDto>>
+
+    @GET("api/mobile/bookings/{id}")
+    suspend fun bookingDetails(@Path("id") bookingId: String): Response<ApiEnvelope<BookingDetailsDto>>
+
     @GET("api/rooms/availability")
     suspend fun roomAvailability(
         @Query("checkIn") checkIn: String,
