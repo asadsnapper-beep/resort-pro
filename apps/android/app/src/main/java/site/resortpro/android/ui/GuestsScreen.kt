@@ -39,6 +39,7 @@ import site.resortpro.android.R
 import site.resortpro.android.core.network.GuestBookingDto
 import site.resortpro.android.feature.guests.GuestDetailState
 import site.resortpro.android.feature.guests.GuestDetailsViewModel
+import site.resortpro.android.feature.guests.GuestError
 import site.resortpro.android.feature.guests.GuestsViewModel
 
 @Composable
@@ -67,9 +68,12 @@ fun GuestsScreen(viewModel: GuestsViewModel, onBack: () -> Unit, onGuest: (Strin
                     }
                 }
             }
+            // Read once into a local: `state` is a delegated property, so
+            // `state.error` does not smart-cast to non-null inside the branch.
+            val error = state.error
             when {
                 state.isLoading -> item { Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.height(24.dp)); Text(stringResource(R.string.guest_loading)) } }
-                state.error != null -> item { GuestMessage(state.error.orEmpty()) { viewModel.search(state.page) } }
+                error != null -> item { GuestMessage(error.text()) { viewModel.search(state.page) } }
                 state.searched && state.guests.isEmpty() -> item { GuestMessage(stringResource(R.string.guest_none)) }
                 state.searched -> {
                     item { Text(stringResource(R.string.guest_search_count, state.total, state.page, state.totalPages), style = MaterialTheme.typography.labelLarge) }
@@ -108,7 +112,7 @@ internal fun GuestDetailsContent(state: GuestDetailState, onBack: () -> Unit, on
             item { TextButton(onClick = onBack) { Text(stringResource(R.string.action_back)) }; Text(stringResource(R.string.guest_details_title), style = MaterialTheme.typography.headlineMedium, fontFamily = FontFamily.Serif) }
             when {
                 state.isLoading -> item { CircularProgressIndicator() }
-                state.error != null -> item { GuestMessage(state.error, onRetry) }
+                state.error != null -> item { GuestMessage(state.error.text(), onRetry) }
                 state.guest != null -> {
                     val guest = state.guest
                     item {
@@ -157,6 +161,20 @@ internal fun guestBookingStatus(status: String): String = when (status) {
     "NO_SHOW" -> stringResource(R.string.guest_status_no_show)
     "CONFLICT" -> stringResource(R.string.guest_status_conflict)
     else -> status.lowercase().replace('_', ' ').replaceFirstChar { it.titlecase() }
+}
+
+/**
+ * Resolves a failure to text. A recognised condition goes through strings.xml,
+ * so values-bn applies; text the server sent is shown as it arrived.
+ *
+ * Lives beside the screens rather than in the view model because
+ * `stringResource` needs a composition, and a view model holding a Context to
+ * pre-format its own strings is the thing worth avoiding.
+ */
+@Composable
+internal fun GuestError.text(): String = when (this) {
+    is GuestError.Known -> stringResource(message)
+    is GuestError.FromServer -> message
 }
 
 @Composable

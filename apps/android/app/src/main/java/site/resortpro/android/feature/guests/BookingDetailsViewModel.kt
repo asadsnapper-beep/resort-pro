@@ -8,9 +8,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import site.resortpro.android.R
 import site.resortpro.android.core.network.BookingDetailsDto
 
-data class BookingDetailsState(val loading: Boolean = false, val booking: BookingDetailsDto? = null, val error: String? = null)
+data class BookingDetailsState(val loading: Boolean = false, val booking: BookingDetailsDto? = null, val error: GuestError? = null)
 
 class BookingDetailsViewModel(private val repository: GuestsRepository, private val id: String) : ViewModel() {
     private val mutableState = MutableStateFlow(BookingDetailsState())
@@ -22,7 +23,7 @@ class BookingDetailsViewModel(private val repository: GuestsRepository, private 
         viewModelScope.launch {
             try { val booking = repository.booking(id); mutableState.update { it.copy(loading = false, booking = booking) } }
             catch (error: CancellationException) { throw error }
-            catch (error: Exception) { mutableState.update { it.copy(loading = false, error = error.message ?: "Could not load this booking.") } }
+            catch (error: Exception) { mutableState.update { it.copy(loading = false, error = error.toGuestError(R.string.guest_error_load_booking)) } }
         }
     }
     class Factory(private val repository: GuestsRepository, private val id: String) : ViewModelProvider.Factory {

@@ -116,4 +116,15 @@
     <string name="guest_status_no_show">No show</string>
     <string name="guest_status_pending">Pending</string>
     <string name="guest_view_profile">View guest profile</string>
+    <!-- Guest and booking failures. Previously built as prose in Kotlin, which
+         meant a Bangla user got Bangla screens and English errors. -->
+    <string name="guest_error_offline">Could not reach ResortPro. Check your connection and try again.</string>
+    <string name="guest_error_signed_out">Your session is no longer valid. Please sign in again.</string>
+    <string name="guest_error_forbidden">Access denied, or your permissions changed. Sign in again or contact your manager.</string>
+    <string name="guest_error_missing">This item is unavailable, or the server needs an update.</string>
+    <string name="guest_error_mismatch">The server returned a different record than the one requested.</string>
+    <string name="guest_error_incomplete">The server\'s reply was incomplete.</string>
+    <string name="guest_error_search">Could not search guests.</string>
+    <string name="guest_error_load_guest">Could not load this guest.</string>
+    <string name="guest_error_load_booking">Could not load this booking.</string>
 </resources>

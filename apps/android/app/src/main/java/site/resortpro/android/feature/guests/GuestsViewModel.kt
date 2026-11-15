@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import site.resortpro.android.R
 import site.resortpro.android.core.network.GuestDetailsDto
 import site.resortpro.android.core.network.GuestSummaryDto
 
@@ -17,7 +18,7 @@ data class GuestSearchState(
     val guests: List<GuestSummaryDto> = emptyList(),
     val isLoading: Boolean = false,
     val searched: Boolean = false,
-    val error: String? = null,
+    val error: GuestError? = null,
     val page: Int = 1,
     val totalPages: Int = 0,
     val total: Int = 0,
@@ -45,7 +46,7 @@ class GuestsViewModel(private val repository: GuestsRepository) : ViewModel() {
                 val result = repository.search(query, page)
                 if (version == requestVersion) mutableState.update { it.copy(isLoading = false, guests = result.guests, page = result.page, totalPages = result.totalPages, total = result.total) }
             } catch (error: CancellationException) { throw error }
-            catch (error: Exception) { if (version == requestVersion) mutableState.update { it.copy(isLoading = false, error = error.message ?: "Could not search guests.") } }
+            catch (error: Exception) { if (version == requestVersion) mutableState.update { it.copy(isLoading = false, error = error.toGuestError(R.string.guest_error_search)) } }
         }
     }
 
@@ -57,7 +58,7 @@ class GuestsViewModel(private val repository: GuestsRepository) : ViewModel() {
     }
 }
 
-data class GuestDetailState(val isLoading: Boolean = false, val guest: GuestDetailsDto? = null, val error: String? = null)
+data class GuestDetailState(val isLoading: Boolean = false, val guest: GuestDetailsDto? = null, val error: GuestError? = null)
 
 class GuestDetailsViewModel(private val repository: GuestsRepository, private val guestId: String) : ViewModel() {
     private val mutableState = MutableStateFlow(GuestDetailState())
@@ -70,7 +71,7 @@ class GuestDetailsViewModel(private val repository: GuestsRepository, private va
         viewModelScope.launch {
             try { val guest = repository.details(guestId); mutableState.update { it.copy(isLoading = false, guest = guest) } }
             catch (error: CancellationException) { throw error }
-            catch (error: Exception) { mutableState.update { it.copy(isLoading = false, error = error.message ?: "Could not load this guest.") } }
+            catch (error: Exception) { mutableState.update { it.copy(isLoading = false, error = error.toGuestError(R.string.guest_error_load_guest)) } }
         }
     }
 
