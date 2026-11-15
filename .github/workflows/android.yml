@@ -77,6 +77,40 @@ jobs:
       - name: Unit tests
         run: ./gradlew :app:testDebugUnitTest
 
+      # `BUILD SUCCESSFUL` from the step above says nothing about how many
+      # tests ran. Gradle's "N actionable tasks" counts tasks, not tests, and a
+      # run that executes zero tests is exactly as green as one that executes
+      # all of them — so a renamed package, a misplaced source directory or a
+      # stray filter would sail through CI unnoticed. This reads the JUnit XML
+      # and refuses a run that tested nothing.
+      - name: Report and assert the unit test count
+        if: success() || failure()
+        run: |
+          python3 - <<'PY'
+          import glob, sys, xml.etree.ElementTree as ET
+
+          paths = sorted(glob.glob('app/build/test-results/testDebugUnitTest/*.xml'))
+          if not paths:
+              sys.exit('No JUnit XML under app/build/test-results/testDebugUnitTest. '
+                       'The test task produced no results at all.')
+
+          tests = failures = errors = skipped = 0
+          for path in paths:
+              root = ET.parse(path).getroot()
+              tests    += int(root.get('tests', 0))
+              failures += int(root.get('failures', 0))
+              errors   += int(root.get('errors', 0))
+              skipped  += int(root.get('skipped', 0))
+
+          print(f"{len(paths)} test class{'es' if len(paths) != 1 else ''}")
+          print(f'tests={tests} failures={failures} errors={errors} skipped={skipped}')
+
+          if tests == 0:
+              sys.exit('The suite ran zero tests, which BUILD SUCCESSFUL does not '
+                       'distinguish from a full green run.')
+          print(f'{tests} unit tests ran.')
+          PY
+
       # assembleDebug is the part that catches what the unit tests cannot: a
       # Compose screen referring to a model field that no longer exists, a
       # missing string resource, a navigation route that does not typecheck.
@@ -84,9 +118,10 @@ jobs:
         run: ./gradlew :app:assembleDebug
 
       # Gradle's console output truncates multi-failure test runs, and the HTML
-      # report says which assertion failed and why.
+      # report says which assertion failed and why. Kept on a pass too, so the
+      # per-class breakdown behind the printed count is there to check.
       - name: Upload test report
-        if: failure()
+        if: success() || failure()
         uses: actions/upload-artifact@v4
         with:
           name: android-unit-test-report
