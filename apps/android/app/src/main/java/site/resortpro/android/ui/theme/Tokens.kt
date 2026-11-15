@@ -1,10 +1,9 @@
 package site.resortpro.android.ui.theme
 
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * Existing screen gaps and insets. Numeric names avoid assigning one visual
+ * Existing screen dimensions. Numeric names avoid assigning one visual
  * purpose to a value that is currently shared by several different layouts.
  * This slice is additive; screens keep their current values until migrated.
  */
@@ -19,8 +18,9 @@ object ResortSpacing {
     val Space12 = 12.dp
     val Space14 = 14.dp
     val Space16 = 16.dp
-    // 18, 20, 22 and 24 dp are deliberately separate: changing an inset
-    // changes the layout. Guest/booking screens on the pending branch use 22.
+    // Keep near-duplicate values distinct: replacing an existing inset changes
+    // the layout. On dev, 22 dp is a spinner height in Login, Rooms and WalkIn;
+    // the pending guest branch also uses 22 dp as an inset.
     val Space18 = 18.dp
     val Space20 = 20.dp
     val Space22 = 22.dp
@@ -30,21 +30,15 @@ object ResortSpacing {
 }
 
 /**
- * Explicit corner radii already used by the thumbnail and pending guest
- * surfaces. Material components without an explicit shape retain their own
- * defaults; these values do not override MaterialTheme.shapes.
+ * Explicit radii do not override the defaults in MaterialTheme.shapes.
  */
 object ResortRadius {
-    val Thumbnail = 8.dp
-    val GuestCard = 20.dp
-    val GuestSurface = 24.dp
+    // WalkInScreen's document thumbnail on dev.
+    val Radius8 = 8.dp
+    // GuestsScreen and BookingDetailsScreen cards on the unmerged guest branch.
+    val Radius20 = 20.dp
+    // GuestsScreen and BookingDetailsScreen surfaces on the unmerged guest branch.
+    val Radius24 = 24.dp
 }
 
-/**
- * Current screens do not set custom elevation values. This marker means
- * "leave the component's Material default alone", not a measured elevation
- * and not a value to pass to an elevation parameter.
- */
-object ResortElevation {
-    val MaterialDefault: Dp = Dp.Unspecified
-}
+// Current screens do not set custom elevation values.
