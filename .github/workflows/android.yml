@@ -111,6 +111,11 @@ jobs:
           print(f'{tests} unit tests ran.')
           PY
 
+      # Compile the device-test sources even when this job has no emulator.
+      # Running them still requires a separate device/emulator test environment.
+      - name: Compile instrumentation tests
+        run: ./gradlew :app:assembleDebugAndroidTest
+
       # assembleDebug is the part that catches what the unit tests cannot: a
       # Compose screen referring to a model field that no longer exists, a
       # missing string resource, a navigation route that does not typecheck.

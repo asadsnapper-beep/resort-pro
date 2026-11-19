@@ -73,6 +73,8 @@ class CriticalFlowsTest {
                         onOpenHousekeeping = {},
                         onOpenWalkIn = {},
                         onLogout = {},
+                        onEnableAppLock = {},
+                        onDeclineAppLock = {},
                     )
                 } else {
                     LoginScreen(
