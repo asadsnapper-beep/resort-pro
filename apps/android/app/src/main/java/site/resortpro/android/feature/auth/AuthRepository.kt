@@ -7,6 +7,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl
+import kotlinx.serialization.json.JsonElement
 import retrofit2.Response
 import site.resortpro.android.core.network.ApiEnvelope
 import site.resortpro.android.core.network.ApiException
@@ -88,7 +89,7 @@ class AuthRepository(
         val response = networkCall {
             api.login(LoginRequest(email = email, password = password, slug = slug))
         }
-        val data: LoginData = response.requireData()
+        val data: LoginData = response.requireData(json)
         sessionStore.setAccessToken(data.token)
         return AuthenticatedSession(user = data.user, tenant = data.tenant)
     }
@@ -101,7 +102,7 @@ class AuthRepository(
 
         try {
             val response = api.me()
-            AuthenticatedSession(user = response.requireData())
+            AuthenticatedSession(user = response.requireData(json))
         } catch (_: IOException) {
             // Keep the encrypted refresh cookie. A temporary offline state must
             // not destroy an otherwise valid session.
@@ -115,7 +116,7 @@ class AuthRepository(
     suspend fun loadHome(role: String, tenantId: String): HomeLoadResult = when (RolePolicy.homeKind(role)) {
         HomeKind.OPERATIONS_WITH_FINANCIALS, HomeKind.FRONT_DESK -> {
             val cached = loadCached<DashboardData>(cacheKey("dashboard", tenantId)) {
-                networkCall(api::dashboard).requireData()
+                networkCall(api::dashboard).requireData(json)
             }
             HomeLoadResult(
                 content = HomeContent.Operations(
@@ -128,7 +129,7 @@ class AuthRepository(
         }
         HomeKind.SHAREHOLDER -> {
             val cached = loadCached<ShareholderSummary>(cacheKey("shareholder-summary", tenantId)) {
-                networkCall(api::shareholderSummary).requireData()
+                networkCall(api::shareholderSummary).requireData(json)
             }
             HomeLoadResult(HomeContent.Investment(cached.value), cached.syncedAt, cached.fromCache)
         }
@@ -173,20 +174,21 @@ class AuthRepository(
             throw NetworkUnavailableException(error)
         }
     }
+}
 
-    private fun <T> Response<ApiEnvelope<T>>.requireData(): T {
-        if (isSuccessful) {
-            return body()?.data
-                ?: throw ApiException(code(), null, "ResortPro returned an empty response.")
-        }
-
-        val errorEnvelope = errorBody()?.string()?.let { body ->
-            runCatching { json.decodeFromString<ApiEnvelope<T>>(body) }.getOrNull()
-        }
-        throw ApiException(
-            status = code(),
-            apiCode = errorEnvelope?.code,
-            message = errorEnvelope?.error ?: "Request failed. Please try again.",
-        )
+internal fun <T> Response<ApiEnvelope<T>>.requireData(json: Json): T {
+    if (isSuccessful) {
+        return body()?.data
+            ?: throw ApiException(code(), null, "ResortPro returned an empty response.")
     }
+
+    // Error payloads do not require the erased success-data type's serializer.
+    val errorEnvelope = errorBody()?.string()?.let { body ->
+        runCatching { json.decodeFromString<ApiEnvelope<JsonElement>>(body) }.getOrNull()
+    }
+    throw ApiException(
+        status = code(),
+        apiCode = errorEnvelope?.code,
+        message = errorEnvelope?.error ?: "Request failed. Please try again.",
+    )
 }
