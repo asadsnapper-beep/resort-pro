@@ -211,7 +211,9 @@ jobs:
   # ── Layer 2: E2E Role Tests (Playwright) ───────────────────────────────────
   e2e-tests:
     name: E2E Role Tests
-    runs-on: ubuntu-latest
+    # Playwright 1.59.1 cannot install browser dependencies on Ubuntu 26.04.
+    # Pin this job until the Playwright upgrade is tested on a newer runner.
+    runs-on: ubuntu-24.04
     needs: api-tests          # only run E2E if API tests pass
 
 
