@@ -826,12 +826,27 @@ export async function authRoutes(app: FastifyInstance) {
       const { email, slug } = request.body as { email: string; slug: string };
       if (!email || !slug) return reply.status(400).send({ success: false, error: 'Email and resort slug required' });
 
-      // Always return 200 to prevent email enumeration
+      // Always return 200 to prevent email enumeration.
+      //
+      // The reply is identical whether the account exists, the slug is wrong,
+      // or the provider refused the message — which is correct for the caller
+      // and useless for us. Each branch below therefore logs, so the three
+      // outcomes can be told apart from the server side.
+      //
+      // The slug is logged; the e-mail address is not. This endpoint is
+      // unauthenticated, so anyone could otherwise write arbitrary addresses
+      // into our logs just by posting to it.
       const tenant = await prisma.tenant.findUnique({ where: { slug } });
-      if (!tenant) return reply.send(ok(null, 'If that account exists, a reset link has been sent.'));
+      if (!tenant) {
+        request.log.warn({ tenantSlug: slug }, 'Password reset requested for an unknown resort slug');
+        return reply.send(ok(null, 'If that account exists, a reset link has been sent.'));
+      }
 
       const user = await prisma.user.findUnique({ where: { tenantId_email: { tenantId: tenant.id, email } } });
-      if (!user) return reply.send(ok(null, 'If that account exists, a reset link has been sent.'));
+      if (!user) {
+        request.log.warn({ tenantSlug: slug }, 'Password reset requested for an address with no account on that resort');
+        return reply.send(ok(null, 'If that account exists, a reset link has been sent.'));
+      }
 
       // Expire old tokens
       await prisma.passwordResetToken.updateMany({ where: { userId: user.id, used: false }, data: { used: true } });
@@ -844,7 +859,7 @@ export async function authRoutes(app: FastifyInstance) {
       const webUrl = process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:3000';
       const resetUrl = `${webUrl}/auth/reset-password?token=${token}`;
 
-      await sendEmail({
+      const { error: emailError } = await sendEmail({
         to: email,
         subject: 'Reset your ResortPro password',
         html: `
@@ -860,6 +875,19 @@ export async function authRoutes(app: FastifyInstance) {
           <p>If you didn't request this, ignore this email.</p>
         `,
       });
+
+      if (emailError) {
+        // The reply below stays a success on purpose — changing it would leak
+        // whether the account exists. But the send itself must not vanish.
+        // Before this, a provider rejection and a delivered message were
+        // indistinguishable from outside *and* inside: a reset token sat in
+        // the database with no record of whether anything was ever sent, and
+        // the only trace of `email_disabled` was in sendEmail's own warning.
+        request.log.error(
+          { userId: user.id, tenantSlug: slug, reason: emailError },
+          'Password reset e-mail was not sent',
+        );
+      }
 
       return ok(null, 'If that account exists, a reset link has been sent.');
     },
