@@ -66,6 +66,8 @@ object RolePolicy {
         else -> HomeKind.LIMITED
     }
 
+    fun canViewGuests(role: String): Boolean = role in setOf("OWNER", "MANAGER", "RECEPTIONIST")
+
     fun canViewRooms(role: String): Boolean = role in setOf("OWNER", "MANAGER", "RECEPTIONIST")
 
     fun canViewHousekeeping(role: String): Boolean =

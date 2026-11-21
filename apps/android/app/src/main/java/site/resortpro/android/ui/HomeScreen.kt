@@ -46,6 +46,7 @@ fun HomeScreen(
     onLogout: () -> Unit,
     onEnableAppLock: () -> Unit,
     onDeclineAppLock: () -> Unit,
+    onOpenGuests: (() -> Unit)? = null,
 ) {
     Scaffold(modifier = Modifier.statusBarsPadding()) { padding ->
         LazyColumn(
@@ -105,6 +106,9 @@ fun HomeScreen(
             navigationButton("Rooms & availability", onOpenRooms)
             navigationButton("Housekeeping", onOpenHousekeeping)
             navigationButton("New walk-in", onOpenWalkIn)
+            if (onOpenGuests != null) item {
+                Button(onClick = onOpenGuests, modifier = Modifier.fillMaxWidth().height(50.dp)) { Text(stringResource(R.string.guest_search_title)) }
+            }
 
             when {
                 state.isHomeLoading -> item { LoadingCard() }

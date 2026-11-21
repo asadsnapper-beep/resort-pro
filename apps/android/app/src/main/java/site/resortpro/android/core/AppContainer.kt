@@ -21,6 +21,7 @@ import site.resortpro.android.feature.auth.AuthRepository
 import site.resortpro.android.feature.rooms.RoomsRepository
 import site.resortpro.android.feature.housekeeping.HousekeepingRepository
 import site.resortpro.android.feature.housekeeping.HousekeepingSyncWorker
+import site.resortpro.android.feature.guests.GuestsRepository
 import site.resortpro.android.feature.walkin.WalkInRepository
 
 class AppContainer(context: Context) {
@@ -80,6 +81,8 @@ class AppContainer(context: Context) {
         json = json,
         cacheDao = database.cacheDao(),
     )
+
+    val guestsRepository = GuestsRepository(authApi)
 
     val housekeepingRepository = HousekeepingRepository(
         api = authApi,

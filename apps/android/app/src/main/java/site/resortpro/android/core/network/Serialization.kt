@@ -1,5 +1,6 @@
 package site.resortpro.android.core.network
 
+import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -25,3 +26,5 @@ object FlexibleDoubleSerializer : KSerializer<Double> {
         encoder.encodeDouble(value)
     }
 }
+
+object FlexibleNullableDoubleSerializer : KSerializer<Double?> by FlexibleDoubleSerializer.nullable
