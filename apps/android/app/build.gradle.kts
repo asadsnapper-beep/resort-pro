@@ -28,7 +28,7 @@ android {
             // nothing on a real phone — so the debug build could only ever talk
             // to an API when run in an emulator. Override it to test a physical
             // device against staging or a machine on the LAN:
-            //   ./gradlew assembleDebug -PapiBaseUrl=https://resortpro-api.webcoronet.com/
+            //   ./gradlew assembleDebug -PapiBaseUrl=https://<your-staging-api>/
             val apiBaseUrl = (project.findProperty("apiBaseUrl") as String?)
                 ?: "http://10.0.2.2:4000/"
             buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")

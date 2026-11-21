@@ -117,6 +117,29 @@ jobs:
       - name: Debug build
         run: ./gradlew :app:assembleDebug
 
+      - name: Release bundle
+        run: ./gradlew :app:bundleRelease
+
+      - name: Verify release bundle
+        run: |
+          bundle=app/build/outputs/bundle/release/app-release.aab
+          if [ ! -s "$bundle" ]; then
+            echo "Release bundle is missing or empty: $bundle"
+            exit 1
+          fi
+          echo "Release bundle size: $(wc -c < "$bundle") bytes"
+
+      - name: Upload release bundle and R8 mapping
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-bundle-and-mapping
+          path: |
+            apps/android/app/build/outputs/bundle/release/*.aab
+            apps/android/app/build/outputs/mapping/release/mapping.txt
+          retention-days: 7
+          if-no-files-found: warn
+
       # Gradle's console output truncates multi-failure test runs, and the HTML
       # report says which assertion failed and why. Kept on a pass too, so the
       # per-class breakdown behind the printed count is there to check.
