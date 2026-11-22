@@ -49,6 +49,8 @@ fun ResortProTheme(
 
     MaterialTheme(
         colorScheme = colors,
+        typography = ResortProTypography,
+        shapes = ResortProShapes,
         content = content,
     )
 }
