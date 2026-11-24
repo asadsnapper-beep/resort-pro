@@ -30,9 +30,27 @@ export function isEmailConfigured(): boolean {
   return EMAIL_ENABLED;
 }
 
+/* ── Escaping ───────────────────────────────────────────────────────────────── */
+// Guest and tenant names are user input. Interpolated raw, a name like
+// `<a href="…">Verify payment</a>` becomes a live link in a branded email.
+export function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Colors go into style attributes; only a plain hex value may pass.
+export function safeColor(value: string | undefined, fallback: string): string {
+  return value && /^#[0-9a-fA-F]{3,8}$/.test(value) ? value : fallback;
+}
+
 /* ── Template variable replacer ─────────────────────────────────────────────── */
+// The template itself is trusted HTML written by the resort; the values are not.
 export function renderTemplate(html: string, vars: Record<string, string>): string {
-  return html.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? '');
+  return html.replace(/\{\{(\w+)\}\}/g, (_, key) => escapeHtml(vars[key] ?? ''));
 }
 
 /* ── Default branded HTML wrapper ───────────────────────────────────────────── */
@@ -49,12 +67,15 @@ export function wrapEmail({
   accentColor?: string;
   unsubscribeUrl?: string;
 }): string {
+  const name = escapeHtml(tenantName);
+  primaryColor = safeColor(primaryColor, '#1a6b5e');
+  accentColor = safeColor(accentColor, '#d4a853');
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${tenantName}</title>
+  <title>${name}</title>
 </head>
 <body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:40px 16px;">
@@ -63,7 +84,7 @@ export function wrapEmail({
         <!-- Header -->
         <tr>
           <td style="background:${primaryColor};padding:28px 40px;text-align:center;">
-            <p style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">${tenantName}</p>
+            <p style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">${name}</p>
           </td>
         </tr>
         <!-- Body -->
@@ -75,8 +96,8 @@ export function wrapEmail({
         <!-- Footer -->
         <tr>
           <td style="background:#f9fafb;padding:24px 40px;text-align:center;border-top:1px solid #e5e7eb;">
-            <p style="margin:0 0 8px;color:#9ca3af;font-size:12px;">${tenantName}</p>
-            ${unsubscribeUrl ? `<p style="margin:0;"><a href="${unsubscribeUrl}" style="color:#9ca3af;font-size:12px;text-decoration:underline;">Unsubscribe</a></p>` : ''}
+            <p style="margin:0 0 8px;color:#9ca3af;font-size:12px;">${name}</p>
+            ${unsubscribeUrl ? `<p style="margin:0;"><a href="${escapeHtml(unsubscribeUrl)}" style="color:#9ca3af;font-size:12px;text-decoration:underline;">Unsubscribe</a></p>` : ''}
           </td>
         </tr>
       </table>
@@ -125,8 +146,17 @@ export async function sendEmail({
 }
 
 /* ── Pre-built sequence email bodies ─────────────────────────────────────────── */
+// Every template value is escaped; colors must be hex.
+function escapeVars<T extends Record<string, string>>(raw: T): T {
+  const out = {} as Record<string, string>;
+  for (const [k, v] of Object.entries(raw)) {
+    out[k] = /Color$/.test(k) ? safeColor(v, k === 'accentColor' ? '#d4a853' : '#1a6b5e') : escapeHtml(v);
+  }
+  return out as T;
+}
+
 export const SEQUENCE_TEMPLATES = {
-  BOOKING_CONFIRMED: (vars: { guestName: string; roomName: string; checkIn: string; checkOut: string; confirmationNo: string; tenantName: string; accentColor: string }) => `
+  BOOKING_CONFIRMED: (raw: { guestName: string; roomName: string; checkIn: string; checkOut: string; confirmationNo: string; tenantName: string; accentColor: string }) => { const vars = escapeVars(raw); return `
     <h2 style="margin:0 0 16px;font-size:24px;color:#111827;">Your booking is confirmed! 🎉</h2>
     <p style="color:#6b7280;line-height:1.6;">Hi ${vars.guestName},</p>
     <p style="color:#6b7280;line-height:1.6;">We're thrilled to welcome you to <strong>${vars.tenantName}</strong>. Your reservation is confirmed and we can't wait to host you.</p>
@@ -138,9 +168,9 @@ export const SEQUENCE_TEMPLATES = {
     </table>
     <p style="color:#6b7280;line-height:1.6;">If you have any questions before your arrival, feel free to reach out to us anytime.</p>
     <p style="color:#6b7280;line-height:1.6;margin-top:24px;">Warm regards,<br/><strong>${vars.tenantName} Team</strong></p>
-  `,
+  `; },
 
-  PRE_ARRIVAL: (vars: { guestName: string; checkIn: string; tenantName: string; primaryColor: string; slug: string; apiUrl: string }) => `
+  PRE_ARRIVAL: (raw: { guestName: string; checkIn: string; tenantName: string; primaryColor: string; slug: string; apiUrl: string }) => { const vars = escapeVars(raw); return `
     <h2 style="margin:0 0 16px;font-size:24px;color:#111827;">Your stay is almost here! ✨</h2>
     <p style="color:#6b7280;line-height:1.6;">Hi ${vars.guestName},</p>
     <p style="color:#6b7280;line-height:1.6;">Just a few days until your arrival on <strong>${vars.checkIn}</strong>. We're preparing everything to make your stay perfect.</p>
@@ -150,31 +180,31 @@ export const SEQUENCE_TEMPLATES = {
       <li>🛏️ Request a room upgrade</li>
       <li>🎂 Planning a celebration? Let us know</li>
     </ul>
-    <a href="${vars.apiUrl}/${vars.slug}" style="display:inline-block;margin-top:24px;padding:14px 28px;background:${vars.primaryColor};color:#ffffff;border-radius:50px;text-decoration:none;font-weight:600;font-size:14px;">Explore our resort →</a>
+    <a href="${vars.apiUrl}/${encodeURIComponent(raw.slug)}" style="display:inline-block;margin-top:24px;padding:14px 28px;background:${vars.primaryColor};color:#ffffff;border-radius:50px;text-decoration:none;font-weight:600;font-size:14px;">Explore our resort →</a>
     <p style="color:#6b7280;line-height:1.6;margin-top:24px;">See you soon!<br/><strong>${vars.tenantName} Team</strong></p>
-  `,
+  `; },
 
-  POST_STAY: (vars: { guestName: string; tenantName: string; primaryColor: string; slug: string; apiUrl: string }) => `
+  POST_STAY: (raw: { guestName: string; tenantName: string; primaryColor: string; slug: string; apiUrl: string }) => { const vars = escapeVars(raw); return `
     <h2 style="margin:0 0 16px;font-size:24px;color:#111827;">Thank you for staying with us 🙏</h2>
     <p style="color:#6b7280;line-height:1.6;">Hi ${vars.guestName},</p>
     <p style="color:#6b7280;line-height:1.6;">It was a pleasure hosting you at <strong>${vars.tenantName}</strong>. We hope your stay was everything you'd hoped for.</p>
     <p style="color:#6b7280;line-height:1.6;">We'd love to hear your thoughts — your feedback helps us improve for every future guest.</p>
-    <a href="${vars.apiUrl}/${vars.slug}#feedback" style="display:inline-block;margin-top:24px;padding:14px 28px;background:${vars.primaryColor};color:#ffffff;border-radius:50px;text-decoration:none;font-weight:600;font-size:14px;">Share your feedback →</a>
+    <a href="${vars.apiUrl}/${encodeURIComponent(raw.slug)}#feedback" style="display:inline-block;margin-top:24px;padding:14px 28px;background:${vars.primaryColor};color:#ffffff;border-radius:50px;text-decoration:none;font-weight:600;font-size:14px;">Share your feedback →</a>
     <p style="color:#6b7280;line-height:1.6;margin-top:24px;">We hope to welcome you back soon!<br/><strong>${vars.tenantName} Team</strong></p>
-  `,
+  `; },
 
-  WIN_BACK: (vars: { guestName: string; tenantName: string; primaryColor: string; accentColor: string; slug: string; apiUrl: string }) => `
+  WIN_BACK: (raw: { guestName: string; tenantName: string; primaryColor: string; accentColor: string; slug: string; apiUrl: string }) => { const vars = escapeVars(raw); return `
     <h2 style="margin:0 0 16px;font-size:24px;color:#111827;">We miss you, ${vars.guestName}! 💚</h2>
     <p style="color:#6b7280;line-height:1.6;">It's been a while since your last visit to <strong>${vars.tenantName}</strong>, and we'd love to welcome you back.</p>
     <div style="background:linear-gradient(135deg,${vars.primaryColor}15,${vars.accentColor}15);border-radius:12px;padding:24px;margin:24px 0;text-align:center;">
       <p style="margin:0 0 8px;font-size:28px;font-weight:700;color:${vars.primaryColor};">Special Offer</p>
       <p style="margin:0;color:#374151;font-size:16px;">Mention this email to receive a <strong>10% discount</strong> on your next booking.</p>
     </div>
-    <a href="${vars.apiUrl}/${vars.slug}#booking" style="display:inline-block;padding:14px 28px;background:${vars.primaryColor};color:#ffffff;border-radius:50px;text-decoration:none;font-weight:600;font-size:14px;">Book your return stay →</a>
+    <a href="${vars.apiUrl}/${encodeURIComponent(raw.slug)}#booking" style="display:inline-block;padding:14px 28px;background:${vars.primaryColor};color:#ffffff;border-radius:50px;text-decoration:none;font-weight:600;font-size:14px;">Book your return stay →</a>
     <p style="color:#6b7280;line-height:1.6;margin-top:24px;">We look forward to seeing you again!<br/><strong>${vars.tenantName} Team</strong></p>
-  `,
+  `; },
 
-  BIRTHDAY: (vars: { guestName: string; tenantName: string; primaryColor: string; accentColor: string; slug: string; apiUrl: string }) => `
+  BIRTHDAY: (raw: { guestName: string; tenantName: string; primaryColor: string; accentColor: string; slug: string; apiUrl: string }) => { const vars = escapeVars(raw); return `
     <h2 style="margin:0 0 16px;font-size:24px;color:#111827;text-align:center;">🎂 Happy Birthday, ${vars.guestName}!</h2>
     <p style="color:#6b7280;line-height:1.6;text-align:center;">Wishing you a wonderful birthday from all of us at <strong>${vars.tenantName}</strong>.</p>
     <div style="text-align:center;font-size:48px;margin:24px 0;">🎉🥂🌟</div>
@@ -183,8 +213,8 @@ export const SEQUENCE_TEMPLATES = {
       <p style="margin:0;color:#374151;">Complimentary room upgrade + welcome amenities on your birthday stay.</p>
     </div>
     <div style="text-align:center;margin-top:28px;">
-      <a href="${vars.apiUrl}/${vars.slug}#booking" style="display:inline-block;padding:14px 28px;background:${vars.accentColor};color:#1a1a1a;border-radius:50px;text-decoration:none;font-weight:700;font-size:14px;">Claim your birthday treat →</a>
+      <a href="${vars.apiUrl}/${encodeURIComponent(raw.slug)}#booking" style="display:inline-block;padding:14px 28px;background:${vars.accentColor};color:#1a1a1a;border-radius:50px;text-decoration:none;font-weight:700;font-size:14px;">Claim your birthday treat →</a>
     </div>
     <p style="color:#6b7280;line-height:1.6;margin-top:24px;text-align:center;">With love,<br/><strong>${vars.tenantName} Team</strong></p>
-  `,
+  `; },
 };
